@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1.7
+FROM eclipse-temurin:21-jre-alpine
+ARG APP_VERSION=dev
+ARG MODULE=service
+RUN apk add --no-cache curl
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=America/Lima"
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      pe.clinica.cardenas.module="${MODULE}"
+WORKDIR /app
+COPY app.jar /app/app.jar
+ENTRYPOINT ["java","-jar","/app/app.jar"]

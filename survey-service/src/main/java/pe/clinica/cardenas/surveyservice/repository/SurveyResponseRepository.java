@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.surveyservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.surveyservice.domain.SurveyResponse; import java.util.List; public interface SurveyResponseRepository extends JpaRepository<SurveyResponse,Long>{List<SurveyResponse> findTop500ByOrderBySubmittedAtDesc();}

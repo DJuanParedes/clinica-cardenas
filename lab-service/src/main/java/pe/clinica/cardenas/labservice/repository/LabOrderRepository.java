@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.labservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.labservice.domain.LabOrder; import java.util.List; public interface LabOrderRepository extends JpaRepository<LabOrder,Long>{List<LabOrder> findAllByOrderByExpectedDateAsc();}

@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.operationsservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.operationsservice.domain.Equipment; import java.util.List; public interface EquipmentRepository extends JpaRepository<Equipment,Long>{List<Equipment> findAllByOrderByNextMaintenanceAsc();}

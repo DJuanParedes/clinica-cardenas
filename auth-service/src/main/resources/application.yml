@@ -1,0 +1,68 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: auth-service
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:mysql}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  otp:
+    provider: ${OTP_PROVIDER:local}
+    local-code: ${LOCAL_OTP_CODE:}
+    email:
+      from: ${MAIL_FROM:${MAIL_USERNAME:}}
+      ttl-minutes: ${MAIL_OTP_TTL_MINUTES:10}
+    twilio:
+      service-sid: ${TWILIO_VERIFY_SERVICE_SID:}
+      api-key: ${TWILIO_API_KEY:}
+      api-secret: ${TWILIO_API_SECRET:}
+management:
+  health:
+    mail:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+bootstrap:
+  admin:
+    name: ${BOOTSTRAP_ADMIN_NAME}
+    email: ${BOOTSTRAP_ADMIN_EMAIL}
+    phone: ${BOOTSTRAP_ADMIN_PHONE}
+    recovery-channel: ${BOOTSTRAP_ADMIN_RECOVERY_CHANNEL}
+
+services:
+  appointments: ${APPOINTMENT_SERVICE_URL:http://localhost:8083}

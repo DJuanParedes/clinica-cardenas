@@ -1,0 +1,38 @@
+.git
+.idea
+**/target
+frontend/node_modules
+frontend/dist
+**/data
+*.zip
+
+# Secretos y archivos de produccion
+.env
+.env.*
+*.env
+*.env.*
+
+# Artefactos de validacion/diagnostico que no deben inflar el contexto Docker
+build-logs
+*.log
+DIAGNOSTICO-CLINICA.txt
+COMPILACION-COMPLETA.txt
+PRUEBA-FUNCIONAL.txt
+VALIDACION-OK.txt
+COMPILACION-ACTUAL.txt
+PREVALIDACION.txt
+CLASIFICACION-ERRORES.txt
+startup-logs
+
+# No son necesarios para compilar los microservicios Java
+docs
+postman
+frontend
+deploy
+*.md
+*.bat
+*.ps1
+*.sh
+
+# Artefactos Java exportados temporalmente al host durante la instalacion
+build-artifacts

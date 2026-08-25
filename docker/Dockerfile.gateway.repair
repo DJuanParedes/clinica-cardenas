@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7
+FROM maven:3.9.11-eclipse-temurin-21 AS build
+WORKDIR /workspace
+ENV MAVEN_OPTS="-Xmx768m -XX:MaxMetaspaceSize=384m"
+COPY . .
+RUN --mount=type=cache,id=clinica-cardenas-m2,target=/root/.m2 \
+    mvn -q -pl api-gateway -am \
+      -Dmaven.wagon.http.retryHandler.count=3 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=60 \
+      -DskipTests package \
+    && jar="$(find api-gateway/target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | head -n 1)" \
+    && test -n "$jar" \
+    && mkdir -p /gateway \
+    && cp "$jar" /gateway/app.jar \
+    && grep -q 'WebClient.builder()' api-gateway/src/main/java/pe/clinica/cardenas/gateway/ActiveAccountValidationFilter.java \
+    && ! grep -q 'WebClient.Builder builder' api-gateway/src/main/java/pe/clinica/cardenas/gateway/ActiveAccountValidationFilter.java \
+    && grep -q 'CONTENT_ROUTE_URI:lb://CONTENT-SERVICE' api-gateway/src/main/resources/application.yml \
+    && grep -q 'AUTH_ROUTE_URI:lb://AUTH-SERVICE' api-gateway/src/main/resources/application.yml \
+    && grep -q 'validateActiveSession(authorization)' api-gateway/src/main/java/pe/clinica/cardenas/gateway/ActiveAccountValidationFilter.java \
+    && grep -q '.timeout(authValidationTimeout)' api-gateway/src/main/java/pe/clinica/cardenas/gateway/ActiveAccountValidationFilter.java \
+    && grep -q '.flatMap(validationStatus' api-gateway/src/main/java/pe/clinica/cardenas/gateway/ActiveAccountValidationFilter.java
+
+FROM eclipse-temurin:21-jre-alpine
+ARG APP_VERSION=dev
+RUN apk add --no-cache curl
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=America/Lima"
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      pe.clinica.cardenas.module="api-gateway" \
+      pe.clinica.cardenas.gateway.runtime="docker-dns-auth-scope-v3"
+WORKDIR /app
+COPY --from=build /gateway/app.jar /app/app.jar
+ENTRYPOINT ["java","-jar","/app/app.jar"]

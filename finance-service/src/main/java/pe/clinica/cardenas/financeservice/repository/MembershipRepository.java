@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.financeservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.financeservice.domain.Membership; import java.util.List; public interface MembershipRepository extends JpaRepository<Membership,Long>{List<Membership> findAllByOrderByEndDateAsc();}

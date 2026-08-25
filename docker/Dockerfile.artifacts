@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1.7
+FROM maven:3.9.11-eclipse-temurin-21 AS build
+WORKDIR /workspace
+
+# Compila todo Java una sola vez. Las dependencias Maven se conservan en cache BuildKit.
+COPY . .
+RUN --mount=type=cache,id=clinica-cardenas-m2,target=/root/.m2 \
+    mvn -q -T 2 \
+      -Dmaven.wagon.http.retryHandler.count=3 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=60 \
+      -DskipTests package \
+    && mkdir -p /runtime \
+    && for module in \
+      eureka-server api-gateway auth-service patient-service appointment-service \
+      clinical-service finance-service lab-service operations-service inventory-service \
+      dashboard-service content-service encounter-service survey-service backup-service; do \
+         jar="$(find "$module/target" -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | head -n 1)"; \
+         test -n "$jar"; \
+         mkdir -p "/runtime/$module"; \
+         cp "$jar" "/runtime/$module/app.jar"; \
+       done \
+    && test "$(find /runtime -mindepth 2 -maxdepth 2 -type f -name 'app.jar' | wc -l)" -eq 15
+
+# Esta etapa se exporta al host con --output type=local.
+# No crea una imagen gigante de artefactos dentro de Docker Desktop.
+FROM scratch AS export
+COPY --from=build /runtime /runtime
+COPY --from=build /workspace/VERSION.txt /BUILD_VERSION.txt

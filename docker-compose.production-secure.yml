@@ -1,0 +1,660 @@
+name: clinica-cardenas-prod
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: clinica-mysql
+    command:
+    - --character-set-server=utf8mb4
+    - --collation-server=utf8mb4_0900_ai_ci
+    - --innodb-buffer-pool-size=512M
+    - --max-connections=200
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Configure MYSQL_ROOT_PASSWORD}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Configure AUTH_DB_PASSWORD}
+      PATIENT_DB_PASSWORD: ${PATIENT_DB_PASSWORD:?Configure PATIENT_DB_PASSWORD}
+      APPOINTMENT_DB_PASSWORD: ${APPOINTMENT_DB_PASSWORD:?Configure APPOINTMENT_DB_PASSWORD}
+      CLINICAL_DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?Configure CLINICAL_DB_PASSWORD}
+      FINANCE_DB_PASSWORD: ${FINANCE_DB_PASSWORD:?Configure FINANCE_DB_PASSWORD}
+      LAB_DB_PASSWORD: ${LAB_DB_PASSWORD:?Configure LAB_DB_PASSWORD}
+      OPERATIONS_DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?Configure OPERATIONS_DB_PASSWORD}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD:?Configure INVENTORY_DB_PASSWORD}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?Configure CONTENT_DB_PASSWORD}
+      ENCOUNTER_DB_PASSWORD: ${ENCOUNTER_DB_PASSWORD:?Configure ENCOUNTER_DB_PASSWORD}
+      SURVEY_DB_PASSWORD: ${SURVEY_DB_PASSWORD:?Configure SURVEY_DB_PASSWORD}
+    volumes:
+    - mysql-data:/var/lib/mysql
+    - ./database/mysql/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h 127.0.0.1 -uroot --silent
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - db
+  eureka-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: eureka-server
+    container_name: clinica-eureka-server
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8761/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    environment: {}
+    networks:
+    - app
+  auth-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: auth-service
+    container_name: clinica-auth-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:?Configure BOOTSTRAP_ADMIN_NAME}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?Configure BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PHONE: ${BOOTSTRAP_ADMIN_PHONE:?Configure BOOTSTRAP_ADMIN_PHONE}
+      BOOTSTRAP_ADMIN_RECOVERY_CHANNEL: ${BOOTSTRAP_ADMIN_RECOVERY_CHANNEL:?Configure BOOTSTRAP_ADMIN_RECOVERY_CHANNEL}
+      OTP_PROVIDER: ${OTP_PROVIDER:?Configure OTP_PROVIDER}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_OTP_TTL_MINUTES: ${MAIL_OTP_TTL_MINUTES:-10}
+      TWILIO_VERIFY_SERVICE_SID: ${TWILIO_VERIFY_SERVICE_SID:-}
+      TWILIO_API_KEY: ${TWILIO_API_KEY:-}
+      TWILIO_API_SECRET: ${TWILIO_API_SECRET:-}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      DB_URL: jdbc:mysql://mysql:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: auth_user
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:?Configure AUTH_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8081/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  patient-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: patient-service
+    container_name: clinica-patient-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      ENCOUNTER_SERVICE_URL: http://encounter-service:8092
+      DB_URL: jdbc:mysql://mysql:3306/patient_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: patient_user
+      DB_PASSWORD: ${PATIENT_DB_PASSWORD:?Configure PATIENT_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8082/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  appointment-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: appointment-service
+    container_name: clinica-appointment-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      ENCOUNTER_SERVICE_URL: http://encounter-service:8092
+      DB_URL: jdbc:mysql://mysql:3306/appointment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: appointment_user
+      DB_PASSWORD: ${APPOINTMENT_DB_PASSWORD:?Configure APPOINTMENT_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8083/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  clinical-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: clinical-service
+    container_name: clinica-clinical-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DOCUMENT_STORAGE_PATH: /app/storage
+      DB_URL: jdbc:mysql://mysql:3306/clinical_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: clinical_user
+      DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?Configure CLINICAL_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    volumes:
+    - clinical-documents:/app/storage
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8084/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  finance-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: finance-service
+    container_name: clinica-finance-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      ENCOUNTER_SERVICE_URL: http://encounter-service:8092
+      LAB_SERVICE_URL: http://lab-service:8086
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      DB_URL: jdbc:mysql://mysql:3306/finance_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: finance_user
+      DB_PASSWORD: ${FINANCE_DB_PASSWORD:?Configure FINANCE_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8085/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  lab-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: lab-service
+    container_name: clinica-lab-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DB_URL: jdbc:mysql://mysql:3306/lab_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: lab_user
+      DB_PASSWORD: ${LAB_DB_PASSWORD:?Configure LAB_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8086/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  operations-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: operations-service
+    container_name: clinica-operations-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DB_URL: jdbc:mysql://mysql:3306/operations_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: operations_user
+      DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?Configure OPERATIONS_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8087/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  inventory-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: inventory-service
+    container_name: clinica-inventory-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DB_URL: jdbc:mysql://mysql:3306/inventory_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: inventory_user
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD:?Configure INVENTORY_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8091/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  dashboard-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: dashboard-service
+    container_name: clinica-dashboard-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: production
+      PATIENT_SERVICE_URL: http://patient-service:8082
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      CLINICAL_SERVICE_URL: http://clinical-service:8084
+      FINANCE_SERVICE_URL: http://finance-service:8085
+      LAB_SERVICE_URL: http://lab-service:8086
+      OPERATIONS_SERVICE_URL: http://operations-service:8087
+      CONTENT_SERVICE_URL: http://content-service:8089
+      INVENTORY_SERVICE_URL: http://inventory-service:8091
+      ENCOUNTER_SERVICE_URL: http://encounter-service:8092
+      SURVEY_SERVICE_URL: http://survey-service:8093
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      patient-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      clinical-service:
+        condition: service_healthy
+      finance-service:
+        condition: service_healthy
+      lab-service:
+        condition: service_healthy
+      operations-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      encounter-service:
+        condition: service_healthy
+      survey-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8088/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+  content-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: content-service
+    container_name: clinica-content-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DB_URL: jdbc:mysql://mysql:3306/content_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: content_user
+      DB_PASSWORD: ${CONTENT_DB_PASSWORD:?Configure CONTENT_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8089/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  backup-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: backup-service
+    container_name: clinica-backup-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      PATIENT_SERVICE_URL: http://patient-service:8082
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      CLINICAL_SERVICE_URL: http://clinical-service:8084
+      FINANCE_SERVICE_URL: http://finance-service:8085
+      LAB_SERVICE_URL: http://lab-service:8086
+      OPERATIONS_SERVICE_URL: http://operations-service:8087
+      DASHBOARD_SERVICE_URL: http://dashboard-service:8088
+      CONTENT_SERVICE_URL: http://content-service:8089
+      INVENTORY_SERVICE_URL: http://inventory-service:8091
+      ENCOUNTER_SERVICE_URL: http://encounter-service:8092
+      SURVEY_SERVICE_URL: http://survey-service:8093
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      patient-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      clinical-service:
+        condition: service_healthy
+      finance-service:
+        condition: service_healthy
+      lab-service:
+        condition: service_healthy
+      operations-service:
+        condition: service_healthy
+      dashboard-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      encounter-service:
+        condition: service_healthy
+      survey-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8094/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: api-gateway
+    container_name: clinica-api-gateway
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: production
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_VALIDATION_TIMEOUT_SECONDS: "3"
+      CORS_ALLOWED_ORIGIN_1: https://${DOMAIN}
+      CORS_ALLOWED_ORIGIN_2: https://${DOMAIN}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      patient-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      clinical-service:
+        condition: service_healthy
+      finance-service:
+        condition: service_healthy
+      lab-service:
+        condition: service_healthy
+      operations-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      dashboard-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      encounter-service:
+        condition: service_healthy
+      survey-service:
+        condition: service_healthy
+      backup-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8090/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+  frontend:
+    build: ./frontend
+    container_name: clinica-frontend
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      CLINIC_ID: ${CLINIC_ID:-CARDENAS}
+      CLINIC_NAME: ${CLINIC_NAME:-Clínica Cárdenas}
+      CLINIC_SHORT_NAME: ${CLINIC_SHORT_NAME:-Cárdenas}
+      CLINIC_TAGLINE: ${CLINIC_TAGLINE:-Atención odontológica en La Floresta}
+      CLINIC_DESCRIPTION: ${CLINIC_DESCRIPTION:-Atención odontológica para pacientes de La Floresta y zonas cercanas.}
+      CLINIC_LOGO_URL: ${CLINIC_LOGO_URL:-/brand/logo-cardenas.svg}
+      CLINIC_HERO_IMAGE_URL: ${CLINIC_HERO_IMAGE_URL:-/brand/cardenas-fachada.png}
+      CLINIC_PRIMARY_COLOR: ${CLINIC_PRIMARY_COLOR:-#3B78A6}
+      CLINIC_PRIMARY_DARK_COLOR: ${CLINIC_PRIMARY_DARK_COLOR:-#245C80}
+      CLINIC_ACCENT_COLOR: ${CLINIC_ACCENT_COLOR:-#D06B4F}
+      CLINIC_ACCENT_DARK_COLOR: ${CLINIC_ACCENT_DARK_COLOR:-#B8533C}
+      CLINIC_SIDEBAR_DARK_COLOR: ${CLINIC_SIDEBAR_DARK_COLOR:-#193D52}
+      CLINIC_PHONE: ${CLINIC_PHONE:-}
+      CLINIC_EMAIL: ${CLINIC_EMAIL:-}
+      CLINIC_ADDRESS: ${CLINIC_ADDRESS:-La Floresta, Lima, Perú}
+      CLINIC_WORKING_HOURS: ${CLINIC_WORKING_HOURS:-Atención previa coordinación}
+    volumes:
+    - ./clinic-brand:/usr/share/nginx/html/clinic-brand:ro
+    networks:
+    - app
+  encounter-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: encounter-service
+    container_name: clinica-encounter-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      PATIENT_SERVICE_URL: http://patient-service:8082
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      FINANCE_SERVICE_URL: http://finance-service:8085
+      SURVEY_SERVICE_URL: http://survey-service:8093
+      DB_URL: jdbc:mysql://mysql:3306/encounter_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: encounter_user
+      DB_PASSWORD: ${ENCOUNTER_DB_PASSWORD:?Configure ENCOUNTER_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      patient-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      finance-service:
+        condition: service_healthy
+      survey-service:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8092/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  survey-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: survey-service
+    container_name: clinica-survey-service
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: mysql
+      DB_URL: jdbc:mysql://mysql:3306/survey_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8
+      DB_USER: survey_user
+      DB_PASSWORD: ${SURVEY_DB_PASSWORD:?Configure SURVEY_DB_PASSWORD}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8093/actuator/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    networks:
+    - app
+    - db
+  caddy:
+    image: caddy:2.11.4-alpine
+    container_name: clinica-caddy
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Configure DOMAIN}
+    ports:
+    - 80:80
+    - 443:443
+    - 443:443/udp
+    volumes:
+    - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    - caddy-data:/data
+    - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+    networks:
+    - app
+networks:
+  app:
+    driver: bridge
+  db:
+    driver: bridge
+    internal: true
+volumes:
+  mysql-data: null
+  clinical-documents: null
+  caddy-data: null
+  caddy-config: null

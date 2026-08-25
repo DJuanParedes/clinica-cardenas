@@ -1,0 +1,37 @@
+server:
+  port: 8084
+spring:
+  application:
+    name: clinical-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:mysql}
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+clinical:
+  storage:
+    path: ${DOCUMENT_STORAGE_PATH:./storage}

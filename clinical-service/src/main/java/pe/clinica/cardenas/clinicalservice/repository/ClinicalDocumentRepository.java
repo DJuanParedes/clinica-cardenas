@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.clinicalservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.clinicalservice.domain.ClinicalDocument; import java.util.List; public interface ClinicalDocumentRepository extends JpaRepository<ClinicalDocument,Long>{List<ClinicalDocument> findAllByOrderByUploadedAtDesc();}

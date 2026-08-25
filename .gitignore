@@ -1,0 +1,97 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.railway.example
+*.env
+*.env.*
+!*.env.example
+!.env.production.example
+!.env.railway.example
+
+# Credentials, certificates, and private keys
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+credentials*.json
+service-account*.json
+secrets/
+
+# Patient, database, backup, and runtime data
+**/data/
+**/uploads/
+**/backups/
+**/backup/
+**/dumps/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sql.gz
+*.dump
+*.bak
+
+# Logs, diagnostics, and generated status reports
+*.log
+logs/
+**/logs/
+build-logs/
+startup-logs/
+DIAGNOSTICO-CLINICA.txt
+*-ESTADO.txt
+COMPILACION-ACTUAL.txt
+COMPILACION-COMPLETA.txt
+PREVALIDACION.txt
+PRUEBA-FUNCIONAL.txt
+VALIDACION-ACTUAL.txt
+VALIDACION-OK.txt
+VERIFICACION-FUNCIONAL.txt
+CHECKSUMS.sha256
+MANIFEST.txt
+MYSQL-DATOS.txt
+
+# Java / Maven build output
+**/target/
+*.class
+*.jar
+*.war
+build-artifacts/
+.build-*/
+
+# Angular / Node build output and dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+node_modules/
+dist/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE, OS, and local tooling
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+Desktop.ini
+.guide-work/
+tmp/
+temp/
+
+# Archives and local exports
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Runtime branding can contain organization-specific/private assets.
+# Keep the instructions so deployments know how to provide the assets.
+clinic-brand/*
+!clinic-brand/LEEME.txt

@@ -1,0 +1,1411 @@
+{
+  "info": {
+    "_postman_id": "b8e72dbc-ec0b-4b53-91be-4c9d60000001",
+    "name": "Clínica Cárdenas — V4.9.17",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colección de prueba V4.9.17. No contiene contraseñas reales; configura variables de entorno/colección antes de ejecutar autenticación."
+  },
+  "item": [
+    {
+      "name": "Login administrador",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": true
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set('token', json.token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/dashboard",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "dashboard"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar pacientes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/patients",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "patients"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear paciente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/patients",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "patients"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Paciente de Prueba\",\n  \"dni\": \"71234567\",\n  \"birthDate\": \"1995-05-12\",\n  \"district\": \"Cayma\",\n  \"address\": \"Dirección de prueba\",\n  \"phone\": \"987123456\",\n  \"email\": \"prueba@example.com\",\n  \"occupation\": \"Docente\",\n  \"emergencyContact\": \"Contacto - Familiar\",\n  \"emergencyPhone\": \"987123457\",\n  \"currentCondition\": \"Evaluación general\",\n  \"familyHistory\": \"Sin antecedentes\",\n  \"allergies\": \"Ninguna\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar citas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/appointments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "appointments"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear cita",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/appointments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "appointments"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"patientId\": 1,\n  \"patientName\": \"Andrea Flores Mendoza\",\n  \"doctorName\": \"Dra. Valeria Cárdenas\",\n  \"specialty\": \"Odontología general\",\n  \"chair\": \"Sillón 3\",\n  \"startAt\": \"2026-08-10T16:00:00\",\n  \"endAt\": \"2026-08-10T17:00:00\",\n  \"reason\": \"Evaluación de prueba\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar emergencias",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/emergencies",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "emergencies"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar laboratorio",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/lab-orders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "lab-orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar presupuestos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/budgets",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "budgets"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar comisiones",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/commissions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "commissions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar membresías",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/memberships",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "memberships"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar seguimientos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/operations/follow-ups",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "operations",
+            "follow-ups"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar reclamos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/operations/complaints",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "operations",
+            "complaints"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar empleados",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/operations/employees",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "operations",
+            "employees"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar equipos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/operations/equipment",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "operations",
+            "equipment"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar documentos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/operations/documents",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "operations",
+            "documents"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Reporte resumen",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/reports/summary",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "reports",
+            "summary"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Solicitud pública de cita",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/inquiries",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "inquiries"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Paciente Web\",\n  \"phone\": \"987654321\",\n  \"specialty\": \"Evaluación general\",\n  \"message\": \"Deseo una cita\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Listar solicitudes web",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/inquiries",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "inquiries"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear registro de respaldo",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/modules/backups",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "modules",
+            "backups"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Respaldo manual\",\n  \"subject\": \"Bases demo\",\n  \"detail\": \"Prueba desde Postman\",\n  \"responsible\": \"Administrador\",\n  \"eventDate\": \"2026-08-04\",\n  \"amount\": 0,\n  \"status\": \"COMPLETADO\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Consultar odontograma",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/odontograms/Andrea%20Flores%20Mendoza",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "odontograms",
+            "Andrea%20Flores%20Mendoza"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar usuarios",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar doctores",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/scheduling/doctors",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "scheduling",
+            "doctors"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar sillones",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/scheduling/chairs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "scheduling",
+            "chairs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar inventario",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "inventory",
+            "items"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear insumo",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "inventory",
+            "items"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"INS-100\",\n  \"name\": \"Guantes de nitrilo\",\n  \"category\": \"BIOSEGURIDAD\",\n  \"unit\": \"CAJA\",\n  \"currentStock\": 20,\n  \"minimumStock\": 5,\n  \"lot\": \"L-100\",\n  \"expiryDate\": \"2027-12-31\",\n  \"unitCost\": 28.5,\n  \"inventoryStatus\": \"DISPONIBLE\",\n  \"active\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Registrar movimiento inventario",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "inventory",
+            "movements"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"itemId\": 1,\n  \"movementType\": \"ENTRADA\",\n  \"quantity\": 10,\n  \"reason\": \"Compra a proveedor\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar pagos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/payments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "payments"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Registrar pago",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/payments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "payments"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"patientName\": \"Andrea Flores Mendoza\",\n  \"concept\": \"Adelanto\",\n  \"amount\": 150,\n  \"paymentMethod\": \"YAPE\",\n  \"reference\": \"OPERACION-001\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Resumen financiero",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/summary",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "summary"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar cajas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/cash-sessions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "cash-sessions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Abrir caja",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/cash-sessions/open",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "cash-sessions",
+            "open"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"branch\": \"Sede principal\",\n  \"openingAmount\": 200,\n  \"notes\": \"Apertura diaria\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar gastos",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/finance/expenses",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "finance",
+            "expenses"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Cambiar contraseña",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "disabled": false
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-password",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "change-password"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{admin_password}}\",\n  \"newPassword\": \"{{admin_new_password}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Novedades 4.0 — Atención 360 y calidad",
+      "item": [
+        {
+          "name": "Buscar paciente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/search?term=Andrea",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "term",
+                  "value": "Andrea"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paciente 360",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encounters/patients/{{patientId}}/360",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encounters",
+                "patients",
+                "{{patientId}}",
+                "360"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sincronizar citas anteriores",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encounters/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encounters",
+                "sync"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "Mapa de sillones",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encounters/chairs/map",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encounters",
+                "chairs",
+                "map"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Analítica mensual por sillón",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encounters/chairs/analytics?from=2026-08-01&to=2026-08-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encounters",
+                "chairs",
+                "analytics"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-08-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-08-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear meta por sillón",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chair-goals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chair-goals"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chairName\": \"Sillón 1\",\n  \"periodType\": \"MENSUAL\",\n  \"periodStart\": \"2026-08-01\",\n  \"productionGoal\": 20000,\n  \"collectionGoal\": 16000,\n  \"utilizationGoal\": 75,\n  \"patientGoal\": 80\n}"
+            }
+          }
+        },
+        {
+          "name": "Guardar filtro financiero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/saved-filters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "saved-filters"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sillón 1 agosto\",\n  \"reportType\": \"ANALISIS_SILLON\",\n  \"parametersJson\": \"{\\\"from\\\":\\\"2026-08-01\\\",\\\"to\\\":\\\"2026-08-31\\\"}\",\n  \"shared\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Generar código de encuesta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/surveys/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "surveys",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encounterId\": \"{{encounterId}}\",\n  \"patientId\": \"{{patientId}}\",\n  \"doctorName\": \"Dra. Valeria Cárdenas\",\n  \"specialty\": \"Rehabilitación oral\",\n  \"branch\": \"Sede principal\",\n  \"chairName\": \"Sillón 1\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Enviar encuesta pública",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/public/surveys",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "surveys"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyCode\": \"\",\n  \"receptionScore\": 5,\n  \"kindnessScore\": 5,\n  \"waitTimeScore\": 4,\n  \"explanationScore\": 5,\n  \"doctorTreatmentScore\": 5,\n  \"cleanlinessScore\": 5,\n  \"comfortScore\": 5,\n  \"priceClarityScore\": 4,\n  \"overallScore\": 5,\n  \"recommend\": true,\n  \"anonymous\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Resumen de satisfacción",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/surveys/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "surveys",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Indicadores de calidad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encounters/quality/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encounters",
+                "quality",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Auditoría central",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/audit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "audit"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Respaldos verificados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/governance/backups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "governance",
+                "backups"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_email",
+      "value": ""
+    },
+    {
+      "key": "admin_password",
+      "value": ""
+    },
+    {
+      "key": "admin_new_password",
+      "value": ""
+    }
+  ]
+}

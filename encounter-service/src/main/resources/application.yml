@@ -1,0 +1,35 @@
+server:
+  port: 8092
+spring:
+  application:
+    name: encounter-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:mysql}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+services:
+  patients: ${PATIENT_SERVICE_URL:http://localhost:8082}
+  appointments: ${APPOINTMENT_SERVICE_URL:http://localhost:8083}
+  finance: ${FINANCE_SERVICE_URL:http://localhost:8085}
+  surveys: ${SURVEY_SERVICE_URL:http://localhost:8093}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized

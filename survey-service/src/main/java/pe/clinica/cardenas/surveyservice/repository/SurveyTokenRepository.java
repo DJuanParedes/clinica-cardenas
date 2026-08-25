@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.surveyservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.surveyservice.domain.SurveyToken; import java.util.Optional; public interface SurveyTokenRepository extends JpaRepository<SurveyToken,Long>{Optional<SurveyToken> findByCode(String code);}

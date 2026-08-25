@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-labelledby="title desc">
+<title id="title">Clínica Cárdenas</title><desc id="desc">Símbolo dental azul y naranja inspirado en la identidad visual de Clínica Cárdenas.</desc>
+<defs><linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4A86B2"/><stop offset="1" stop-color="#2F6E9C"/></linearGradient><linearGradient id="orange" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#DD7658"/><stop offset="1" stop-color="#C45B43"/></linearGradient></defs>
+<path d="M174 33C151 13 119 5 87 12 48 20 18 51 13 91c-5 42 17 82 54 101 33 17 75 14 105-9 19-15 31-35 36-57-14 30-41 51-73 56-39 6-78-14-96-50-18-35-11-78 18-105 28-27 72-34 106-17 7 4 14 8 20 13l-9 10z" fill="url(#orange)"/>
+<path d="M70 84c13-6 22-20 38-21 22-2 35 17 53 26 11 6 21 6 32 3-3 24-9 48-21 68-8 14-19 25-31 25-14 0-21-18-31-24-10 6-18 24-31 24-15 0-27-17-35-35-7-16-11-34-12-52 11 2 23-2 38-14z" fill="url(#blue)"/>
+<path d="M48 75c23 10 47 3 64-17 9-10 22-17 34-17 19 0 31 13 37 27-21 10-40 7-56-4-15-11-24-9-36 2-12 12-26 18-43 16V75z" fill="url(#orange)"/>
+</svg>

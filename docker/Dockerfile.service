@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.7
+FROM maven:3.9.11-eclipse-temurin-21 AS build-all
+WORKDIR /workspace
+COPY . .
+RUN --mount=type=cache,id=clinica-cardenas-m2,target=/root/.m2 \
+    mvn -q \
+      -Dmaven.wagon.http.retryHandler.count=3 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=60 \
+      -DskipTests package \
+    && mkdir -p /artifacts \
+    && for module in \
+      eureka-server api-gateway auth-service patient-service appointment-service \
+      clinical-service finance-service lab-service operations-service inventory-service \
+      dashboard-service content-service encounter-service survey-service backup-service; do \
+         jar="$(find "$module/target" -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | head -n 1)"; \
+         test -n "$jar"; \
+         cp "$jar" "/artifacts/$module.jar"; \
+       done
+
+FROM eclipse-temurin:21-jre-alpine
+ARG MODULE
+RUN apk add --no-cache curl
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=America/Lima"
+WORKDIR /app
+COPY --from=build-all /artifacts/${MODULE}.jar /app/app.jar
+ENTRYPOINT ["java","-jar","/app/app.jar"]

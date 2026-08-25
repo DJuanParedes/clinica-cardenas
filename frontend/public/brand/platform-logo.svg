@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Plataforma multiclínica</title>
+  <desc id="desc">Símbolo neutral de una red de clínicas conectadas</desc>
+  <defs>
+    <linearGradient id="g" x1="18" y1="16" x2="110" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#256D7B"/>
+      <stop offset="1" stop-color="#173A59"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#g)"/>
+  <path d="M64 27c-8 0-14 6-14 14v9H41c-8 0-14 6-14 14s6 14 14 14h9v9c0 8 6 14 14 14s14-6 14-14v-9h9c8 0 14-6 14-14s-6-14-14-14h-9v-9c0-8-6-14-14-14Z" fill="#fff"/>
+  <circle cx="27" cy="31" r="6" fill="#57D1C9"/>
+  <circle cx="101" cy="31" r="6" fill="#57D1C9"/>
+  <circle cx="27" cy="97" r="6" fill="#57D1C9"/>
+  <circle cx="101" cy="97" r="6" fill="#57D1C9"/>
+  <path d="m32 35 14 13m50-13L82 48M32 93l14-13m50 13L82 80" fill="none" stroke="#57D1C9" stroke-width="4" stroke-linecap="round"/>
+</svg>

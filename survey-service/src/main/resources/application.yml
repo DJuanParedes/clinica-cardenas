@@ -1,0 +1,17 @@
+server: { port: 8093 }
+spring:
+  application: { name: survey-service }
+  profiles: { active: "${SPRING_PROFILES_ACTIVE:mysql}" }
+  jpa: { open-in-view: false }
+eureka:
+  client:
+    service-url: { defaultZone: "${EUREKA_URL:http://localhost:8761/eureka/}" }
+  instance: { prefer-ip-address: true }
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: 480
+management:
+  endpoints:
+    web:
+      exposure: { include: health,info,metrics }

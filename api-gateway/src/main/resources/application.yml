@@ -1,0 +1,112 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: "${AUTH_ROUTE_URI:lb://AUTH-SERVICE}"
+              predicates:
+                - "Path=/api/auth/**,/api/users/**,/api/clinics/**,/api/public/clinics/**"
+
+            - id: patient-service
+              uri: "${PATIENT_ROUTE_URI:lb://PATIENT-SERVICE}"
+              predicates:
+                - "Path=/api/patients/**"
+
+            - id: appointment-service
+              uri: "${APPOINTMENT_ROUTE_URI:lb://APPOINTMENT-SERVICE}"
+              predicates:
+                - "Path=/api/appointments/**,/api/scheduling/**"
+
+            - id: clinical-service
+              uri: "${CLINICAL_ROUTE_URI:lb://CLINICAL-SERVICE}"
+              predicates:
+                - "Path=/api/budgets/**,/api/operations/documents/**,/api/odontograms/**"
+
+            - id: finance-service
+              uri: "${FINANCE_ROUTE_URI:lb://FINANCE-SERVICE}"
+              predicates:
+                - "Path=/api/finance/**"
+
+            - id: lab-service
+              uri: "${LAB_ROUTE_URI:lb://LAB-SERVICE}"
+              predicates:
+                - "Path=/api/lab-orders/**"
+
+            - id: inventory-service
+              uri: "${INVENTORY_ROUTE_URI:lb://INVENTORY-SERVICE}"
+              predicates:
+                - "Path=/api/inventory/**"
+
+            - id: operations-service
+              uri: "${OPERATIONS_ROUTE_URI:lb://OPERATIONS-SERVICE}"
+              predicates:
+                - "Path=/api/emergencies/**,/api/operations/follow-ups/**,/api/operations/complaints/**,/api/operations/employees/**,/api/operations/equipment/**,/api/modules/**"
+
+            - id: encounter-service
+              uri: "${ENCOUNTER_ROUTE_URI:lb://ENCOUNTER-SERVICE}"
+              predicates:
+                - "Path=/api/encounters/**,/api/proformas/**,/api/treatments/**,/api/chair-goals/**,/api/saved-filters/**,/api/audit/**,/api/governance/**"
+
+            - id: survey-service
+              uri: "${SURVEY_ROUTE_URI:lb://SURVEY-SERVICE}"
+              predicates:
+                - "Path=/api/surveys/**,/api/public/surveys/**"
+
+            - id: dashboard-service
+              uri: "${DASHBOARD_ROUTE_URI:lb://DASHBOARD-SERVICE}"
+              predicates:
+                - "Path=/api/dashboard/**,/api/reports/**"
+
+            - id: backup-service
+              uri: "${BACKUP_ROUTE_URI:lb://BACKUP-SERVICE}"
+              predicates:
+                - "Path=/api/backups/**"
+
+            - id: content-service
+              uri: "${CONTENT_ROUTE_URI:lb://CONTENT-SERVICE}"
+              predicates:
+                - "Path=/api/public/**,/api/inquiries/**"
+
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - "${CORS_ALLOWED_ORIGIN_1:http://localhost:4200}"
+                  - "${CORS_ALLOWED_ORIGIN_2:http://localhost:8080}"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+services:
+  auth: ${AUTH_SERVICE_URL:http://localhost:8081}

@@ -1,0 +1,1 @@
+package pe.clinica.cardenas.clinicalservice.repository; import org.springframework.data.jpa.repository.JpaRepository; import pe.clinica.cardenas.clinicalservice.domain.Budget; import java.util.List; public interface BudgetRepository extends JpaRepository<Budget,Long>{List<Budget> findAllByOrderByCreatedAtDesc();}

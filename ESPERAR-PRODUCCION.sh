@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$ROOT"; ENV_FILE="${1:-.env.production}"; TIMEOUT="${2:-600}"
+fail(){ echo "PRODUCCION: $*" >&2; exit 1; }; getv(){ grep -m1 -E "^$1=" "$ENV_FILE" | cut -d= -f2- || true; }
+[[ -f "$ENV_FILE" ]] || fail "No existe $ENV_FILE"; domain="$(getv DOMAIN)"; [[ -n "$domain" ]] || fail "Falta DOMAIN"
+containers=(clinica-mysql clinica-eureka-server clinica-auth-service clinica-patient-service clinica-appointment-service clinica-clinical-service clinica-finance-service clinica-lab-service clinica-operations-service clinica-inventory-service clinica-dashboard-service clinica-content-service clinica-encounter-service clinica-survey-service clinica-backup-service clinica-api-gateway clinica-frontend clinica-caddy)
+end=$((SECONDS+TIMEOUT)); echo "Esperando 18 contenedores de producción..."; while (( SECONDS < end )); do pending=(); for name in "${containers[@]}"; do if ! docker inspect "$name" >/dev/null 2>&1; then pending+=("$name:no-creado"); continue; fi; state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$name" 2>/dev/null || true)"; [[ "$state" == healthy || "$state" == running ]] || pending+=("$name:$state"); done; ((${#pending[@]}==0)) && break; echo "Pendientes: ${pending[*]}"; sleep 8; done; (( SECONDS < end )) || fail "Timeout de contenedores"
+docker compose --env-file "$ENV_FILE" -f docker-compose.production-secure.yml exec -T api-gateway curl -fsS http://localhost:8090/actuator/health >/dev/null || fail "Gateway interno no saludable"
+https_end=$((SECONDS+TIMEOUT)); while (( SECONDS < https_end )); do if curl -fsS --max-time 20 "https://$domain/" >/dev/null 2>&1; then echo "OK - HTTPS público responde en https://$domain"; exit 0; fi; sleep 10; done; fail "HTTPS aún no responde"

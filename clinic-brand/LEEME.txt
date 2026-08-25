@@ -1,0 +1,12 @@
+Coloca aquí los recursos propios de la clínica.
+
+Nombres recomendados:
+- logo.svg o logo.png
+- fachada.jpg o fachada.png
+
+Después configura en .env:
+CLINIC_LOGO_URL=/clinic-brand/logo.svg
+CLINIC_HERO_IMAGE_URL=/clinic-brand/fachada.jpg
+
+El logo y la fachada son independientes para cada instalación. No guardes aquí
+documentos de pacientes ni archivos clínicos.

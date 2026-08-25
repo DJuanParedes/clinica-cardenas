@@ -1,0 +1,56 @@
+CLINICA CARDENAS V4.9.17 - MYSQL
+================================
+
+ESTA ENTREGA CONTIENE SOLO LA VERSION ACTUAL.
+
+BASE DE DATOS:
+  MySQL
+  Local para DBeaver: localhost:3307
+  Las contrasenas se generan en .env.
+
+PRIMERA VEZ / ACTUALIZACION:
+  1) Abre Docker Desktop.
+  2) Ejecuta 01-INSTALAR-O-ACTUALIZAR.bat
+
+USO DIARIO:
+  Ejecuta 02-INICIAR.bat
+  No recompila el sistema.
+  Si las imagenes existen pero faltan contenedores, los crea automaticamente.
+
+DETENER:
+  Ejecuta 03-DETENER.bat
+
+ESTADO:
+  Ejecuta 04-VER-ESTADO.bat
+
+DIAGNOSTICO:
+  Ejecuta 05-GENERAR-DIAGNOSTICO.bat
+
+PORTAL: http://localhost:8080
+MYSQL:  localhost:3307
+
+IMPORTANTE:
+  Los datos se guardan en el volumen mysql-data.
+  LIMPIAR-DATOS-LOCAL.bat elimina los datos locales y debe usarse solo si deseas reiniciar desde cero.
+  El instalador no convierte automaticamente datos existentes de otro motor de base de datos.
+
+RECUPERACION SIN RECOMPILAR:
+  Si Docker muestra 17 IMAGENES y 0 CONTENEDORES, ejecuta directamente 02-INICIAR.bat.
+  El sistema validara las imagenes, creara los 17 contenedores y arrancara sin Maven/Angular.
+
+NOTA DE INSTALACION: la reparación dirigida del Gateway construye desde la carpeta actual (`.`) para evitar problemas de comillas con rutas Windows.
+
+VALIDACION SIN REINSTALAR
+Si el sistema ya esta levantado, ejecuta 06-VALIDAR-SISTEMA.bat para repetir solo las pruebas funcionales sin recompilar ni recrear contenedores.
+
+
+VALIDACION FINAL DEL ESTADO ACTUAL
+  Si Gateway ya tiene docker-dns-auth-scope-v3, ejecuta 08-VALIDAR-FINAL.bat.
+  No recompila imagenes ni recrea contenedores sanos.
+  Si backup-service estaba detenido, lo inicia y exige health=UP antes de las pruebas.
+  El ruteo publico se valida por estructura JSON, sin comparar textos acentuados literalmente en PowerShell 5.1.
+
+CORRECCION DE SESION GATEWAY
+  El timeout de seguridad solo mide la validacion interna contra auth-service.
+  No limita el tiempo de la operacion clinica posterior.
+  Si el Gateway actual no tiene docker-dns-auth-scope-v3, ejecuta 07-REPARAR-RUTEO-Y-VALIDAR.bat.
