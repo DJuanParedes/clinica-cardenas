@@ -46,6 +46,7 @@ public class AuthController {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final OtpVerificationService otp;
+    private final pe.clinica.cardenas.authservice.service.SecurityAuditService audit;
     private String dummyPasswordHash;
 
     @PostConstruct
@@ -126,6 +127,7 @@ public class AuthController {
             log.warn("No se pudo iniciar OTP de recuperación para una cuenta registrada: {}", ex.getClass().getSimpleName());
             return ResetRequestResponse.generic();
         }
+        audit.record("PASSWORD_RESET_REQUESTED", account, null);
         account.setLastPasswordResetRequestAt(now);
         account.setPasswordResetRequestCount(count + 1);
         account.setPasswordResetFailureCount(0);
@@ -163,6 +165,7 @@ public class AuthController {
                 account.setPasswordResetFailureCount(0);
             }
             users.save(account);
+            audit.record("PASSWORD_RESET_REJECTED", account, null);
             throw invalidResetCode();
         }
         validateAccountPasswordRules(request.newPassword(), account);
@@ -178,6 +181,7 @@ public class AuthController {
         account.setPasswordResetWindowStartedAt(null);
         account.setPasswordResetLockedUntil(null);
         users.save(account);
+        audit.record("PASSWORD_RESET_COMPLETED", account, null);
     }
 
     /**
@@ -300,3 +304,4 @@ public class AuthController {
         static ResetRequestResponse generic() { return new ResetRequestResponse("Si el correo está registrado, se enviará un código al medio de recuperación configurado.", null, null); }
     }
 }
+

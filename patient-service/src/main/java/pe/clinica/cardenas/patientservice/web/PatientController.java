@@ -55,13 +55,14 @@ public class PatientController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
     public Patient create(@Valid @RequestBody Patient patient, Authentication authentication, HttpServletRequest request) {
+        normalize(patient);
         if (repository.existsByDni(patient.getDni())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un paciente con ese DNI");
         }
         patient.setId(null);
         patient.setStatus(Status.ACTIVO);
         normalize(patient);
-        Patient saved = repository.save(patient);
+        Patient saved = saveOrConflict(patient);
         audit.log(saved.getId().toString(), "CREAR", null, saved, "Registro de paciente", request.getHeader("Authorization"));
         return saved;
     }
@@ -71,6 +72,7 @@ public class PatientController {
     public Patient update(@PathVariable Long id, @Valid @RequestBody Patient incoming, Authentication authentication, HttpServletRequest request) {
         Patient current = find(id);
         String before = current.toString();
+        normalize(incoming);
         repository.findByDni(incoming.getDni())
                 .filter(other -> !other.getId().equals(id))
                 .ifPresent(other -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un paciente con ese DNI"); });
@@ -88,7 +90,7 @@ public class PatientController {
         current.setCurrentCondition(incoming.getCurrentCondition());
         current.setFamilyHistory(incoming.getFamilyHistory());
         current.setAllergies(incoming.getAllergies());
-        Patient saved = repository.save(current);
+        Patient saved = saveOrConflict(current);
         audit.log(id.toString(), "ACTUALIZAR", before, saved, "Actualización administrativa", request.getHeader("Authorization"));
         return saved;
     }
@@ -99,9 +101,19 @@ public class PatientController {
         Patient current = find(id);
         Status before = current.getStatus();
         current.setStatus(value);
-        Patient saved = repository.save(current);
+        Patient saved = saveOrConflict(current);
         audit.log(id.toString(), "CAMBIAR_ESTADO", before, value, "Cambio de estado del paciente", request.getHeader("Authorization"));
         return saved;
+    }
+
+    private Patient saveOrConflict(Patient patient) {
+        try {
+            return repository.saveAndFlush(patient);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            // Includes a concurrent insert with the same document. No DB details are exposed.
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No se pudo guardar el paciente. Verifica coincidencias de DNI y los datos ingresados.");
+        }
     }
 
     private Patient find(Long id) {
@@ -123,3 +135,4 @@ public class PatientController {
         if (patient.getEmail() != null) patient.setEmail(patient.getEmail().trim().toLowerCase());
     }
 }
+

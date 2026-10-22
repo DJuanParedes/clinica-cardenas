@@ -1,15 +1,17 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { UserRole } from '../core/models';
 import { AuthService } from '../core/auth.service';
 
+interface SecurityAudit { id:number; occurredAt:string; actor:string; action:string; userId:number; previousRole:string|null; newRole:string|null; }
 type RecoveryChannel='SMS'|'WHATSAPP';
 interface ManagedUser { id:number; fullName:string; email:string; dni?:string|null; phone?:string|null; recoveryChannel?:RecoveryChannel|null; role:UserRole; clinicId:string; platformAdmin:boolean; enabled:boolean; mustResetPassword:boolean; lockedUntil?:string|null; lastLoginAt?:string|null; passwordChangedAt?:string|null; }
 interface DoctorProfile { id:number; fullName:string; accountEmail?:string|null; specialty:string; branch:string; shiftStart:string; shiftEnd:string; active:boolean; }
 
 @Component({
-  selector:'app-users', standalone:true, imports:[FormsModule],
+  selector:'app-users', standalone:true, imports:[FormsModule,DatePipe],
   template:`
     <section class="page-head"><div><span>Seguridad y acceso · {{auth.user()?.clinic?.name}}</span><h1>Usuarios de esta clínica</h1><p>Las cuentas creadas aquí pertenecen únicamente a {{auth.user()?.clinic?.shortName}}. El DNI se registra como clave temporal, pero el usuario debe activar su acceso con “Olvidé mi contraseña”.</p></div><button class="primary-btn" (click)="openNew()">＋ Nuevo usuario</button></section>
     @if(message()){<div class="msg" [class.error]="messageType()==='error'">{{message()}}</div>}
@@ -39,6 +41,13 @@ interface DoctorProfile { id:number; fullName:string; accountEmail?:string|null;
       @for(u of filtered();track u.id){<tr><td><b>{{u.fullName}}</b><small>{{u.email}}</small></td><td>{{u.dni||'—'}}</td><td><b>{{u.phone||'—'}}</b><small>{{channelLabel(u.recoveryChannel)}}</small></td><td><span class="role">{{roleLabel(u.role)}}</span></td><td><span class="status" [class.warn]="u.mustResetPassword" [class.off]="!u.enabled">{{!u.enabled?'BLOQUEADO':u.mustResetPassword?'CAMBIO DE CLAVE PENDIENTE':'HABILITADO'}}</span></td><td><div class="row-actions"><button (click)="edit(u)">Editar</button>@if(u.role!=='ADMIN'){<button (click)="toggle(u)">{{u.enabled?'Bloquear':'Habilitar'}}</button>@if(u.enabled){<button (click)="reissue(u)">Reemitir acceso</button>}}</div></td></tr>}
       </tbody></table></div>
     </section>
+    <section class="panel-card"><div class="toolbar"><div><h2>Bitácora de seguridad</h2><p>Últimos 100 eventos de esta clínica. Horario local del navegador.</p></div><button class="secondary-btn" (click)="loadAudit()">Actualizar bitácora</button></div>
+      @if(auditError()){<p role="alert">{{auditError()}}</p>}
+      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Fecha</th><th>Actor</th><th>Evento</th><th>Usuario</th><th>Rol anterior</th><th>Rol nuevo</th></tr></thead><tbody>
+      @for(event of auditEntries();track event.id){<tr><td>{{event.occurredAt | date:'dd/MM/yyyy HH:mm:ss'}}</td><td>{{event.actor}}</td><td>{{event.action}}</td><td>{{event.userId}}</td><td>{{event.previousRole||'—'}}</td><td>{{event.newRole||'—'}}</td></tr>}
+      @empty{<tr><td colspan="6">No hay eventos cargados. Actualiza la bitácora para consultar el registro.</td></tr>}
+      </tbody></table></div>
+    </section>
   `,
   styles:[`
     .msg{padding:11px 14px;background:#e8f7ee;border:1px solid #cbe9d8;color:#2d7253;border-radius:10px;margin-bottom:14px;font-size:11px}.msg.error{background:#fff0f0;border-color:#efcaca;color:#a33}.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:8px;margin-bottom:18px}.flow>div{background:#fff;border:1px solid #dfeaea;border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center}.flow b{width:28px;height:28px;border-radius:9px;background:#e4f2f7;color:#3B78A6;display:grid;place-items:center}.flow span{font-size:9px;color:#587477}.flow i{font-style:normal;color:#98abad}.form-card{margin-bottom:18px}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.form-grid label{font-size:10px;font-weight:700;color:#48696b}.form-grid input,.form-grid select{display:block;width:100%;box-sizing:border-box;border:1px solid #dce7e8;border-radius:9px;padding:11px;margin-top:6px}.form-grid small{display:block;margin-top:4px;color:#789092}.switch{display:flex!important;align-items:center;gap:8px;margin-top:22px}.switch input{width:auto!important;margin:0!important}.initial-info{padding:11px;border-radius:10px;background:#fff7e9;border:1px solid #f0dfb7;align-self:end}.initial-info b,.initial-info span{display:block}.initial-info b{font-size:9px;color:#765b25}.initial-info span{font-size:8px;color:#806f49;margin-top:3px;line-height:1.5}.actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}.close{border:1px solid #dce7e8;background:#fff;border-radius:8px;width:32px;height:32px}.toolbar{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}.search{flex:1}.search input{width:100%;border:1px solid #dce7e8;border-radius:9px;padding:10px}.role,.status{font-size:8px;border-radius:99px;padding:6px 9px;background:#e6f5f4;color:#18747a}.status{background:#e8f7ee;color:#347556}.status.warn{background:#fff3d5;color:#866621}.status.off{background:#f5eeee;color:#9a4d4d}.row-actions{display:flex;gap:6px;flex-wrap:wrap}.row-actions button{border:1px solid #dce7e8;background:#fff;border-radius:7px;padding:6px 8px;font-size:8px}.data-table td small,.data-table td b{display:block}.data-table td small{font-size:8px;color:#789092;margin-top:3px}@media(max-width:850px){.flow{grid-template-columns:1fr}.flow i{display:none}}@media(max-width:650px){.form-grid{grid-template-columns:1fr}.actions{grid-column:auto}}
@@ -48,8 +57,10 @@ export class UsersComponent implements OnInit{
   private api=inject(ApiService);
   readonly auth=inject(AuthService);
   readonly users=signal<ManagedUser[]>([]);readonly doctorProfiles=signal<DoctorProfile[]>([]);readonly formOpen=signal(false);readonly editingId=signal<number|null>(null);readonly saving=signal(false);readonly message=signal('');readonly messageType=signal<'success'|'error'>('success');
+  readonly auditEntries=signal<SecurityAudit[]>([]); readonly auditError=signal('');
+  loadAudit(){this.auditError.set('');this.api.get<SecurityAudit[]>('/users/audit').subscribe({next:v=>this.auditEntries.set(v),error:()=>{this.auditEntries.set([]);this.auditError.set('No se pudo consultar la bitácora.');}});}
   query='';draft:any=this.empty();
-  ngOnInit(){this.load();}
+  ngOnInit(){this.load();this.loadAudit();}
   load(){this.api.get<ManagedUser[]>('/users').subscribe({next:v=>this.users.set(v),error:e=>this.notify(e?.error?.detail||e?.error?.message||'No se pudieron cargar los usuarios.','error')});this.api.get<DoctorProfile[]>('/scheduling/doctors').subscribe({next:v=>this.doctorProfiles.set(v),error:()=>this.doctorProfiles.set([])});}
   filtered(){const q=this.query.trim().toLowerCase();return this.users().filter(u=>!q||`${u.fullName} ${u.email} ${u.dni||''} ${u.role}`.toLowerCase().includes(q));}
   openNew(){this.editingId.set(null);this.draft=this.empty();this.formOpen.set(true);}
@@ -63,3 +74,4 @@ export class UsersComponent implements OnInit{
   private empty(){return{fullName:'',email:'',dni:'',phone:'+51',recoveryChannel:'SMS' as RecoveryChannel,role:'RECEPCION' as UserRole,enabled:true,doctorSpecialty:'',doctorBranch:'Sede principal',shiftStart:'08:00',shiftEnd:'18:00'};}
   private notify(t:string,type:'success'|'error'='success'){this.message.set(t);this.messageType.set(type);}
 }
+

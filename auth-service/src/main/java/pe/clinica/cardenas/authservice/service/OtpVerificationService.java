@@ -37,6 +37,9 @@ public class OtpVerificationService {
     private static final String APPROVED_STATUS = "\"status\":\"approved\"";
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final SecureRandom secureRandom = new SecureRandom();
+    private java.time.Clock clock = java.time.Clock.systemUTC();
+    private static final int MAX_CODE_ATTEMPTS = 5;
+    private static final int LOCAL_TTL_MINUTES = 10;
     private final ConcurrentMap<String, EmailChallenge> emailChallenges = new ConcurrentHashMap<>();
     private final JavaMailSender mailSender;
 
@@ -92,6 +95,10 @@ public class OtpVerificationService {
     public void start(String destination, RecoveryChannel channel) {
         String selected = normalizedProvider();
         if ("local".equals(selected)) {
+            cleanupExpiredChallenges();
+            String nonce = UUID.randomUUID().toString();
+            emailChallenges.put(challengeKey(destination, channel), new EmailChallenge(hash(nonce, localCode), nonce,
+                    clock.instant().plus(Duration.ofMinutes(LOCAL_TTL_MINUTES)), 0));
             log.warn("OTP_PROVIDER=local activo para {} por {}. Consulta el código únicamente con MOSTRAR-OTP-LOCAL.bat; no usar este proveedor en producción.",
                     mask(destination), channel);
             return;
@@ -111,7 +118,7 @@ public class OtpVerificationService {
 
     public boolean check(String destination, RecoveryChannel channel, String code) {
         String selected = normalizedProvider();
-        if ("local".equals(selected)) return localCode.equals(code);
+        if ("local".equals(selected)) return checkChallenge(challengeKey(destination, channel), code);
         if (isEmailProvider(selected)) {
             if (channel != RecoveryChannel.EMAIL) return false;
             return checkEmailCode(destination, code);
@@ -128,7 +135,7 @@ public class OtpVerificationService {
         cleanupExpiredChallenges();
         String code = String.format(Locale.ROOT, "%06d", secureRandom.nextInt(1_000_000));
         String nonce = UUID.randomUUID().toString();
-        EmailChallenge challenge = new EmailChallenge(hash(nonce, code), nonce, Instant.now().plus(Duration.ofMinutes(emailTtlMinutes)));
+        EmailChallenge challenge = new EmailChallenge(hash(nonce, code), nonce, clock.instant().plus(Duration.ofMinutes(emailTtlMinutes)), 0);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(emailFrom.trim());
@@ -148,7 +155,7 @@ public class OtpVerificationService {
                 """.formatted(code, emailTtlMinutes));
         try {
             mailSender.send(message);
-            emailChallenges.put(email, challenge);
+            emailChallenges.put(challengeKey(email, RecoveryChannel.EMAIL), challenge);
             log.info("Código de recuperación enviado por correo a {}", mask(email));
         } catch (MailException ex) {
             log.warn("No se pudo enviar el correo de recuperación: {}", ex.getClass().getSimpleName());
@@ -157,23 +164,34 @@ public class OtpVerificationService {
     }
 
     private boolean checkEmailCode(String destination, String code) {
-        String email = normalizeEmail(destination);
-        EmailChallenge challenge = emailChallenges.get(email);
-        if (challenge == null || challenge.expiresAt().isBefore(Instant.now())) {
-            emailChallenges.remove(email);
-            return false;
-        }
-        String receivedHash = hash(challenge.nonce(), code == null ? "" : code.trim());
-        boolean approved = MessageDigest.isEqual(
-                challenge.hash().getBytes(StandardCharsets.UTF_8),
-                receivedHash.getBytes(StandardCharsets.UTF_8));
-        if (approved) emailChallenges.remove(email, challenge);
-        return approved;
+        return checkChallenge(challengeKey(destination, RecoveryChannel.EMAIL), code);
+    }
+
+    private String challengeKey(String destination, RecoveryChannel channel) {
+        return channel.name() + ":" + normalizeEmail(destination);
+    }
+
+    private boolean checkChallenge(String key, String code) {
+        java.util.concurrent.atomic.AtomicBoolean approved = new java.util.concurrent.atomic.AtomicBoolean();
+        // compute serializes checks of one challenge, including consumption and failed attempts.
+        emailChallenges.computeIfPresent(key, (ignored, challenge) -> {
+            if (!challenge.expiresAt().isAfter(clock.instant())) return null;
+            String receivedHash = hash(challenge.nonce(), code == null ? "" : code.trim());
+            if (MessageDigest.isEqual(challenge.hash().getBytes(StandardCharsets.UTF_8),
+                    receivedHash.getBytes(StandardCharsets.UTF_8))) {
+                approved.set(true);
+                return null;
+            }
+            int attempts = challenge.attempts() + 1;
+            return attempts >= MAX_CODE_ATTEMPTS ? null
+                    : new EmailChallenge(challenge.hash(), challenge.nonce(), challenge.expiresAt(), attempts);
+        });
+        return approved.get();
     }
 
     private void cleanupExpiredChallenges() {
-        Instant now = Instant.now();
-        emailChallenges.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+        Instant now = clock.instant();
+        emailChallenges.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
     }
 
     private String post(String url, String form) {
@@ -263,5 +281,6 @@ public class OtpVerificationService {
         return destination.length() < 5 ? "***" : "***" + destination.substring(destination.length() - 4);
     }
 
-    private record EmailChallenge(String hash, String nonce, Instant expiresAt) {}
+    private record EmailChallenge(String hash, String nonce, Instant expiresAt, int attempts) {}
 }
+
