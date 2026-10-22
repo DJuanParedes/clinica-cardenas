@@ -3,11 +3,11 @@
 GitHub Pages sirve Angular. No ejecuta Java, MySQL, Eureka ni el gateway.
 
 ## Activación
-En Settings > Pages, seleccionar GitHub Actions. El plan actual no admite Pages en este repositorio privado: requiere un plan compatible o una decisión explícita del propietario para hacerlo público. No cambiar la visibilidad sin esa decisión.
+Repositorio público por autorización del propietario el 22/10/2026. En Settings > Pages se ha seleccionado GitHub Actions.
 
 Al integrar un cambio en main, el flujo `Publicar interfaz en GitHub Pages` compila y despliega automáticamente. También admite Run workflow. Las propuestas de cambio solo compilan: no sustituyen la web publicada. El artefacto contiene únicamente la compilación de frontend, sin archivos Java, documentos académicos, bases de datos ni secretos.
 
-Dirección prevista, pendiente de un despliegue exitoso: https://DJuanParedes.github.io/clinica-cardenas/
+Dirección del sitio (disponible después del primer despliegue exitoso): https://DJuanParedes.github.io/clinica-cardenas/
 
 ## Servidor pendiente
 Sin PUBLIC_API_BASE_URL, muestra una portada de revisión y un aviso persistente. Bloquea solicitudes API y deshabilita ingreso y recuperación. No simula usuarios, pacientes ni OTP. Las rutas usan hash en Pages para permitir recargar enlaces. El modo local mantiene las rutas habituales y su proxy.
