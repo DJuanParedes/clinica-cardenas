@@ -38,8 +38,8 @@ const DEFAULT_CLINIC: ClinicConfig = {
   shortName: 'Cárdenas',
   tagline: 'Atención odontológica en La Floresta',
   description: 'Atención odontológica para pacientes de La Floresta y zonas cercanas.',
-  logoUrl: '/brand/logo-cardenas.svg',
-  heroImageUrl: '/brand/cardenas-fachada.png',
+  logoUrl: 'brand/logo-cardenas.svg',
+  heroImageUrl: 'brand/cardenas-fachada.png',
   primaryColor: '#3B78A6',
   primaryDarkColor: '#245C80',
   accentColor: '#D06B4F',
@@ -77,7 +77,7 @@ export class ClinicConfigService {
     this.setMeta('description', 'Portal general de acceso y directorio de clínicas odontológicas.');
     this.setMeta('theme-color', '#173A59');
     const favicon = this.document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (favicon) favicon.href = '/brand/platform-logo.svg';
+    if (favicon) favicon.href = 'brand/platform-logo.svg';
   }
 
   applyClinic(brand: ClinicBrand | ClinicConfig): void {
@@ -205,6 +205,8 @@ export class ClinicConfigService {
   private assetUrl(value: unknown, fallback: string): string {
     if (typeof value !== 'string') return fallback;
     const normalized = value.trim();
+    if (/^\/?brand\/[a-zA-Z0-9_.-]+$/.test(normalized)) return new URL(normalized.replace(/^\//, ''), this.document.baseURI).href;
     return /^(\/[^\s]*|https:\/\/[^\s]+)$/i.test(normalized) ? normalized : fallback;
   }
 }
+
