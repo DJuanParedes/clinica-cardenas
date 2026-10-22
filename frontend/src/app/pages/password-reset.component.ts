@@ -1,3 +1,4 @@
+import { backendPending } from '../core/deployment';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -10,7 +11,7 @@ import { ClinicConfigService } from '../core/clinic-config.service';
   <div class="reset-page">
     <section class="reset-card">
       <a routerLink="/login" class="back">← Volver al inicio de sesión</a>
-      <div class="brand"><img src="/brand/platform-logo.svg" alt="Plataforma multiclínica"><div><b>Portal odontológico</b><small>Recuperación general de acceso</small></div></div>
+      <div class="brand"><img src="brand/platform-logo.svg" alt="Plataforma multiclínica"><div><b>Portal odontológico</b><small>Recuperación general de acceso</small></div></div>
       <div class="steps"><span [class.on]="step()>=1">1</span><i></i><span [class.on]="step()>=2">2</span><i></i><span [class.on]="step()>=3">3</span></div>
       @if(step()===1){
         <span class="eyebrow">Paso 1 de 3</span><h1>Recuperar contraseña</h1>
@@ -19,7 +20,7 @@ import { ClinicConfigService } from '../core/clinic-config.service';
         <form (ngSubmit)="requestCode()">
           <label>Correo electrónico<input type="email" [(ngModel)]="email" name="email" required placeholder="usuario@correo.com"></label>
           @if(message()){<div class="message" [class.error]="error()">{{message()}}</div>}
-          <button class="primary" [disabled]="loading()">{{loading()?'Enviando...':'Enviar código de verificación'}}</button>
+          <button class="primary" [disabled]="backendPending || loading()">{{loading()?'Enviando...':'Enviar código de verificación'}}</button>
         </form>
       }
       @if(step()===2){
@@ -31,8 +32,8 @@ import { ClinicConfigService } from '../core/clinic-config.service';
           <label>Repite la contraseña<input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required minlength="10"></label>
           <div class="rules">Debe incluir mayúscula, minúscula, número y símbolo. No puede ser tu DNI.</div>
           @if(message()){<div class="message" [class.error]="error()">{{message()}}</div>}
-          <button class="primary" [disabled]="loading()">{{loading()?'Validando...':'Verificar código y cambiar contraseña'}}</button>
-          <button type="button" class="link" (click)="requestCode()" [disabled]="loading()">Reenviar código</button>
+          <button class="primary" [disabled]="backendPending || loading()">{{loading()?'Validando...':'Verificar código y cambiar contraseña'}}</button>
+          <button type="button" class="link" (click)="requestCode()" [disabled]="backendPending || loading()">Reenviar código</button>
         </form>
       }
       @if(step()===3){
@@ -47,12 +48,14 @@ import { ClinicConfigService } from '../core/clinic-config.service';
   `]
 })
 export class PasswordResetComponent implements OnInit{
+  readonly backendPending = backendPending;
   private auth=inject(AuthService);private route=inject(ActivatedRoute);private router=inject(Router);private branding=inject(ClinicConfigService);
   readonly step=signal(1);readonly loading=signal(false);readonly message=signal('');readonly error=signal(false);readonly destination=signal<string|null>(null);readonly channel=signal<string|null>(null);readonly required=signal(false);
   email='';code='';newPassword='';confirmPassword='';
   ngOnInit(){this.branding.applyPlatformBranding();this.email=this.route.snapshot.queryParamMap.get('email')||'';this.required.set(this.route.snapshot.queryParamMap.get('required')==='1');}
-  requestCode(){if(!this.email.trim())return;this.loading.set(true);this.message.set('');this.error.set(false);this.auth.requestPasswordReset(this.email.trim()).subscribe({next:r=>{this.loading.set(false);this.destination.set(r.destination||null);this.channel.set(r.channel||null);this.message.set(r.message||'Código solicitado.');this.step.set(2);},error:e=>{this.loading.set(false);this.error.set(true);this.message.set(e?.error?.detail||e?.error?.message||'No se pudo enviar el código.');}});}
-  confirmReset(){if(this.newPassword!==this.confirmPassword){this.error.set(true);this.message.set('Las contraseñas no coinciden.');return;}if(!this.passwordShapeValid()){this.error.set(true);this.message.set('La contraseña debe tener 10 a 80 caracteres e incluir mayúscula, minúscula, número y símbolo.');return;}if(!this.code.trim()){this.error.set(true);this.message.set('Ingresa el código de verificación.');return;}this.loading.set(true);this.error.set(false);this.message.set('');this.auth.confirmPasswordReset(this.email.trim(),this.code.trim(),this.newPassword).subscribe({next:()=>{this.loading.set(false);this.step.set(3);},error:e=>{this.loading.set(false);this.error.set(true);this.message.set(e?.error?.detail||e?.error?.message||'No se pudo cambiar la contraseña.');}});}
+  requestCode(){if(backendPending)return;if(!this.email.trim())return;this.loading.set(true);this.message.set('');this.error.set(false);this.auth.requestPasswordReset(this.email.trim()).subscribe({next:r=>{this.loading.set(false);this.destination.set(r.destination||null);this.channel.set(r.channel||null);this.message.set(r.message||'Código solicitado.');this.step.set(2);},error:e=>{this.loading.set(false);this.error.set(true);this.message.set(e?.error?.detail||e?.error?.message||'No se pudo enviar el código.');}});}
+  confirmReset(){if(backendPending)return;if(this.newPassword!==this.confirmPassword){this.error.set(true);this.message.set('Las contraseñas no coinciden.');return;}if(!this.passwordShapeValid()){this.error.set(true);this.message.set('La contraseña debe tener 10 a 80 caracteres e incluir mayúscula, minúscula, número y símbolo.');return;}if(!this.code.trim()){this.error.set(true);this.message.set('Ingresa el código de verificación.');return;}this.loading.set(true);this.error.set(false);this.message.set('');this.auth.confirmPasswordReset(this.email.trim(),this.code.trim(),this.newPassword).subscribe({next:()=>{this.loading.set(false);this.step.set(3);},error:e=>{this.loading.set(false);this.error.set(true);this.message.set(e?.error?.detail||e?.error?.message||'No se pudo cambiar la contraseña.');}});}
   private passwordShapeValid(){const v=this.newPassword;return v.length>=10&&v.length<=80&&/[A-Z]/.test(v)&&/[a-z]/.test(v)&&/\d/.test(v)&&/[^A-Za-z0-9]/.test(v);}
   goLogin(){void this.router.navigate(['/login'],{queryParams:{email:this.email}});}
 }
+

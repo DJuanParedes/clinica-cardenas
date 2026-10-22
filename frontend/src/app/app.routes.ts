@@ -1,3 +1,5 @@
+import { backendPending } from './core/deployment';
+import { PagesPreviewComponent } from './pages/pages-preview.component';
 import { Routes } from '@angular/router';
 import { HomeComponent } from './pages/home.component';
 import { PlatformHomeComponent } from './pages/platform-home.component';
@@ -43,7 +45,7 @@ const genericRoutes: Routes = MODULES.map(config => ({
 }));
 
 export const routes: Routes = [
-  { path: '', component: PlatformHomeComponent },
+  { path: '', component: backendPending ? PagesPreviewComponent : PlatformHomeComponent },
   { path: 'marca/:clinicSlug', component: HomeComponent },
   { path: 'login', component: LoginComponent },
   { path: 'recuperar-contrasena', component: PasswordResetComponent },
@@ -83,3 +85,4 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '' }
 ];
+

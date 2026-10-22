@@ -20,6 +20,7 @@ public class Patient extends TenantOwnedEntity {
     @Column(nullable = false, length = 120)
     private String fullName;
 
+    @NotBlank
     @Pattern(regexp = "\\d{8}")
     @Column(nullable = false, unique = true, length = 8)
     private String dni;
@@ -62,3 +63,4 @@ public class Patient extends TenantOwnedEntity {
     @Enumerated(EnumType.STRING)
     private Status status;
 }
+

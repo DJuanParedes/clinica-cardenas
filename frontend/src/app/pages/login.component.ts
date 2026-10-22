@@ -1,3 +1,4 @@
+import { backendPending } from '../core/deployment';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -12,18 +13,18 @@ import { ClinicConfigService } from '../core/clinic-config.service';
     <div class="login-page">
       <section class="login-visual">
         <a class="back" routerLink="/">← Volver al portal</a>
-        <div class="visual-copy"><div class="logo"><img src="/brand/platform-logo.svg" alt="Plataforma multiclínica"></div><span>Portal odontológico</span><h1>Un acceso seguro para cada clínica.</h1><p>Ingresa con tu cuenta. La plataforma identificará automáticamente tu clínica, su marca, tus funciones y la información que puedes consultar.</p><div class="visual-points"><b>✓ Identidad propia después de ingresar</b><b>✓ Información separada por clínica</b><b>✓ Acceso según responsabilidades</b></div></div>
+        <div class="visual-copy"><div class="logo"><img src="brand/platform-logo.svg" alt="Plataforma multiclínica"></div><span>Portal odontológico</span><h1>Un acceso seguro para cada clínica.</h1><p>Ingresa con tu cuenta. La plataforma identificará automáticamente tu clínica, su marca, tus funciones y la información que puedes consultar.</p><div class="visual-points"><b>✓ Identidad propia después de ingresar</b><b>✓ Información separada por clínica</b><b>✓ Acceso según responsabilidades</b></div></div>
       </section>
       <section class="login-panel">
         <div class="login-card">
-          <div class="mobile-brand"><img src="/brand/platform-logo.svg" alt="Plataforma multiclínica"> Portal odontológico</div>
+          <div class="mobile-brand"><img src="brand/platform-logo.svg" alt="Plataforma multiclínica"> Portal odontológico</div>
           <span class="eyebrow">Acceso general seguro</span><h2>Bienvenido</h2><p>Al validar tus datos ingresarás directamente al espacio privado de tu clínica.</p>
           <form [formGroup]="form" (ngSubmit)="submit()">
             <label>Correo electrónico<input type="email" formControlName="email" placeholder="usuario@correo.com" autocomplete="username"></label>
             <label>Contraseña<div class="password"><input [type]="showPassword() ? 'text' : 'password'" formControlName="password" placeholder="••••••••" autocomplete="current-password"><button type="button" (click)="showPassword.set(!showPassword())">{{ showPassword() ? 'Ocultar' : 'Ver' }}</button></div></label>
             <div class="forgot"><a [routerLink]="['/recuperar-contrasena']" [queryParams]="{email:form.controls.email.value}">¿Olvidaste tu contraseña?</a></div>
             @if (error()) { <div class="error">{{ error() }}</div> }
-            <button class="submit" [disabled]="form.invalid || loading()">{{ loading() ? 'Validando...' : 'Ingresar al sistema' }}</button>
+            <button class="submit" [disabled]="backendPending || form.invalid || loading()">{{ loading() ? 'Validando...' : 'Ingresar al sistema' }}</button>
           </form>
           <div class="access-note"><b>Primer ingreso</b><span>Si el Administrador acaba de crear tu cuenta, tu DNI queda registrado como clave temporal de seguridad, pero no abre una sesión. Presiona “¿Olvidaste tu contraseña?”, recibe el código por SMS o WhatsApp y crea tu contraseña personal antes de ingresar.</span></div>
         </div>
@@ -35,6 +36,7 @@ import { ClinicConfigService } from '../core/clinic-config.service';
   `]
 })
 export class LoginComponent implements OnInit {
+  readonly backendPending = backendPending;
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -55,6 +57,7 @@ export class LoginComponent implements OnInit {
   }
 
   submit(): void {
+    if (backendPending) return;
     if (this.form.invalid) return;
     this.loading.set(true); this.error.set('');
     const { email, password } = this.form.getRawValue();
@@ -67,3 +70,4 @@ export class LoginComponent implements OnInit {
     });
   }
 }
+

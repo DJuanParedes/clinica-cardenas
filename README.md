@@ -177,3 +177,8 @@ Cuando el Gateway ya tenga el marcador `docker-dns-auth-scope-v3`, usa `08-VALID
 El filtro de sesión del Gateway limita únicamente la llamada interna a `auth-service`; el tiempo de ejecución del microservicio destino queda fuera de ese timeout. En local la validación interna admite hasta 10 segundos y un solo reintento transitorio, pero continúa en modo fail-closed: si no se puede confirmar la vigencia del JWT, la operación se rechaza. Producción mantiene un timeout explícito de 3 segundos para esa validación interna.
 
 Si una carpeta anterior tiene el marcador de Gateway previo, ejecuta `07-REPARAR-RUTEO-Y-VALIDAR.bat`: reconstruye únicamente `api-gateway`, recrea Gateway + Frontend para refrescar DNS y continúa con la validación sin tocar MySQL ni los demás microservicios.
+
+## Avance académico del Sprint 1
+
+La trazabilidad de HU-01, HU-02 y HU-12, las mejoras de seguridad, el guion de demostración y las verificaciones pendientes están en [docs/SPRINT-1.md](docs/SPRINT-1.md). La evidencia corresponde al 22/10/2026 y no acredita reuniones ni ejecución durante el calendario original del Sprint.
+

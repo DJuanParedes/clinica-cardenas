@@ -49,7 +49,7 @@ type ClinicDraft = Omit<ClinicBrand, 'id' | 'active'>;
             <label>Color de acento<div class="color-field"><input type="color" [(ngModel)]="draft.accentColor" name="accentColor"><input [(ngModel)]="draft.accentColor" name="accentColorText" required pattern="#[0-9A-Fa-f]{6}"></div></label>
             <label>Acento oscuro<div class="color-field"><input type="color" [(ngModel)]="draft.accentDarkColor" name="accentDarkColor"><input [(ngModel)]="draft.accentDarkColor" name="accentDarkColorText" required pattern="#[0-9A-Fa-f]{6}"></div></label>
             <label>Barra lateral<div class="color-field"><input type="color" [(ngModel)]="draft.sidebarDarkColor" name="sidebarDarkColor"><input [(ngModel)]="draft.sidebarDarkColor" name="sidebarDarkColorText" required pattern="#[0-9A-Fa-f]{6}"></div></label>
-            <div class="brand-preview" [style.background]="'linear-gradient(135deg,'+draft.primaryDarkColor+','+draft.sidebarDarkColor+')'"><span [style.background]="draft.accentColor"></span><img [src]="draft.logoUrl || '/brand/logo-cardenas.svg'" alt="Vista del logo"><b>{{draft.shortName || 'Nueva marca'}}</b></div>
+            <div class="brand-preview" [style.background]="'linear-gradient(135deg,'+draft.primaryDarkColor+','+draft.sidebarDarkColor+')'"><span [style.background]="draft.accentColor"></span><img [src]="draft.logoUrl || 'brand/logo-cardenas.svg'" alt="Vista del logo"><b>{{draft.shortName || 'Nueva marca'}}</b></div>
           </fieldset>
 
           <fieldset><legend>Contacto y dominio</legend>
@@ -67,7 +67,7 @@ type ClinicDraft = Omit<ClinicBrand, 'id' | 'active'>;
     <section class="clinic-grid">
       @for(item of clinics(); track item.id){
         <article class="clinic-card" [class.inactive]="!item.active">
-          <div class="brand-strip" [style.background]="'linear-gradient(135deg,'+item.primaryDarkColor+','+item.sidebarDarkColor+')'"><img [src]="item.logoUrl || '/brand/logo-cardenas.svg'" [alt]="'Logo '+item.name"><span [style.background]="item.accentColor"></span></div>
+          <div class="brand-strip" [style.background]="'linear-gradient(135deg,'+item.primaryDarkColor+','+item.sidebarDarkColor+')'"><img [src]="item.logoUrl || 'brand/logo-cardenas.svg'" [alt]="'Logo '+item.name"><span [style.background]="item.accentColor"></span></div>
           <div class="clinic-body"><div class="clinic-title"><div><small>{{item.code}}</small><h2>{{item.name}}</h2></div><span class="status" [class.off]="!item.active">{{item.active ? 'ACTIVA' : 'INACTIVA'}}</span></div>
             <p>{{item.tagline || item.description}}</p>
             <dl><div><dt>URL pública</dt><dd>/marca/{{item.slug}}</dd></div><div><dt>Contacto</dt><dd>{{item.phone || item.email || 'Por completar'}}</dd></div><div><dt>Dominio</dt><dd>{{item.customDomain || 'Sin dominio propio'}}</dd></div></dl>
@@ -125,9 +125,10 @@ export class ClinicsComponent implements OnInit {
   }
   private empty(): ClinicDraft {
     return { code:'', slug:'', name:'', shortName:'', tagline:'Odontología especializada', description:'Atención odontológica profesional, segura y cercana.',
-      logoUrl:'/brand/logo-cardenas.svg', heroImageUrl:'/brand/cardenas-fachada.png', primaryColor:'#3B78A6', primaryDarkColor:'#245C80',
+      logoUrl:'brand/logo-cardenas.svg', heroImageUrl:'brand/cardenas-fachada.png', primaryColor:'#3B78A6', primaryDarkColor:'#245C80',
       accentColor:'#D06B4F', accentDarkColor:'#B8533C', sidebarDarkColor:'#193D52', phone:'', email:'', address:'', workingHours:'Lun a sáb, 8:00 a 20:00', customDomain:null };
   }
   private notify(text: string, type: 'success' | 'error' = 'success'): void { this.message.set(text); this.messageType.set(type); }
   private errorText(error: any, fallback: string): string { return error?.error?.detail || error?.error?.message || fallback; }
 }
+

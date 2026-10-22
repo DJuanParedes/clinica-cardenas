@@ -11,11 +11,11 @@ import { ClinicConfigService } from '../core/clinic-config.service';
   template: `
     <div class="public-site">
       <header class="public-nav">
-        <a class="public-brand" href="#inicio"><img [src]="clinic.logoUrl()" [alt]="'Logo ' + clinic.name()"><div><b>{{ clinic.name() }}</b><small>{{ clinic.config().tagline }}</small></div></a>
+        <a class="public-brand" routerLink="." fragment="inicio"><img [src]="clinic.logoUrl()" [alt]="'Logo ' + clinic.name()"><div><b>{{ clinic.name() }}</b><small>{{ clinic.config().tagline }}</small></div></a>
         <nav>
-          <a href="#nosotros">Nosotros</a><a href="#servicios">Especialidades</a><a href="#doctores">Doctores</a><a href="#tecnologia">Tecnología</a><a [routerLink]="['/marca',clinic.config().slug,'encuesta']">Encuesta</a><a href="#contacto">Contacto</a>
+          <a routerLink="." fragment="nosotros">Nosotros</a><a routerLink="." fragment="servicios">Especialidades</a><a routerLink="." fragment="doctores">Doctores</a><a routerLink="." fragment="tecnologia">Tecnología</a><a [routerLink]="['/marca',clinic.config().slug,'encuesta']">Encuesta</a><a routerLink="." fragment="contacto">Contacto</a>
         </nav>
-        <div class="public-actions"><a class="login-link" [routerLink]="['/marca',clinic.config().slug,'encuesta']">Calificar atención</a><a class="appointment" href="#contacto">Reservar cita</a><a class="login-link" routerLink="/login">Iniciar sesión</a></div>
+        <div class="public-actions"><a class="login-link" [routerLink]="['/marca',clinic.config().slug,'encuesta']">Calificar atención</a><a class="appointment" routerLink="." fragment="contacto">Reservar cita</a><a class="login-link" routerLink="/login">Iniciar sesión</a></div>
       </header>
 
       <main>
@@ -24,7 +24,7 @@ import { ClinicConfigService } from '../core/clinic-config.service';
             <div class="eyebrow">● Atención odontológica integral</div>
             <h1>Tu sonrisa merece una atención <span>extraordinaria.</span></h1>
             <p>{{ clinic.config().description }}</p>
-            <div class="hero-buttons"><a class="primary" href="#contacto">Agenda una evaluación</a><a class="secondary" href="#servicios">Ver especialidades</a></div>
+            <div class="hero-buttons"><a class="primary" routerLink="." fragment="contacto">Agenda una evaluación</a><a class="secondary" routerLink="." fragment="servicios">Ver especialidades</a></div>
             <div class="hero-trust"><div><b>La Floresta</b><small>sede de atención</small></div><div><b>Integral</b><small>evaluación odontológica</small></div><div><b>Coordinada</b><small>solicitud de citas</small></div></div>
           </div>
           <div class="hero-visual">
@@ -37,21 +37,21 @@ import { ClinicConfigService } from '../core/clinic-config.service';
 
         <section class="quick-care">
           <div><span>🚨</span><b>¿Tienes una emergencia dental?</b><p>Dolor intenso, inflamación, sangrado o traumatismo.</p></div>
-          <a href="#contacto">Solicitar atención prioritaria →</a>
+          <a routerLink="." fragment="contacto">Solicitar atención prioritaria →</a>
         </section>
 
         <section class="section" id="servicios">
           <div class="section-heading"><span>Especialidades</span><h2>Todo lo que tu salud bucal necesita</h2><p>Atención integral para niños, jóvenes, adultos y adultos mayores.</p></div>
           <div class="service-grid">
             @for (service of services; track service.title) {
-              <article><div class="service-icon">{{ service.icon }}</div><h3>{{ service.title }}</h3><p>{{ service.text }}</p><a href="#contacto">Conocer más →</a></article>
+              <article><div class="service-icon">{{ service.icon }}</div><h3>{{ service.title }}</h3><p>{{ service.text }}</p><a routerLink="." fragment="contacto">Conocer más →</a></article>
             }
           </div>
         </section>
 
         <section class="section about" id="nosotros">
           <div class="about-visual"><div class="clinic-room">🪥<span>Atención odontológica<br>en La Floresta</span></div><div class="experience"><b>La Floresta</b><small>Lima, Perú</small></div></div>
-          <div class="about-copy"><span class="section-label">Nuestra clínica</span><h2>Atención odontológica cercana y organizada</h2><p>La evaluación, el plan propuesto, las citas y el seguimiento se registran de forma ordenada para que el paciente conozca cada etapa de su atención.</p><ul><li>Evaluación a cargo del equipo clínico asignado.</li><li>Registro seguro de la historia y evolución clínica.</li><li>Presupuestos y tratamientos claramente documentados.</li><li>Seguimiento coordinado desde recepción.</li></ul><a class="primary" href="#doctores">Conoce cómo atendemos</a></div>
+          <div class="about-copy"><span class="section-label">Nuestra clínica</span><h2>Atención odontológica cercana y organizada</h2><p>La evaluación, el plan propuesto, las citas y el seguimiento se registran de forma ordenada para que el paciente conozca cada etapa de su atención.</p><ul><li>Evaluación a cargo del equipo clínico asignado.</li><li>Registro seguro de la historia y evolución clínica.</li><li>Presupuestos y tratamientos claramente documentados.</li><li>Seguimiento coordinado desde recepción.</li></ul><a class="primary" routerLink="." fragment="doctores">Conoce cómo atendemos</a></div>
         </section>
 
         <section class="section doctors" id="doctores">
@@ -68,9 +68,9 @@ import { ClinicConfigService } from '../core/clinic-config.service';
         <section class="section testimonials"><div class="section-heading"><span>Proceso de atención</span><h2>Un recorrido sencillo para cada paciente</h2></div><div class="testimonial-grid"><article><b>1. Solicita una evaluación</b><p>Envía tus datos y recepción se comunicará para coordinar la disponibilidad.</p></article><article><b>2. Recibe un plan claro</b><p>El equipo clínico registra la evaluación y explica las alternativas correspondientes.</p></article><article><b>3. Continúa tu seguimiento</b><p>Las citas, avances y pagos quedan organizados dentro de la historia del paciente.</p></article></div></section>
 
         <section class="contact" id="contacto"><div><span>Reserva tu evaluación</span><h2>Comienza hoy a cuidar tu sonrisa</h2><p>La recepción de {{ clinic.shortName() }} confirmará tu solicitud y te indicará los horarios disponibles.</p><div class="contact-data"><b>📍 {{ clinic.config().address }}</b>@if(clinic.config().phone){<b>☎ {{ clinic.config().phone }}</b>}@if(clinic.config().email){<b>✉ {{ clinic.config().email }}</b>}<b>🕘 {{ clinic.config().workingHours }}</b></div></div><form (ngSubmit)="sendInquiry()"><label>Nombre completo<input [(ngModel)]="inquiry.fullName" name="fullName" placeholder="Escribe tu nombre" required></label><label>Teléfono<input [(ngModel)]="inquiry.phone" name="phone" inputmode="numeric" maxlength="9" pattern="[0-9]{9}" placeholder="999999999" required></label><label>Motivo de consulta<select [(ngModel)]="inquiry.specialty" name="specialty" required><option>Evaluación general</option><option>Dolor o molestia dental</option><option>Consulta sobre tratamiento</option><option>Control odontológico</option><option>Atención prioritaria</option></select></label><label>Mensaje<textarea [(ngModel)]="inquiry.message" name="message" placeholder="Cuéntanos brevemente qué necesitas"></textarea></label><button [disabled]="sending()">{{sending() ? 'Enviando...' : 'Solicitar cita'}}</button>@if(inquiryMessage()){<small [class.error-text]="inquiryError()">{{inquiryMessage()}}</small>}</form></section>
-        <section class="legal-section" id="privacidad"><article><h3>Privacidad</h3><p>Los datos enviados se utilizan para gestionar la atención solicitada y quedan restringidos al personal autorizado.</p></article><article id="terminos"><h3>Términos de atención</h3><p>La solicitud web no confirma una cita hasta que recepción valide la disponibilidad del doctor y del sillón.</p></article><article id="reclamaciones"><h3>Libro de reclamaciones</h3><p>Recepción registra reclamos y entrega el código de seguimiento dentro del módulo de satisfacción.</p><a href="#contacto">Enviar una solicitud →</a></article></section>
+        <section class="legal-section" id="privacidad"><article><h3>Privacidad</h3><p>Los datos enviados se utilizan para gestionar la atención solicitada y quedan restringidos al personal autorizado.</p></article><article id="terminos"><h3>Términos de atención</h3><p>La solicitud web no confirma una cita hasta que recepción valide la disponibilidad del doctor y del sillón.</p></article><article id="reclamaciones"><h3>Libro de reclamaciones</h3><p>Recepción registra reclamos y entrega el código de seguimiento dentro del módulo de satisfacción.</p><a routerLink="." fragment="contacto">Enviar una solicitud →</a></article></section>
       </main>
-      <footer><div class="public-brand"><img [src]="clinic.logoUrl()" [alt]="'Logo ' + clinic.name()"><div><b>{{ clinic.name() }}</b><small>{{ clinic.config().tagline }}</small></div></div><p>© 2026 {{ clinic.name() }}. Plataforma de gestión odontológica.</p><div><a href="#privacidad">Privacidad</a><a href="#terminos">Términos</a><a href="#reclamaciones">Libro de reclamaciones</a></div></footer>
+      <footer><div class="public-brand"><img [src]="clinic.logoUrl()" [alt]="'Logo ' + clinic.name()"><div><b>{{ clinic.name() }}</b><small>{{ clinic.config().tagline }}</small></div></div><p>© 2026 {{ clinic.name() }}. Plataforma de gestión odontológica.</p><div><a routerLink="." fragment="privacidad">Privacidad</a><a routerLink="." fragment="terminos">Términos</a><a routerLink="." fragment="reclamaciones">Libro de reclamaciones</a></div></footer>
     </div>
   `,
   styles: [`
@@ -128,3 +128,4 @@ export class HomeComponent implements OnInit {
     {initials:'EO',name:'Equipo de odontopediatría',specialty:'Odontopediatría',description:'Prevención y atención adaptada para niños y adolescentes.'}
   ];
 }
+

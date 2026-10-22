@@ -12,10 +12,10 @@ import { ClinicBrand } from '../core/models';
     <div class="platform-page">
       <header>
         <a class="platform-brand" routerLink="/">
-          <img src="/brand/platform-logo.svg" alt="Plataforma multiclínica">
+          <img src="brand/platform-logo.svg" alt="Plataforma multiclínica">
           <div><b>Portal odontológico</b><small>Plataforma multiclínica</small></div>
         </a>
-        <nav><a href="#clinicas">Clínicas</a><a href="#como-funciona">Cómo funciona</a></nav>
+        <nav><a routerLink="." fragment="clinicas">Clínicas</a><a routerLink="." fragment="como-funciona">Cómo funciona</a></nav>
         <a class="login" routerLink="/login">Iniciar sesión</a>
       </header>
 
@@ -25,12 +25,12 @@ import { ClinicBrand } from '../core/models';
             <span class="eyebrow">Una plataforma · múltiples clínicas</span>
             <h1>Encuentra tu clínica y accede a una atención organizada.</h1>
             <p>Este es el portal general de la red. Cada clínica mantiene su propia identidad, equipo, pacientes e información completamente separada.</p>
-            <div class="actions"><a class="primary" href="#clinicas">Ver clínicas</a><a class="secondary" routerLink="/login">Acceso del personal</a></div>
+            <div class="actions"><a class="primary" routerLink="." fragment="clinicas">Ver clínicas</a><a class="secondary" routerLink="/login">Acceso del personal</a></div>
             <div class="trust"><span><b>{{clinics().length}}</b> clínicas disponibles</span><span><b>24/7</b> acceso seguro</span><span><b>100%</b> información separada</span></div>
           </div>
           <div class="network" aria-hidden="true">
             <div class="network-ring ring-one"></div><div class="network-ring ring-two"></div>
-            <div class="hub"><img src="/brand/platform-logo.svg" alt=""><b>Portal general</b><small>Conecta sin mezclar</small></div>
+            <div class="hub"><img src="brand/platform-logo.svg" alt=""><b>Portal general</b><small>Conecta sin mezclar</small></div>
             <div class="node node-a">Clínica A</div><div class="node node-b">Clínica B</div><div class="node node-c">Clínica C</div>
           </div>
         </section>
@@ -67,7 +67,7 @@ import { ClinicBrand } from '../core/models';
         </section>
       </main>
 
-      <footer><div class="platform-brand"><img src="/brand/platform-logo.svg" alt=""><div><b>Portal odontológico</b><small>Gestión multiclínica segura</small></div></div><p>Una sola plataforma, espacios independientes para cada clínica.</p><a routerLink="/login">Acceso al sistema</a></footer>
+      <footer><div class="platform-brand"><img src="brand/platform-logo.svg" alt=""><div><b>Portal odontológico</b><small>Gestión multiclínica segura</small></div></div><p>Una sola plataforma, espacios independientes para cada clínica.</p><a routerLink="/login">Acceso al sistema</a></footer>
     </div>
   `,
   styles: [`
@@ -93,3 +93,4 @@ export class PlatformHomeComponent implements OnInit {
     return `linear-gradient(180deg, transparent, color-mix(in srgb, ${brand.primaryDarkColor} 72%, transparent)), url("${brand.heroImageUrl}")`;
   }
 }
+

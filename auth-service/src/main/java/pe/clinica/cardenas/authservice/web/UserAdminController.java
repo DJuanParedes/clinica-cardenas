@@ -35,6 +35,10 @@ public class UserAdminController {
     private final UserAccountRepository repository;
     private final PasswordEncoder encoder;
     private final SchedulingProvisioningClient scheduling;
+    private final pe.clinica.cardenas.authservice.service.SecurityAuditService audit;
+
+    @GetMapping("/audit")
+    public java.util.List<pe.clinica.cardenas.authservice.domain.SecurityAuditEntry> audit() { return audit.recent(); }
 
     @GetMapping
     public List<UserView> list() {
@@ -79,6 +83,7 @@ public class UserAdminController {
             scheduling.ensureDoctor(null, saved.getFullName(), saved.getEmail(), request.doctorSpecialty().trim(), request.doctorBranch().trim(),
                     normalizedShiftStart(request.shiftStart()), normalizedShiftEnd(request.shiftEnd()), true, http.getHeader("Authorization"));
         }
+        audit.record("USER_CREATED", saved, null);
         return UserView.from(saved);
     }
 
@@ -130,6 +135,7 @@ public class UserAdminController {
         } else if (previousRole == Role.DOCTOR) {
             scheduling.setDoctorActive(previousEmail, false, authorization);
         }
+        audit.record("USER_UPDATED", saved, previousRole);
         return UserView.from(saved);
     }
 
@@ -146,6 +152,7 @@ public class UserAdminController {
         if (value) { account.setFailedAttempts(0); account.setLockedUntil(null); }
         UserAccount saved = repository.save(account);
         if (saved.getRole() == Role.DOCTOR) scheduling.setDoctorActive(saved.getEmail(), value, http.getHeader("Authorization"));
+        audit.record(value ? "USER_ENABLED" : "USER_DISABLED", saved, account.getRole());
         return UserView.from(saved);
     }
 
@@ -157,11 +164,13 @@ public class UserAdminController {
         if (account.getRole() == Role.ADMIN) throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede eliminar el Administrador principal");
         if (account.getLastLoginAt() != null) throw new ResponseStatusException(HttpStatus.CONFLICT, "Una cuenta que ya ingresó no se elimina; debe bloquearse para conservar trazabilidad");
         if (account.getRole() == Role.DOCTOR) scheduling.setDoctorActive(account.getEmail(), false, http.getHeader("Authorization"));
+        audit.record("USER_DELETED_BEFORE_LOGIN", account, account.getRole());
         repository.delete(account);
     }
 
     @PostMapping("/{id}/reissue-initial-access")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     public void reissueInitialAccess(@PathVariable Long id) {
         UserAccount account = find(id);
         if (account.getRole() == Role.ADMIN) throw new ResponseStatusException(HttpStatus.CONFLICT, "El Administrador no utiliza acceso temporal por DNI");
@@ -179,6 +188,7 @@ public class UserAdminController {
         account.setPasswordResetFailureCount(0);
         account.setPasswordResetLockedUntil(null);
         repository.save(account);
+        audit.record("INITIAL_ACCESS_REISSUED", account, account.getRole());
     }
 
     private void validateDoctorFields(Role role, String specialty, String branch, String shiftStart, String shiftEnd) {
@@ -243,3 +253,4 @@ public class UserAdminController {
             @NotNull Role role, boolean enabled,
             String doctorSpecialty, String doctorBranch, String shiftStart, String shiftEnd) {}
 }
+
