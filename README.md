@@ -182,3 +182,7 @@ Si una carpeta anterior tiene el marcador de Gateway previo, ejecuta `07-REPARAR
 
 La trazabilidad de HU-01, HU-02 y HU-12, las mejoras de seguridad, el guion de demostración y las verificaciones pendientes están en [docs/SPRINT-1.md](docs/SPRINT-1.md). La evidencia corresponde al 22/10/2026 y no acredita reuniones ni ejecución durante el calendario original del Sprint.
 
+
+## Documentación académica revisada
+
+El contraste directo con el Charter y las tarjetas completas están en [docs/REVISION-ACADEMICA-SPRINT-1.md](docs/REVISION-ACADEMICA-SPRINT-1.md). La página académica y sus archivos descargables se incluyen en `frontend/public/sprint-1/`; tras desplegar este cambio estarán en [Sprint 1](https://djuanparedes.github.io/clinica-cardenas/sprint-1/). La estimación 21 SP es propuesta y no acredita eventos ni conformidad del cliente.
