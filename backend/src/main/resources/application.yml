@@ -1,0 +1,87 @@
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: clinica-cardenas
+  main:
+    banner-mode: off
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/clinica?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8&connectionCollation=utf8mb4_0900_ai_ci}
+    username: ${DB_USER:clinica}
+    password: ${DB_PASSWORD:clinica}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none   # el esquema lo gobiernan las migraciones de Flyway
+    properties:
+      hibernate:
+        jdbc.time_zone: America/Lima
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    mail:
+      enabled: false
+
+app:
+  timezone: America/Lima
+  # true: el código de recuperación de contraseña también se devuelve en la respuesta (solo demo)
+  demo-mode: ${APP_DEMO_MODE:true}
+  seed-demo-data: ${APP_SEED_DEMO:true}
+  jwt:
+    secret: ${JWT_SECRET:cambia-este-secreto-en-produccion-clinica-cardenas-2026}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  security:
+    max-failed-attempts: 5
+    lock-minutes: 15
+  company:
+    # RUC 10102984841: Clínica Dental Cárdenas (persona natural con negocio)
+    ruc: ${EMPRESA_RUC:10102984841}
+    business-name: ${EMPRESA_RAZON_SOCIAL:CLÍNICA DENTAL CÁRDENAS}
+    trade-name: ${EMPRESA_NOMBRE_COMERCIAL:Clínica Dental Cárdenas}
+    address: ${EMPRESA_DIRECCION:Urb. La Floresta, Chaclacayo - Lima}
+    ubigeo: ${EMPRESA_UBIGEO:150107}
+  sunat:
+    # soap: envía el XML firmado al servicio billService (API simulada de SUNAT en docker-compose)
+    # interno: validación dentro del backend, sin red
+    mode: ${SUNAT_MODE:soap}
+    ambiente: ${SUNAT_AMBIENTE:BETA SIMULADO}
+    url: ${SUNAT_URL:http://localhost:8082/ol-ti-itcpfegem-beta/billService}
+    consulta-url: ${SUNAT_CONSULTA_URL:http://localhost:8082/v1/ruc}
+    usuario: ${SUNAT_USUARIO:MODDATOS}
+    clave: ${SUNAT_CLAVE:MODDATOS}
+    certificado: ${SUNAT_CERTIFICADO:classpath:sunat/certificado-demo.p12}
+    certificado-clave: ${SUNAT_CERTIFICADO_CLAVE:clinica-demo}
+    igv-rate: 0.18
+    boleta-max-sin-documento: 700.00
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN

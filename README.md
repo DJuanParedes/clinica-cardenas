@@ -1,188 +1,212 @@
-# Clínica Cárdenas V4.9.17 — MySQL
+# Clínica Dental Cárdenas · Sprint 1
 
-Esta carpeta contiene **solo la versión vigente V4.9.17**. La base de datos del sistema es **MySQL** tanto en local como en producción.
+Sistema Web de Gestión Odontológica. Este Sprint 1 cubre el ingreso del paciente, la agenda sin cruces,
+la historia clínica con odontograma y la facturación electrónica.
 
-## Plataforma multiclinica y multimarca
+| Capa | Tecnología | Imagen Docker |
+|---|---|---|
+| Frontend | Angular 18 (standalone, sin librerías de UI) | `nginx:1.27-alpine` · ~25 MB |
+| Backend | Java 21 · Spring Boot 3.4 · JPA · Flyway · JWT | JRE recortado con `jlink` sobre `alpine` · ~90 MB |
+| Base de datos | MySQL 8.4 | `mysql:8.4` con memoria ajustada |
+| API simulada de SUNAT | Node 20 sin dependencias | `node:20-alpine` · ~45 MB |
 
-Una sola instalación administra varias clínicas o marcas. El superadministrador entra
-en **Clínicas y marcas**, registra logo, colores, dirección pública, dominio y contacto,
-y usa el selector superior para cambiar la clínica activa. Después crea el administrador
-y los demás usuarios de esa clínica desde **Usuarios y roles**.
+## Cómo levantarlo
 
-El aislamiento no depende de la pantalla: `clinic_id` es obligatorio en las 34 entidades
-operativas, Hibernate agrega el filtro a consultas y escrituras, y el JWT firmado contiene
-la clínica activa. Pacientes, citas, odontogramas, caja, inventario, auditoría, encuestas y
-respaldos quedan separados aunque compartan la misma instalación MySQL. Los registros
-anteriores se asignan automáticamente a `CARDENAS`. Consulta `docs/MULTICLINICA.md`.
+Solo necesitas **Docker Desktop** abierto. No hace falta tener Java, Maven ni Node instalados.
 
-La interfaz tiene tres niveles claramente separados: `/` es el portal general neutral y
-muestra el directorio de todas las clínicas activas; `/marca/{slug}` es la página pública de
-una marca concreta; y `/app` es el espacio privado que solo adopta el logo, los colores y los
-datos de la clínica después de autenticar al usuario. `/login` y la recuperación de contraseña
-también son neutrales, porque la clínica se determina mediante la cuenta validada.
-## Superadministrador global privado
+En Windows basta con doble clic en uno de estos archivos:
 
-La plataforma conserva exactamente una cuenta global con `platformAdmin=true`. Esta cuenta
-puede entrar al portal principal, crear clínicas, cambiar la clínica activa y administrar a
-sus responsables. La API impide eliminarla, deshabilitarla o cambiarle el rol.
+| Archivo | Qué hace |
+|---|---|
+| `iniciar.bat` | Construye y levanta todo, y abre el navegador |
+| `actualizar.bat` | Aplica cambios del código **conservando los datos** |
+| `reiniciar-limpio.bat` | Borra la base de datos y vuelve a crear los datos de ejemplo |
+| `pruebas-unitarias.bat` | Ejecuta las pruebas JUnit del backend (resultado en `pruebas-unitarias.log`) |
 
-Su nombre, correo, teléfono y canal de recuperación se guardan únicamente en el archivo
-privado `.env`, excluido de Git y de los ZIP. En una instalación nueva el asistente solicita
-esos datos. No existe una contraseña fija en el código: la cuenta nace con una clave aleatoria
-y el propietario establece o recupera su contraseña mediante OTP.
+O desde una terminal:
 
-La sede confirmada de **Clínica Cárdenas** se muestra como **La Floresta,
-Lima, Perú**. El teléfono, correo y horario público quedan sin inventar hasta que el
-superadministrador registre los datos oficiales en **Clínicas y marcas**.
+```bash
+docker compose up -d --build
+```
 
-`CONFIGURAR-CLINICA.bat` se conserva únicamente para la identidad predeterminada de una
-instalación nueva o para compatibilidad; las marcas adicionales se crean desde el sistema.
+La primera vez tarda unos minutos porque descarga dependencias y compila. Luego:
 
-## Uso local recomendado
+- **Aplicación:** http://localhost:8081
+- **API simulada de SUNAT** (panel con los comprobantes recibidos): http://localhost:8082
+- **MySQL** (DBeaver / Workbench): `localhost:3307` · base `clinica` · usuario `clinica` · contraseña `clinica`
 
-1. Extrae la carpeta en una ruta corta, por ejemplo `C:\ClinicaCardenas`.
-2. Abre Docker Desktop.
-3. Primera instalación o después de recibir una actualización: ejecuta `01-INSTALAR-O-ACTUALIZAR.bat`.
-4. En los siguientes días: ejecuta `02-INICIAR.bat`. **No recompila.**
-5. Para detener: `03-DETENER.bat`.
-6. Para revisar el estado: `04-VER-ESTADO.bat`.
-7. Si ocurre un problema: `05-GENERAR-DIAGNOSTICO.bat`.
+Para ver el avance del arranque: `docker compose logs -f backend`.
+Para apagar: `docker compose down`. Para borrar también la base de datos: `docker compose down -v`.
 
-## Base de datos MySQL
+### Cuentas de prueba
 
-Se usa **un solo servidor MySQL** y una base independiente por microservicio que persiste datos. Esto evita levantar múltiples servidores de base de datos y mantiene separado el esquema lógico de cada servicio.
+Todas usan la contraseña **`Clinica2026`**.
 
-Bases locales:
+| Usuario | Rol | Qué ve |
+|---|---|---|
+| `admin` | Administrador | Todo, incluida la gestión de usuarios y horarios |
+| `recepcion` | Recepcionista | Pacientes, nueva cita, agenda, llegada de pacientes |
+| `dra.cardenas` | Odontóloga (Ortodoncia) | Su agenda, historia clínica, odontograma, plan |
+| `dr.ramos` | Odontólogo (Endodoncia) | Igual que la anterior |
+| `caja` | Responsable de caja | Comprobantes y envío a SUNAT |
+| `director` | Director | Inicio, agenda y pacientes (consulta) |
 
-- `auth_db`
-- `patient_db`
-- `appointment_db`
-- `clinical_db`
-- `finance_db`
-- `lab_db`
-- `operations_db`
-- `inventory_db`
-- `content_db`
-- `encounter_db`
-- `survey_db`
+En el primer arranque también se crean 8 pacientes, citas para hoy y el siguiente día hábil, y una historia
+clínica completa (María Fernanda Quispe, DNI 45872196) con odontograma y plan en curso. Para arrancar sin
+datos de ejemplo usa `APP_SEED_DEMO=false` en un archivo `.env` (ver `.env.example`).
 
-### Conexión desde DBeaver en local
+### Consumo de recursos
 
-- Host: `localhost`
-- Puerto: `3307`
-- Motor: MySQL
-- Usuario administrador local: `root`
-- Contraseña: valor `MYSQL_ROOT_PASSWORD` del archivo `.env` generado por `PREPARAR-ENTORNO-LOCAL.bat`
+Los contenedores tienen límites de memoria: MySQL 384 MB, backend 384 MB, frontend 64 MB y SUNAT simulada 64 MB.
+En reposo el sistema completo usa alrededor de 450–550 MB de RAM.
 
-También puedes conectarte con los usuarios propios de cada microservicio (`auth_user`, `patient_user`, etc.) usando su contraseña correspondiente del `.env`.
+- MySQL arranca sin `performance_schema` y con un buffer pool de 64 MB.
+- El backend usa un JRE recortado con `jlink`, GC serial y heap relativo al límite del contenedor.
+- El frontend es estático y lo sirve nginx con gzip; el backend queda detrás de `/api` (mismo origen, sin CORS).
 
-## Persistencia
+## Qué incluye el Sprint 1
 
-Los datos MySQL locales se guardan en el volumen Docker `mysql-data`. `03-DETENER.bat` **no borra** ese volumen. `LIMPIAR-DATOS-LOCAL.bat` sí elimina los volúmenes locales y debe usarse únicamente si quieres reiniciar los datos desde cero.
+| Historia | Dónde está |
+|---|---|
+| **HU-25** Iniciar sesión | Pantalla de acceso, JWT, bloqueo de 15 min tras 5 intentos fallidos, cierre de sesión que invalida el token, protección de pantallas y endpoints por rol |
+| Recuperar contraseña | Código de 6 dígitos con vencimiento de 15 min y máximo 5 intentos. Sin SMTP configurado, el código aparece en pantalla (modo demostración) y en el log del backend |
+| **HU-27** Cuentas de usuario | Crear, editar, desactivar o reactivar, desbloquear y asignar contraseña temporal, todo con registro de cambios. Horario de atención por odontólogo |
+| **HU-01** Registrar paciente | Validación de DNI (8 dígitos), carné de extranjería y pasaporte. Detecta duplicados mientras se escribe y la base los bloquea con una restricción única |
+| **HU-02** Buscar paciente | Búsqueda exacta o por prefijo de documento y búsqueda parcial por nombres o apellidos, con índices. Si no hay resultados, ofrece registrar al paciente |
+| **HU-03** Actualizar datos *(extra)* | Edición con fecha y usuario de modificación y registro de cambios |
+| **HU-07** Programar cita | Horarios libres calculados en el servidor según el horario del odontólogo. Valida cruces del odontólogo y del paciente; un bloqueo de fila evita reservas simultáneas |
+| Agenda diaria | Columnas por odontólogo, línea de "ahora" y estados de la cita (llegada, en atención, atendida, cancelada con motivo) |
+| **HU-08 / HU-09** *(extra)* | Reprogramar revalidando disponibilidad y estados de la sala de espera |
+| **HU-04** Historia clínica | Antecedentes, alergias en alerta y diagnósticos CIE-10. Solo la ven el odontólogo y el administrador (restringido en el servidor) |
+| **HU-05** Odontograma | Interactivo por pieza y cara (notación FDI, dentición permanente y decidua). Rojo para hallazgos y azul para tratamientos; imprimible |
+| **HU-06** Plan de tratamiento | Procedimientos del catálogo con precio, estado por procedimiento, evolución por sesión y avance del plan |
+| **HU-10** Generar comprobante | Boleta B001 y factura F001 con correlativo controlado (bloqueo de serie), IGV incluido, validación de RUC con dígito verificador e importe en letras. Factura los procedimientos realizados del paciente |
+| **HU-11** Enviar a SUNAT | Genera el XML UBL 2.1 y lo envía al servicio de facturación. Guarda el CDR y cada intento de envío |
+| **HU-12** Consultar comprobante | Búsqueda por número, cliente, estado o fecha; representación impresa; descarga del XML y del CDR |
 
-**Importante:** al cambiar a esta arquitectura se crea un almacenamiento MySQL nuevo. Si necesitas conservar datos reales de una instalación anterior con otro motor, esos datos deben exportarse y migrarse explícitamente; el instalador no hace una conversión automática.
+### Facturación electrónica y API simulada de SUNAT
 
-## Compilación optimizada
+Los comprobantes se emiten con el RUC de la clínica, **10102984841** (Clínica Dental Cárdenas). El RUC, la razón
+social y la dirección se cambian sin tocar el código con las variables `EMPRESA_*` del archivo `.env`.
 
-La compilación Java usa un solo reactor Maven para generar los 15 JAR y los exporta temporalmente al host sin crear una imagen intermedia pesada. Después Docker construye las 15 imágenes Java de forma secuencial, una por una, y compila el frontend al final. Si una fase posterior falla, los JAR exportados de la misma versión se reutilizan en el siguiente intento. MySQL usa la imagen local `mysql:8.4` cuando ya existe y solo se descarga cuando hace falta.
+El backend hace lo mismo que con SUNAT real:
 
-## Creación automática de contenedores
+1. Genera el XML UBL 2.1 y lo **firma digitalmente** (XMLDSig, RSA-SHA256, firma `SignatureSP` dentro de
+   `ext:ExtensionContent`). El valor de resumen de la firma es el código hash impreso en el comprobante.
+2. Lo comprime en `10102984841-03-B001-1.zip` y lo envía por **SOAP `sendBill`** con WS-Security (usuario SOL
+   secundario `RUC + MODDATOS`).
+3. Lee la **Constancia de Recepción (CDR)** que devuelve SUNAT y guarda el estado y cada intento.
 
-Después de completar las imágenes, `01-INSTALAR-O-ACTUALIZAR.bat` ejecuta `ASEGURAR-CONTENEDORES.ps1`. Si no existe ningún contenedor, crea los 17 definidos por Compose (MySQL + 16 componentes) sin recompilar y verifica 17/17 antes del arranque. `02-INICIAR.bat` hace la misma comprobación: si las imágenes son correctas pero los contenedores fueron borrados, los vuelve a crear automáticamente sin tocar los volúmenes persistentes.
+La API simulada (`sunat-sim/`, puerto **8082**) imita el servicio `billService` del entorno beta:
 
-## Inicio optimizado
+| Servicio | Qué hace |
+|---|---|
+| `POST /ol-ti-itcpfegem-beta/billService` · `sendBill` | Valida usuario SOL, nombre del ZIP, RUC emisor, serie, tipo, firma, receptor y totales. Responde con el CDR (ZIP) o con un SOAP Fault |
+| `POST /ol-ti-itcpfegem-beta/billService` · `getStatusCdr` | Devuelve el CDR de un comprobante ya recibido |
+| `GET /v1/ruc/{ruc}` | Consulta RUC: razón social, dirección, estado y condición (padrón de ejemplo) |
+| `GET /` | Panel con los comprobantes recibidos y botones para simular el servicio **normal, lento o caído** |
 
-El inicio local es escalonado: MySQL se inicia y valida primero; después Eureka y los microservicios por grupos; finalmente Gateway y frontend. Esto reduce picos de RAM/CPU.
+Respuestas según el catálogo de errores de SUNAT:
 
-## URLs locales
+| Caso | Código | Estado en el sistema |
+|---|---|---|
+| Comprobante correcto | `0` | Aceptado |
+| RUC del receptor no figura en el padrón | `0` + observación `4093` | Aceptado con observaciones |
+| Factura a un cliente sin RUC | `2800` | Rechazado (con CDR) |
+| RUC del receptor dado de baja | `2018` | Rechazado (con CDR) |
+| Total distinto de valor de venta + IGV | `3277` | Rechazado (con CDR) |
+| XML sin firma o alterado | `2335` | Rechazado |
+| Usuario o clave SOL incorrectos | `0102` | Error de envío, se puede reintentar |
+| Ya enviado antes | `1033` | El sistema recupera el CDR con `getStatusCdr` |
+| Servicio caído o sin conexión | — | Error de envío, se puede reintentar |
 
-- Portal general de clínicas: http://localhost:8080
-- Página pública Cárdenas: http://localhost:8080/marca/cardenas
-- Acceso general: http://localhost:8080/login
-- Gateway: http://localhost:8090/actuator/health
-- Eureka: http://localhost:8761
-- MySQL para DBeaver: `localhost:3307`
+RUC de prueba del padrón: `20100070970` (activo), `20511465061` (colegio de Chosica), `20548777217`
+(dado de baja, no habido). Al escribir un RUC en una factura, la razón social y la dirección se completan solas.
 
-## Odontograma FDI / ISO 3950
+**Para pasar a SUNAT real** no cambia el código, solo la configuración del `.env`:
 
-El módulo clínico mantiene el flujo original de la clínica y aplica una estructura compatible con la nomenclatura de dos dígitos de **FDI / ISO 3950:2016**. Esta implementación es una alineación técnica del módulo; no representa una certificación del software por FDI ni por ISO.
+```
+SUNAT_URL=https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService   # beta oficial
+SUNAT_USUARIO=<usuario SOL secundario>
+SUNAT_CLAVE=<clave SOL>
+SUNAT_CERTIFICADO=file:/ruta/certificado.pfx
+SUNAT_CERTIFICADO_CLAVE=<clave del certificado>
+```
 
-- Dentición permanente: cuadrantes 1 a 4 y piezas 11–48.
-- Dentición temporal: cuadrantes 5 a 8 y piezas 51–85.
-- Registro de dentición permanente, temporal o mixta.
-- Superficies mesial (M), distal (D), vestibular (V), lingual/palatina (L), oclusal (O) e incisal (I), con validación anatómica básica.
-- Caries documentada por severidad (`INICIAL`, `MODERADA`, `SEVERA`) y actividad (`ACTIVA`, `INACTIVA`).
-- Evaluación de riesgo de caries, factores de riesgo, factores protectores, diagnóstico y plan de tratamiento.
-- El backend rechaza números dentales, superficies y valores clínicos no reconocidos; además convierte los odontogramas antiguos del formato simple al formato estructurado al volver a guardarlos.
+El certificado incluido (`backend/src/main/resources/sunat/certificado-demo.p12`) es autofirmado y solo sirve para
+la demostración. Con `SUNAT_MODE=interno` el backend valida sin red, sin usar la API simulada.
 
-Referencias oficiales consultadas:
+## Estructura
 
-- ISO 3950:2016, *Dentistry — Designation system for teeth and areas of the oral cavity*: https://www.iso.org/standard/68292.html
-- FDI, *Classification of caries lesions of tooth surfaces and caries management systems*: https://www.fdiworlddental.org/classification-caries-lesions-tooth-surfaces-and-caries-management-systems
-- FDI, *Carious lesions and first restorative treatment*: https://www.fdiworlddental.org/carious-lesions-and-first-restorative-treatment
-- FDI, *Caries prevention and management chairside guide*: https://www.fdiworlddental.org/caries-prevention-and-management-chairside-guide
+```
+clinica-cardenas/
+├── docker-compose.yml
+├── pruebas/sprint1-e2e.js           pruebas end-to-end de todas las historias y de SUNAT
+├── sunat-sim/                       API simulada de SUNAT (billService SOAP, consulta RUC, panel)
+├── backend/                         Spring Boot
+│   ├── src/main/resources/db/migration   V1 esquema · V2 catálogos (Flyway)
+│   └── src/main/java/pe/clinicacardenas/
+│       ├── auth/        login, recuperación, política de contraseñas
+│       ├── security/    JWT, filtro, reglas por rol
+│       ├── user/        cuentas, roles, horarios
+│       ├── patient/     registro y búsqueda
+│       ├── agenda/      odontólogos, horarios libres, citas
+│       ├── clinical/    historia, diagnóstico, odontograma, plan, evolución
+│       ├── billing/     series, comprobantes, UBL, firma digital, cliente SOAP de SUNAT
+│       ├── dashboard/   resumen de inicio por rol
+│       └── common/      errores con formato único, auditoría
+└── frontend/                        Angular
+    └── src/app/
+        ├── core/        API, sesión, guardas por rol, formatos
+        ├── shared/      odontograma, buscador de pacientes, modal, íconos
+        ├── layout/      menú lateral según rol
+        └── pages/       una pantalla por historia
+```
 
-## Flujo simplificado de Recepción
+Todos los errores de la API usan el mismo formato:
 
-El menú **Recepción de hoy** concentra las tareas operativas que requieren una decisión inmediata y mantiene separadas las responsabilidades clínicas:
+```json
+{ "timestamp": "...", "status": 409, "code": "CRUCE_HORARIO",
+  "message": "Dra. Rosa Cárdenas Vílchez ya tiene una cita de 10:00 a 10:30. Elige otro horario libre.",
+  "path": "/api/appointments" }
+```
 
-1. Buscar o registrar al paciente verificando DNI y teléfono.
-2. Programar la cita seleccionando doctor, sillón y horario disponible.
-3. El día de la cita, registrar únicamente `LLEGÓ` o `NO ASISTIÓ`.
-4. Si no asistió, resolver el caso reprogramando con historial o cerrando sin reprogramar.
-5. Derivar al doctor para diagnóstico y atención clínica; Recepción no modifica odontogramas ni evoluciones.
-6. Registrar pagos solamente contra una proforma o saldo identificado.
+## Desarrollo local sin Docker (opcional)
 
-La pantalla también muestra solicitudes web nuevas, pacientes por recibir, personas presentes e inasistencias pendientes. Desde cada tarjeta se abre la operación correspondiente sin navegar por módulos clínicos. El odontograma se vincula al identificador único del paciente para evitar cruces entre personas con nombres iguales.
+```bash
+# Solo la base de datos
+docker compose up -d db
 
-## Producción
+# Backend (IntelliJ o consola), con Java 21
+cd backend
+DB_URL="jdbc:mysql://localhost:3307/clinica?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" mvn spring-boot:run
 
-En producción MySQL queda en una red Docker interna y **no publica el puerto 3306 al host**. Consulta `docs/PRODUCCION.md`.
+# Frontend, con Node 20
+cd frontend
+npm install
+npm start          # http://localhost:4200 (redirige /api al backend en :8080)
+```
 
-Para preparar un despliegue por servicios desde GitHub, consulta
-[`docs/RAILWAY.md`](docs/RAILWAY.md). Los secretos reales se configuran fuera del
-repositorio usando `.env.production.example` únicamente como inventario. Las reglas para
-credenciales y datos clínicos están en [`SECURITY.md`](SECURITY.md).
+## Pruebas realizadas
 
-## Recuperación cuando las imágenes ya existen pero no hay contenedores
+**Unitarias (JUnit, 11/11):** validación de pacientes, horarios libres y cruces, RUC, IGV, importe en letras,
+odontograma, política de contraseñas y firma digital del XML (válida y detecta alteraciones). Se ejecutan con `pruebas-unitarias.bat` o `cd backend && mvn test`.
 
-Si Docker muestra las 17 imágenes necesarias pero `Containers: 0`, **no vuelvas a compilar**. Ejecuta `02-INICIAR.bat`. El iniciador valida las imágenes mediante `docker image inspect` en JSON, crea automáticamente los 17 contenedores con `docker compose create --no-build --pull never`, verifica 17/17 y recién después inicia MySQL y el resto del sistema.
+**End-to-end (48/48)** contra el sistema completo en Docker, con `node pruebas/sprint1-e2e.js http://localhost:8081`:
 
-La verificación de versión de las imágenes no usa plantillas `--format` de Docker; procesa el JSON con PowerShell para evitar diferencias de interpretación de comillas en Windows PowerShell 5.1. Si falla esa comprobación, el diagnóstico lo registra como `ERROR_VERIFICACION_IMAGENES`, separado de errores reales del frontend.
-## Instalación limpia desde Docker vacío
+| Historia | Qué se probó |
+|---|---|
+| HU-25 | Login de los 5 roles · aviso de intentos restantes · bloqueo tras 5 intentos y desbloqueo · recuperación con código (incorrecto, débil, reutilizado) · cierre de sesión invalida el token · 6 accesos indebidos por rol devuelven 403 |
+| HU-27 | Crear cuenta · validaciones · desactivar corta el acceso al instante · el admin no puede desactivarse · auditoría |
+| HU-01 / HU-02 / HU-03 | Registro con normalización de nombres · duplicado bloqueado · DNI/fecha/teléfono inválidos · búsqueda por DNI y por nombre con tildes (24 ms) · edición con trazabilidad |
+| HU-07 / HU-08 / HU-09 | Horarios libres · cita en horario libre · cruce del odontólogo y del paciente · fuera de horario y en el pasado · **reservas simultáneas: siempre una sola gana** · flujo de estados · reprogramar y cancelar con motivo |
+| HU-04 / HU-05 / HU-06 | Historia y alerta de alergias · diagnóstico CIE-10 · odontograma válido e inválido (sin perder datos) · plan, evolución y cierre automático |
+| SUNAT | XML firmado con el RUC 10102984841 y hash = DigestValue · envío SOAP aceptado y registrado en la API simulada · consulta RUC (activo, no habido, inexistente, inválido) · factura a RUC de baja rechazada con CDR `2018` · RUC fuera del padrón aceptado con observación `4093` · SUNAT caída → error → reintento aceptado · consulta de estado `getStatusCdr` |
+| HU-10 / HU-11 / HU-12 | Boleta con IGV y correlativo · no se factura dos veces un procedimiento · factura con RUC validado · límite S/ 700 · envío a SUNAT y bloqueo de reenvío · XML UBL 2.1 y CDR · búsqueda por número, documento y estado |
 
-Si eliminaste imágenes, contenedores y volúmenes, abre Docker Desktop y ejecuta **solo** `01-INSTALAR-O-ACTUALIZAR.bat`. El instalador descargará MySQL, compilará y construirá las 16 imágenes de la aplicación, creará los 17 contenedores, inicializará las 11 bases MySQL, arrancará el sistema por etapas y ejecutará la prueba funcional final.
+También se recorrieron en el navegador: acceso, recuperación de contraseña, registro de paciente (con aviso de duplicado),
+nueva cita, edición del odontograma y emisión de boleta, en escritorio y en celular.
 
-No ejecutes `02-INICIAR.bat` hasta que `01-INSTALAR-O-ACTUALIZAR.bat` termine con `INSTALACION / ACTUALIZACION COMPLETADA`.
-
-### Recuperación automática de MySQL
-La inicialización MySQL es idempotente. Si una ejecución anterior dejó el volumen creado pero faltan bases o usuarios, el arranque vuelve a ejecutar el inicializador y comprueba 11/11 antes de iniciar Eureka. Al actualizar desde otra carpeta, se recuperan los secretos MySQL del contenedor existente para mantener compatibilidad con el volumen.
-
-## Repetir solo la validación funcional
-
-Si los contenedores ya están ejecutándose y solo necesitas volver a comprobar el sistema, usa `06-VALIDAR-SISTEMA.bat`. Este flujo recupera los secretos de la instalación existente, verifica Gateway, MySQL y Backup, y ejecuta la suite funcional **sin recompilar imágenes ni recrear contenedores sanos**. Si `backup-service` estaba detenido, puede iniciarlo sin tocar los demás servicios.
-
-La suite distingue una respuesta HTTP correcta con lista vacía (`[]`) de un error de autenticación. Los HTTP 400/401/403 que forman parte de pruebas negativas esperadas se registran como validaciones correctas y no como errores reales.
-
-
-## Reparación dirigida del ruteo local
-Si el Gateway necesita la corrección de ruteo local, ejecuta `07-REPARAR-RUTEO-Y-VALIDAR.bat`. Reconstruye únicamente `api-gateway` cuando su marcador runtime sea antiguo. Si el ruteo ya está correcto, no recrea Gateway/Frontend de forma innecesaria. No elimina ni renueva los volúmenes MySQL/documentos.
-
-La comprobación de `/api/public/home` valida el contrato JSON por propiedades (`clinic`, `tagline`, `specialties`, `hours`, `phone`, `address`) y horario, sin comparar literalmente textos acentuados. Esto evita falsos negativos de Windows PowerShell 5.1 por decodificación UTF-8.
-
-## Validación final del estado actual
-
-Cuando el Gateway ya tenga el marcador `docker-dns-auth-scope-v3`, usa `08-VALIDAR-FINAL.bat`. No ejecuta Maven, NPM ni `docker build`; verifica ruteo, recupera `backup-service` si estaba detenido, comprueba MySQL 11/11 y ejecuta la batería funcional completa.
-
-El filtro de sesión del Gateway limita únicamente la llamada interna a `auth-service`; el tiempo de ejecución del microservicio destino queda fuera de ese timeout. En local la validación interna admite hasta 10 segundos y un solo reintento transitorio, pero continúa en modo fail-closed: si no se puede confirmar la vigencia del JWT, la operación se rechaza. Producción mantiene un timeout explícito de 3 segundos para esa validación interna.
-
-Si una carpeta anterior tiene el marcador de Gateway previo, ejecuta `07-REPARAR-RUTEO-Y-VALIDAR.bat`: reconstruye únicamente `api-gateway`, recrea Gateway + Frontend para refrescar DNS y continúa con la validación sin tocar MySQL ni los demás microservicios.
-
-## Avance académico del Sprint 1
-
-La trazabilidad de HU-01, HU-02 y HU-12, las mejoras de seguridad, el guion de demostración y las verificaciones pendientes están en [docs/SPRINT-1.md](docs/SPRINT-1.md). La evidencia corresponde al 22/10/2026 y no acredita reuniones ni ejecución durante el calendario original del Sprint.
-
-
-## Documentación académica revisada
-
-El contraste directo con el Charter y las tarjetas completas están en [docs/REVISION-ACADEMICA-SPRINT-1.md](docs/REVISION-ACADEMICA-SPRINT-1.md). La página académica y sus archivos descargables se incluyen en `frontend/public/sprint-1/`; tras desplegar este cambio estarán en [Sprint 1](https://djuanparedes.github.io/clinica-cardenas/sprint-1/). La estimación 21 SP es propuesta y no acredita eventos ni conformidad del cliente.
+Durante las pruebas se corrigió un caso real: dos recepcionistas reservando el mismo horario al mismo tiempo
+podían crear dos citas. Ahora la reserva bloquea al odontólogo y lee con `READ COMMITTED`, y la prueba
+con 6 solicitudes simultáneas acepta exactamente una.
