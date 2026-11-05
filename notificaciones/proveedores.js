@@ -135,10 +135,13 @@ async function graph(body) {
  * ventana hay que usar una plantilla aprobada. Por eso, para recordatorios, el modo recomendado es "plantilla".
  * @param plantillaForzada nombre de plantilla para la prueba del panel (p. ej. hello_world)
  */
-async function enviarWhatsApp(local, cuerpo, plantillaForzada) {
+async function enviarWhatsApp(local, cuerpo, plantillaForzada, opciones = {}) {
   const to = '51' + local;
   const nombre = plantillaForzada || WA.plantilla;
-  const usarPlantilla = plantillaForzada || (WA.modo ? WA.modo === 'plantilla' : Boolean(WA.plantilla));
+  let usarPlantilla = plantillaForzada || (WA.modo ? WA.modo === 'plantilla' : Boolean(WA.plantilla));
+  // Mensajes escritos a mano en el panel (como un chat): van como texto normal mientras la plantilla no esté
+  // aprobada. Meta solo los entrega si el paciente escribió a la clínica en las últimas 24 h.
+  if (opciones.chat && !plantillaForzada && WA.estadoPlantilla !== 'APPROVED') usarPlantilla = false;
   if (usarPlantilla && !nombre) throw new Error('WA_MODO=plantilla pero falta WA_PLANTILLA');
   if (usarPlantilla) {
     const template = nombre === 'hello_world'

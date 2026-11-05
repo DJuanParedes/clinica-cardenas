@@ -100,10 +100,11 @@ async function deliver(m) {
   } else {
     try {
       const r = m.canal === 'WHATSAPP'
-        ? await prov.enviarWhatsApp(clave, m.cuerpo, m.plantilla)
+        ? await prov.enviarWhatsApp(clave, m.cuerpo, m.plantilla, { chat: m.tipo === 'MENSAJE' })
         : await prov.enviarCorreo(m.destinoNormalizado, m.asunto, m.cuerpo);
       m.proveedorId = r.id;
       m.via = r.via;
+      if (m.canal === 'WHATSAPP' && r.via === 'texto') m.nota = 'Enviado como texto: Meta solo lo entrega si el paciente escribió a la clínica en las últimas 24 h';
     } catch (e) {
       m.estado = 'FALLIDO';
       m.error = e.name === 'TimeoutError' ? 'El proveedor no respondió a tiempo' : e.message;
@@ -297,7 +298,7 @@ function render(){
   const sel=document.getElementById('who'); sel.innerHTML=nums.map(n=>'<option value="'+esc(n)+'" '+(n===who?'selected':'')+'>'+esc(lbl(n))+'</option>').join('')||'<option>Sin conversaciones</option>';
   document.getElementById('wacount').textContent=wa.length+' mensajes';
   const chat=document.getElementById('chat');
-  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+badge(m)+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
+  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+badge(m)+(m.estado==='ENVIADO'&&m.via==='texto'?'<br>Texto libre: llega si el paciente te escribió en las últimas 24 h':'')+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
   chat.scrollTop=chat.scrollHeight;
   const em=ms.filter(m=>m.canal==='EMAIL'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO')).reverse();
   document.getElementById('mailcount').textContent=em.length+' correos';
