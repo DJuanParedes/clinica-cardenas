@@ -26,4 +26,7 @@ public class TreatmentItem {
     public Long invoiceId;
     @Column(name = "sort_order")
     public int sortOrder;
+    /** Odontólogo que realizó el procedimiento (base para comisiones, HU-17). */
+    @Column(name = "done_by_dentist_id")
+    public Long doneByDentistId;
 }

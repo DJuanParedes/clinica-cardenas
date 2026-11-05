@@ -35,6 +35,9 @@ public class Patient {
     public String emergencyContactPhone;
     public String notes;
     public boolean active = true;
+    /** HU-23: canal preferido para avisos (WHATSAPP, EMAIL, AMBOS, NINGUNO). */
+    @Column(name = "notify_channel")
+    public String notifyChannel = "WHATSAPP";
 
     @Column(name = "created_at")
     public LocalDateTime createdAt;

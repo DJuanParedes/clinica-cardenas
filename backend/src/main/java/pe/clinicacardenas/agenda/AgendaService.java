@@ -1,5 +1,6 @@
 package pe.clinicacardenas.agenda;
 
+import pe.clinicacardenas.notification.NotificationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -37,9 +38,12 @@ public class AgendaService {
     private final DentistScheduleRepository schedules;
     private final PatientRepository patients;
     private final AuditService audit;
+    private final NotificationService notifications;
 
     public AgendaService(AppointmentRepository appointments, DentistRepository dentists,
-                         DentistScheduleRepository schedules, PatientRepository patients, AuditService audit) {
+                         DentistScheduleRepository schedules, PatientRepository patients, AuditService audit,
+                         NotificationService notifications) {
+        this.notifications = notifications;
         this.appointments = appointments;
         this.dentists = dentists;
         this.schedules = schedules;
@@ -196,6 +200,7 @@ public class AgendaService {
         appointments.save(a);
         audit.record("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
                 + " el " + a.startAt.format(DMY_HM));
+        notifications.appointmentCreated(a);   // HU-23: recordatorio programado
         return a;
     }
 
@@ -210,6 +215,8 @@ public class AgendaService {
             throw ApiException.field("changeReason", "Indica el motivo de la reprogramación.");
         }
         String before = a.startAt.format(DMY_HM) + " con " + a.dentist.getFullName();
+        java.time.LocalDateTime previousStart = a.startAt;
+        String previousDentist = a.dentist.getFullName();
         AppointmentRequest merged = new AppointmentRequest(a.patient.id, r.dentistId(), r.startAt(), r.durationMin(),
                 r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason());
         validateAndFill(a, merged);
@@ -220,6 +227,9 @@ public class AgendaService {
         appointments.save(a);
         audit.record("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
                 + " · " + r.changeReason().trim());
+        if (!previousStart.equals(a.startAt) || !previousDentist.equals(a.dentist.getFullName())) {
+            notifications.appointmentRescheduled(a, previousStart, previousDentist);   // HU-24
+        }
         return a;
     }
 
@@ -247,6 +257,9 @@ public class AgendaService {
         appointments.save(a);
         audit.record("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
                 + (r.reason() == null || r.reason().isBlank() ? "" : " · " + r.reason().trim()));
+        if (a.status == AppointmentStatus.CANCELADA) {
+            notifications.appointmentCancelled(a, r.reason());   // HU-24
+        }
         return a;
     }
 

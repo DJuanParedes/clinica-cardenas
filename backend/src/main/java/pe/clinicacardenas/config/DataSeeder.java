@@ -43,10 +43,13 @@ public class DataSeeder implements ApplicationRunner {
     private final ClinicalService clinical;
     private final ProcedureRepository procedures;
     private final boolean seedDemo;
+    private final HistorySeeder history;
 
     public DataSeeder(UserRepository users, UserService userService, PatientService patientService, AgendaService agenda,
                       AppointmentRepository appointments, DentistRepository dentists, ClinicalService clinical,
-                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo) {
+                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo,
+                      HistorySeeder history) {
+        this.history = history;
         this.users = users;
         this.userService = userService;
         this.patientService = patientService;
@@ -73,6 +76,11 @@ public class DataSeeder implements ApplicationRunner {
                 seedDemoData();
             } catch (Exception e) {
                 log.warn("No se pudieron crear todos los datos de demostración: {}", e.getMessage());
+            }
+            try {
+                history.seed();
+            } catch (Exception e) {
+                log.warn("No se pudo crear la historia de demostración: {}", e.toString());
             }
         }
         log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}", DEMO_PASSWORD);

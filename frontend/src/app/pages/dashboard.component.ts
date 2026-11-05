@@ -19,12 +19,20 @@ import { IconComponent } from '../shared/icon.component';
           <h1>{{ greeting }}, {{ firstName }}</h1>
         </div>
         <div class="actions">
-          @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+          @if (auth.can('PACIENTES_EDITAR')) {
             <a class="btn" routerLink="/pacientes/nuevo"><app-icon name="patient" [size]="16" /> Registrar paciente</a>
+          }
+          @if (auth.can('CITAS_GESTIONAR')) {
             <a class="btn primary" routerLink="/citas/nueva"><app-icon name="plus" [size]="16" /> Nueva cita</a>
           }
-          @if (auth.hasRole('CAJA')) {
-            <a class="btn primary" routerLink="/comprobantes/nuevo"><app-icon name="receipt" [size]="16" /> Emitir comprobante</a>
+          @if (auth.can('COMPROBANTES') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn" routerLink="/comprobantes/nuevo"><app-icon name="receipt" [size]="16" /> Emitir comprobante</a>
+          }
+          @if (auth.can('CAJA_COBRAR') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn primary" routerLink="/caja/cobro"><app-icon name="wallet" [size]="16" /> Registrar cobro</a>
+          }
+          @if (auth.can('REPORTES') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn primary" routerLink="/reportes"><app-icon name="chart" [size]="16" /> Ver indicadores</a>
           }
         </div>
       </div>
@@ -44,16 +52,16 @@ import { IconComponent } from '../shared/icon.component';
             <span class="l">en sala de espera</span>
             <span class="meta">o en atención ahora</span>
           </div>
-          @if (auth.hasRole('ADMIN', 'CAJA', 'DIRECTOR')) {
+          @if (auth.can('CAJA_COBRAR', 'CAJA_REPORTE', 'REPORTES')) {
             <div class="fig">
-              <span class="v tabular">{{ money(data.billedToday) }}</span>
-              <span class="l">facturado hoy</span>
-              <span class="meta">{{ money(data.billedMonth) }} en el mes</span>
+              <span class="v tabular">{{ money(data.collectedToday) }}</span>
+              <span class="l">cobrado hoy</span>
+              <span class="meta">{{ money(data.collectedMonth) }} en el mes · {{ money(data.receivable) }} por cobrar</span>
             </div>
             <div class="fig">
               <span class="v tabular" [class.warn]="data.pendingSunat > 0">{{ data.pendingSunat }}</span>
               <span class="l">comprobantes sin enviar</span>
-              @if (data.pendingSunat > 0 && auth.hasRole('ADMIN', 'CAJA')) {
+              @if (data.pendingSunat > 0 && auth.can('COMPROBANTES')) {
                 <a class="meta" routerLink="/comprobantes" [queryParams]="{ status: 'GENERADO' }">Revisar envíos</a>
               } @else { <span class="meta">todo enviado a SUNAT</span> }
             </div>
@@ -75,7 +83,7 @@ import { IconComponent } from '../shared/icon.component';
           <section class="panel">
             <div class="panel-head">
               <h3>Próximas citas de hoy</h3>
-              @if (auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO', 'DIRECTOR')) { <a routerLink="/agenda" class="small">Ver agenda completa</a> }
+              @if (auth.can('AGENDA_VER')) { <a routerLink="/agenda" class="small">Ver agenda completa</a> }
             </div>
             @if (data.upcoming.length === 0) {
               <div class="empty">
@@ -93,7 +101,7 @@ import { IconComponent } from '../shared/icon.component';
                       <div class="muted small">{{ a.reason }} · {{ a.dentist.fullName }} · {{ a.durationMin }} min</div>
                     </div>
                     <span class="tag" [class]="'tag ' + tone(a.status)">{{ label(a.status) }}</span>
-                    @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+                    @if (auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="arrive(a)" [disabled]="busy === a.id">Registrar llegada</button>
                     }
                   </li>
@@ -115,9 +123,9 @@ import { IconComponent } from '../shared/icon.component';
                       <div class="strong">{{ a.patient.fullName }}</div>
                       <div class="muted small">Cita {{ hhmm(a.startAt) }} · llegó {{ hhmm(a.arrivedAt) }}</div>
                     </div>
-                    @if (a.status === 'EN_ESPERA' && auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO')) {
+                    @if (a.status === 'EN_ESPERA' && auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="move(a, 'EN_ATENCION')" [disabled]="busy === a.id">Pasar a atención</button>
-                    } @else if (a.status === 'EN_ATENCION' && auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO')) {
+                    } @else if (a.status === 'EN_ATENCION' && auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="move(a, 'ATENDIDA')" [disabled]="busy === a.id">Marcar atendida</button>
                     } @else {
                       <span class="tag" [class]="'tag ' + tone(a.status)">{{ label(a.status) }}</span>

@@ -17,7 +17,7 @@ import java.util.Map;
 /** HU-10, HU-11 y HU-12. */
 @RestController
 @RequestMapping("/api/billing")
-@PreAuthorize("hasAnyRole('CAJA','ADMIN')")
+@PreAuthorize("hasAuthority('COMPROBANTES')")
 public class BillingController {
 
     private final BillingService service;

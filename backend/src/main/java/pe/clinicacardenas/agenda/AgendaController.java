@@ -29,6 +29,7 @@ public class AgendaController {
     }
 
     @GetMapping("/agenda/slots")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
     public Map<String, Object> slots(@RequestParam Long dentistId,
                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                      @RequestParam(defaultValue = "30") int duration,
@@ -37,12 +38,14 @@ public class AgendaController {
     }
 
     @GetMapping("/agenda/day")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
     public Map<String, Object> day(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                    @RequestParam(required = false) Long dentistId) {
         return service.day(date, dentistId);
     }
 
     @GetMapping("/appointments")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
     public List<Appointment> range(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                    @RequestParam(required = false) Long dentistId) {
@@ -50,30 +53,32 @@ public class AgendaController {
     }
 
     @GetMapping("/appointments/{id}")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
     public Appointment get(@PathVariable Long id) {
         return service.get(id);
     }
 
     @GetMapping("/appointments/{id}/audit")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
     public List<AuditLog> history(@PathVariable Long id) {
         return audit.forEntity("CITA", id);
     }
 
     @PostMapping("/appointments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('CITAS_GESTIONAR')")
     public Appointment create(@RequestBody AgendaService.AppointmentRequest req) {
         return service.create(req);
     }
 
     @PutMapping("/appointments/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('CITAS_GESTIONAR')")
     public Appointment reschedule(@PathVariable Long id, @RequestBody AgendaService.AppointmentRequest req) {
         return service.reschedule(id, req);
     }
 
     @PatchMapping("/appointments/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION','ODONTOLOGO')")
+    @PreAuthorize("hasAuthority('CITAS_ESTADO')")
     public Appointment status(@PathVariable Long id, @RequestBody AgendaService.StatusRequest req) {
         return service.changeStatus(id, req);
     }
