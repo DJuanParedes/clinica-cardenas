@@ -97,6 +97,10 @@ public class PortalService {
         return digits.length() < 3 ? "tu celular" : "•••• ••" + digits.substring(digits.length() - 3);
     }
 
+    public Map<String, Object> ping() {
+        return Map.of("ok", true, "clinic", Map.of("name", clinicName, "address", clinicAddress, "phone", clinicPhone));
+    }
+
     // ------------------------------------------------------------------ activación con código
 
     @Transactional

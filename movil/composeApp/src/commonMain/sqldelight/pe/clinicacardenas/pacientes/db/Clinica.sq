@@ -1,0 +1,38 @@
+-- Persistencia local multiplataforma (SQLDelight): sesión, ajustes y citas guardadas para usar la app sin conexión.
+
+CREATE TABLE ajuste (
+    clave TEXT NOT NULL PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
+CREATE TABLE cita (
+    id INTEGER NOT NULL PRIMARY KEY,
+    inicio TEXT NOT NULL,
+    fin TEXT NOT NULL,
+    duracion INTEGER NOT NULL,
+    motivo TEXT NOT NULL,
+    estado TEXT NOT NULL,
+    odontologo TEXT NOT NULL,
+    especialidad TEXT NOT NULL,
+    color TEXT NOT NULL,
+    puede_confirmar INTEGER NOT NULL,
+    proxima INTEGER NOT NULL
+);
+
+obtenerAjuste:
+SELECT valor FROM ajuste WHERE clave = ?;
+
+guardarAjuste:
+INSERT OR REPLACE INTO ajuste(clave, valor) VALUES (?, ?);
+
+borrarAjuste:
+DELETE FROM ajuste WHERE clave = ?;
+
+citas:
+SELECT * FROM cita ORDER BY inicio;
+
+insertarCita:
+INSERT OR REPLACE INTO cita VALUES ?;
+
+borrarCitas:
+DELETE FROM cita;

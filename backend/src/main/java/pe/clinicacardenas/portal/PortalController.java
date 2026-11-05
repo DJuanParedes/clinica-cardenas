@@ -20,6 +20,12 @@ public class PortalController {
         this.jwt = jwt;
     }
 
+    /** La app móvil comprueba la conexión con el servidor de la clínica. */
+    @GetMapping("/auth/ping")
+    public Map<String, Object> ping() {
+        return service.ping();
+    }
+
     @PostMapping("/auth/code")
     public Map<String, Object> code(@RequestBody PortalService.CodeRequest req) {
         return service.requestCode(req);

@@ -181,6 +181,11 @@ SUNAT_CERTIFICADO_CLAVE=<clave del certificado>
 El certificado incluido (`backend/src/main/resources/sunat/certificado-demo.p12`) es autofirmado y solo sirve para
 la demostración. Con `SUNAT_MODE=interno` el backend valida sin red, sin usar la API simulada.
 
+## App móvil (Android e iOS)
+
+La carpeta [`movil/`](movil/README.md) tiene la app de pacientes hecha con **Kotlin Multiplatform + Compose Multiplatform**. Desde la app el paciente ve sus citas, las confirma, recibe recordatorios en el teléfono, revisa su estado de cuenta y elige por dónde le llegan los avisos.
+Para generar el APK sin Android Studio, haz doble clic en `construir-apk.bat`; el APK queda en `apk\ClinicaCardenas.apk`. Los detalles están en [movil/README.md](movil/README.md).
+
 ## Estructura
 
 ```
