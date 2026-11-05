@@ -11,9 +11,5 @@ Para activarlo:
 4. Esperar la aprobación del **nombre visible** "Clínica Dental Cárdenas".
 5. Copiar el nuevo *Phone Number ID* en `WA_PHONE_NUMBER_ID` del `.env` y ejecutar `actualizar.bat`.
 
-## Correo real
-Poner la contraseña de aplicación de Gmail en el `.env` (`SMTP_HOST`, `SMTP_USUARIO`, `SMTP_CLAVE`, `CORREOS_PERMITIDOS`).
-Ver README → "Mensajes reales por WhatsApp y correo".
-
 ## No ejecutar las pruebas automáticas en producción
 Las pruebas de `pruebas/` crean pacientes con números inventados. En producción podrían recibir mensajes reales.
