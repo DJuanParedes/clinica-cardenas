@@ -171,6 +171,9 @@ async function runTick(force) {
   return sent;
 }
 setInterval(() => tick().catch((e) => console.warn('planificador:', e.message)), 10_000);
+// Revisa credenciales y plantilla al arrancar y cada 30 minutos (para avisar en el panel si el token vence).
+setTimeout(() => prov.revisarProveedores(), 3_000);
+setInterval(() => prov.revisarProveedores(), 30 * 60_000);
 
 // ---------------------------------------------------------------- panel
 function panel() {
@@ -205,6 +208,9 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 .pv form{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.pv input,.pv select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;flex:1;min-width:120px}
 .badge{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px}.badge.r{background:#217a4a;color:#fff}.badge.t{background:#eef1f4;color:#688494}
 #res{font-size:12.5px;margin-top:6px}
+.al{margin:12px 22px 0;max-width:1256px;border-radius:12px;padding:12px 16px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.al.error{background:#fdece4;color:#9a2f06;border:1px solid #f6c3ab}.al.aviso{background:#fff4dc;color:#7a4600;border:1px solid #f3d79c}
+.al b{display:block;margin-bottom:2px}.al .sp{flex:1}
 .wide{grid-column:1/-1}.empty{padding:30px;text-align:center;color:var(--muted)}
 .stats{display:flex;gap:18px;font-size:13px;color:var(--muted)}.stats b{color:var(--ink);font-size:16px}
 @media (max-width:900px){main{grid-template-columns:1fr}.mail{grid-template-columns:1fr;height:auto}.inbox{max-height:260px}}
@@ -217,6 +223,7 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
   <span>Servicio:</span><button class="btn" data-m="normal">Normal</button><button class="btn" data-m="caido">Caído</button>
   <button class="btn orange" id="force">Enviar recordatorios ahora</button>
 </header>
+<div id="alertas"></div>
 <div class="prov" id="prov"></div>
 <main>
   <section class="card"><h2>WhatsApp <span class="sub" id="wacount"></span></h2>
@@ -236,7 +243,7 @@ const badge=m=>m.estado==='ENVIADO'?(m.real?'<span class="badge r">REAL</span>':
 let provDrawn=false;
 function drawProv(p){
   if(provDrawn) return; provDrawn=true;
-  const box=(t,c,ch,ph,extra)=>'<div class="pv"><b>'+t+'</b> · '+(c.modo==='real'?'<span class="real">Envío real</span> · '+esc(c.proveedor)+(c.envio?' · '+esc(c.envio):'')+(c.remitente?' · desde '+esc(c.remitente):'')
+  const box=(t,c,ch,ph,extra)=>'<div class="pv"><b>'+t+'</b> · '+(c.modo==='real'?'<span class="real">Envío real</span> · '+esc(c.proveedor)+(c.numero?' · desde '+esc(c.numero):'')+(c.envio?' · '+esc(c.envio):'')+(c.estadoPlantilla?' ('+({APPROVED:'aprobada',PENDING:'en revisión',REJECTED:'rechazada'}[c.estadoPlantilla]||c.estadoPlantilla)+')':'')+(c.remitente?' · desde '+esc(c.remitente):'')
     +'<div class="sub">'+(p.enviarATodos?'Envía a todos los pacientes.':'Solo envía de verdad a: '+(c.permitidos.length?esc(c.permitidos.join(', ')):'(nadie; agrega destinos en el .env)')+'. El resto queda en la bandeja de prueba.')+'</div>'
     :'<span class="test">Modo de prueba</span><div class="sub">Configura las credenciales en el archivo .env para enviar de verdad (ver README).</div>')
     +(c.modo==='real'?'<form data-c="'+ch+'"><input name="d" placeholder="'+ph+'" required>'+extra+'<button class="btn orange">Enviar prueba real</button></form>':'')+'</div>';
@@ -247,7 +254,11 @@ function drawProv(p){
     const j=await r.json();b.disabled=false;
     document.getElementById('res').innerHTML=r.ok?'<span class="real">✓ Enviado. ID del proveedor: '+esc(j.proveedorId)+'</span>':'<span style="color:#c2410c">✗ '+esc(j.error)+'</span>';load();});
 }
-async function load(){ const r=await fetch('/api/estado'); data=await r.json(); drawProv(data.proveedores); render(); }
+function drawAlertas(list){
+  document.getElementById('alertas').innerHTML=(list||[]).map(a=>'<div class="al '+a.nivel+'"><span>'+(a.nivel==='error'?'⚠️':'⏳')+'</span><div class="sp"><b>'+(a.clave==='wa-token'?'WhatsApp: revisa el token':a.clave==='wa-plantilla'?'WhatsApp: plantilla':'Correo')+'</b>'+esc(a.texto)+'<div class="sub">Desde '+fmt(a.desde)+'</div></div><button class="btn" onclick="recheck(this)">Volver a comprobar</button></div>').join('');
+}
+async function recheck(b){ b.disabled=true; await fetch('/admin/revisar',{method:'POST'}); provDrawn=false; await load(); }
+async function load(){ const r=await fetch('/api/estado'); data=await r.json(); drawAlertas(data.alertas); drawProv(data.proveedores); render(); }
 function render(){
   document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===data.modo));
   const ms=data.mensajes;
@@ -295,7 +306,12 @@ const server = http.createServer((req, res) => {
 
     if (p === '/health') return send(res, 200, { status: 'UP' });
     if (p === '/' && req.method === 'GET') return send(res, 200, panel(), 'text/html; charset=utf-8');
-    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { modo, proveedores: prov.estadoProveedores(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { modo, proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/admin/revisar' && req.method === 'POST') {
+      await prov.revisarProveedores();
+      return send(res, 200, { proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas() });
+    }
+    if (p === '/api/alertas' && req.method === 'GET') return send(res, 200, prov.listaAlertas());
     if (p === '/admin/prueba' && req.method === 'POST') {
       // Envío real de prueba escrito a mano por el operador en el panel (por eso no aplica la lista de permitidos).
       const canal = body && body.canal;

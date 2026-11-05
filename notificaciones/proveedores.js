@@ -23,6 +23,7 @@ const WA = {
   base: env('WA_API_BASE', 'https://graph.facebook.com'),
   plantilla: env('WA_PLANTILLA'),
   idioma: env('WA_PLANTILLA_IDIOMA', 'es'),
+  wabaId: env('WA_WABA_ID'),
   modo: env('WA_MODO').toLowerCase(), // plantilla | texto (por defecto: plantilla si hay WA_PLANTILLA)
   permitidos: new Set(list('WA_NUMEROS_PERMITIDOS').map((n) => localPhone(n)).filter(Boolean)),
 };
@@ -38,6 +39,75 @@ function localPhone(v) {
 /** Los parámetros de plantilla no admiten saltos de línea ni más de 4 espacios seguidos. */
 const flatten = (s) => String(s).replace(/\s*\n+\s*/g, ' · ').replace(/\s{4,}/g, '   ').slice(0, 1000);
 
+// ---------------------------------------------------------------- alertas (se muestran en el panel)
+const alertas = {}; // clave → { nivel: 'error'|'aviso'|'ok', texto, desde }
+function alerta(clave, nivel, texto) {
+  if (!texto) { delete alertas[clave]; return; }
+  if (alertas[clave]?.texto !== texto) alertas[clave] = { nivel, texto, desde: new Date().toISOString() };
+}
+const TOKEN_VENCIDO = 'El token de WhatsApp venció o no es válido. Genera uno nuevo en Meta (de preferencia permanente, con un usuario del sistema), pégalo en WA_TOKEN del archivo .env y ejecuta actualizar.bat.';
+
+/** Traduce los errores más comunes de Meta a instrucciones claras. */
+function explicarErrorMeta(e, status) {
+  const code = e.code;
+  if (code === 190 || status === 401) { alerta('wa-token', 'error', TOKEN_VENCIDO); return 'El token de WhatsApp venció o no es válido (actualízalo en el .env)'; }
+  if (code === 132001) return `La plantilla "${WA.plantilla}" no existe en ese idioma o aún no está aprobada por Meta`;
+  if (code === 131030) return 'Ese número no está en la lista de destinatarios del número de prueba de Meta (agrégalo en developers.facebook.com)';
+  if (code === 131047) return 'Pasaron más de 24 h desde el último mensaje del paciente: usa una plantilla aprobada';
+  if (code === 130429 || code === 80007) return 'Meta limitó la cantidad de envíos por ahora; se puede reenviar en unos minutos';
+  return null;
+}
+
+async function graphGet(path) {
+  const res = await fetch(`${WA.base}/${WA.version}/${path}`, { headers: { Authorization: `Bearer ${WA.token}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.error) { const err = new Error(json.error?.message || `HTTP ${res.status}`); err.meta = json.error || {}; err.status = res.status; throw err; }
+  return json;
+}
+
+/** Revisión periódica: token válido, número activo y estado de la plantilla. */
+async function revisarWhatsApp() {
+  if (!waActivo()) return;
+  try {
+    const num = await graphGet(`${WA.phoneId}?fields=display_phone_number,verified_name`);
+    alerta('wa-token', null, null);
+    WA.numero = num.display_phone_number;
+    WA.nombre = num.verified_name;
+  } catch (e) {
+    if (e.meta?.code === 190 || e.status === 401) alerta('wa-token', 'error', TOKEN_VENCIDO);
+    else if (e.name !== 'TimeoutError') alerta('wa-token', 'aviso', 'No se pudo comprobar la cuenta de WhatsApp: ' + e.message);
+    return;
+  }
+  if (WA.plantilla && WA.wabaId && WA.modo !== 'texto') {
+    try {
+      const t = await graphGet(`${WA.wabaId}/message_templates?name=${encodeURIComponent(WA.plantilla)}&fields=name,status,language,rejected_reason`);
+      const p = (t.data || []).find((x) => x.name === WA.plantilla && (x.language || '').startsWith(WA.idioma)) || (t.data || [])[0];
+      WA.estadoPlantilla = p ? p.status : 'NO_EXISTE';
+      if (!p) alerta('wa-plantilla', 'error', `La plantilla "${WA.plantilla}" no existe en tu cuenta de WhatsApp. Créala en WhatsApp Manager (ver README).`);
+      else if (p.status === 'APPROVED') alerta('wa-plantilla', null, null);
+      else if (p.status === 'REJECTED') alerta('wa-plantilla', 'error', `Meta rechazó la plantilla "${WA.plantilla}"${p.rejected_reason && p.rejected_reason !== 'NONE' ? ' (' + p.rejected_reason + ')' : ''}. Edítala en WhatsApp Manager y vuelve a enviarla.`);
+      else alerta('wa-plantilla', 'aviso', `La plantilla "${WA.plantilla}" está en revisión en Meta (${p.status}). Los recordatorios por WhatsApp saldrán cuando la aprueben.`);
+    } catch (e) {
+      // sin permiso para leer plantillas: no es grave, solo no se muestra el estado
+    }
+  }
+}
+
+async function revisarCorreo() {
+  if (!correoActivo()) return;
+  try { await smtp().verify(); alerta('smtp', null, null); }
+  catch (e) {
+    const auth = /auth|535|534|credentials|Username and Password/i.test(String(e.message));
+    alerta('smtp', 'error', auth
+      ? 'Gmail/SMTP rechazó el usuario o la contraseña. Usa una contraseña de aplicación (no tu contraseña normal) en SMTP_CLAVE del .env.'
+      : 'No se pudo conectar al servidor de correo (' + e.message + ').');
+  }
+}
+
+async function revisarProveedores() {
+  await Promise.allSettled([revisarWhatsApp(), revisarCorreo()]);
+}
+
 async function graph(body) {
   const res = await fetch(`${WA.base}/${WA.version}/${WA.phoneId}/messages`, {
     method: 'POST',
@@ -48,9 +118,11 @@ async function graph(body) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok || json.error) {
     const e = json.error || {};
+    const claro = explicarErrorMeta(e, res.status);
     const detail = e.error_data?.details || e.message || `HTTP ${res.status}`;
-    throw new Error(`WhatsApp (Meta) rechazó el envío: ${detail}${e.code ? ` [código ${e.code}]` : ''}`);
+    throw new Error(claro ? `${claro} [código ${e.code}]` : `WhatsApp (Meta) rechazó el envío: ${detail}${e.code ? ` [código ${e.code}]` : ''}`);
   }
+  alerta('wa-token', null, null);
   return json.messages?.[0]?.id || null;
 }
 
@@ -124,7 +196,8 @@ async function enviarCorreo(destino, asunto, cuerpo) {
     subject: asunto || 'Clínica Dental Cárdenas',
     text: cuerpo,
     html: htmlCorreo(asunto || 'Clínica Dental Cárdenas', cuerpo),
-  });
+  }).catch((e) => { revisarCorreo(); throw e; });
+  alerta('smtp', null, null);
   return { id: info.messageId, via: 'smtp' };
 }
 
@@ -145,7 +218,7 @@ function estadoProveedores() {
   return {
     enviarATodos: ENVIAR_A_TODOS,
     whatsapp: waActivo()
-      ? { modo: 'real', proveedor: 'WhatsApp Cloud API (Meta)', envio: WA.plantilla && WA.modo !== 'texto' ? `plantilla ${WA.plantilla}` : 'texto libre (ventana de 24 h)', permitidos: [...WA.permitidos].map((n) => '+51 ' + n) }
+      ? { modo: 'real', proveedor: 'WhatsApp Cloud API (Meta)', numero: WA.numero || null, estadoPlantilla: WA.estadoPlantilla || null, envio: WA.plantilla && WA.modo !== 'texto' ? `plantilla ${WA.plantilla}` : 'texto libre (ventana de 24 h)', permitidos: [...WA.permitidos].map((n) => '+51 ' + n) }
       : { modo: 'prueba', proveedor: 'Simulado' },
     correo: correoActivo()
       ? { modo: 'real', proveedor: `SMTP ${SMTP.host}:${SMTP.port}`, remitente: SMTP.from || SMTP.user, permitidos: [...SMTP.permitidos] }
@@ -153,4 +226,6 @@ function estadoProveedores() {
   };
 }
 
-module.exports = { localPhone, enviarWhatsApp, enviarCorreo, destinoReal, estadoProveedores, waActivo, correoActivo };
+const listaAlertas = () => Object.entries(alertas).map(([clave, a]) => ({ clave, ...a }));
+
+module.exports = { revisarProveedores, listaAlertas, localPhone, enviarWhatsApp, enviarCorreo, destinoReal, estadoProveedores, waActivo, correoActivo };

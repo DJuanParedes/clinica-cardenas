@@ -226,7 +226,15 @@ Las credenciales van en el archivo `.env`. Después de cambiarlo, ejecuta `actua
 
    La aprobación suele tardar unos minutos.
 
-Para producción hacen falta un número propio verificado en Meta Business y un token permanente de usuario del sistema.
+**Token permanente.** El token temporal vence en 24 h. Para no cambiarlo nunca:
+1. En business.facebook.com entra a **Configuración → Usuarios del sistema → Agregar** (rol Administrador).
+2. En **Asignar activos**, dale control total a la app y a la cuenta de WhatsApp.
+3. Toca **Generar token** con caducidad **Nunca** y los permisos `whatsapp_business_messaging` y `whatsapp_business_management`.
+4. Pégalo en `WA_TOKEN`.
+
+**Alertas en el panel.** Al arrancar y cada 30 minutos, el microservicio comprueba tres cosas: si el token sigue siendo válido, si Meta ya aprobó la plantilla y si el correo SMTP acepta las credenciales. Para ver si la plantilla está aprobada, agrega `WA_WABA_ID` en el `.env`. Si algo falla, el panel `localhost:9083` muestra un aviso con lo que hay que hacer y un botón **Volver a comprobar**.
+
+Para producción hace falta además un número propio verificado en Meta Business.
 
 ## App móvil (Android e iOS)
 
