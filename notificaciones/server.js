@@ -12,6 +12,9 @@
  *   POST   /admin/modo                  {"modo":"normal|caido"} simula caída del servicio
  *   POST   /admin/enviar-pendientes     envía ya los recordatorios programados (demostración)
  *   POST   /admin/prueba                {canal, destino, plantilla?} envío real de prueba desde el panel
+ *   POST   /v1/contactos                {pacienteId, nombre, telefono, correo, demo} o una lista: agenda de pacientes
+ *   GET    /v1/contactos                agenda (número → nombre del paciente)
+ *   POST   /admin/enviar                {destino, texto} mensaje de WhatsApp escrito desde el panel
  *   GET    /                            panel: bandeja de WhatsApp y de correo
  *
  * Reglas:
@@ -46,6 +49,21 @@ function save() {
   }, 200);
 }
 const byKey = (k) => db.mensajes.find((m) => m.clave === k);
+db.contactos = db.contactos || {};
+
+/** Agenda: cada paciente que registra la clínica se guarda con su número y su nombre (lo envía el sistema central). */
+function guardarContacto(c) {
+  if (!c || !c.nombre) return null;
+  const tel = prov.localPhone(c.telefono);
+  const correo = c.correo && validEmail(c.correo) ? String(c.correo).trim().toLowerCase() : null;
+  const datos = { pacienteId: c.pacienteId ?? c.id ?? null, nombre: String(c.nombre).trim(), telefono: tel, correo, demo: Boolean(c.demo), actualizado: now().toISOString() };
+  // si el paciente cambió de número, se quita el número anterior
+  for (const [k, v] of Object.entries(db.contactos)) if (datos.pacienteId && v.pacienteId === datos.pacienteId && k !== tel) delete db.contactos[k];
+  if (tel) db.contactos[tel] = datos;
+  save();
+  return datos;
+}
+const contactoDe = (destino) => db.contactos[prov.localPhone(destino)] || Object.values(db.contactos).find((c) => c.correo && c.correo === String(destino).trim().toLowerCase()) || null;
 const now = () => new Date();
 
 // ---------------------------------------------------------------- proveedores simulados
@@ -71,7 +89,9 @@ async function deliver(m) {
     m.estado = 'FALLIDO'; m.error = 'Canal no soportado'; return m;
   }
   const clave = m.canal === 'WHATSAPP' ? prov.localPhone(m.destino) : m.destinoNormalizado;
-  const decision = m.forzarReal ? { real: true } : prov.destinoReal(m.canal, clave);
+  const contacto = contactoDe(m.destino);
+  if (contacto && !m.paciente) m.paciente = { id: contacto.pacienteId, nombre: contacto.nombre, demo: contacto.demo };
+  const decision = m.forzarReal ? { real: true } : prov.destinoReal(m.canal, clave, m.paciente);
   m.real = decision.real;
   m.nota = decision.motivo || null;
   if (!decision.real) {
@@ -123,6 +143,7 @@ function create(b, scheduled) {
     estado: scheduled ? 'PROGRAMADO' : 'PENDIENTE',
     intentos: 0,
     webhookPendiente: false,
+    paciente: b.paciente && b.paciente.nombre ? { id: b.paciente.id ?? null, nombre: String(b.paciente.nombre), demo: Boolean(b.paciente.demo) } : null,
   };
 }
 
@@ -193,6 +214,7 @@ main{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:18px 22px;max
 .phone .top{background:var(--wa);color:#fff;padding:10px 14px;font-weight:600;display:flex;gap:10px;align-items:center}
 .phone .top select{flex:1;border:0;border-radius:6px;padding:5px;font:inherit}
 .chat{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.compose{display:flex;gap:6px;padding:8px;background:#f0f0f0}.compose input{flex:1;border:0;border-radius:18px;padding:9px 14px;font:inherit;font-size:14px}
 .bub{background:var(--wa2);border-radius:8px 8px 2px 8px;padding:8px 10px;max-width:92%;align-self:flex-end;white-space:pre-wrap;font-size:13.5px;box-shadow:0 1px 1px rgba(0,0,0,.1)}
 .bub .meta{font-size:11px;color:#667;text-align:right;margin-top:4px}.bub.fail{background:#fde2e2}
 .mail{display:grid;grid-template-columns:300px 1fr;height:560px}
@@ -227,7 +249,8 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 <div class="prov" id="prov"></div>
 <main>
   <section class="card"><h2>WhatsApp <span class="sub" id="wacount"></span></h2>
-    <div class="phone"><div class="top">💬 <select id="who"></select></div><div class="chat" id="chat"></div></div></section>
+    <div class="phone"><div class="top">💬 <select id="who"></select></div><div class="chat" id="chat"></div>
+    <form class="compose" id="compose"><input id="txt" placeholder="Escribe un mensaje para este paciente…" autocomplete="off"><button class="btn orange">Enviar</button></form></div></section>
   <section class="card"><h2>Correo electrónico <span class="sub" id="mailcount"></span></h2>
     <div class="mail"><div class="inbox" id="inbox"></div><div class="read" id="read"><div class="empty">Selecciona un correo.</div></div></div></section>
   <section class="card wide"><h2>Recordatorios programados y bitácora</h2><div style="overflow:auto"><table>
@@ -238,13 +261,13 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 let data=null, who=null, mailSel=null;
 const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const fmt=s=>s?new Date(s).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba'};
+const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba',MENSAJE:'Mensaje'};
 const badge=m=>m.estado==='ENVIADO'?(m.real?'<span class="badge r">REAL</span>':'<span class="badge t">PRUEBA</span>'):'';
 let provDrawn=false;
 function drawProv(p){
   if(provDrawn) return; provDrawn=true;
   const box=(t,c,ch,ph,extra)=>'<div class="pv"><b>'+t+'</b> · '+(c.modo==='real'?'<span class="real">Envío real</span> · '+esc(c.proveedor)+(c.numero?' · desde '+esc(c.numero):'')+(c.envio?' · '+esc(c.envio):'')+(c.estadoPlantilla?' ('+({APPROVED:'aprobada',PENDING:'en revisión',REJECTED:'rechazada'}[c.estadoPlantilla]||c.estadoPlantilla)+')':'')+(c.remitente?' · desde '+esc(c.remitente):'')
-    +'<div class="sub">'+(p.enviarATodos?'Envía a todos los pacientes.':'Solo envía de verdad a: '+(c.permitidos.length?esc(c.permitidos.join(', ')):'(nadie; agrega destinos en el .env)')+'. El resto queda en la bandeja de prueba.')+'</div>'
+    +'<div class="sub">'+(p.destinos==='todos'?'Envía a todos los destinos.':p.destinos==='pacientes'?'Envía a todos los pacientes registrados por la clínica'+(c.permitidos.length?' y a '+esc(c.permitidos.join(', ')):'')+'. Los pacientes de ejemplo quedan en la bandeja de prueba.':'Solo envía de verdad a: '+(c.permitidos.length?esc(c.permitidos.join(', ')):'(nadie; agrega destinos en el .env)')+'. El resto queda en la bandeja de prueba.')+'</div>'
     :'<span class="test">Modo de prueba</span><div class="sub">Configura las credenciales en el archivo .env para enviar de verdad (ver README).</div>')
     +(c.modo==='real'?'<form data-c="'+ch+'"><input name="d" placeholder="'+ph+'" required>'+extra+'<button class="btn orange">Enviar prueba real</button></form>':'')+'</div>';
   document.getElementById('prov').innerHTML=box('WhatsApp',p.whatsapp,'WHATSAPP','987654321','<select name="t"><option value="">Mensaje normal</option><option value="hello_world">Plantilla hello_world</option></select>')
@@ -266,8 +289,12 @@ function render(){
   document.getElementById('stats').innerHTML='<span><b>'+c('ENVIADO')+'</b> enviados</span><span><b>'+c('PROGRAMADO')+'</b> programados</span><span><b>'+data.duplicadosEvitados+'</b> duplicados evitados</span><span><b>'+c('FALLIDO')+'</b> fallidos</span>';
   const wa=ms.filter(m=>m.canal==='WHATSAPP'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO'));
   const nums=[...new Set(wa.map(m=>m.destinoNormalizado||m.destino))];
+  const fp=t=>'+51 '+t.slice(0,3)+' '+t.slice(3,6)+' '+t.slice(6);
+  const ag={}; Object.entries(data.contactos||{}).forEach(([t,c])=>ag[fp(t)]=c);
+  Object.keys(ag).filter(n=>!ag[n].demo).forEach(n=>{ if(!nums.includes(n)) nums.push(n); });
   if(!who||!nums.includes(who)) who=nums[nums.length-1]||null;
-  const sel=document.getElementById('who'); sel.innerHTML=nums.map(n=>'<option '+(n===who?'selected':'')+'>'+esc(n)+'</option>').join('')||'<option>Sin conversaciones</option>';
+  const lbl=n=>ag[n]?ag[n].nombre+' · '+n+(ag[n].demo?' (ejemplo)':''):n;
+  const sel=document.getElementById('who'); sel.innerHTML=nums.map(n=>'<option value="'+esc(n)+'" '+(n===who?'selected':'')+'>'+esc(lbl(n))+'</option>').join('')||'<option>Sin conversaciones</option>';
   document.getElementById('wacount').textContent=wa.length+' mensajes';
   const chat=document.getElementById('chat');
   chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+badge(m)+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
@@ -280,6 +307,10 @@ function render(){
   document.getElementById('log').innerHTML=ms.slice().reverse().slice(0,120).map(m=>'<tr><td><span class="tag '+m.estado+'">'+m.estado+'</span>'+badge(m)+(m.error?'<div class="sub">'+esc(m.error)+'</div>':'')+(m.nota&&m.estado==='ENVIADO'?'<div class="sub">'+esc(m.nota)+'</div>':'')+'</td><td>'+(TYPE[m.tipo]||m.tipo)+'</td><td>'+m.canal+'</td><td>'+esc(m.destino)+'</td><td>'+fmt(m.programadoPara)+'</td><td>'+fmt(m.enviadoEn)+'</td><td style="font-family:monospace;font-size:11.5px">'+esc(m.clave)+'</td><td>'+(m.programadoPara?(m.webhookRespuesta??'—'):'—')+'</td></tr>').join('')||'<tr><td colspan="8" class="empty">Sin mensajes.</td></tr>';
 }
 document.getElementById('who').onchange=e=>{who=e.target.value;render();};
+document.getElementById('compose').onsubmit=async e=>{e.preventDefault();const i=document.getElementById('txt');if(!who||!i.value.trim())return;
+  const b=e.target.querySelector('button');b.disabled=true;
+  const r=await fetch('/admin/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destino:who,texto:i.value})});
+  const j=await r.json();b.disabled=false;if(r.ok)i.value='';else alert(j.error||'No se pudo enviar');load();};
 document.getElementById('inbox').onclick=e=>{const d=e.target.closest('[data-id]'); if(d){mailSel=+d.dataset.id; render();}};
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{await fetch('/admin/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:b.dataset.m})});load();});
 document.getElementById('force').onclick=async()=>{const r=await fetch('/admin/enviar-pendientes',{method:'POST'});const j=await r.json();alert(j.enviados+' recordatorio(s) enviado(s).');load();};
@@ -306,7 +337,24 @@ const server = http.createServer((req, res) => {
 
     if (p === '/health') return send(res, 200, { status: 'UP' });
     if (p === '/' && req.method === 'GET') return send(res, 200, panel(), 'text/html; charset=utf-8');
-    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { modo, proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { contactos: db.contactos, modo, proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/v1/contactos' && req.method === 'GET') return send(res, 200, Object.entries(db.contactos).map(([tel, c]) => ({ ...c, telefono: tel })));
+    if (p === '/v1/contactos' && req.method === 'POST') {
+      const lista = Array.isArray(body) ? body : [body];
+      const guardados = lista.map(guardarContacto).filter(Boolean).length;
+      return send(res, 200, { guardados, total: Object.keys(db.contactos).length });
+    }
+    if (p === '/admin/enviar' && req.method === 'POST') {
+      const texto = String(body && body.texto || '').trim();
+      const contacto = body && contactoDe(body.destino);
+      if (!texto) return send(res, 400, { error: 'Escribe el mensaje.' });
+      if (!body.destino || !prov.localPhone(body.destino)) return send(res, 400, { error: 'Elige un número de celular válido.' });
+      const m = create({ clave: 'panel-' + Date.now(), canal: 'WHATSAPP', destino: body.destino, cuerpo: texto, tipo: 'MENSAJE', paciente: contacto ? { id: contacto.pacienteId, nombre: contacto.nombre, demo: contacto.demo } : null }, false);
+      db.mensajes.push(m);
+      await deliver(m);
+      save(); log('panel ' + m.estado);
+      return send(res, m.estado === 'ENVIADO' ? 200 : 502, publicView(m));
+    }
     if (p === '/admin/revisar' && req.method === 'POST') {
       await prov.revisarProveedores();
       return send(res, 200, { proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas() });

@@ -12,6 +12,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 import pe.clinicacardenas.common.Dates;
+import pe.clinicacardenas.patient.PatientRepository;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -39,6 +40,7 @@ public class NotificationDispatcher {
     private static final int MAX_ATTEMPTS = 5;
 
     private final NotificationRepository repo;
+    private final PatientRepository patients;
     private final TransactionTemplate tx;
     private final ObjectMapper json;
     private final String baseUrl;
@@ -47,10 +49,11 @@ public class NotificationDispatcher {
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicBoolean again = new AtomicBoolean(false);
 
-    public NotificationDispatcher(NotificationRepository repo, TransactionTemplate tx, ObjectMapper json,
+    public NotificationDispatcher(NotificationRepository repo, PatientRepository patients, TransactionTemplate tx, ObjectMapper json,
                                   @Value("${app.notifications.url}") String baseUrl,
                                   @Value("${app.notifications.enabled:true}") boolean enabled) {
         this.repo = repo;
+        this.patients = patients;
         this.tx = tx;
         this.json = json;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
@@ -170,6 +173,17 @@ public class NotificationDispatcher {
             payload.put("cuerpo", n.body);
             payload.put("tipo", n.type);
             payload.put("referencia", n.appointmentId == null ? null : "cita-" + n.appointmentId);
+            if (n.patientId != null) {
+                // nombre del paciente y si es real o de ejemplo: el microservicio decide si lo envía de verdad
+                patients.findById(n.patientId).ifPresent(p -> {
+                    Map<String, Object> c = ContactSync.contact(p);
+                    Map<String, Object> pac = new LinkedHashMap<>();
+                    pac.put("id", p.id);
+                    pac.put("nombre", c.get("nombre"));
+                    pac.put("demo", c.get("demo"));
+                    payload.put("paciente", pac);
+                });
+            }
             String path = "/v1/mensajes";
             if ("PROGRAMAR".equals(n.operation)) {
                 path = "/v1/recordatorios";

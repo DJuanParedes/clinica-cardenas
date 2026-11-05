@@ -190,7 +190,14 @@ El microservicio `notificaciones` envía mensajes reales con dos proveedores:
 Cada canal funciona solo con sus credenciales. Un canal sin credenciales queda en modo de prueba: los mensajes solo se ven en el panel `http://localhost:9083`.
 Las credenciales van en el archivo `.env`. Después de cambiarlo, ejecuta `actualizar.bat`. El panel muestra qué canal envía de verdad y tiene un botón **Enviar prueba real**.
 
-> **Seguridad.** Los pacientes de ejemplo tienen celulares y correos inventados que podrían ser de personas reales. Por eso solo se envía de verdad a los destinos de `WA_NUMEROS_PERMITIDOS` y `CORREOS_PERMITIDOS`. Los demás mensajes quedan en la bandeja de prueba. Con `ENVIAR_A_TODOS=true` se envía a todos los pacientes; úsalo solo con datos reales.
+> **¿A quién se envía de verdad?** Lo decide `DESTINOS_REALES` en el `.env`:
+> - `permitidos`: solo los números y correos de `WA_NUMEROS_PERMITIDOS` y `CORREOS_PERMITIDOS`.
+> - `pacientes`: todos los pacientes que registra la clínica. Al registrar o editar un paciente, su número y su nombre se guardan solos en la agenda del microservicio. En el panel aparecen por nombre y se les puede escribir desde ahí.
+> - `todos`: cualquier destino.
+>
+> Los **pacientes de ejemplo** que se crean al instalar (columna `demo`) nunca reciben mensajes reales: sus números y correos son inventados y podrían ser de personas reales.
+>
+> Con el **número de prueba de Meta** solo llegan mensajes a los 5 números verificados en developers.facebook.com. Para escribir a cualquier paciente hace falta agregar un **número propio** de la clínica en WhatsApp Manager (Números de teléfono → Agregar), con un método de pago en la cuenta de WhatsApp.
 
 ### Correo con Gmail (5 minutos)
 1. Activa la verificación en dos pasos en tu cuenta de Google.

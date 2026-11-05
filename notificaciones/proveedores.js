@@ -5,15 +5,19 @@
  *
  * Si un proveedor no está configurado, el canal sigue en modo de prueba: el mensaje solo se ve en el panel.
  *
- * Por seguridad, los datos de ejemplo tienen números y correos que pueden ser de personas reales. Por eso solo se envía
- * de verdad a los destinos de WA_NUMEROS_PERMITIDOS / CORREOS_PERMITIDOS. Para enviar a todos los pacientes
- * (producción) se pone ENVIAR_A_TODOS=true.
+ * ¿A quién se envía de verdad? Lo decide DESTINOS_REALES:
+ *   - permitidos: solo a WA_NUMEROS_PERMITIDOS / CORREOS_PERMITIDOS (pruebas).
+ *   - pacientes:  a todos los pacientes registrados por el personal de la clínica, más los permitidos. Los pacientes de
+ *                 ejemplo (creados por el sistema al instalar) quedan en la bandeja de prueba, porque sus números y
+ *                 correos son inventados y podrían ser de personas reales.
+ *   - todos:      a cualquier destino (equivale al antiguo ENVIAR_A_TODOS=true).
  */
 const env = (k, d = '') => (process.env[k] ?? d).trim();
 const list = (k) => env(k).split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
 
 const TIMEOUT_MS = Number(env('PROVEEDOR_TIMEOUT_MS', '8000'));
 const ENVIAR_A_TODOS = env('ENVIAR_A_TODOS', 'false').toLowerCase() === 'true';
+const DESTINOS = (env('DESTINOS_REALES') || (ENVIAR_A_TODOS ? 'todos' : 'permitidos')).toLowerCase();
 
 // ---------------------------------------------------------------- WhatsApp Cloud API
 const WA = {
@@ -203,20 +207,28 @@ async function enviarCorreo(destino, asunto, cuerpo) {
 
 // ---------------------------------------------------------------- decisión
 /** ¿Este mensaje se envía de verdad o se queda en la bandeja de prueba? */
-function destinoReal(canal, destinoNormalizado) {
-  if (canal === 'WHATSAPP') {
-    if (!waActivo()) return { real: false, motivo: 'WhatsApp en modo de prueba (sin credenciales de Meta)' };
-    if (ENVIAR_A_TODOS || WA.permitidos.has(destinoNormalizado)) return { real: true };
-    return { real: false, motivo: 'Número fuera de WA_NUMEROS_PERMITIDOS: se dejó solo en la bandeja de prueba' };
+/**
+ * ¿Este mensaje se envía de verdad o se queda en la bandeja de prueba?
+ * @param info datos del paciente que manda el sistema central: { demo: true|false } (puede faltar)
+ */
+function destinoReal(canal, destinoNormalizado, info) {
+  const wa = canal === 'WHATSAPP';
+  if (wa && !waActivo()) return { real: false, motivo: 'WhatsApp en modo de prueba (sin credenciales de Meta)' };
+  if (!wa && !correoActivo()) return { real: false, motivo: 'Correo en modo de prueba (sin SMTP configurado)' };
+  const permitidos = wa ? WA.permitidos : SMTP.permitidos;
+  if (DESTINOS === 'todos' || permitidos.has(destinoNormalizado)) return { real: true };
+  if (DESTINOS === 'pacientes') {
+    if (info && info.demo === false) return { real: true };
+    if (info && info.demo) return { real: false, motivo: 'Paciente de ejemplo (datos inventados): se dejó solo en la bandeja de prueba' };
+    return { real: false, motivo: 'Destino que no es de un paciente registrado: se dejó en la bandeja de prueba' };
   }
-  if (!correoActivo()) return { real: false, motivo: 'Correo en modo de prueba (sin SMTP configurado)' };
-  if (ENVIAR_A_TODOS || SMTP.permitidos.has(destinoNormalizado)) return { real: true };
-  return { real: false, motivo: 'Correo fuera de CORREOS_PERMITIDOS: se dejó solo en la bandeja de prueba' };
+  return { real: false, motivo: (wa ? 'Número fuera de WA_NUMEROS_PERMITIDOS' : 'Correo fuera de CORREOS_PERMITIDOS') + ': se dejó solo en la bandeja de prueba' };
 }
 
 function estadoProveedores() {
   return {
-    enviarATodos: ENVIAR_A_TODOS,
+    enviarATodos: DESTINOS === 'todos',
+    destinos: DESTINOS,
     whatsapp: waActivo()
       ? { modo: 'real', proveedor: 'WhatsApp Cloud API (Meta)', numero: WA.numero || null, estadoPlantilla: WA.estadoPlantilla || null, envio: WA.plantilla && WA.modo !== 'texto' ? `plantilla ${WA.plantilla}` : 'texto libre (ventana de 24 h)', permitidos: [...WA.permitidos].map((n) => '+51 ' + n) }
       : { modo: 'prueba', proveedor: 'Simulado' },

@@ -75,6 +75,7 @@ services:
       SMTP_NOMBRE: ${SMTP_NOMBRE:-Clínica Dental Cárdenas}
       CORREOS_PERMITIDOS: ${CORREOS_PERMITIDOS:-}
       ENVIAR_A_TODOS: ${ENVIAR_A_TODOS:-false}
+      DESTINOS_REALES: ${DESTINOS_REALES:-}
     volumes:
       - notif-data:/data
     ports:

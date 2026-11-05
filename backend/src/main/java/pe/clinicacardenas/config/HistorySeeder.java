@@ -74,7 +74,7 @@ public class HistorySeeder {
 
     private void addPatient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {
         if (patients.findByDocTypeAndDocNumber("DNI", dni).isPresent()) return;
-        patientService.create(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
+        patientService.createDemo(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
                 email, null, district, null, null, null));
     }
 

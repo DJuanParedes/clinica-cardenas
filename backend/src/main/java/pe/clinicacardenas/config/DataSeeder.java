@@ -87,7 +87,7 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private Patient patient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {
-        return patientService.create(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
+        return patientService.createDemo(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
                 email, null, district, null, null, null));
     }
 

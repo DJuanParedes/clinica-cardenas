@@ -39,6 +39,10 @@ public class Patient {
     @Column(name = "notify_channel")
     public String notifyChannel = "WHATSAPP";
 
+    /** Paciente de ejemplo creado al instalar (no recibe mensajes reales). */
+    @Column(name = "demo")
+    public boolean demo;
+
     @Column(name = "created_at")
     public LocalDateTime createdAt;
     @Column(name = "created_by")
