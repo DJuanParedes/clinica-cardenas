@@ -1,77 +1,320 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../core/api.service';
-import { UserRole } from '../core/models';
+import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ToastService } from '../core/toast.service';
+import { AuditEntry } from '../core/models';
+import { apiError, dateTime, initials } from '../core/format';
+import { IconComponent } from '../shared/icon.component';
+import { ModalComponent } from '../shared/modal.component';
 
-interface SecurityAudit { id:number; occurredAt:string; actor:string; action:string; userId:number; previousRole:string|null; newRole:string|null; }
-type RecoveryChannel='SMS'|'WHATSAPP';
-interface ManagedUser { id:number; fullName:string; email:string; dni?:string|null; phone?:string|null; recoveryChannel?:RecoveryChannel|null; role:UserRole; clinicId:string; platformAdmin:boolean; enabled:boolean; mustResetPassword:boolean; lockedUntil?:string|null; lastLoginAt?:string|null; passwordChangedAt?:string|null; }
-interface DoctorProfile { id:number; fullName:string; accountEmail?:string|null; specialty:string; branch:string; shiftStart:string; shiftEnd:string; active:boolean; }
+const ROLE_TONE: Record<string, string> = { ADMIN: 'gum', RECEPCION: 'teal', ODONTOLOGO: 'blue', CAJA: 'amber', DIRECTOR: 'grey' };
+const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
+const PERMISSIONS: { role: string; can: string }[] = [
+  { role: 'Administrador', can: 'Todo el sistema, cuentas de usuario y horarios' },
+  { role: 'Recepcionista', can: 'Pacientes, citas y agenda' },
+  { role: 'Odontólogo', can: 'Su agenda, historia clínica, odontograma y plan de tratamiento' },
+  { role: 'Responsable de caja', can: 'Comprobantes y envío a SUNAT' },
+  { role: 'Director', can: 'Inicio, agenda y pacientes (consulta)' },
+];
+
+/** HU-27 crear, editar y desactivar cuentas · HU-25 control de bloqueos. */
 @Component({
-  selector:'app-users', standalone:true, imports:[FormsModule,DatePipe],
-  template:`
-    <section class="page-head"><div><span>Seguridad y acceso · {{auth.user()?.clinic?.name}}</span><h1>Usuarios de esta clínica</h1><p>Las cuentas creadas aquí pertenecen únicamente a {{auth.user()?.clinic?.shortName}}. El DNI se registra como clave temporal, pero el usuario debe activar su acceso con “Olvidé mi contraseña”.</p></div><button class="primary-btn" (click)="openNew()">＋ Nuevo usuario</button></section>
-    @if(message()){<div class="msg" [class.error]="messageType()==='error'">{{message()}}</div>}
-    <section class="flow"><div><b>1</b><span>ADMIN registra correo real, DNI y teléfono</span></div><i>→</i><div><b>2</b><span>DNI = clave temporal (no inicia sesión)</span></div><i>→</i><div><b>3</b><span>Usuario pulsa “Olvidé mi contraseña”</span></div><i>→</i><div><b>4</b><span>Código SMS/WhatsApp + nueva clave</span></div></section>
-    @if(formOpen()){
-      <section class="panel-card form-card"><div class="card-title"><div><span>{{editingId()?'Edición':'Alta de usuario'}}</span><h2>{{editingId()?'Actualizar cuenta':'Crear cuenta'}}</h2></div><button class="close" (click)="closeForm()">×</button></div>
-      <form (ngSubmit)="save()" class="form-grid">
-        <label>Nombre completo<input [(ngModel)]="draft.fullName" name="fullName" required maxlength="120"></label>
-        <label>Correo electrónico real<input type="email" [(ngModel)]="draft.email" name="email" required maxlength="160" placeholder="persona@correo.com" [readonly]="!!editingId()"><small>{{editingId()?'El correo es la identidad histórica de la cuenta y no se modifica.':'Se usará para iniciar sesión y recuperar el acceso.'}}</small></label>
-        <label>DNI<input [(ngModel)]="draft.dni" name="dni" [required]="draft.role!=='ADMIN'" maxlength="8" pattern="[0-9]{8}" inputmode="numeric"><small>{{draft.role==='ADMIN'?'Opcional para el administrador de clínica.':'Se registra como clave temporal; no permite iniciar sesión antes del OTP.'}}</small></label>
-        <label>Rol<select [(ngModel)]="draft.role" name="role" required>@if(auth.isPlatformAdmin()){<option value="ADMIN">Administrador de clínica</option>}<option value="DOCTOR">Doctor</option><option value="RECEPCION">Recepción</option><option value="FINANZAS">Finanzas</option></select><small>@if(auth.isPlatformAdmin()){El administrador quedará asignado a la clínica seleccionada.}</small></label>
-        <label>Teléfono de recuperación<input [(ngModel)]="draft.phone" name="phone" required placeholder="+51987654321"><small>Para Perú puedes escribir 9XXXXXXXX; se normaliza a +51.</small></label>
-        <label>Enviar código por<select [(ngModel)]="draft.recoveryChannel" name="recoveryChannel" required><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
-        @if(draft.role==='DOCTOR'){
-          <label>Especialidad<input [(ngModel)]="draft.doctorSpecialty" name="doctorSpecialty" required placeholder="Ej. Endodoncia"></label>
-          <label>Sede<input [(ngModel)]="draft.doctorBranch" name="doctorBranch" required placeholder="Sede principal"></label>
-          <label>Horario inicio<input type="time" [(ngModel)]="draft.shiftStart" name="shiftStart" required min="08:00" max="22:00"></label>
-          <label>Horario fin<input type="time" [(ngModel)]="draft.shiftEnd" name="shiftEnd" required min="08:00" max="22:00"><small>El perfil de Agenda se crea/sincroniza automáticamente.</small></label>
-        }
-        @if(editingId()){<label class="switch"><input type="checkbox" [(ngModel)]="draft.enabled" name="enabled" [disabled]="draft.role==='ADMIN'"> Cuenta habilitada</label>}
-        @if(!editingId()){<div class="initial-info"><b>No debes inventar una contraseña.</b><span>El backend registra automáticamente el DNI como clave temporal, pero bloquea el inicio de sesión hasta que el usuario use “Olvidé mi contraseña”, verifique el código y cree su clave personal.</span></div>}
-        <div class="actions"><button type="button" class="secondary-btn" (click)="closeForm()">Cancelar</button><button class="primary-btn" [disabled]="saving()">{{saving()?'Guardando...':'Guardar usuario'}}</button></div>
-      </form></section>
-    }
-    <section class="panel-card"><div class="toolbar"><div class="search"><input [(ngModel)]="query" placeholder="Buscar por nombre, correo, DNI o rol"></div><button class="secondary-btn" (click)="load()">Actualizar</button></div>
-      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Usuario</th><th>Identificación</th><th>Recuperación</th><th>Rol</th><th>Acceso</th><th>Acciones</th></tr></thead><tbody>
-      @for(u of filtered();track u.id){<tr><td><b>{{u.fullName}}</b><small>{{u.email}}</small></td><td>{{u.dni||'—'}}</td><td><b>{{u.phone||'—'}}</b><small>{{channelLabel(u.recoveryChannel)}}</small></td><td><span class="role">{{roleLabel(u.role)}}</span></td><td><span class="status" [class.warn]="u.mustResetPassword" [class.off]="!u.enabled">{{!u.enabled?'BLOQUEADO':u.mustResetPassword?'CAMBIO DE CLAVE PENDIENTE':'HABILITADO'}}</span></td><td><div class="row-actions"><button (click)="edit(u)">Editar</button>@if(u.role!=='ADMIN'){<button (click)="toggle(u)">{{u.enabled?'Bloquear':'Habilitar'}}</button>@if(u.enabled){<button (click)="reissue(u)">Reemitir acceso</button>}}</div></td></tr>}
-      </tbody></table></div>
-    </section>
-    <section class="panel-card"><div class="toolbar"><div><h2>Bitácora de seguridad</h2><p>Últimos 100 eventos de esta clínica. Horario local del navegador.</p></div><button class="secondary-btn" (click)="loadAudit()">Actualizar bitácora</button></div>
-      @if(auditError()){<p role="alert">{{auditError()}}</p>}
-      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Fecha</th><th>Actor</th><th>Evento</th><th>Usuario</th><th>Rol anterior</th><th>Rol nuevo</th></tr></thead><tbody>
-      @for(event of auditEntries();track event.id){<tr><td>{{event.occurredAt | date:'dd/MM/yyyy HH:mm:ss'}}</td><td>{{event.actor}}</td><td>{{event.action}}</td><td>{{event.userId}}</td><td>{{event.previousRole||'—'}}</td><td>{{event.newRole||'—'}}</td></tr>}
-      @empty{<tr><td colspan="6">No hay eventos cargados. Actualiza la bitácora para consultar el registro.</td></tr>}
-      </tbody></table></div>
-    </section>
-  `,
-  styles:[`
-    .msg{padding:11px 14px;background:#e8f7ee;border:1px solid #cbe9d8;color:#2d7253;border-radius:10px;margin-bottom:14px;font-size:11px}.msg.error{background:#fff0f0;border-color:#efcaca;color:#a33}.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:8px;margin-bottom:18px}.flow>div{background:#fff;border:1px solid #dfeaea;border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center}.flow b{width:28px;height:28px;border-radius:9px;background:#e4f2f7;color:#3B78A6;display:grid;place-items:center}.flow span{font-size:9px;color:#587477}.flow i{font-style:normal;color:#98abad}.form-card{margin-bottom:18px}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.form-grid label{font-size:10px;font-weight:700;color:#48696b}.form-grid input,.form-grid select{display:block;width:100%;box-sizing:border-box;border:1px solid #dce7e8;border-radius:9px;padding:11px;margin-top:6px}.form-grid small{display:block;margin-top:4px;color:#789092}.switch{display:flex!important;align-items:center;gap:8px;margin-top:22px}.switch input{width:auto!important;margin:0!important}.initial-info{padding:11px;border-radius:10px;background:#fff7e9;border:1px solid #f0dfb7;align-self:end}.initial-info b,.initial-info span{display:block}.initial-info b{font-size:9px;color:#765b25}.initial-info span{font-size:8px;color:#806f49;margin-top:3px;line-height:1.5}.actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}.close{border:1px solid #dce7e8;background:#fff;border-radius:8px;width:32px;height:32px}.toolbar{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}.search{flex:1}.search input{width:100%;border:1px solid #dce7e8;border-radius:9px;padding:10px}.role,.status{font-size:8px;border-radius:99px;padding:6px 9px;background:#e6f5f4;color:#18747a}.status{background:#e8f7ee;color:#347556}.status.warn{background:#fff3d5;color:#866621}.status.off{background:#f5eeee;color:#9a4d4d}.row-actions{display:flex;gap:6px;flex-wrap:wrap}.row-actions button{border:1px solid #dce7e8;background:#fff;border-radius:7px;padding:6px 8px;font-size:8px}.data-table td small,.data-table td b{display:block}.data-table td small{font-size:8px;color:#789092;margin-top:3px}@media(max-width:850px){.flow{grid-template-columns:1fr}.flow i{display:none}}@media(max-width:650px){.form-grid{grid-template-columns:1fr}.actions{grid-column:auto}}
-  `]
-})
-export class UsersComponent implements OnInit{
-  private api=inject(ApiService);
-  readonly auth=inject(AuthService);
-  readonly users=signal<ManagedUser[]>([]);readonly doctorProfiles=signal<DoctorProfile[]>([]);readonly formOpen=signal(false);readonly editingId=signal<number|null>(null);readonly saving=signal(false);readonly message=signal('');readonly messageType=signal<'success'|'error'>('success');
-  readonly auditEntries=signal<SecurityAudit[]>([]); readonly auditError=signal('');
-  loadAudit(){this.auditError.set('');this.api.get<SecurityAudit[]>('/users/audit').subscribe({next:v=>this.auditEntries.set(v),error:()=>{this.auditEntries.set([]);this.auditError.set('No se pudo consultar la bitácora.');}});}
-  query='';draft:any=this.empty();
-  ngOnInit(){this.load();this.loadAudit();}
-  load(){this.api.get<ManagedUser[]>('/users').subscribe({next:v=>this.users.set(v),error:e=>this.notify(e?.error?.detail||e?.error?.message||'No se pudieron cargar los usuarios.','error')});this.api.get<DoctorProfile[]>('/scheduling/doctors').subscribe({next:v=>this.doctorProfiles.set(v),error:()=>this.doctorProfiles.set([])});}
-  filtered(){const q=this.query.trim().toLowerCase();return this.users().filter(u=>!q||`${u.fullName} ${u.email} ${u.dni||''} ${u.role}`.toLowerCase().includes(q));}
-  openNew(){this.editingId.set(null);this.draft=this.empty();this.formOpen.set(true);}
-  edit(u:ManagedUser){const dp=this.doctorProfiles().find(d=>d.accountEmail?.toLowerCase()===u.email.toLowerCase());this.editingId.set(u.id);this.draft={fullName:u.fullName,email:u.email,dni:u.dni||'',phone:u.phone||'',recoveryChannel:u.recoveryChannel||'SMS',role:u.role,enabled:u.enabled,doctorSpecialty:dp?.specialty||'',doctorBranch:dp?.branch||'Sede principal',shiftStart:(dp?.shiftStart||'08:00').slice(0,5),shiftEnd:(dp?.shiftEnd||'18:00').slice(0,5)};this.formOpen.set(true);window.scrollTo({top:0,behavior:'smooth'});}
-  closeForm(){this.formOpen.set(false);this.editingId.set(null);this.draft=this.empty();}
-  save(){this.saving.set(true);const req=this.editingId()?this.api.put<ManagedUser>(`/users/${this.editingId()}`,this.draft):this.api.post<ManagedUser>('/users',this.draft);req.subscribe({next:()=>{const isNew=!this.editingId();this.saving.set(false);this.closeForm();this.notify(isNew?'Usuario creado. El DNI queda como clave temporal de seguridad, pero no abre sesión. Indícale que use “Olvidé mi contraseña” para recibir su código y crear una contraseña personal.':'Usuario actualizado correctamente.');this.load();},error:e=>{this.saving.set(false);this.notify(e?.error?.detail||e?.error?.message||'No se pudo guardar el usuario.','error')}});}
-  toggle(u:ManagedUser){this.api.patch<ManagedUser>(`/users/${u.id}/enabled?value=${!u.enabled}`).subscribe({next:v=>{Object.assign(u,v);this.notify('Estado de la cuenta actualizado.');},error:e=>this.notify(e?.error?.detail||e?.error?.message||'No se pudo cambiar el estado.','error')});}
-  reissue(u:ManagedUser){if(!confirm(`¿Reemitir acceso inicial para ${u.fullName}? La contraseña temporal volverá a ser su DNI y deberá verificar un nuevo código.`))return;this.api.post<void>(`/users/${u.id}/reissue-initial-access`,{}).subscribe({next:()=>{this.notify('Acceso inicial reemitido. El usuario debe usar “Olvidé mi contraseña”.');this.load();},error:e=>this.notify(e?.error?.detail||e?.error?.message||'No se pudo reemitir el acceso.','error')});}
-  roleLabel(role:UserRole){return({ADMIN:'Administrador',DOCTOR:'Doctor',RECEPCION:'Recepción',FINANZAS:'Finanzas'} as Record<UserRole,string>)[role];}
-  channelLabel(v?:RecoveryChannel|null){return v==='WHATSAPP'?'Código por WhatsApp':v==='SMS'?'Código por SMS':'Sin recuperación configurada';}
-  private empty(){return{fullName:'',email:'',dni:'',phone:'+51',recoveryChannel:'SMS' as RecoveryChannel,role:'RECEPCION' as UserRole,enabled:true,doctorSpecialty:'',doctorBranch:'Sede principal',shiftStart:'08:00',shiftEnd:'18:00'};}
-  private notify(t:string,type:'success'|'error'='success'){this.message.set(t);this.messageType.set(type);}
-}
+  selector: 'app-users',
+  standalone: true,
+  imports: [FormsModule, IconComponent, ModalComponent],
+  template: `
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h1>Usuarios y accesos</h1>
+          <p class="sub">Cada persona entra con su propia cuenta y ve solo las funciones de su rol.</p>
+        </div>
+        <div class="actions"><button class="btn primary" type="button" (click)="openNew()"><app-icon name="plus" [size]="16" /> Crear cuenta</button></div>
+      </div>
 
+      <div class="layout">
+        <section class="panel">
+          <table class="table">
+            <thead><tr><th>Persona</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+            <tbody>
+              @for (u of users; track u.id) {
+                <tr [class.off]="!u.active">
+                  <td>
+                    <div class="row">
+                      <span class="avatar">{{ ini(u.fullName) }}</span>
+                      <div><div class="strong">{{ u.fullName }}</div><div class="muted small">{{ u.username }} · {{ u.email }}</div></div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="tag plain" [class]="'tag plain ' + roleTone(u.role)">{{ u.roleLabel }}</span>
+                    @if (u.dentist) { <div class="muted small">{{ u.dentist.specialty }}</div> }
+                  </td>
+                  <td>
+                    @if (!u.active) { <span class="tag grey">Desactivada</span> }
+                    @else if (u.locked) { <span class="tag amber">Bloqueada</span> }
+                    @else { <span class="tag green">Activa</span> }
+                  </td>
+                  <td class="muted small nowrap">{{ u.lastLoginAt ? dt(u.lastLoginAt) : 'Nunca' }}</td>
+                  <td class="right">
+                    <div class="row end">
+                      @if (u.locked && u.active) { <button class="btn sm" type="button" (click)="unlock(u)"><app-icon name="unlock" [size]="14" /> Desbloquear</button> }
+                      <button class="btn sm" type="button" (click)="openEdit(u)">Editar</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+
+        <aside class="panel perms">
+          <div class="panel-head"><h3>Qué puede hacer cada rol</h3></div>
+          <ul>
+            @for (p of permissions; track p.role) { <li><span class="strong">{{ p.role }}</span><span class="muted small">{{ p.can }}</span></li> }
+          </ul>
+          <div class="panel-foot small muted">5 intentos fallidos bloquean la cuenta 15 minutos.</div>
+        </aside>
+      </div>
+    </div>
+
+    <app-modal [open]="modal" [title]="editing ? 'Editar cuenta' : 'Crear cuenta'" [subtitle]="editing ? editing.username : ''" [width]="620" (close)="modal = false">
+      <form class="grid cols-2" (ngSubmit)="save()" autocomplete="off">
+        <div class="field span-2">
+          <label class="req" for="fn">Nombres y apellidos</label>
+          <input id="fn" name="fn" class="input" [class.invalid]="e['fullName']" [(ngModel)]="f.fullName" />
+          @if (e['fullName']) { <span class="err">{{ e['fullName'] }}</span> }
+        </div>
+        <div class="field">
+          <label class="req" for="un">Usuario</label>
+          <input id="un" name="un" class="input" [class.invalid]="e['username']" [(ngModel)]="f.username" [disabled]="!!editing" autocapitalize="none" />
+          @if (e['username']) { <span class="err">{{ e['username'] }}</span> }
+        </div>
+        <div class="field">
+          <label class="req" for="em">Correo</label>
+          <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" />
+          @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
+        </div>
+        <div class="field">
+          <label class="req" for="rl">Rol</label>
+          <select id="rl" name="rl" class="input" [class.invalid]="e['role']" [(ngModel)]="f.role">
+            @for (r of roles; track r.code) { <option [value]="r.code">{{ r.label }}</option> }
+          </select>
+          @if (e['role']) { <span class="err">{{ e['role'] }}</span> }
+        </div>
+        @if (!editing) {
+          <div class="field">
+            <label class="req" for="pw">Contraseña inicial</label>
+            <input id="pw" name="pw" class="input" [class.invalid]="e['password']" [(ngModel)]="f.password" autocomplete="new-password" />
+            @if (e['password']) { <span class="err">{{ e['password'] }}</span> } @else { <span class="hint">Mínimo 8 caracteres, una letra y un número.</span> }
+          </div>
+        } @else { <div></div> }
+        @if (f.role === 'ODONTOLOGO') {
+          <div class="field">
+            <label class="req" for="sp">Especialidad</label>
+            <input id="sp" name="sp" class="input" [class.invalid]="e['specialty']" [(ngModel)]="f.specialty" list="specs" />
+            <datalist id="specs"><option value="Odontología general"></option><option value="Ortodoncia"></option><option value="Endodoncia"></option><option value="Periodoncia"></option><option value="Rehabilitación oral"></option><option value="Odontopediatría"></option><option value="Cirugía bucal"></option></datalist>
+            @if (e['specialty']) { <span class="err">{{ e['specialty'] }}</span> }
+          </div>
+          <div class="field">
+            <label for="cop">Colegiatura (COP)</label>
+            <input id="cop" name="cop" class="input" [(ngModel)]="f.cop" />
+          </div>
+        }
+      </form>
+
+      @if (editing) {
+        <div class="danger-zone">
+          @if (editing.dentist) {
+            <div class="dz-row">
+              <div><div class="strong small">Horario de atención</div><div class="muted small">Define los bloques en los que se pueden programar citas.</div></div>
+              <button class="btn sm" type="button" (click)="openSchedule()"><app-icon name="calendar" [size]="14" /> Editar horario</button>
+            </div>
+          }
+          <div class="dz-row">
+            <div><div class="strong small">Contraseña temporal</div><div class="muted small">Desbloquea la cuenta y reemplaza la contraseña.</div></div>
+            <div class="row">
+              <input class="input pwi" [(ngModel)]="tempPassword" placeholder="Nueva contraseña" aria-label="Contraseña temporal" />
+              <button class="btn sm" type="button" (click)="setPassword()" [disabled]="tempPassword.length < 8">Asignar</button>
+            </div>
+          </div>
+          <div class="dz-row">
+            <div><div class="strong small">{{ editing.active ? 'Desactivar cuenta' : 'Reactivar cuenta' }}</div>
+              <div class="muted small">{{ editing.active ? 'La persona pierde el acceso de inmediato. Su historial se conserva.' : 'La persona podrá volver a iniciar sesión.' }}</div></div>
+            <button class="btn sm" [class.danger]="editing.active" type="button" (click)="toggleActive()" [disabled]="editing.id === auth.user()?.id">
+              {{ editing.active ? 'Desactivar' : 'Reactivar' }}
+            </button>
+          </div>
+          @if (audit.length) {
+            <details>
+              <summary class="small strong">Registro de cambios ({{ audit.length }})</summary>
+              <ul class="audit">@for (a of audit; track a.id) { <li><span class="muted">{{ dt(a.createdAt) }}</span> {{ a.username }} · {{ a.detail }}</li> }</ul>
+            </details>
+          }
+        </div>
+      }
+
+      <ng-container modal-actions>
+        <button class="btn" type="button" (click)="modal = false">Cancelar</button>
+        <button class="btn primary" type="button" (click)="save()" [disabled]="saving">{{ editing ? 'Guardar cambios' : 'Crear cuenta' }}</button>
+      </ng-container>
+    </app-modal>
+
+    <app-modal [open]="scheduleOpen" title="Horario de atención" [subtitle]="editing?.fullName" [width]="640" (close)="scheduleOpen = false">
+      <div class="sched">
+        @for (day of days; track $index; let di = $index) {
+          <div class="srow">
+            <span class="dname">{{ day }}</span>
+            <div class="blocks">
+              @for (b of blocksOf(di + 1); track $index) {
+                <span class="blk">
+                  <input type="time" class="input t" [(ngModel)]="b.start" step="900" [attr.aria-label]="day + ' inicio'" />
+                  <span class="muted">a</span>
+                  <input type="time" class="input t" [(ngModel)]="b.end" step="900" [attr.aria-label]="day + ' fin'" />
+                  <button type="button" class="btn ghost sm" (click)="removeBlock(b)" aria-label="Quitar bloque"><app-icon name="x" [size]="14" /></button>
+                </span>
+              } @empty { <span class="muted small">No atiende</span> }
+              <button type="button" class="btn ghost sm" (click)="addBlock(di + 1)"><app-icon name="plus" [size]="14" /> Bloque</button>
+            </div>
+          </div>
+        }
+      </div>
+      <ng-container modal-actions>
+        <button class="btn" type="button" (click)="scheduleOpen = false">Cancelar</button>
+        <button class="btn primary" type="button" (click)="saveSchedule()">Guardar horario</button>
+      </ng-container>
+    </app-modal>
+  `,
+  styles: [`
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+    tr.off td { opacity: .6; }
+    .nowrap { white-space: nowrap; }
+    .end { justify-content: flex-end; }
+    .perms ul { list-style: none; margin: 0; padding: 6px 18px; }
+    .perms li { display: flex; flex-direction: column; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+    .perms li:last-child { border-bottom: 0; }
+    .danger-zone { margin-top: 20px; border: 1px solid var(--line); border-radius: var(--radius); }
+    .dz-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .danger-zone details { padding: 12px 14px; }
+    .pwi { width: 170px; height: 30px; font-size: 13px; }
+    .audit { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+    .sched { display: flex; flex-direction: column; }
+    .srow { display: grid; grid-template-columns: 100px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: center; }
+    .dname { font-weight: 600; font-size: var(--step--1); }
+    .blocks { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .blk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+    .t { width: 104px; height: 30px; font-size: 13px; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  `],
+})
+export class UsersComponent implements OnInit {
+  private api = inject(Api);
+  private toast = inject(ToastService);
+  auth = inject(AuthService);
+
+  users: any[] = [];
+  roles: { code: string; label: string }[] = [];
+  permissions = PERMISSIONS;
+  days = DAYS;
+
+  modal = false;
+  editing: any = null;
+  f: any = {};
+  e: Record<string, string> = {};
+  saving = false;
+  tempPassword = '';
+  audit: AuditEntry[] = [];
+
+  scheduleOpen = false;
+  blocks: { weekday: number; start: string; end: string }[] = [];
+
+  ngOnInit() {
+    this.load();
+    this.api.roles().subscribe((r) => (this.roles = r));
+  }
+
+  load() { this.api.users().subscribe((u) => (this.users = u)); }
+
+  openNew() {
+    this.editing = null;
+    this.f = { fullName: '', username: '', email: '', role: 'RECEPCION', password: '', specialty: '', cop: '' };
+    this.e = {};
+    this.modal = true;
+  }
+
+  openEdit(u: any) {
+    this.editing = u;
+    this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, specialty: u.dentist?.specialty || '', cop: u.dentist?.cop || '' };
+    this.e = {};
+    this.tempPassword = '';
+    this.audit = [];
+    this.api.userAudit(u.id).subscribe((a) => (this.audit = a));
+    this.modal = true;
+  }
+
+  save() {
+    this.saving = true;
+    this.e = {};
+    const req = this.editing ? this.api.updateUser(this.editing.id, this.f) : this.api.createUser(this.f);
+    req.subscribe({
+      next: (u) => {
+        this.saving = false;
+        this.modal = false;
+        this.toast.ok(this.editing ? `Cuenta de ${u.fullName} actualizada.` : `Cuenta creada: ${u.username}.`);
+        this.load();
+      },
+      error: (err) => {
+        this.saving = false;
+        const a = apiError(err);
+        this.e = a.fields || {};
+        this.toast.error(a.message);
+      },
+    });
+  }
+
+  toggleActive() {
+    const u = this.editing;
+    if (u.active && !confirm(`¿Desactivar la cuenta de ${u.fullName}? Perderá el acceso de inmediato.`)) return;
+    this.api.setUserActive(u.id, !u.active).subscribe({
+      next: (r) => { this.editing = r; this.toast.ok(r.active ? 'Cuenta reactivada.' : 'Cuenta desactivada.'); this.load(); this.api.userAudit(r.id).subscribe((a) => (this.audit = a)); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  unlock(u: any) {
+    this.api.unlockUser(u.id).subscribe({
+      next: () => { this.toast.ok(`Cuenta de ${u.fullName} desbloqueada.`); this.load(); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  setPassword() {
+    this.api.setUserPassword(this.editing.id, this.tempPassword).subscribe({
+      next: () => { this.toast.ok('Contraseña temporal asignada. Compártela de forma privada.'); this.tempPassword = ''; this.load(); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  openSchedule() {
+    this.api.schedules(this.editing.dentist.id).subscribe((list) => {
+      this.blocks = list.map((s) => ({ weekday: s.weekday, start: s.startTime, end: s.endTime }));
+      this.scheduleOpen = true;
+    });
+  }
+
+  blocksOf(day: number) { return this.blocks.filter((b) => b.weekday === day); }
+  addBlock(day: number) { this.blocks.push({ weekday: day, start: '09:00', end: '13:00' }); }
+  removeBlock(b: any) { this.blocks = this.blocks.filter((x) => x !== b); }
+
+  saveSchedule() {
+    this.api.saveSchedules(this.editing.dentist.id, this.blocks).subscribe({
+      next: () => { this.scheduleOpen = false; this.toast.ok('Horario actualizado.'); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  roleTone(r: string) { return ROLE_TONE[r] || 'grey'; }
+  ini = initials;
+  dt = dateTime;
+}

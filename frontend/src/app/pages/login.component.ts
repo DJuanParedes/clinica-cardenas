@@ -1,73 +1,169 @@
-import { backendPending } from '../core/deployment';
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
-import { ClinicConfigService } from '../core/clinic-config.service';
+import { apiError } from '../core/format';
+import { IconComponent } from '../shared/icon.component';
+import { LogoComponent } from '../shared/logo.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, IconComponent, LogoComponent],
   template: `
-    <div class="login-page">
-      <section class="login-visual">
-        <a class="back" routerLink="/">← Volver al portal</a>
-        <div class="visual-copy"><div class="logo"><img src="brand/platform-logo.svg" alt="Plataforma multiclínica"></div><span>Portal odontológico</span><h1>Un acceso seguro para cada clínica.</h1><p>Ingresa con tu cuenta. La plataforma identificará automáticamente tu clínica, su marca, tus funciones y la información que puedes consultar.</p><div class="visual-points"><b>✓ Identidad propia después de ingresar</b><b>✓ Información separada por clínica</b><b>✓ Acceso según responsabilidades</b></div></div>
-      </section>
-      <section class="login-panel">
-        <div class="login-card">
-          <div class="mobile-brand"><img src="brand/platform-logo.svg" alt="Plataforma multiclínica"> Portal odontológico</div>
-          <span class="eyebrow">Acceso general seguro</span><h2>Bienvenido</h2><p>Al validar tus datos ingresarás directamente al espacio privado de tu clínica.</p>
-          <form [formGroup]="form" (ngSubmit)="submit()">
-            <label>Correo electrónico<input type="email" formControlName="email" placeholder="usuario@correo.com" autocomplete="username"></label>
-            <label>Contraseña<div class="password"><input [type]="showPassword() ? 'text' : 'password'" formControlName="password" placeholder="••••••••" autocomplete="current-password"><button type="button" (click)="showPassword.set(!showPassword())">{{ showPassword() ? 'Ocultar' : 'Ver' }}</button></div></label>
-            <div class="forgot"><a [routerLink]="['/recuperar-contrasena']" [queryParams]="{email:form.controls.email.value}">¿Olvidaste tu contraseña?</a></div>
-            @if (error()) { <div class="error">{{ error() }}</div> }
-            <button class="submit" [disabled]="backendPending || form.invalid || loading()">{{ loading() ? 'Validando...' : 'Ingresar al sistema' }}</button>
-          </form>
-          <div class="access-note"><b>Primer ingreso</b><span>Si el Administrador acaba de crear tu cuenta, tu DNI queda registrado como clave temporal de seguridad, pero no abre una sesión. Presiona “¿Olvidaste tu contraseña?”, recibe el código por SMS o WhatsApp y crea tu contraseña personal antes de ingresar.</span></div>
+    <div class="wrap">
+      <section class="art" aria-label="Clínica Dental Cárdenas">
+        <!-- ondas de la marca: celeste y naranja -->
+        <svg class="waves" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 0 H800 V40 C 600 150, 300 60, 0 170 Z" fill="#00B0E0"/>
+          <path d="M0 214 C 300 100, 600 196, 800 82" fill="none" stroke="#F89818" stroke-width="20"/>
+          <path d="M0 900 V820 C 260 720, 560 860, 800 700 V900 Z" fill="#00B0E0"/>
+          <path d="M0 780 C 260 676, 560 812, 800 652" fill="none" stroke="#F89818" stroke-width="14"/>
+        </svg>
+        <span class="dot d1" aria-hidden="true"></span>
+        <span class="dot d2" aria-hidden="true"></span>
+
+        <div class="badge"><app-logo [size]="104" /></div>
+
+        <div class="slogan">
+          <span class="l1">Que tu</span>
+          <span class="l2">Sonrisa</span>
+          <span class="l3">sea para</span>
+          <span class="l4">toda la vida</span>
         </div>
+
+        <p class="who">
+          <strong>Clínica Dental Cárdenas</strong><br>
+          La Floresta, Chaclacayo · Odontología integral
+        </p>
+      </section>
+
+      <section class="formside">
+        <form class="card" (ngSubmit)="submit()" novalidate>
+          <div class="mobile-brand"><app-logo [size]="52" /><span>Clínica Dental Cárdenas</span></div>
+          <h2>Iniciar sesión</h2>
+          <p class="muted">Ingresa con la cuenta que te asignó la administración de la clínica.</p>
+
+          @if (error) {
+            <div class="notice" [class.gum]="!locked" [class.amber]="locked" role="alert">
+              <app-icon [name]="locked ? 'lock' : 'alert'" />
+              <div>
+                <div>{{ error }}</div>
+                @if (locked) { <a routerLink="/recuperar" class="small">Recuperar contraseña</a> }
+              </div>
+            </div>
+          }
+
+          <div class="field">
+            <label for="u">Usuario</label>
+            <input id="u" name="username" class="input" [class.invalid]="touched && !username" [(ngModel)]="username"
+                   autocomplete="username" autocapitalize="none" spellcheck="false" autofocus />
+            @if (touched && !username) { <span class="err">Ingresa tu usuario.</span> }
+          </div>
+
+          <div class="field">
+            <div class="spread"><label for="p">Contraseña</label><a routerLink="/recuperar" class="small">¿Olvidaste tu contraseña?</a></div>
+            <div class="pw">
+              <input id="p" name="password" class="input" [class.invalid]="touched && !password" [(ngModel)]="password"
+                     [type]="show ? 'text' : 'password'" autocomplete="current-password" />
+              <button type="button" class="eye" (click)="show = !show" [attr.aria-label]="show ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+                <app-icon [name]="show ? 'eyeOff' : 'eye'" />
+              </button>
+            </div>
+            @if (touched && !password) { <span class="err">Ingresa tu contraseña.</span> }
+          </div>
+
+          <button class="btn primary lg block" type="submit" [disabled]="loading">
+            @if (loading) { <span class="spin"></span> Verificando… } @else { Ingresar }
+          </button>
+
+          <details class="demo">
+            <summary>Cuentas de prueba</summary>
+            <p class="small muted">Contraseña para todas: <strong>Clinica2026</strong></p>
+            <div class="accounts">
+              @for (a of demo; track a.u) {
+                <button type="button" class="acc" (click)="fill(a.u)"><span class="strong">{{ a.u }}</span><span class="muted">{{ a.r }}</span></button>
+              }
+            </div>
+          </details>
+        </form>
       </section>
     </div>
   `,
   styles: [`
-    .login-page{min-height:100vh;display:grid;grid-template-columns:.92fr 1.08fr;background:linear-gradient(135deg,#f2f7f8,#fbfcfc)}.login-visual{position:relative;overflow:hidden;padding:42px 6vw;background:radial-gradient(circle at 86% 18%,rgba(77,205,194,.3),transparent 28%),linear-gradient(145deg,#173a59,#102e47);color:#fff;display:flex;align-items:center}.login-visual::after{content:'';position:absolute;width:520px;height:520px;border:1px solid rgba(255,255,255,.09);border-radius:50%;right:-220px;bottom:-170px;box-shadow:0 0 0 90px rgba(255,255,255,.025),0 0 0 180px rgba(255,255,255,.018)}.back{position:absolute;top:35px;left:45px;color:#d1e5e8;font-size:14px;font-weight:700}.visual-copy{position:relative;z-index:2;max-width:560px}.logo{width:78px;height:78px;border-radius:22px;background:#fff;display:grid;place-items:center;box-shadow:0 20px 45px rgba(0,0,0,.18);margin-bottom:22px}.logo img{width:70px;height:70px;object-fit:contain}.visual-copy>span{font-size:12px;letter-spacing:2px;color:#d5e8ee;font-weight:700;text-transform:uppercase}.visual-copy h1{font-size:clamp(40px,4.3vw,62px);letter-spacing:-2.4px;line-height:1.05;margin:18px 0}.visual-copy p{color:#e3eef1;line-height:1.75;max-width:520px;font-size:16px}.visual-points{display:flex;flex-direction:column;gap:13px;margin-top:34px;color:#f2f8f9;font-size:15px}.login-panel{display:grid;place-items:center;padding:48px}.login-card{width:min(520px,100%);background:#fff;border:1px solid #dce8e9;border-radius:26px;padding:42px;box-shadow:0 28px 70px rgba(28,72,77,.12)}.mobile-brand{display:none;align-items:center;gap:8px}.mobile-brand img{width:38px;height:38px;object-fit:contain}.eyebrow{color:var(--brand-blue);text-transform:uppercase;font-size:12px;letter-spacing:1.5px;font-weight:800}.login-card h2{font-size:42px;line-height:1.1;letter-spacing:-1.4px;margin:10px 0}.login-card>p{color:#607b7e;font-size:15px;line-height:1.6;margin:0 0 30px}.login-card form{display:grid;gap:20px}.login-card label{font-size:14px;font-weight:800;color:#385b5e}.login-card input{width:100%;height:54px;box-sizing:border-box;margin-top:8px;border:1px solid #cfdfe1;border-radius:12px;padding:14px 15px;background:#fff;outline:none;font-size:15px}.login-card input:focus{border-color:var(--brand-blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand-blue) 16%,transparent)}.password{position:relative}.password input{padding-right:70px}.password button{position:absolute;right:7px;top:15px;min-height:40px;border:0;background:#edf5f6;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;color:#486a6c;cursor:pointer}.submit{min-height:54px;border:0;border-radius:12px;background:var(--brand-orange);color:#fff;padding:15px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 14px 30px color-mix(in srgb,var(--brand-orange) 24%,transparent)}.submit:disabled{opacity:.6;cursor:not-allowed}.error{padding:12px 14px;border-radius:10px;background:#fff0f0;color:#a33f3f;font-size:13px;border:1px solid #f4cccc}.forgot{text-align:right;margin-top:-7px}.forgot a{font-size:13px;color:var(--brand-blue);font-weight:800}.access-note{margin-top:25px;padding:16px 17px;border-radius:13px;background:#eef6f8;border:1px solid #d9e8ec}.access-note b,.access-note span{display:block}.access-note b{font-size:13px;color:#2d5c72}.access-note span{font-size:12px;color:#607b80;line-height:1.65;margin-top:5px}@media(max-width:1050px){.login-page{grid-template-columns:.82fr 1.18fr}.login-panel{padding:30px}.login-card{padding:34px}}@media(max-width:900px){.login-page{grid-template-columns:1fr}.login-visual{display:none}.login-panel{padding:22px;min-height:100vh}.login-card{padding:28px}.mobile-brand{display:flex;margin-bottom:28px;color:var(--brand-blue-dark);font-size:16px;font-weight:800}.login-card h2{font-size:36px}}
-  `]
+    .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; background: var(--surface); }
+    .art { position: relative; overflow: hidden; background: #f4fbfe; display: flex; flex-direction: column; justify-content: center; padding: 150px 64px 140px; }
+    .dot { position: absolute; border-radius: 50%; }
+    .d1 { width: 46px; height: 46px; right: 9%; top: 34%; background: #F89818; opacity: .9; }
+    .d2 { width: 70px; height: 70px; left: -24px; top: 58%; background: #00B0E0; opacity: .2; }
+    .waves { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .badge { position: relative; width: 132px; height: 132px; border-radius: 50%; background: #fff; display: grid; place-items: center;
+      box-shadow: 0 10px 40px -10px rgba(0, 120, 170, .35); margin-bottom: 22px; }
+    .slogan { position: relative; display: flex; flex-direction: column; align-items: flex-start; font-family: var(--font-display); line-height: 1; }
+    .l1 { font-size: clamp(2rem, 3.4vw, 2.9rem); font-weight: 900; color: #00a3d4; }
+    .l2 { font-family: var(--font-script); font-size: clamp(3rem, 5.2vw, 4.4rem); font-weight: 700; color: var(--orange); margin: -4px 0 -2px 6px; }
+    .l3 { font-size: clamp(2rem, 3.4vw, 2.9rem); font-weight: 900; color: var(--orange); }
+    .l4 { margin-top: 12px; font-size: clamp(1.8rem, 3.1vw, 2.6rem); font-weight: 900; color: #fff; background: #00b0e0; padding: 6px 22px 10px; border-radius: 999px; }
+    .who { position: relative; margin-top: 26px; color: var(--ink-2); font-size: 15px; }
+    .who strong { font-family: var(--font-display); font-size: 18px; color: var(--ink); }
+    .formside { display: grid; place-items: center; padding: 32px 20px; }
+    .card { width: min(400px, 100%); display: flex; flex-direction: column; gap: 18px; }
+    .card h2 { font-size: var(--step-3); }
+    .mobile-brand { display: none; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 900; font-size: 20px; }
+    .pw { position: relative; }
+    .pw .input { padding-right: 44px; }
+    .eye { position: absolute; right: 4px; top: 4px; height: 32px; width: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
+    .eye:hover { color: var(--ink); background: var(--surface-2); }
+    .demo { border-top: 1px solid var(--line); padding-top: 14px; font-size: var(--step--1); }
+    .demo summary { cursor: pointer; color: var(--ink-2); font-weight: 700; }
+    .demo p { margin: 8px 0; }
+    .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .acc { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+    .acc:hover { border-color: var(--brand); background: var(--brand-soft); }
+    @media (max-width: 900px) {
+      .wrap { grid-template-columns: 1fr; }
+      .art { display: none; }
+      .mobile-brand { display: flex; }
+    }
+  `],
 })
-export class LoginComponent implements OnInit {
-  readonly backendPending = backendPending;
-  private readonly fb = inject(FormBuilder);
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
-  private readonly branding = inject(ClinicConfigService);
-  readonly loading = signal(false);
-  readonly error = signal('');
-  readonly showPassword = signal(false);
-  readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(10)]]
-  });
+export class LoginComponent {
+  private auth = inject(AuthService);
+  private router = inject(Router);
 
-  ngOnInit(): void {
-    this.branding.applyPlatformBranding();
-    const email = this.route.snapshot.queryParamMap.get('email');
-    if (email) this.form.controls.email.setValue(email);
+  username = '';
+  password = '';
+  show = false;
+  loading = false;
+  touched = false;
+  error = '';
+  locked = false;
+
+  demo = [
+    { u: 'admin', r: 'Administrador' }, { u: 'recepcion', r: 'Recepcionista' },
+    { u: 'dra.cardenas', r: 'Odontóloga' }, { u: 'dr.ramos', r: 'Odontólogo' },
+    { u: 'caja', r: 'Caja' }, { u: 'director', r: 'Director' },
+  ];
+
+  fill(u: string) {
+    this.username = u;
+    this.password = 'Clinica2026';
   }
 
-  submit(): void {
-    if (backendPending) return;
-    if (this.form.invalid) return;
-    this.loading.set(true); this.error.set('');
-    const { email, password } = this.form.getRawValue();
-    this.auth.login(email, password).subscribe({
-      next: () => void this.router.navigateByUrl(this.auth.homeForRole()),
-      error: () => {
-        this.loading.set(false);
-        this.error.set('No se pudo iniciar sesión. Verifica tus datos. Si es tu primer acceso o no recuerdas la contraseña, usa “¿Olvidaste tu contraseña?”.');
-      }
+  submit() {
+    this.touched = true;
+    this.error = '';
+    if (!this.username || !this.password) return;
+    this.loading = true;
+    this.auth.login(this.username.trim(), this.password).subscribe({
+      next: () => this.router.navigateByUrl(this.auth.home()),
+      error: (e) => {
+        const err = apiError(e);
+        this.loading = false;
+        this.locked = err.code === 'CUENTA_BLOQUEADA';
+        this.error = err.status === 0 ? 'No hay conexión con el servidor.' : err.message;
+        this.password = '';
+      },
     });
   }
 }
-

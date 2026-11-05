@@ -1,0 +1,105 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { ApiError } from './models';
+
+export const STATUS_LABEL: Record<string, string> = {
+  PROGRAMADA: 'Programada', CONFIRMADA: 'Confirmada', EN_ESPERA: 'En espera', EN_ATENCION: 'En atención',
+  ATENDIDA: 'Atendida', CANCELADA: 'Cancelada', NO_ASISTIO: 'No asistió',
+};
+export const STATUS_TONE: Record<string, string> = {
+  PROGRAMADA: 'grey', CONFIRMADA: 'teal', EN_ESPERA: 'amber', EN_ATENCION: 'blue',
+  ATENDIDA: 'green', CANCELADA: 'gum', NO_ASISTIO: 'gum',
+};
+export const INVOICE_LABEL: Record<string, string> = {
+  GENERADO: 'Por enviar', ACEPTADO: 'Aceptado', OBSERVADO: 'Aceptado con observaciones', RECHAZADO: 'Rechazado', ERROR: 'Error de envío',
+};
+export const INVOICE_TONE: Record<string, string> = {
+  GENERADO: 'amber', ACEPTADO: 'green', OBSERVADO: 'teal', RECHAZADO: 'gum', ERROR: 'gum',
+};
+export const ITEM_LABEL: Record<string, string> = { PENDIENTE: 'Pendiente', EN_PROCESO: 'En proceso', REALIZADO: 'Realizado' };
+export const ITEM_TONE: Record<string, string> = { PENDIENTE: 'grey', EN_PROCESO: 'amber', REALIZADO: 'green' };
+
+export const DOC_TYPES = [
+  { code: 'DNI', label: 'DNI' },
+  { code: 'CE', label: 'Carné de extranjería' },
+  { code: 'PAS', label: 'Pasaporte' },
+];
+
+const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 });
+export function soles(v: number | string | null | undefined): string {
+  const n = typeof v === 'string' ? parseFloat(v) : v ?? 0;
+  return money.format(isNaN(n as number) ? 0 : (n as number));
+}
+
+/** Fecha local en formato yyyy-MM-dd (sin desfase UTC). */
+export function isoDate(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+export function parseLocal(iso: string): Date {
+  // "2026-11-05T09:30:00" o "2026-11-05" interpretados como hora local
+  const [d, t] = iso.split('T');
+  const [y, m, day] = d.split('-').map(Number);
+  const [hh, mm, ss] = (t || '00:00:00').split(':').map((x) => parseInt(x, 10) || 0);
+  return new Date(y, m - 1, day, hh, mm, ss);
+}
+
+export function hhmm(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const t = iso.includes('T') ? iso.split('T')[1] : iso;
+  return t.substring(0, 5);
+}
+
+const dayFmt = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
+const shortFmt = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+const dateTimeFmt = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+
+export function longDay(iso: string): string {
+  const s = dayFmt.format(parseLocal(iso));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+export function shortDate(iso: string | null | undefined): string { return iso ? shortFmt.format(parseLocal(iso)) : '—'; }
+export function dateTime(iso: string | null | undefined): string { return iso ? dateTimeFmt.format(parseLocal(iso)) : '—'; }
+
+export function initials(name: string | null | undefined): string {
+  if (!name) return '?';
+  const parts = name.replace(/^(Dra?\.)\s+/i, '').trim().split(/\s+/);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+export function apiError(err: unknown): ApiError {
+  const e = err as HttpErrorResponse;
+  const body = e?.error;
+  if (body && typeof body === 'object' && 'message' in body) return body as ApiError;
+  return { status: e?.status ?? 0, code: 'DESCONOCIDO', message: 'No se pudo completar la operación.' };
+}
+
+/** RUC peruano: 11 dígitos, prefijo válido y dígito verificador (módulo 11). */
+export function validRuc(ruc: string): boolean {
+  if (!/^\d{11}$/.test(ruc)) return false;
+  if (!['10', '15', '16', '17', '20'].includes(ruc.substring(0, 2))) return false;
+  const w = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(ruc[i]) * w[i];
+  let check = 11 - (sum % 11);
+  if (check === 10) check = 0;
+  if (check === 11) check = 1;
+  return check === Number(ruc[10]);
+}
+
+export const CUSTOMER_DOC: Record<string, string> = { '0': 'Sin documento', '1': 'DNI', '4': 'Carné de extranjería', '6': 'RUC', '7': 'Pasaporte' };
+
+export function patientDocToSunat(docType: string): string {
+  return ({ DNI: '1', CE: '4', PAS: '7' } as Record<string, string>)[docType] || '1';
+}
+
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
