@@ -58,11 +58,27 @@ services:
       WEBHOOK_URL: http://backend:8080/api/internal/notifications/callback
       WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
       TZ: America/Lima
+      # Envío real (ver README → "Mensajes reales"). Sin credenciales, el canal queda en modo de prueba.
+      WA_TOKEN: ${WA_TOKEN:-}
+      WA_PHONE_NUMBER_ID: ${WA_PHONE_NUMBER_ID:-}
+      WA_API_VERSION: ${WA_API_VERSION:-v21.0}
+      WA_PLANTILLA: ${WA_PLANTILLA:-}
+      WA_PLANTILLA_IDIOMA: ${WA_PLANTILLA_IDIOMA:-es}
+      WA_MODO: ${WA_MODO:-}
+      WA_NUMEROS_PERMITIDOS: ${WA_NUMEROS_PERMITIDOS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      SMTP_REMITENTE: ${SMTP_REMITENTE:-}
+      SMTP_NOMBRE: ${SMTP_NOMBRE:-Clínica Dental Cárdenas}
+      CORREOS_PERMITIDOS: ${CORREOS_PERMITIDOS:-}
+      ENVIAR_A_TODOS: ${ENVIAR_A_TODOS:-false}
     volumes:
       - notif-data:/data
     ports:
       - "9083:8093"
-    mem_limit: 64m
+    mem_limit: 128m
 
   backend:
     build: ./backend

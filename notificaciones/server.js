@@ -1,8 +1,9 @@
 /*
  * Microservicio de notificaciones · Clínica Dental Cárdenas (HU-23 / HU-24, SP-02)
  * -----------------------------------------------------------------------------
- * Envía mensajes por WhatsApp y correo electrónico. Los proveedores están simulados (como el entorno de
- * pruebas de WhatsApp Cloud API y un servidor SMTP de pruebas): los mensajes se ven en el panel web.
+ * Envía mensajes por WhatsApp (WhatsApp Cloud API de Meta) y correo electrónico (SMTP). Ver proveedores.js.
+ * Si un canal no tiene credenciales, funciona en modo de prueba: el mensaje solo se ve en el panel web.
+ * Todos los mensajes, reales o de prueba, aparecen en el panel.
  *
  *   POST   /v1/mensajes                 envío inmediato            { clave, canal, destino, asunto, cuerpo, tipo, referencia }
  *   POST   /v1/recordatorios            programa un envío futuro   { ...lo anterior, enviarEn (ISO-8601) }
@@ -10,18 +11,20 @@
  *   GET    /v1/mensajes                 lista (para el panel)
  *   POST   /admin/modo                  {"modo":"normal|caido"} simula caída del servicio
  *   POST   /admin/enviar-pendientes     envía ya los recordatorios programados (demostración)
+ *   POST   /admin/prueba                {canal, destino, plantilla?} envío real de prueba desde el panel
  *   GET    /                            panel: bandeja de WhatsApp y de correo
  *
  * Reglas:
  *   - Idempotencia: la "clave" identifica el mensaje. Si llega de nuevo, NO se reenvía: se responde duplicado=true.
  *   - Los recordatorios se envían a su hora con un planificador interno y el resultado se informa al sistema
  *     central por webhook (X-Webhook-Token). Si el webhook falla, se reintenta.
- * Sin dependencias externas: Node 20.
+ * Node 20 + nodemailer.
  */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const prov = require('./proveedores');
 
 const PORT = Number(process.env.PORT || 8093);
 const DATA_FILE = process.env.DATA_FILE || '/data/notificaciones.json';
@@ -54,19 +57,39 @@ function normalizePhone(v) {
 }
 const validEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || ''));
 
-function deliver(m) {
+/** Entrega un mensaje: por el proveedor real si está configurado y el destino está permitido; si no, queda en el panel. */
+async function deliver(m) {
   m.intentos = (m.intentos || 0) + 1;
   if (m.canal === 'WHATSAPP') {
     const phone = normalizePhone(m.destino);
     if (!phone) { m.estado = 'FALLIDO'; m.error = 'El número no es un celular peruano válido para WhatsApp'; return m; }
     m.destinoNormalizado = phone;
-    m.proveedorId = 'wamid.' + crypto.randomBytes(9).toString('hex');
   } else if (m.canal === 'EMAIL') {
     if (!validEmail(m.destino)) { m.estado = 'FALLIDO'; m.error = 'Dirección de correo inválida'; return m; }
-    m.destinoNormalizado = String(m.destino).toLowerCase();
-    m.proveedorId = '<' + crypto.randomBytes(8).toString('hex') + '@smtp.clinicacardenas.pe>';
+    m.destinoNormalizado = String(m.destino).trim().toLowerCase();
   } else {
     m.estado = 'FALLIDO'; m.error = 'Canal no soportado'; return m;
+  }
+  const clave = m.canal === 'WHATSAPP' ? prov.localPhone(m.destino) : m.destinoNormalizado;
+  const decision = m.forzarReal ? { real: true } : prov.destinoReal(m.canal, clave);
+  m.real = decision.real;
+  m.nota = decision.motivo || null;
+  if (!decision.real) {
+    m.proveedorId = m.canal === 'WHATSAPP' ? 'prueba.' + crypto.randomBytes(9).toString('hex') : '<prueba.' + crypto.randomBytes(8).toString('hex') + '@clinicacardenas.pe>';
+    m.via = 'bandeja de prueba';
+  } else {
+    try {
+      const r = m.canal === 'WHATSAPP'
+        ? await prov.enviarWhatsApp(clave, m.cuerpo, m.plantilla)
+        : await prov.enviarCorreo(m.destinoNormalizado, m.asunto, m.cuerpo);
+      m.proveedorId = r.id;
+      m.via = r.via;
+    } catch (e) {
+      m.estado = 'FALLIDO';
+      m.error = e.name === 'TimeoutError' ? 'El proveedor no respondió a tiempo' : e.message;
+      console.warn(`envío ${m.canal} a ${m.destinoNormalizado} falló: ${m.error}`);
+      return m;
+    }
   }
   m.estado = 'ENVIADO';
   m.enviadoEn = now().toISOString();
@@ -104,7 +127,7 @@ function create(b, scheduled) {
 }
 
 const publicView = (m) => ({ id: m.id, clave: m.clave, estado: m.estado, error: m.error || null, proveedorId: m.proveedorId || null,
-  programadoPara: m.programadoPara, enviadoEn: m.enviadoEn || null });
+  programadoPara: m.programadoPara, enviadoEn: m.enviadoEn || null, real: Boolean(m.real), nota: m.nota || null });
 
 // ---------------------------------------------------------------- planificador y webhook
 async function notifyCentral(m) {
@@ -125,13 +148,19 @@ async function notifyCentral(m) {
   save();
 }
 
+let ticking = false;
 async function tick(force = false) {
-  if (modo === 'caido') return 0;
+  if (modo === 'caido' || ticking) return 0;
+  ticking = true;
+  try { return await runTick(force); } finally { ticking = false; }
+}
+
+async function runTick(force) {
   const t = now();
   let sent = 0;
   for (const m of db.mensajes) {
     if (m.estado === 'PROGRAMADO' && (force || new Date(m.programadoPara) <= t)) {
-      deliver(m);
+      await deliver(m);
       sent++;
       save();
       await notifyCentral(m);
@@ -170,18 +199,25 @@ main{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:18px 22px;max
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
 .PROGRAMADO{background:#e2f4fb;color:#055f88}.ENVIADO{background:#e1f4e9;color:#217a4a}.FALLIDO{background:#fdece4;color:#c2410c}.ANULADO{background:#eef1f4;color:#688494}
+.prov{display:flex;gap:10px;flex-wrap:wrap;padding:12px 22px 0;max-width:1300px}
+.pv{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;flex:1;min-width:260px}
+.pv b{font-size:14px}.pv .real{color:#217a4a;font-weight:700}.pv .test{color:#9a5b00;font-weight:700}
+.pv form{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.pv input,.pv select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;flex:1;min-width:120px}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px}.badge.r{background:#217a4a;color:#fff}.badge.t{background:#eef1f4;color:#688494}
+#res{font-size:12.5px;margin-top:6px}
 .wide{grid-column:1/-1}.empty{padding:30px;text-align:center;color:var(--muted)}
 .stats{display:flex;gap:18px;font-size:13px;color:var(--muted)}.stats b{color:var(--ink);font-size:16px}
 @media (max-width:900px){main{grid-template-columns:1fr}.mail{grid-template-columns:1fr;height:auto}.inbox{max-height:260px}}
 </style></head><body>
 <header>
   <svg width="38" height="38" viewBox="40 40 332 332" aria-hidden="true"><path d="M334 102 A154 154 0 1 0 342 300 A149.5 149.5 0 1 1 334 102 Z" fill="#F89818"/><circle cx="206" cy="206" r="78" fill="#00B0E0"/></svg>
-  <div><h1>Microservicio de notificaciones</h1><div class="sub">Clínica Dental Cárdenas · WhatsApp y correo (proveedores de prueba)</div></div>
+  <div><h1>Microservicio de notificaciones</h1><div class="sub">Clínica Dental Cárdenas · WhatsApp Cloud API (Meta) y correo SMTP</div></div>
   <span class="sp"></span>
   <div class="stats" id="stats"></div>
   <span>Servicio:</span><button class="btn" data-m="normal">Normal</button><button class="btn" data-m="caido">Caído</button>
   <button class="btn orange" id="force">Enviar recordatorios ahora</button>
 </header>
+<div class="prov" id="prov"></div>
 <main>
   <section class="card"><h2>WhatsApp <span class="sub" id="wacount"></span></h2>
     <div class="phone"><div class="top">💬 <select id="who"></select></div><div class="chat" id="chat"></div></div></section>
@@ -195,8 +231,23 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 let data=null, who=null, mailSel=null;
 const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const fmt=s=>s?new Date(s).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso'};
-async function load(){ const r=await fetch('/api/estado'); data=await r.json(); render(); }
+const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba'};
+const badge=m=>m.estado==='ENVIADO'?(m.real?'<span class="badge r">REAL</span>':'<span class="badge t">PRUEBA</span>'):'';
+let provDrawn=false;
+function drawProv(p){
+  if(provDrawn) return; provDrawn=true;
+  const box=(t,c,ch,ph,extra)=>'<div class="pv"><b>'+t+'</b> · '+(c.modo==='real'?'<span class="real">Envío real</span> · '+esc(c.proveedor)+(c.envio?' · '+esc(c.envio):'')+(c.remitente?' · desde '+esc(c.remitente):'')
+    +'<div class="sub">'+(p.enviarATodos?'Envía a todos los pacientes.':'Solo envía de verdad a: '+(c.permitidos.length?esc(c.permitidos.join(', ')):'(nadie; agrega destinos en el .env)')+'. El resto queda en la bandeja de prueba.')+'</div>'
+    :'<span class="test">Modo de prueba</span><div class="sub">Configura las credenciales en el archivo .env para enviar de verdad (ver README).</div>')
+    +(c.modo==='real'?'<form data-c="'+ch+'"><input name="d" placeholder="'+ph+'" required>'+extra+'<button class="btn orange">Enviar prueba real</button></form>':'')+'</div>';
+  document.getElementById('prov').innerHTML=box('WhatsApp',p.whatsapp,'WHATSAPP','987654321','<select name="t"><option value="">Mensaje normal</option><option value="hello_world">Plantilla hello_world</option></select>')
+    +box('Correo',p.correo,'EMAIL','tucorreo@gmail.com','')+'<div id="res" style="width:100%"></div>';
+  document.querySelectorAll('.pv form').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button');b.disabled=true;
+    const r=await fetch('/admin/prueba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({canal:f.dataset.c,destino:f.elements.d.value,plantilla:f.elements.t?f.elements.t.value:''})});
+    const j=await r.json();b.disabled=false;
+    document.getElementById('res').innerHTML=r.ok?'<span class="real">✓ Enviado. ID del proveedor: '+esc(j.proveedorId)+'</span>':'<span style="color:#c2410c">✗ '+esc(j.error)+'</span>';load();});
+}
+async function load(){ const r=await fetch('/api/estado'); data=await r.json(); drawProv(data.proveedores); render(); }
 function render(){
   document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===data.modo));
   const ms=data.mensajes;
@@ -208,14 +259,14 @@ function render(){
   const sel=document.getElementById('who'); sel.innerHTML=nums.map(n=>'<option '+(n===who?'selected':'')+'>'+esc(n)+'</option>').join('')||'<option>Sin conversaciones</option>';
   document.getElementById('wacount').textContent=wa.length+' mensajes';
   const chat=document.getElementById('chat');
-  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
+  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+badge(m)+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
   chat.scrollTop=chat.scrollHeight;
   const em=ms.filter(m=>m.canal==='EMAIL'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO')).reverse();
   document.getElementById('mailcount').textContent=em.length+' correos';
-  document.getElementById('inbox').innerHTML=em.map(m=>'<div data-id="'+m.id+'" class="'+(m.id===mailSel?'on':'')+'"><b>'+esc(m.asunto||'(sin asunto)')+'</b><span>'+esc(m.destino)+' · '+fmt(m.enviadoEn||m.recibidoEn)+'</span></div>').join('')||'<div class="empty">Bandeja vacía.</div>';
+  document.getElementById('inbox').innerHTML=em.map(m=>'<div data-id="'+m.id+'" class="'+(m.id===mailSel?'on':'')+'"><b>'+esc(m.asunto||'(sin asunto)')+badge(m)+'</b><span>'+esc(m.destino)+' · '+fmt(m.enviadoEn||m.recibidoEn)+'</span></div>').join('')||'<div class="empty">Bandeja vacía.</div>';
   const cur=em.find(m=>m.id===mailSel);
   if(cur) document.getElementById('read').innerHTML='<h3>'+esc(cur.asunto)+'</h3><div class="sub">De: notificaciones@clinicacardenas.pe · Para: '+esc(cur.destino)+' · '+fmt(cur.enviadoEn)+'</div><hr style="border:0;border-top:1px solid var(--line)">'+esc(cur.cuerpo);
-  document.getElementById('log').innerHTML=ms.slice().reverse().slice(0,120).map(m=>'<tr><td><span class="tag '+m.estado+'">'+m.estado+'</span>'+(m.error?'<div class="sub">'+esc(m.error)+'</div>':'')+'</td><td>'+(TYPE[m.tipo]||m.tipo)+'</td><td>'+m.canal+'</td><td>'+esc(m.destino)+'</td><td>'+fmt(m.programadoPara)+'</td><td>'+fmt(m.enviadoEn)+'</td><td style="font-family:monospace;font-size:11.5px">'+esc(m.clave)+'</td><td>'+(m.programadoPara?(m.webhookRespuesta??'—'):'—')+'</td></tr>').join('')||'<tr><td colspan="8" class="empty">Sin mensajes.</td></tr>';
+  document.getElementById('log').innerHTML=ms.slice().reverse().slice(0,120).map(m=>'<tr><td><span class="tag '+m.estado+'">'+m.estado+'</span>'+badge(m)+(m.error?'<div class="sub">'+esc(m.error)+'</div>':'')+(m.nota&&m.estado==='ENVIADO'?'<div class="sub">'+esc(m.nota)+'</div>':'')+'</td><td>'+(TYPE[m.tipo]||m.tipo)+'</td><td>'+m.canal+'</td><td>'+esc(m.destino)+'</td><td>'+fmt(m.programadoPara)+'</td><td>'+fmt(m.enviadoEn)+'</td><td style="font-family:monospace;font-size:11.5px">'+esc(m.clave)+'</td><td>'+(m.programadoPara?(m.webhookRespuesta??'—'):'—')+'</td></tr>').join('')||'<tr><td colspan="8" class="empty">Sin mensajes.</td></tr>';
 }
 document.getElementById('who').onchange=e=>{who=e.target.value;render();};
 document.getElementById('inbox').onclick=e=>{const d=e.target.closest('[data-id]'); if(d){mailSel=+d.dataset.id; render();}};
@@ -244,7 +295,26 @@ const server = http.createServer((req, res) => {
 
     if (p === '/health') return send(res, 200, { status: 'UP' });
     if (p === '/' && req.method === 'GET') return send(res, 200, panel(), 'text/html; charset=utf-8');
-    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { modo, mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { modo, proveedores: prov.estadoProveedores(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
+    if (p === '/admin/prueba' && req.method === 'POST') {
+      // Envío real de prueba escrito a mano por el operador en el panel (por eso no aplica la lista de permitidos).
+      const canal = body && body.canal;
+      if (!['WHATSAPP', 'EMAIL'].includes(canal) || !body.destino) return send(res, 400, { error: 'Indica canal y destino.' });
+      if (canal === 'WHATSAPP' && !prov.waActivo()) return send(res, 400, { error: 'WhatsApp no está configurado: faltan WA_TOKEN y WA_PHONE_NUMBER_ID en el archivo .env.' });
+      if (canal === 'EMAIL' && !prov.correoActivo()) return send(res, 400, { error: 'El correo no está configurado: faltan SMTP_HOST, SMTP_USUARIO y SMTP_CLAVE en el archivo .env.' });
+      const m = create({
+        clave: 'prueba-' + Date.now(), canal, destino: body.destino, tipo: 'PRUEBA',
+        asunto: 'Prueba de envío · Clínica Dental Cárdenas',
+        cuerpo: 'Hola, este es un mensaje de prueba del sistema de la Clínica Dental Cárdenas. Si lo recibiste, los avisos de citas ya llegan a tu ' + (canal === 'EMAIL' ? 'correo.' : 'WhatsApp.'),
+      }, false);
+      m.forzarReal = true;
+      if (body.plantilla) m.plantilla = String(body.plantilla);
+      db.mensajes.push(m);
+      await deliver(m);
+      delete m.forzarReal;
+      save(); log('prueba ' + m.estado);
+      return send(res, m.estado === 'ENVIADO' ? 200 : 502, publicView(m));
+    }
     if (p === '/admin/modo' && req.method === 'POST') {
       if (['normal', 'caido'].includes(body && body.modo)) modo = body.modo;
       return send(res, 200, { modo });
@@ -265,8 +335,10 @@ const server = http.createServer((req, res) => {
       if (errs.length) { log(400); return send(res, 400, { error: errs.join('; ') }); }
       const prev = byKey(body.clave);
       if (prev) { db.duplicados = (db.duplicados || 0) + 1; save(); log('200 duplicado'); return send(res, 200, { ...publicView(prev), duplicado: true }); }
-      const m = deliver(create(body, false));
-      db.mensajes.push(m); save(); log(m.estado);
+      const m = create(body, false);
+      db.mensajes.push(m);
+      await deliver(m);
+      save(); log(m.estado + (m.real ? ' (real)' : ''));
       return send(res, 201, { ...publicView(m), duplicado: false });
     }
     if (p === '/v1/recordatorios' && req.method === 'POST') {

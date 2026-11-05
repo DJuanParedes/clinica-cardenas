@@ -179,7 +179,7 @@ public class NotificationDispatcher {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(payload), StandardCharsets.UTF_8));
         }
-        return http.send(b.timeout(Duration.ofSeconds(6)).build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        return http.send(b.timeout(Duration.ofSeconds(20)).build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
     /** Resultado que informa el microservicio cuando envía un recordatorio programado (webhook). */

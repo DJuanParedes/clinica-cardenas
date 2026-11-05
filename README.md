@@ -181,6 +181,53 @@ SUNAT_CERTIFICADO_CLAVE=<clave del certificado>
 El certificado incluido (`backend/src/main/resources/sunat/certificado-demo.p12`) es autofirmado y solo sirve para
 la demostración. Con `SUNAT_MODE=interno` el backend valida sin red, sin usar la API simulada.
 
+## Mensajes reales por WhatsApp y correo
+
+El microservicio `notificaciones` envía mensajes reales con dos proveedores:
+- **WhatsApp:** la WhatsApp Cloud API oficial de Meta.
+- **Correo:** SMTP, por ejemplo Gmail.
+
+Cada canal funciona solo con sus credenciales. Un canal sin credenciales queda en modo de prueba: los mensajes solo se ven en el panel `http://localhost:9083`.
+Las credenciales van en el archivo `.env`. Después de cambiarlo, ejecuta `actualizar.bat`. El panel muestra qué canal envía de verdad y tiene un botón **Enviar prueba real**.
+
+> **Seguridad.** Los pacientes de ejemplo tienen celulares y correos inventados que podrían ser de personas reales. Por eso solo se envía de verdad a los destinos de `WA_NUMEROS_PERMITIDOS` y `CORREOS_PERMITIDOS`. Los demás mensajes quedan en la bandeja de prueba. Con `ENVIAR_A_TODOS=true` se envía a todos los pacientes; úsalo solo con datos reales.
+
+### Correo con Gmail (5 minutos)
+1. Activa la verificación en dos pasos en tu cuenta de Google.
+2. Entra a <https://myaccount.google.com/apppasswords>, crea una contraseña de aplicación llamada "Clinica" y copia las 16 letras.
+3. En el `.env`:
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USUARIO=tucorreo@gmail.com
+   SMTP_CLAVE=abcd efgh ijkl mnop
+   CORREOS_PERMITIDOS=tucorreo@gmail.com
+   ```
+
+### WhatsApp con la Cloud API de Meta
+1. En <https://developers.facebook.com> crea una app de tipo **Empresa** y agrega el producto **WhatsApp**.
+2. Ve a **WhatsApp → Configuración de la API**. Meta te da un número de prueba gratuito.
+   - Copia el **Token de acceso temporal**, que dura 24 h, y el **Identificador del número de teléfono**.
+   - En "Para", agrega y verifica tu celular. Con el número de prueba se pueden registrar hasta 5 destinatarios.
+3. En el `.env`:
+   ```
+   WA_TOKEN=EAAG...
+   WA_PHONE_NUMBER_ID=1234567890
+   WA_NUMEROS_PERMITIDOS=987654321
+   ```
+4. Ejecuta `actualizar.bat`. En el panel, elige "Plantilla hello_world" y pulsa **Enviar prueba real**. Te llegará el "Hello World" de Meta.
+5. **Para recibir los recordatorios con su texto.** Meta solo permite texto libre si el paciente escribió en las últimas 24 h.
+   - **Prueba rápida:** responde al mensaje de Meta desde tu WhatsApp. Durante 24 h te llegarán los avisos del sistema como texto.
+   - **Uso permanente:** en **WhatsApp Manager → Plantillas de mensajes** crea una plantilla con estos datos y pon `WA_PLANTILLA=aviso_clinica` en el `.env`:
+     - Nombre: `aviso_clinica`
+     - Categoría: Utilidad
+     - Idioma: Español
+     - Cuerpo: `Hola, te escribe Clínica Dental Cárdenas: {{1}} Gracias por tu preferencia.`
+
+   La aprobación suele tardar unos minutos.
+
+Para producción hacen falta un número propio verificado en Meta Business y un token permanente de usuario del sistema.
+
 ## App móvil (Android e iOS)
 
 La carpeta [`movil/`](movil/README.md) tiene la app de pacientes hecha con **Kotlin Multiplatform + Compose Multiplatform**. Desde la app el paciente ve sus citas, las confirma, recibe recordatorios en el teléfono, revisa su estado de cuenta y elige por dónde le llegan los avisos.

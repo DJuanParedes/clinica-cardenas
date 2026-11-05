@@ -1,0 +1,9 @@
+{
+  "name": "clinica-notificaciones",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Microservicio de notificaciones: WhatsApp Cloud API (Meta) y correo SMTP",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "nodemailer": "6.9.16" }
+}
