@@ -99,6 +99,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-en-produccion-clinica-cardenas-2026}
       APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
       APP_SEED_DEMO: ${APP_SEED_DEMO:-true}
+      APP_SEED_PASSWORD: ${APP_SEED_PASSWORD:-Clinica2026}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
