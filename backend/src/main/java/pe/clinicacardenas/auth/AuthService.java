@@ -10,6 +10,7 @@ import pe.clinicacardenas.common.ApiException;
 import pe.clinicacardenas.common.AuditService;
 import pe.clinicacardenas.common.Dates;
 import pe.clinicacardenas.security.JwtService;
+import pe.clinicacardenas.security.PermissionService;
 import pe.clinicacardenas.user.User;
 import pe.clinicacardenas.user.UserRepository;
 
@@ -33,13 +34,14 @@ public class AuthService {
     private final JwtService jwt;
     private final AuditService audit;
     private final MailNotifier mail;
+    private final PermissionService permissions;
     private final int maxAttempts;
     private final int lockMinutes;
     private final boolean demoMode;
     private final SecureRandom random = new SecureRandom();
 
     public AuthService(UserRepository users, DentistRepository dentists, PasswordResetCodeRepository codes,
-                       PasswordEncoder encoder, JwtService jwt, AuditService audit, MailNotifier mail,
+                       PasswordEncoder encoder, JwtService jwt, AuditService audit, MailNotifier mail, PermissionService permissions,
                        @Value("${app.security.max-failed-attempts}") int maxAttempts,
                        @Value("${app.security.lock-minutes}") int lockMinutes,
                        @Value("${app.demo-mode}") boolean demoMode) {
@@ -50,6 +52,7 @@ public class AuthService {
         this.jwt = jwt;
         this.audit = audit;
         this.mail = mail;
+        this.permissions = permissions;
         this.maxAttempts = maxAttempts;
         this.lockMinutes = lockMinutes;
         this.demoMode = demoMode;
@@ -105,6 +108,7 @@ public class AuthService {
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
         dentists.findByUserId(u.id).ifPresent(d -> m.put("dentistId", d.id));
+        m.put("permissions", permissions.forRole(u.role.name()));
         return m;
     }
 

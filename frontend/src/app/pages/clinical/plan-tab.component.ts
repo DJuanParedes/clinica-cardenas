@@ -204,7 +204,7 @@ export class PlanTabComponent implements OnInit {
   draft: DraftItem[] = [];
   modalError = '';
 
-  get canEdit() { return this.auth.hasRole('ODONTOLOGO', 'ADMIN'); }
+  get canEdit() { return this.auth.can('PLAN_TRATAMIENTO'); }
 
   ngOnInit() {
     this.load();

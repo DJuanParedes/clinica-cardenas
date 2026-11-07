@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import pe.clinicacardenas.agenda.AppointmentStatus;
 import pe.clinicacardenas.common.ApiException;
 import pe.clinicacardenas.common.AuditService;
 import pe.clinicacardenas.common.Dates;
+import pe.clinicacardenas.notification.ContactSync;
 import pe.clinicacardenas.security.CurrentUser;
 
 import java.time.LocalDateTime;
@@ -25,8 +27,11 @@ public class PatientService {
     private final PatientRepository repo;
     private final AppointmentRepository appointments;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
-    public PatientService(PatientRepository repo, AppointmentRepository appointments, AuditService audit) {
+    public PatientService(PatientRepository repo, AppointmentRepository appointments, AuditService audit,
+                          ApplicationEventPublisher events) {
+        this.events = events;
         this.repo = repo;
         this.appointments = appointments;
         this.audit = audit;
@@ -119,6 +124,16 @@ public class PatientService {
 
     @Transactional
     public Patient create(PatientValidator.Input in) {
+        return create(in, false);
+    }
+
+    /** Paciente de ejemplo para la demostración: queda marcado y no recibe WhatsApp ni correos reales. */
+    @Transactional
+    public Patient createDemo(PatientValidator.Input in) {
+        return create(in, true);
+    }
+
+    private Patient create(PatientValidator.Input in, boolean demo) {
         Map<String, String> errors = PatientValidator.validate(in, Dates.today());
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
@@ -136,8 +151,10 @@ public class PatientService {
         p.docNumber = doc;
         p.createdAt = Dates.now();
         p.createdBy = CurrentUser.usernameOrSystem();
+        p.demo = demo;
         repo.save(p);
         audit.record("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc);
+        events.publishEvent(new ContactSync.PatientSaved(p.id));
         return p;
     }
 
@@ -161,6 +178,7 @@ public class PatientService {
         p.updatedBy = CurrentUser.usernameOrSystem();
         repo.save(p);
         audit.record("PACIENTE", p.id, "EDITAR", changes.isEmpty() ? "Datos actualizados" : "Actualizó " + String.join(", ", changes));
+        events.publishEvent(new ContactSync.PatientSaved(p.id));
         return p;
     }
 

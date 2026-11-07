@@ -32,7 +32,7 @@ import java.util.*;
 public class DataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
-    private static final String DEMO_PASSWORD = "Clinica2026";
+    private final String DEMO_PASSWORD;
 
     private final UserRepository users;
     private final UserService userService;
@@ -43,10 +43,14 @@ public class DataSeeder implements ApplicationRunner {
     private final ClinicalService clinical;
     private final ProcedureRepository procedures;
     private final boolean seedDemo;
+    private final HistorySeeder history;
 
     public DataSeeder(UserRepository users, UserService userService, PatientService patientService, AgendaService agenda,
                       AppointmentRepository appointments, DentistRepository dentists, ClinicalService clinical,
-                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo) {
+                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo,
+                      @Value("${app.seed-password:Clinica2026}") String seedPassword,
+                      HistorySeeder history) {
+        this.history = history;
         this.users = users;
         this.userService = userService;
         this.patientService = patientService;
@@ -56,6 +60,7 @@ public class DataSeeder implements ApplicationRunner {
         this.clinical = clinical;
         this.procedures = procedures;
         this.seedDemo = seedDemo;
+        this.DEMO_PASSWORD = seedPassword;
     }
 
     @Override
@@ -74,12 +79,18 @@ public class DataSeeder implements ApplicationRunner {
             } catch (Exception e) {
                 log.warn("No se pudieron crear todos los datos de demostración: {}", e.getMessage());
             }
+            try {
+                history.seed();
+            } catch (Exception e) {
+                log.warn("No se pudo crear la historia de demostración: {}", e.toString());
+            }
         }
-        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}", DEMO_PASSWORD);
+        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}",
+                "Clinica2026".equals(DEMO_PASSWORD) ? DEMO_PASSWORD : "(la de APP_SEED_PASSWORD)");
     }
 
     private Patient patient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {
-        return patientService.create(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
+        return patientService.createDemo(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
                 email, null, district, null, null, null));
     }
 

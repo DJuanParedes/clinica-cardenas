@@ -26,6 +26,7 @@ public class PatientController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> search(@RequestParam(defaultValue = "") String q,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "20") int size) {
@@ -33,37 +34,40 @@ public class PatientController {
     }
 
     @GetMapping("/check-document")
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> check(@RequestParam String type, @RequestParam String number,
                                      @RequestParam(required = false) Long excludeId) {
         return service.checkDocument(type, number, excludeId);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> get(@PathVariable Long id) {
         return service.summary(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public Patient create(@RequestBody PatientValidator.Input in) {
         return service.create(in);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public Patient update(@PathVariable Long id, @RequestBody PatientValidator.Input in) {
         return service.update(id, in);
     }
 
     @GetMapping("/{id}/appointments")
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public List<Appointment> appointments(@PathVariable Long id) {
         service.get(id);
         return appointments.findByPatientIdOrderByStartAtDesc(id);
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public List<AuditLog> audit(@PathVariable Long id) {
         return audit.forEntity("PACIENTE", id);
     }

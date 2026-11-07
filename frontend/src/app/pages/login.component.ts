@@ -86,6 +86,7 @@ import { LogoComponent } from '../shared/logo.component';
               }
             </div>
           </details>
+          <a class="patient-app" routerLink="/app/ingresar"><app-icon name="smartphone" [size]="18" /> <span><strong>¿Eres paciente?</strong> Revisa tus citas en la app</span></a>
         </form>
       </section>
     </div>
@@ -119,6 +120,8 @@ import { LogoComponent } from '../shared/logo.component';
     .demo p { margin: 8px 0; }
     .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .acc { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+    .patient-app { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--orange-soft); color: var(--orange-ink); font-size: 13.5px; }
+    .patient-app:hover { text-decoration: none; filter: brightness(.98); }
     .acc:hover { border-color: var(--brand); background: var(--brand-soft); }
     @media (max-width: 900px) {
       .wrap { grid-template-columns: 1fr; }

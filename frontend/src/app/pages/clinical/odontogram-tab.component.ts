@@ -60,7 +60,7 @@ export class OdontogramTabComponent implements OnInit {
   updatedAt?: string;
   updatedBy?: string;
 
-  get canEdit() { return this.auth.hasRole('ODONTOLOGO', 'ADMIN'); }
+  get canEdit() { return this.auth.can('HISTORIA_CLINICA'); }
 
   ngOnInit() {
     this.api.odontogram(this.patientId).subscribe((r) => this.apply(r));

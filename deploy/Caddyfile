@@ -1,0 +1,11 @@
+# HTTPS automático con Let's Encrypt para el dominio del servidor (DOMINIO en el .env)
+{$DOMINIO} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy frontend:80
+}

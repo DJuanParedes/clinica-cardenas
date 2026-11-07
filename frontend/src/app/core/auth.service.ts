@@ -60,6 +60,24 @@ export class AuthService {
     this.user.set(null);
   }
 
+  /** HU-26: ¿el rol del usuario tiene alguno de estos permisos? */
+  can(...perms: string[]): boolean {
+    const u = this.user();
+    return !!u && !!u.permissions && perms.some((p) => u.permissions.includes(p));
+  }
+
+  /** Vuelve a leer el perfil: aplica al instante cambios de permisos hechos por el administrador. */
+  refresh() {
+    if (!this.token) return;
+    this.http.get<SessionUser>('/api/auth/me').subscribe({
+      next: (u) => {
+        try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } catch { /* sin almacenamiento */ }
+        this.user.set(u);
+      },
+      error: () => {},
+    });
+  }
+
   hasRole(...roles: Role[]): boolean {
     const u = this.user();
     return !!u && roles.includes(u.role);
