@@ -76,6 +76,9 @@ services:
       CORREOS_PERMITIDOS: ${CORREOS_PERMITIDOS:-}
       ENVIAR_A_TODOS: ${ENVIAR_A_TODOS:-false}
       DESTINOS_REALES: ${DESTINOS_REALES:-}
+      # Webhook de Meta: estados entregado/leído y respuestas "1"/"2" del paciente
+      WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-}
+      WA_APP_SECRET: ${WA_APP_SECRET:-}
     volumes:
       - notif-data:/data
     ports:

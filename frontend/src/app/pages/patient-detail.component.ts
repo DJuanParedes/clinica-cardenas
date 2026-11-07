@@ -11,13 +11,14 @@ import { IconComponent } from '../shared/icon.component';
 import { HistoryTabComponent } from './clinical/history-tab.component';
 import { OdontogramTabComponent } from './clinical/odontogram-tab.component';
 import { PlanTabComponent } from './clinical/plan-tab.component';
+import { FilesTabComponent } from './clinical/files-tab.component';
 
-type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'cuenta';
+type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuenta';
 
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent],
+  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -68,6 +69,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'cuenta';
             <a [class.on]="tab === 'odontograma'" (click)="go('odontograma')">Odontograma</a>
           }
           @if (canPlan) { <a [class.on]="tab === 'plan'" (click)="go('plan')">Plan de tratamiento</a> }
+          <a [class.on]="tab === 'archivos'" (click)="go('archivos')">Fotos y documentos</a>
           @if (canAccount) { <a [class.on]="tab === 'cuenta'" (click)="go('cuenta')">Cuenta y pagos</a> }
         </nav>
 
@@ -76,6 +78,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'cuenta';
           @case ('odontograma') { <app-odontogram-tab [patientId]="p.id" /> }
           @case ('plan') { <app-plan-tab [patientId]="p.id" /> }
           @case ('cuenta') { <app-account-tab [patientId]="p.id" /> }
+          @case ('archivos') { <app-files-tab [patientId]="p.id" [patientName]="p.fullName" /> }
           @default {
             <div class="grid summary">
               <section class="panel">
@@ -86,6 +89,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'cuenta';
                     <dt>Dirección</dt><dd>{{ addressLine(p) }}</dd>
                     <dt>Contacto de emergencia</dt><dd>{{ p.emergencyContactName || '—' }} {{ p.emergencyContactPhone ? '· ' + p.emergencyContactPhone : '' }}</dd>
                     <dt>Notas</dt><dd>{{ p.notes || '—' }}</dd>
+                    <dt>Datos personales</dt><dd>@if ($any(p).dataConsent) { <span class="tag green">Consentimiento Ley 29733</span> } @else { <span class="tag amber">Sin consentimiento registrado</span> }</dd>
                     <dt>Registro</dt><dd class="muted">{{ dt(p.createdAt) }} por {{ p.createdBy }}</dd>
                     @if (p.updatedAt) { <dt>Última modificación</dt><dd class="muted">{{ dt(p.updatedAt) }} por {{ p.updatedBy }}</dd> }
                   </dl>
@@ -209,7 +213,7 @@ export class PatientDetailComponent implements OnChanges {
   get canAccount(): boolean { return this.auth.can('CAJA_COBRAR'); }
 
   ngOnChanges() {
-    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, plan: this.canPlan, cuenta: this.canAccount };
+    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, plan: this.canPlan, archivos: true, cuenta: this.canAccount };
     if (!this.tab || !allowed[this.tab]) this.tab = 'resumen';
     const id = +this.id;
     if (this.p?.id === id) return;

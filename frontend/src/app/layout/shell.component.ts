@@ -15,6 +15,8 @@ const NAV: NavGroup[] = [
     { path: '/inicio', label: 'Inicio', icon: 'home', perms: [] },
     { path: '/agenda', label: 'Agenda del día', icon: 'calendar', perms: ['AGENDA_VER'] },
     { path: '/pacientes', label: 'Pacientes', icon: 'patient', perms: ['PACIENTES_VER'] },
+    { path: '/seguimiento', label: 'Seguimiento', icon: 'message', perms: ['AGENDA_VER'] },
+    { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
   ] },
   { title: 'Caja', items: [
     { path: '/caja', label: 'Caja del día', icon: 'wallet', perms: ['CAJA_COBRAR', 'CAJA_EGRESOS'] },
@@ -29,6 +31,7 @@ const NAV: NavGroup[] = [
   { title: 'Seguridad', items: [
     { path: '/usuarios', label: 'Usuarios y accesos', icon: 'shield', perms: ['USUARIOS'] },
     { path: '/roles', label: 'Roles y permisos', icon: 'key', perms: ['ROLES'] },
+    { path: '/seguridad', label: 'Mi seguridad (2 pasos)', icon: 'lock', perms: [] },
   ] },
 ];
 

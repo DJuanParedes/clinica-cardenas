@@ -109,11 +109,12 @@ export const CATEGORY_LABEL: Record<string, string> = {
   INSUMOS: 'Insumos', LABORATORIO: 'Laboratorio', ALQUILER: 'Alquiler', SERVICIOS: 'Servicios', PLANILLA: 'Planilla',
   MANTENIMIENTO: 'Mantenimiento', MARKETING: 'Publicidad', IMPUESTOS: 'Impuestos', OTROS: 'Otros',
 };
-export const NOTIF_TYPE: Record<string, string> = { RECORDATORIO: 'Recordatorio', CAMBIO_CITA: 'Cambio de cita', CANCELACION: 'Cancelación', CODIGO_ACCESO: 'Código de acceso' };
+export const NOTIF_TYPE: Record<string, string> = { RECORDATORIO: 'Recordatorio', CAMBIO_CITA: 'Cambio de cita', CANCELACION: 'Cancelación', CODIGO_ACCESO: 'Código de acceso',
+  MENSAJE: 'Mensaje', CONTROL: 'Control preventivo', LISTA_ESPERA: 'Lista de espera', CUOTA: 'Cuota por vencer' };
 export const NOTIF_STATUS: Record<string, string> = {
-  PENDIENTE: 'En cola', PROGRAMADO: 'Programado', ENVIADO: 'Enviado', FALLIDO: 'Fallido', ANULADO: 'Anulado', DUPLICADO: 'Duplicado evitado',
+  PENDIENTE: 'En cola', PROGRAMADO: 'Programado', ENVIADO: 'Enviado', ENTREGADO: 'Entregado', LEIDO: 'Leído', FALLIDO: 'Fallido', ANULADO: 'Anulado', DUPLICADO: 'Duplicado evitado',
 };
-export const NOTIF_TONE: Record<string, string> = { PENDIENTE: 'amber', PROGRAMADO: 'blue', ENVIADO: 'green', FALLIDO: 'gum', ANULADO: 'grey', DUPLICADO: 'teal' };
+export const NOTIF_TONE: Record<string, string> = { PENDIENTE: 'amber', PROGRAMADO: 'blue', ENVIADO: 'green', ENTREGADO: 'green', LEIDO: 'teal', FALLIDO: 'gum', ANULADO: 'grey', DUPLICADO: 'teal' };
 export const CHANNEL_LABEL: Record<string, string> = { WHATSAPP: 'WhatsApp', EMAIL: 'Correo', AMBOS: 'WhatsApp y correo', NINGUNO: 'No recibir avisos' };
 export const SETTLEMENT_LABEL: Record<string, string> = { PENDIENTE: 'Por pagar', PARCIAL: 'Pago parcial', PAGADA: 'Pagada', ANULADA: 'Anulada' };
 export const SETTLEMENT_TONE: Record<string, string> = { PENDIENTE: 'amber', PARCIAL: 'blue', PAGADA: 'green', ANULADA: 'grey' };
@@ -150,4 +151,13 @@ export function downloadCsv(filename: string, header: string[], rows: (string | 
   };
   const csv = '\ufeff' + [header, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
   saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename);
+}
+
+export const FILE_KIND: Record<string, string> = {
+  FOTO: 'Foto', RADIOGRAFIA: 'Radiografía', DOCUMENTO: 'Documento', CONSENTIMIENTO: 'Consentimiento', RECETA: 'Receta', PRESUPUESTO: 'Presupuesto',
+};
+export function fileSize(b: number): string {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+  return (b / 1024 / 1024).toFixed(1) + ' MB';
 }

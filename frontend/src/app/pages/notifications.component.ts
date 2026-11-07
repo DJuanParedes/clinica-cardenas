@@ -53,7 +53,7 @@ import { IconComponent } from '../shared/icon.component';
                 </td>
                 <td><app-icon [name]="n.channel === 'EMAIL' ? 'mail' : 'message'" [size]="14" /> {{ channel(n.channel) }}<div class="muted small">{{ n.destination }}</div></td>
                 <td><span class="tag" [class]="'tag ' + tone(n.status)">{{ stLabel(n.status) }}</span>
-                  @if (n.lastError && n.status !== 'ENVIADO') { <div class="muted small err">{{ n.lastError }}</div> }
+                  @if (n.lastError && !['ENVIADO','ENTREGADO','LEIDO'].includes(n.status)) { <div class="muted small err">{{ n.lastError }}</div> }
                   @if (n.attempts > 1) { <div class="muted small">{{ n.attempts }} intentos</div> }</td>
                 <td class="tabular small">
                   @if (n.scheduledFor) { <div>Programado: {{ dt(n.scheduledFor) }}</div> }
@@ -83,7 +83,7 @@ import { IconComponent } from '../shared/icon.component';
     </div>
   `,
   styles: [`
-    .counters { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .counters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
     .cnt { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; color: inherit; }
     .cnt.on { outline: 2px solid var(--teal); }
     .cnt .v { font-size: var(--step-2); font-weight: 800; }
@@ -107,7 +107,7 @@ export class NotificationsComponent implements OnInit, OnDestroy {
   status = '';
   type = '';
   open: number | null = null;
-  statusKeys = ['ENVIADO', 'PROGRAMADO', 'PENDIENTE', 'FALLIDO', 'DUPLICADO', 'ANULADO'];
+  statusKeys = ['ENVIADO', 'ENTREGADO', 'LEIDO', 'PROGRAMADO', 'PENDIENTE', 'FALLIDO', 'DUPLICADO', 'ANULADO'];
   typeKeys = ['RECORDATORIO', 'CAMBIO_CITA', 'CANCELACION', 'CODIGO_ACCESO'];
   private timer: any;
 

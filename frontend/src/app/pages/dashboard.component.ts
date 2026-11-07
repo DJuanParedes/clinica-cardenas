@@ -79,6 +79,14 @@ import { IconComponent } from '../shared/icon.component';
           }
         </section>
 
+        @if (alerts().length) {
+          <section class="attn" aria-label="Pendientes de seguimiento">
+            @for (a of alerts(); track a.text) {
+              <a class="attn-item" [routerLink]="a.link" [class.warn]="a.warn"><app-icon [name]="a.icon" [size]="18" /><span>{{ a.text }}</span></a>
+            }
+          </section>
+        }
+
         <div class="board">
           <section class="panel">
             <div class="panel-head">
@@ -140,6 +148,10 @@ import { IconComponent } from '../shared/icon.component';
     </div>
   `,
   styles: [`
+    .attn { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
+    .attn-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--teal-strong); font-size: 13.5px; font-weight: 600; }
+    .attn-item.warn { background: var(--orange-soft); color: var(--orange-ink); }
+    .attn-item:hover { text-decoration: none; filter: brightness(.97); }
     .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
     .fig { display: flex; flex-direction: column; padding: 18px 22px; border-right: 1px solid var(--line); }
     .fig:last-child { border-right: 0; }
@@ -189,6 +201,22 @@ export class DashboardComponent implements OnInit {
   ngOnInit() { this.load(); }
 
   load() { this.api.dashboard().subscribe((d) => (this.data = d)); }
+
+  /** Avisos que piden acción: reprogramaciones, lista de espera, stock bajo y satisfacción. */
+  alerts(): { text: string; link: string; icon: string; warn: boolean }[] {
+    const d = this.data; if (!d) return [];
+    const out: { text: string; link: string; icon: string; warn: boolean }[] = [];
+    const n = (v: any) => +v || 0;
+    if (n(d.rescheduleRequests) && this.auth.can('AGENDA_VER'))
+      out.push({ text: `${d.rescheduleRequests} ${n(d.rescheduleRequests) === 1 ? 'paciente pide' : 'pacientes piden'} reprogramar`, link: '/seguimiento', icon: 'refresh', warn: true });
+    if (n(d.waitlist) && this.auth.can('AGENDA_VER'))
+      out.push({ text: `${d.waitlist} en lista de espera`, link: '/seguimiento', icon: 'clock', warn: false });
+    if (n(d.lowStock) && this.auth.can('INVENTARIO'))
+      out.push({ text: `${d.lowStock} ${n(d.lowStock) === 1 ? 'material por agotarse' : 'materiales por agotarse'}`, link: '/inventario', icon: 'alert', warn: true });
+    if (n(d.surveysCount) && this.auth.can('AGENDA_VER', 'REPORTES'))
+      out.push({ text: `Satisfacción ${(+d.satisfaction).toFixed(1)} ★ (${d.surveysCount} encuestas)`, link: '/seguimiento', icon: 'activity', warn: false });
+    return out;
+  }
 
   hhmm = hhmm;
   money = soles;

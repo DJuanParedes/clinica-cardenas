@@ -15,6 +15,9 @@
  *   POST   /v1/contactos                {pacienteId, nombre, telefono, correo, demo} o una lista: agenda de pacientes
  *   GET    /v1/contactos                agenda (número → nombre del paciente)
  *   POST   /admin/enviar                {destino, texto} mensaje de WhatsApp escrito desde el panel
+ *   GET    /webhook/whatsapp            verificación del webhook de Meta (hub.verify_token = WA_VERIFY_TOKEN)
+ *   POST   /webhook/whatsapp            Meta avisa: entregado / leído y mensajes que escribe el paciente
+ *                                       ("1" confirma la cita, "2" pide reprogramar; se responde solo)
  *   GET    /                            panel: bandeja de WhatsApp y de correo
  *
  * Reglas:
@@ -33,6 +36,10 @@ const PORT = Number(process.env.PORT || 8093);
 const DATA_FILE = process.env.DATA_FILE || '/data/notificaciones.json';
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || 'token-webhook-clinica-cardenas';
+// Respuestas del paciente por WhatsApp: se reenvían al sistema central, que confirma o marca "quiere reprogramar".
+const REPLY_URL = process.env.REPLY_URL || (WEBHOOK_URL ? new URL('/api/internal/whatsapp/reply', WEBHOOK_URL).toString() : '');
+const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || '';
+const WA_APP_SECRET = process.env.WA_APP_SECRET || '';
 
 let modo = 'normal';
 let db = load();
@@ -158,7 +165,7 @@ async function notifyCentral(m) {
     const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Webhook-Token': WEBHOOK_TOKEN },
-      body: JSON.stringify({ clave: m.clave, estado: m.estado, error: m.error || null, proveedorId: m.proveedorId || null }),
+      body: JSON.stringify({ clave: m.clave, estado: m.entrega || m.estado, error: m.error || null, proveedorId: m.proveedorId || null }),
       signal: AbortSignal.timeout(5000),
     });
     m.webhookPendiente = !res.ok;
@@ -197,6 +204,81 @@ setInterval(() => tick().catch((e) => console.warn('planificador:', e.message)),
 setTimeout(() => prov.revisarProveedores(), 3_000);
 setInterval(() => prov.revisarProveedores(), 30 * 60_000);
 
+// ---------------------------------------------------------------- webhook de Meta (WhatsApp)
+const RANK = { ENVIADO: 1, ENTREGADO: 2, LEIDO: 3 };
+
+/** Meta firma cada aviso con la clave secreta de la app (X-Hub-Signature-256). Si no está configurada, se acepta. */
+function firmaValida(raw, header) {
+  if (!WA_APP_SECRET) return true;
+  if (!header || !header.startsWith('sha256=')) return false;
+  const esperado = Buffer.from('sha256=' + crypto.createHmac('sha256', WA_APP_SECRET).update(raw).digest('hex'));
+  const recibido = Buffer.from(header);
+  return esperado.length === recibido.length && crypto.timingSafeEqual(esperado, recibido);
+}
+
+async function estadoDeMeta(st) {
+  const m = db.mensajes.find((x) => x.proveedorId && x.proveedorId === st.id);
+  if (!m) return;
+  if (st.status === 'failed') {
+    m.estado = 'FALLIDO';
+    m.error = (st.errors && st.errors[0] && (st.errors[0].title || st.errors[0].message)) || 'Meta no pudo entregar el mensaje';
+    m.entrega = null;
+  } else {
+    const nuevo = st.status === 'read' ? 'LEIDO' : st.status === 'delivered' ? 'ENTREGADO' : null;
+    if (!nuevo || (RANK[nuevo] || 0) <= (RANK[m.entrega || 'ENVIADO'] || 0)) return;
+    m.entrega = nuevo;
+    m[nuevo === 'LEIDO' ? 'leidoEn' : 'entregadoEn'] = new Date(Number(st.timestamp) * 1000 || Date.now()).toISOString();
+  }
+  save();
+  await notifyCentral(m);
+}
+
+async function mensajeEntrante(msg, perfil) {
+  const local = prov.localPhone(msg.from);
+  if (!local) return;
+  const texto = msg.type === 'text' ? String(msg.text && msg.text.body || '')
+    : msg.type === 'button' ? String(msg.button && msg.button.text || '')
+    : msg.type === 'interactive' ? String((msg.interactive && (msg.interactive.button_reply || msg.interactive.list_reply) || {}).title || '')
+    : '[' + msg.type + ']';
+  if (db.mensajes.some((x) => x.entrante && x.proveedorId === msg.id)) return; // Meta puede reenviar el mismo aviso
+  const contacto = contactoDe(local);
+  db.mensajes.push({
+    id: db.mensajes.length + 1, clave: 'entrante-' + msg.id, canal: 'WHATSAPP', destino: local, destinoNormalizado: local, cuerpo: texto,
+    tipo: 'ENTRANTE', entrante: true, estado: 'RECIBIDO', proveedorId: msg.id, recibidoEn: new Date().toISOString(),
+    enviadoEn: new Date(Number(msg.timestamp) * 1000 || Date.now()).toISOString(), real: true,
+    paciente: contacto ? { id: contacto.pacienteId, nombre: contacto.nombre, demo: contacto.demo } : (perfil ? { id: null, nombre: perfil, demo: false } : null),
+  });
+  save();
+  if (!REPLY_URL) return;
+  let r = null;
+  try {
+    const res = await fetch(REPLY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Webhook-Token': WEBHOOK_TOKEN },
+      body: JSON.stringify({ telefono: local, texto }), signal: AbortSignal.timeout(8000),
+    });
+    r = res.ok ? await res.json() : null;
+  } catch (e) { console.warn('respuesta WhatsApp → sistema central:', e.message); }
+  if (r && r.respuesta) {
+    const m = create({ clave: 'auto-' + msg.id, canal: 'WHATSAPP', destino: local, cuerpo: r.respuesta, tipo: 'MENSAJE',
+      paciente: contacto ? { id: contacto.pacienteId, nombre: contacto.nombre, demo: contacto.demo } : null }, false);
+    db.mensajes.push(m);
+    await deliver(m); // el paciente acaba de escribir: dentro de las 24 h, el texto libre sí llega
+    save();
+    console.log(`respuesta automática a ${local}: ${r.accion} → ${m.estado}`);
+  }
+}
+
+async function avisoDeMeta(body) {
+  for (const entry of (body && body.entry) || []) {
+    for (const ch of entry.changes || []) {
+      const v = ch.value || {};
+      for (const st of v.statuses || []) await estadoDeMeta(st);
+      const perfil = v.contacts && v.contacts[0] && v.contacts[0].profile && v.contacts[0].profile.name;
+      for (const msg of v.messages || []) await mensajeEntrante(msg, perfil);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- panel
 function panel() {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -217,7 +299,7 @@ main{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:18px 22px;max
 .chat{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
 .compose{display:flex;gap:6px;padding:8px;background:#f0f0f0}.compose input{flex:1;border:0;border-radius:18px;padding:9px 14px;font:inherit;font-size:14px}
 .bub{background:var(--wa2);border-radius:8px 8px 2px 8px;padding:8px 10px;max-width:92%;align-self:flex-end;white-space:pre-wrap;font-size:13.5px;box-shadow:0 1px 1px rgba(0,0,0,.1)}
-.bub .meta{font-size:11px;color:#667;text-align:right;margin-top:4px}.bub.fail{background:#fde2e2}
+.bub .meta{font-size:11px;color:#667;text-align:right;margin-top:4px}.bub.fail{background:#fde2e2}.bub.in{background:#fff;align-self:flex-start;border-radius:8px 8px 8px 2px}
 .mail{display:grid;grid-template-columns:300px 1fr;height:560px}
 .inbox{border-right:1px solid var(--line);overflow:auto}.inbox div{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
 .inbox div.on,.inbox div:hover{background:#e2f6fc}.inbox b{display:block}.inbox span{color:var(--muted);font-size:12px}
@@ -262,7 +344,7 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 let data=null, who=null, mailSel=null;
 const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const fmt=s=>s?new Date(s).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba',MENSAJE:'Mensaje'};
+const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba',MENSAJE:'Mensaje',ENTRANTE:'Escribió el paciente',CONTROL:'Control preventivo',LISTA_ESPERA:'Lista de espera',CUOTA:'Cuota'};
 const badge=m=>m.estado==='ENVIADO'?(m.real?'<span class="badge r">REAL</span>':'<span class="badge t">PRUEBA</span>'):'';
 let provDrawn=false;
 function drawProv(p){
@@ -288,7 +370,7 @@ function render(){
   const ms=data.mensajes;
   const c=s=>ms.filter(m=>m.estado===s).length;
   document.getElementById('stats').innerHTML='<span><b>'+c('ENVIADO')+'</b> enviados</span><span><b>'+c('PROGRAMADO')+'</b> programados</span><span><b>'+data.duplicadosEvitados+'</b> duplicados evitados</span><span><b>'+c('FALLIDO')+'</b> fallidos</span>';
-  const wa=ms.filter(m=>m.canal==='WHATSAPP'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO'));
+  const wa=ms.filter(m=>m.canal==='WHATSAPP'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO'||m.estado==='RECIBIDO'));
   const nums=[...new Set(wa.map(m=>m.destinoNormalizado||m.destino))];
   const fp=t=>'+51 '+t.slice(0,3)+' '+t.slice(3,6)+' '+t.slice(6);
   const ag={}; Object.entries(data.contactos||{}).forEach(([t,c])=>ag[fp(t)]=c);
@@ -298,7 +380,7 @@ function render(){
   const sel=document.getElementById('who'); sel.innerHTML=nums.map(n=>'<option value="'+esc(n)+'" '+(n===who?'selected':'')+'>'+esc(lbl(n))+'</option>').join('')||'<option>Sin conversaciones</option>';
   document.getElementById('wacount').textContent=wa.length+' mensajes';
   const chat=document.getElementById('chat');
-  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.estado==='ENVIADO'?' ✓✓':' ✗ '+esc(m.error))+badge(m)+(m.estado==='ENVIADO'&&m.via==='texto'?'<br>Texto libre: llega si el paciente te escribió en las últimas 24 h':'')+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
+  chat.innerHTML=wa.filter(m=>(m.destinoNormalizado||m.destino)===who).map(m=>'<div class="bub '+(m.estado==='FALLIDO'?'fail':'')+(m.entrante?' in':'')+'">'+esc(m.cuerpo)+'<div class="meta">'+(TYPE[m.tipo]||m.tipo)+' · '+fmt(m.enviadoEn||m.recibidoEn)+(m.entrante?'':m.estado==='ENVIADO'?(m.entrega==='LEIDO'?' <span style="color:#34b7f1">✓✓ leído</span>':m.entrega==='ENTREGADO'?' ✓✓ entregado':' ✓ enviado'):' ✗ '+esc(m.error))+badge(m)+(m.estado==='ENVIADO'&&m.via==='texto'?'<br>Texto libre: llega si el paciente te escribió en las últimas 24 h':'')+'</div></div>').join('')||'<div class="empty">Aún no hay mensajes.</div>';
   chat.scrollTop=chat.scrollHeight;
   const em=ms.filter(m=>m.canal==='EMAIL'&&(m.estado==='ENVIADO'||m.estado==='FALLIDO')).reverse();
   document.getElementById('mailcount').textContent=em.length+' correos';
@@ -337,6 +419,26 @@ const server = http.createServer((req, res) => {
     const log = (status) => console.log(`${new Date().toISOString()} ${req.method} ${p} → ${status}`);
 
     if (p === '/health') return send(res, 200, { status: 'UP' });
+    if (p === '/webhook/whatsapp' && req.method === 'GET') {
+      const ok = WA_VERIFY_TOKEN && url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === WA_VERIFY_TOKEN;
+      log(ok ? 'verificado' : 'rechazado');
+      return ok ? send(res, 200, url.searchParams.get('hub.challenge') || '', 'text/plain') : send(res, 403, { error: 'Token de verificación incorrecto' });
+    }
+    if (p === '/webhook/whatsapp' && req.method === 'POST') {
+      if (!firmaValida(Buffer.concat(chunks), req.headers['x-hub-signature-256'])) { log(401); return send(res, 401, { error: 'Firma inválida' }); }
+      send(res, 200, { ok: true }); // Meta espera respuesta rápida; se procesa después
+      avisoDeMeta(body).catch((e) => console.warn('webhook Meta:', e.message));
+      return;
+    }
+    // Simulación local del webhook (para probar sin Meta): {telefono, texto}
+    if (p === '/admin/simular-respuesta' && req.method === 'POST') {
+      const tel = prov.localPhone(body && body.telefono);
+      if (!tel) return send(res, 400, { error: 'Teléfono inválido' });
+      const id = 'sim.' + crypto.randomBytes(6).toString('hex');
+      await mensajeEntrante({ from: '51' + tel, id, type: 'text', text: { body: String(body.texto || '') }, timestamp: String(Math.floor(Date.now() / 1000)) });
+      const auto = db.mensajes.find((x) => x.clave === 'auto-' + id);
+      return send(res, 200, { recibido: true, respuesta: auto ? auto.cuerpo : null });
+    }
     if (p === '/' && req.method === 'GET') return send(res, 200, panel(), 'text/html; charset=utf-8');
     if (p === '/api/estado' && req.method === 'GET') return send(res, 200, { contactos: db.contactos, modo, proveedores: prov.estadoProveedores(), alertas: prov.listaAlertas(), mensajes: db.mensajes, duplicadosEvitados: db.duplicados || 0 });
     if (p === '/v1/contactos' && req.method === 'GET') return send(res, 200, Object.entries(db.contactos).map(([tel, c]) => ({ ...c, telefono: tel })));

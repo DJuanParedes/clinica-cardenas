@@ -7,5 +7,11 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
-	reverse_proxy frontend:80
+	# Webhook de WhatsApp (Meta): entregado/leído y respuestas de los pacientes
+	handle /webhook/whatsapp {
+		reverse_proxy notificaciones:8093
+	}
+	handle {
+		reverse_proxy frontend:80
+	}
 }

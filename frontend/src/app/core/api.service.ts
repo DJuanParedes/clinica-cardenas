@@ -153,6 +153,48 @@ export class Api {
     return this.http.post<any>(`/api/appointments/${appointmentId}/remind`, {});
   }
 
+  // ---------- archivos clínicos y documentos firmados
+  patientFiles(pid: number): Observable<PatientFile[]> { return this.http.get<PatientFile[]>(`/api/patients/${pid}/files`); }
+  uploadFile(pid: number, file: Blob, name: string, meta: { kind: string; title?: string; note?: string; tooth?: number | null; share?: boolean }): Observable<PatientFile> {
+    const fd = new FormData();
+    fd.append('file', file, name);
+    for (const [k, v] of Object.entries(meta)) if (v !== null && v !== undefined && v !== '') fd.append(k, String(v));
+    return this.http.post<PatientFile>(`/api/patients/${pid}/files`, fd);
+  }
+  createDocument(pid: number, body: { kind: string; title: string; body: string; signerName: string; signatureJpeg: string; shareWithPatient: boolean }): Observable<PatientFile> {
+    return this.http.post<PatientFile>(`/api/patients/${pid}/documents`, body);
+  }
+  fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
+  shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
+  deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }
+
+  // ---------- inventario
+  inventory(): Observable<{ items: InventoryItem[]; lowCount: number; recent: any[] }> { return this.http.get<any>('/api/inventory'); }
+  createInventoryItem(body: any): Observable<InventoryItem> { return this.http.post<InventoryItem>('/api/inventory', body); }
+  updateInventoryItem(id: number, body: any): Observable<InventoryItem> { return this.http.put<InventoryItem>(`/api/inventory/${id}`, body); }
+  inventoryMove(id: number, body: { kind: string; quantity: number; reason: string }): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
+  inventoryMoves(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/moves`); }
+  supplies(): Observable<any[]> { return this.http.get<any[]>('/api/inventory/supplies'); }
+  saveSupplies(procedureId: number, list: { itemId: number; quantity: number }[]): Observable<any> { return this.http.put(`/api/inventory/supplies/${procedureId}`, list); }
+
+  // ---------- seguimiento: lista de espera, cuotas, controles, satisfacción
+  waitlist(): Observable<any[]> { return this.http.get<any[]>('/api/waitlist'); }
+  addWaitlist(body: { patientId: number; dentistId?: number | null; reason: string; preference?: string }): Observable<any> { return this.http.post('/api/waitlist', body); }
+  closeWaitlist(id: number): Observable<any> { return this.http.post(`/api/waitlist/${id}/close`, {}); }
+  installments(planId: number): Observable<Installments> { return this.http.get<Installments>(`/api/plans/${planId}/installments`); }
+  createInstallments(planId: number, count: number, firstDueDate: string): Observable<Installments> {
+    return this.http.post<Installments>(`/api/plans/${planId}/installments`, { count, firstDueDate });
+  }
+  recalls(): Observable<any[]> { return this.http.get<any[]>('/api/recalls'); }
+  sendRecall(patientId: number, kind: string): Observable<{ queued: number; message: string }> { return this.http.post<any>(`/api/recalls/${patientId}/send`, { kind }); }
+  rescheduleRequests(): Observable<any[]> { return this.http.get<any[]>('/api/agenda/reschedule-requests'); }
+  satisfaction(days = 90): Observable<any> { return this.http.get('/api/reports/satisfaction', { params: params({ days }) }); }
+
+  // ---------- verificación en 2 pasos
+  totpSetup(): Observable<{ secret: string; otpauthUrl: string }> { return this.http.post<any>('/api/auth/2fa/setup', {}); }
+  totpEnable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/enable', { code }); }
+  totpDisable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/disable', { code }); }
+
   // ---------- app del paciente (HU-22)
   portalMe(): Observable<any> { return this.http.get('/api/portal/me'); }
   portalAppointments(): Observable<{ next: PortalAppointment | null; upcoming: PortalAppointment[]; past: PortalAppointment[] }> {
@@ -161,6 +203,18 @@ export class Api {
   portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
   portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
   portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
+}
+
+export interface PatientFile {
+  id: number; patientId: number; kind: string; title: string; note?: string; tooth?: number; contentType: string; sizeBytes: number;
+  sharedWithPatient: boolean; signedAt?: string; createdAt: string; createdBy: string; image?: boolean;
+}
+
+export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; }
+
+export interface Installments {
+  planId: number; total: number; paid: number;
+  items: { id: number; number: number; dueDate: string; amount: number; status: 'PAGADA' | 'PENDIENTE' | 'VENCIDA' }[];
 }
 
 export interface PermissionMatrix {

@@ -7,6 +7,7 @@ import { PlanView, Procedure } from '../../core/models';
 import { ITEM_LABEL, ITEM_TONE, apiError, isoDate, shortDate, soles } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 import { ModalComponent } from '../../shared/modal.component';
+import { InstallmentsComponent } from './installments.component';
 
 interface DraftItem { procedureId: number | null; tooth: number | null; price: number | null; }
 
@@ -14,7 +15,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
 @Component({
   selector: 'app-plan-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
   template: `
     <div class="spread head">
       <p class="muted small">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }} · los procedimientos realizados quedan disponibles para facturar en caja.</p>
@@ -105,6 +106,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
           </div>
         </div>
 
+        @if (v.plan.status !== 'ANULADO' && v.total > 0) { <app-installments [planId]="v.plan.id" [canEdit]="canInstall && v.plan.status === 'ACTIVO'" /> }
         @if (canEdit && v.plan.status === 'ACTIVO') {
           <div class="panel-foot row">
             <button class="btn sm" type="button" (click)="openAdd(v)"><app-icon name="plus" [size]="14" /> Agregar procedimiento</button>
@@ -205,6 +207,7 @@ export class PlanTabComponent implements OnInit {
   modalError = '';
 
   get canEdit() { return this.auth.can('PLAN_TRATAMIENTO'); }
+  get canInstall() { return this.auth.can('PLAN_TRATAMIENTO', 'CAJA_COBRAR'); }
 
   ngOnInit() {
     this.load();

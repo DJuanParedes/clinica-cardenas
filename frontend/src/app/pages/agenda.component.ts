@@ -84,7 +84,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
                     <span class="t tabular">{{ hhmm(a.startAt) }}–{{ hhmm(a.endAt) }}</span>
                     <span class="n">{{ a.patient.fullName }}</span>
                     <span class="r">{{ a.reason }}</span>
-                    <span class="st">{{ label(a.status) }}</span>
+                    <span class="st">{{ label(a.status) }}@if ($any(a).rescheduleRequestedAt) { · pide reprogramar }</span>
                   </button>
                 }
               </div>
@@ -104,6 +104,9 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
           </div>
           @if (sel.notes) { <p class="small">{{ sel.notes }}</p> }
           @if (sel.statusReason) { <p class="small muted">{{ sel.statusReason }}</p> }
+          @if ($any(sel).rescheduleRequestedAt) {
+            <div class="notice amber"><span>El paciente pidió otro horario (respondió "2" por WhatsApp). Usa <strong>Reprogramar</strong> después de coordinar con él.</span></div>
+          }
           <dl class="kv">
             <dt>Documento</dt><dd>{{ sel.patient.docType }} {{ sel.patient.docNumber }}</dd>
             <dt>Teléfono</dt><dd>{{ sel.patient.phone }}</dd>

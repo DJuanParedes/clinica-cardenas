@@ -28,8 +28,8 @@ export class AuthService {
     return read<string>(TOKEN_KEY);
   }
 
-  login(username: string, password: string): Observable<any> {
-    return this.http.post<any>('/api/auth/login', { username, password }).pipe(
+  login(username: string, password: string, code?: string): Observable<any> {
+    return this.http.post<any>('/api/auth/login', { username, password, code: code || null }).pipe(
       tap((res) => {
         sessionStorage.setItem(TOKEN_KEY, JSON.stringify(res.token));
         sessionStorage.setItem(USER_KEY, JSON.stringify(res.user));

@@ -10,7 +10,7 @@ import { IconComponent } from '../shared/icon.component';
 interface Form {
   docType: string; docNumber: string; firstName: string; lastName: string; birthDate: string; sex: string;
   phone: string; email: string; address: string; district: string;
-  emergencyContactName: string; emergencyContactPhone: string; notes: string;
+  emergencyContactName: string; emergencyContactPhone: string; notes: string; dataConsent: boolean;
 }
 
 /** HU-01 registro y HU-03 actualización de datos del paciente. */
@@ -128,6 +128,14 @@ interface Form {
               <label for="nt">Notas administrativas</label>
               <textarea id="nt" name="notes" class="input" [(ngModel)]="f.notes" maxlength="500" placeholder="Preferencias de horario, seguro, referido por…"></textarea>
             </div>
+            <div class="field span-all">
+              <label class="check consent">
+                <input type="checkbox" name="dataConsent" [(ngModel)]="f.dataConsent" [disabled]="consentLocked" />
+                <span>El paciente autoriza a la Clínica Dental Cárdenas a tratar sus datos personales y de salud para su atención,
+                  recordatorios de citas y facturación, conforme a la Ley N.° 29733 de Protección de Datos Personales.</span>
+              </label>
+              @if (consentLocked) { <span class="muted small">El consentimiento ya fue registrado.</span> }
+            </div>
           </div>
         </section>
 
@@ -141,6 +149,8 @@ interface Form {
     </div>
   `,
   styles: [`
+    .consent { align-items: flex-start; line-height: 1.45; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+    .consent input { margin-top: 3px; }
     .narrow { max-width: 980px; }
     form { display: flex; flex-direction: column; gap: 16px; }
     .dup { margin-bottom: 16px; align-items: center; }
@@ -159,11 +169,12 @@ export class PatientFormComponent implements OnInit {
   today = isoDate();
   f: Form = {
     docType: 'DNI', docNumber: '', firstName: '', lastName: '', birthDate: '', sex: '',
-    phone: '', email: '', address: '', district: '', emergencyContactName: '', emergencyContactPhone: '', notes: '',
+    phone: '', email: '', address: '', district: '', emergencyContactName: '', emergencyContactPhone: '', notes: '', dataConsent: false,
   };
   e: Record<string, string> = {};
   duplicate: { id: number; fullName: string } | null = null;
   saving = false;
+  consentLocked = false;
   meta = '';
   private check$ = new Subject<void>();
 
@@ -186,7 +197,9 @@ export class PatientFormComponent implements OnInit {
           docType: p.docType, docNumber: p.docNumber, firstName: p.firstName, lastName: p.lastName, birthDate: p.birthDate,
           sex: p.sex, phone: p.phone, email: p.email || '', address: p.address || '', district: p.district || '',
           emergencyContactName: p.emergencyContactName || '', emergencyContactPhone: p.emergencyContactPhone || '', notes: p.notes || '',
+          dataConsent: !!(p as any).dataConsent,
         };
+        this.consentLocked = !!(p as any).dataConsent;
         this.meta = p.updatedAt ? `${dateTime(p.updatedAt)} por ${p.updatedBy}` : `registrado el ${dateTime(p.createdAt)} por ${p.createdBy}`;
       });
     } else if (this.doc) {

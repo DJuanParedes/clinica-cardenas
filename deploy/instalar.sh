@@ -23,8 +23,11 @@ APP_DEMO_MODE=false
 APP_SEED_DEMO=true
 # WhatsApp y correo reales: completar con deploy/configurar-mensajes.sh
 DESTINOS_REALES=pacientes
+# token para verificar el webhook de WhatsApp en Meta (https://DOMINIO/webhook/whatsapp)
+WA_VERIFY_TOKEN=$(rand 24)
 ENV
 fi
+grep -q '^WA_VERIFY_TOKEN=' .env || echo "WA_VERIFY_TOKEN=$(rand 24)" >> .env
 grep -q '^DOMINIO=' .env || echo "DOMINIO=$DOMINIO_AUTO" >> .env
 chown -R ubuntu:ubuntu "$DIR" 2>/dev/null || true
 chmod 600 .env
