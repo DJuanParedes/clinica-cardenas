@@ -39,6 +39,12 @@ public class Patient {
     @Column(name = "notify_channel")
     public String notifyChannel = "WHATSAPP";
 
+    /** Consentimiento para el tratamiento de datos personales (Ley N.° 29733). */
+    @Column(name = "data_consent")
+    public boolean dataConsent;
+    @Column(name = "data_consent_at")
+    public LocalDateTime dataConsentAt;
+
     /** Paciente de ejemplo creado al instalar (no recibe mensajes reales). */
     @Column(name = "demo")
     public boolean demo;

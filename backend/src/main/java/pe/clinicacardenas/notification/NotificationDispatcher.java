@@ -200,6 +200,14 @@ public class NotificationDispatcher {
     public boolean applyCallback(String key, String state, String error, String providerId) {
         Boolean ok = tx.execute(s -> repo.findByIdempotencyKey(key).map(n -> {
             if ("ANULADO".equals(n.status)) return true;
+            // Estados de entrega de WhatsApp (webhook de Meta): ENTREGADO y LEIDO solo avanzan, nunca retroceden
+            if ("ENTREGADO".equals(state) || "LEIDO".equals(state)) {
+                if ("LEIDO".equals(n.status) || ("ENTREGADO".equals(n.status) && "ENTREGADO".equals(state))) return true;
+                n.status = state;
+                n.updatedAt = Dates.now();
+                repo.save(n);
+                return true;
+            }
             n.status = "ENVIADO".equals(state) ? "ENVIADO" : "FALLIDO";
             n.lastError = error;
             if (providerId != null) n.providerId = providerId;

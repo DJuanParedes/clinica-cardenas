@@ -100,6 +100,8 @@ services:
       APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
       APP_SEED_DEMO: ${APP_SEED_DEMO:-true}
       APP_SEED_PASSWORD: ${APP_SEED_PASSWORD:-Clinica2026}
+      FILES_DIR: /data/archivos
+      PAGOS_MODO: ${PAGOS_MODO:-simulado}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
@@ -119,6 +121,8 @@ services:
       timeout: 5s
       retries: 18
       start_period: 40s
+    volumes:
+      - files-data:/data/archivos
     mem_limit: 384m
 
   frontend:
@@ -136,5 +140,6 @@ services:
 
 volumes:
   db-data:
+  files-data:
   sunat-data:
   notif-data:

@@ -62,6 +62,11 @@ public class AuthService {
 
     @Transactional(noRollbackFor = ApiException.class)
     public LoginResult login(String username, String password) {
+        return login(username, password, null);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public LoginResult login(String username, String password, String code) {
         LocalDateTime now = Dates.now();
         User u = users.findByUsernameIgnoreCase(username.trim()).orElse(null);
         if (u == null) {
@@ -91,12 +96,69 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENCIALES_INVALIDAS",
                     "Usuario o contraseña incorrectos. Te " + (left == 1 ? "queda 1 intento." : "quedan " + left + " intentos."));
         }
+        // Verificación en 2 pasos: además de la contraseña, el código de 6 dígitos de la app de autenticación
+        if (u.totpEnabled) {
+            if (code == null || code.isBlank()) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.");
+            }
+            if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
+                u.failedAttempts++;
+                users.save(u);
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Usa el código actual de tu app.");
+            }
+        }
         u.failedAttempts = 0;
         u.lockedUntil = null;
         u.lastLoginAt = now;
         users.save(u);
         audit.record("USUARIO", u.id, "LOGIN", "Inicio de sesión");
         return new LoginResult(jwt.generate(u.username, u.role.name()), jwt.getExpirationMinutes(), profile(u));
+    }
+
+    // ------------------------------------------------------------------ verificación en 2 pasos
+
+    private User user(String username) {
+        return users.findByUsernameIgnoreCase(username).orElseThrow(() -> ApiException.notFound("El usuario"));
+    }
+
+    @Transactional
+    public Map<String, Object> setupTotp(String username) {
+        User u = user(username);
+        if (u.totpEnabled) throw ApiException.conflict("2FA_ACTIVA", "La verificación en 2 pasos ya está activa.");
+        u.totpSecret = Totp.newSecret();
+        users.save(u);
+        String label = java.net.URLEncoder.encode("Clínica Cárdenas:" + u.username, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("secret", u.totpSecret);
+        m.put("otpauthUrl", "otpauth://totp/" + label + "?secret=" + u.totpSecret + "&issuer=Cl%C3%ADnica%20C%C3%A1rdenas&digits=6&period=30");
+        return m;
+    }
+
+    @Transactional
+    public Map<String, Object> enableTotp(String username, String code) {
+        User u = user(username);
+        if (u.totpSecret == null) throw ApiException.badRequest("SIN_CONFIGURAR", "Primero genera el código QR.");
+        if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
+            throw ApiException.field("code", "El código no coincide. Revisa la hora de tu teléfono e inténtalo de nuevo.");
+        }
+        u.totpEnabled = true;
+        users.save(u);
+        audit.record("USUARIO", u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
+        return Map.of("enabled", true, "message", "Verificación en 2 pasos activada.");
+    }
+
+    @Transactional
+    public Map<String, Object> disableTotp(String username, String code) {
+        User u = user(username);
+        if (!u.totpEnabled) return Map.of("enabled", false);
+        if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
+            throw ApiException.field("code", "El código no es correcto.");
+        }
+        u.totpEnabled = false;
+        u.totpSecret = null;
+        users.save(u);
+        audit.record("USUARIO", u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
+        return Map.of("enabled", false, "message", "Verificación en 2 pasos desactivada.");
     }
 
     public Map<String, Object> profile(User u) {
@@ -107,6 +169,7 @@ public class AuthService {
         m.put("email", u.email);
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
+        m.put("twoFactor", u.totpEnabled);
         dentists.findByUserId(u.id).ifPresent(d -> m.put("dentistId", d.id));
         m.put("permissions", permissions.forRole(u.role.name()));
         return m;

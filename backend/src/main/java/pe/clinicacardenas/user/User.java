@@ -37,6 +37,13 @@ public class User {
     @Column(name = "last_login_at")
     public LocalDateTime lastLoginAt;
 
+    /** Verificación en 2 pasos (TOTP). */
+    @JsonIgnore
+    @Column(name = "totp_secret")
+    public String totpSecret;
+    @Column(name = "totp_enabled")
+    public boolean totpEnabled;
+
     @Column(name = "created_at")
     public LocalDateTime createdAt;
     @Column(name = "created_by")

@@ -34,11 +34,14 @@ public class ClinicalService {
     private final JdbcTemplate jdbc;
     private final UserRepository users;
     private final AuditService audit;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public ClinicalService(PatientRepository patients, ClinicalHistoryRepository histories, DiagnosisRepository diagnoses,
                            OdontogramEntryRepository odontogram, ProcedureRepository procedures,
                            TreatmentPlanRepository plans, TreatmentItemRepository items, EvolutionRepository evolutions,
-                           DentistRepository dentists, UserRepository users, AuditService audit, JdbcTemplate jdbc) {
+                           DentistRepository dentists, UserRepository users, AuditService audit, JdbcTemplate jdbc,
+                           org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.patients = patients;
         this.histories = histories;
         this.diagnoses = diagnoses;
@@ -92,6 +95,8 @@ public class ClinicalService {
         }
         i.status = status;
         if (nowDone && !wasDone) {
+            events.publishEvent(new TreatmentItemDone(i.id, i.procedure.id,
+                    i.procedure.name + (i.tooth == null ? "" : " · pieza " + i.tooth)));
             i.doneAt = Dates.now();
             Dentist d = currentDentist();
             i.doneByDentistId = d != null ? d.id : (p.dentist == null ? null : p.dentist.id);

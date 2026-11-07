@@ -77,7 +77,7 @@ public class PortalService {
     }
 
     public record CodeRequest(String docType, String docNumber, LocalDate birthDate) {}
-    public record ActivateRequest(String docType, String docNumber, String code, String password) {}
+    public record ActivateRequest(String docType, String docNumber, String code, String password, Boolean dataConsent) {}
     public record LoginRequest(String docType, String docNumber, String password) {}
     public record ChannelRequest(String channel) {}
 
@@ -162,6 +162,12 @@ public class PortalService {
         accounts.save(acc);
         pc.usedAt = now;
         codes.save(pc);
+        if (Boolean.TRUE.equals(r.dataConsent()) && !p.dataConsent) {
+            p.dataConsent = true;     // aceptó el tratamiento de datos personales (Ley N.° 29733) en la app
+            p.dataConsentAt = now;
+            patients.save(p);
+            audit.record("PACIENTE", p.id, "CONSENTIMIENTO_DATOS", "Aceptó el tratamiento de datos personales en la app");
+        }
         audit.record("PACIENTE", p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
         return session(p, acc);
     }
@@ -246,6 +252,11 @@ public class PortalService {
         m.put("status", a.status);
         m.put("dentist", Map.of("fullName", a.dentist.getFullName(), "specialty", a.dentist.specialty, "color", a.dentist.color));
         m.put("canConfirm", a.status == AppointmentStatus.PROGRAMADA && a.startAt.isAfter(now));
+        boolean changeable = (a.status == AppointmentStatus.PROGRAMADA || a.status == AppointmentStatus.CONFIRMADA)
+                && a.startAt.isAfter(now.plusHours(PortalExtrasService.MIN_HOURS_TO_CHANGE));
+        m.put("canReschedule", changeable);
+        m.put("canCancel", changeable);
+        m.put("dentistId", a.dentist.id);
         return m;
     }
 

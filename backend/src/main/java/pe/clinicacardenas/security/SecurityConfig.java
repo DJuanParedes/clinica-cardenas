@@ -47,6 +47,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/auth/login", "/api/auth/recover", "/api/auth/reset").permitAll()
                 .requestMatchers("/api/portal/auth/**").permitAll()
+                .requestMatchers("/api/public/**").permitAll()   // enlaces temporales firmados
                 .requestMatchers("/api/internal/**").permitAll()   // webhooks entre servicios: validan su propio token
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/portal/**").hasRole("PACIENTE")

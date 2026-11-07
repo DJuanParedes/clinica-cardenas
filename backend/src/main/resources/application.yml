@@ -7,6 +7,10 @@ server:
 spring:
   application:
     name: clinica-cardenas
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 13MB
   main:
     banner-mode: off
   datasource:
@@ -89,6 +93,14 @@ app:
     webhook-token: ${NOTIF_WEBHOOK_TOKEN:token-webhook-clinica-cardenas}
     panel-url: ${NOTIF_PANEL_URL:http://localhost:9083}
     clinic-phone: ${CLINICA_TELEFONO:987 654 000}
+
+  files:
+    # Fotos, radiografías y documentos de los pacientes (volumen de Docker en producción)
+    dir: ${FILES_DIR:./archivos}
+    max-mb: 10
+  payments:
+    # simulado: pasarela de prueba (Yape, Plin, tarjeta). Real: Culqi/Izipay con sus llaves en el .env
+    mode: ${PAGOS_MODO:simulado}
 
 logging:
   level:

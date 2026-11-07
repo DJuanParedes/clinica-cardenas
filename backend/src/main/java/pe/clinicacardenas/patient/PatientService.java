@@ -164,7 +164,7 @@ public class PatientService {
         Patient p = get(id);
         PatientValidator.Input merged = new PatientValidator.Input(p.docType, p.docNumber, in.firstName(), in.lastName(),
                 in.birthDate(), in.sex(), in.phone(), in.email(), in.address(), in.district(),
-                in.emergencyContactName(), in.emergencyContactPhone(), in.notes());
+                in.emergencyContactName(), in.emergencyContactPhone(), in.notes(), in.dataConsent());
         Map<String, String> errors = PatientValidator.validate(merged, Dates.today());
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
@@ -209,5 +209,9 @@ public class PatientService {
         p.emergencyContactPhone = blankToNull(in.emergencyContactPhone()) == null ? null
                 : PatientValidator.normalizePhone(in.emergencyContactPhone());
         p.notes = blankToNull(in.notes());
+        if (Boolean.TRUE.equals(in.dataConsent()) && !p.dataConsent) {
+            p.dataConsent = true;
+            p.dataConsentAt = pe.clinicacardenas.common.Dates.now();
+        }
     }
 }

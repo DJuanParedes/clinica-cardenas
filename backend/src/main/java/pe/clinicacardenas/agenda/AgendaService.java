@@ -39,11 +39,13 @@ public class AgendaService {
     private final PatientRepository patients;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public AgendaService(AppointmentRepository appointments, DentistRepository dentists,
                          DentistScheduleRepository schedules, PatientRepository patients, AuditService audit,
-                         NotificationService notifications) {
+                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events) {
         this.notifications = notifications;
+        this.events = events;
         this.appointments = appointments;
         this.dentists = dentists;
         this.schedules = schedules;
@@ -201,6 +203,7 @@ public class AgendaService {
         audit.record("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
                 + " el " + a.startAt.format(DMY_HM));
         notifications.appointmentCreated(a);   // HU-23: recordatorio programado
+        events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.CREATED));
         return a;
     }
 
@@ -222,6 +225,7 @@ public class AgendaService {
         validateAndFill(a, merged);
         a.status = AppointmentStatus.PROGRAMADA;
         a.statusReason = "Reprogramada: " + r.changeReason().trim();
+        a.rescheduleRequestedAt = null;
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
@@ -229,6 +233,7 @@ public class AgendaService {
                 + " · " + r.changeReason().trim());
         if (!previousStart.equals(a.startAt) || !previousDentist.equals(a.dentist.getFullName())) {
             notifications.appointmentRescheduled(a, previousStart, previousDentist);   // HU-24
+            events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.RESCHEDULED));
         }
         return a;
     }
@@ -260,6 +265,7 @@ public class AgendaService {
         if (a.status == AppointmentStatus.CANCELADA) {
             notifications.appointmentCancelled(a, r.reason());   // HU-24
         }
+        events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.STATUS));
         return a;
     }
 

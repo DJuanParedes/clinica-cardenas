@@ -96,6 +96,30 @@ public class NotificationService {
                 + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
     }
 
+    /** Por WhatsApp el paciente puede responder 1 o 2 (lo procesa el webhook del microservicio). */
+    private static String replyHint(String channel) {
+        return "WHATSAPP".equals(channel)
+                ? "Responde *1* para confirmar tu asistencia o *2* si necesitas reprogramar."
+                : "Si no puedes asistir, avísanos respondiendo este mensaje.";
+    }
+
+    /**
+     * Mensaje libre a un paciente por sus canales preferidos (recordatorios de control, lista de espera, cuotas).
+     * La clave evita enviar dos veces el mismo aviso.
+     */
+    @Transactional
+    public int message(Patient p, String type, String subject, String text, String key) {
+        int n = 0;
+        for (Target t : targets(p)) {
+            String k = key + ":" + t.channel();
+            if (repo.existsByIdempotencyKey(k)) continue;
+            add(p, null, type, "ENVIAR", t, subject, "Hola " + firstName(p) + ", " + text
+                    + ("WHATSAPP".equals(t.channel()) ? "\n\n" + clinicName : "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone), k, null);
+            n++;
+        }
+        return n;
+    }
+
     private void add(Patient p, Long appointmentId, String type, String operation, Target t, String subject, String body,
                      String key, LocalDateTime scheduledFor) {
         if (repo.existsByIdempotencyKey(key)) return; // ya encolado: no se duplica
@@ -135,7 +159,7 @@ public class NotificationService {
         for (Target t : targets(a.patient)) {
             add(a.patient, a.id, "RECORDATORIO", "PROGRAMAR", t, "Recordatorio de tu cita · " + clinicName,
                     body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
-                            "Si no puedes asistir, avísanos respondiendo este mensaje."),
+                            replyHint(t.channel())),
                     reminderKey(a, t.channel()), at);
         }
     }
@@ -211,7 +235,7 @@ public class NotificationService {
             if (repo.existsByIdempotencyKey(key)) { duplicated++; continue; }
             add(a.patient, a.id, "RECORDATORIO", "ENVIAR", t, "Recordatorio de tu cita · " + clinicName,
                     body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
-                            "Si no puedes asistir, avísanos respondiendo este mensaje."), key, null);
+                            replyHint(t.channel())), key, null);
             queued++;
         }
         audit.record("CITA", a.id, "RECORDATORIO", queued > 0 ? "Recordatorio enviado por " + ts.stream().map(Target::channel).toList()
@@ -250,7 +274,7 @@ public class NotificationService {
 
     public Map<String, Long> counters() {
         Map<String, Long> m = new LinkedHashMap<>();
-        for (String s : List.of("PENDIENTE", "PROGRAMADO", "ENVIADO", "FALLIDO", "DUPLICADO", "ANULADO")) m.put(s, repo.countByStatus(s));
+        for (String s : List.of("PENDIENTE", "PROGRAMADO", "ENVIADO", "ENTREGADO", "LEIDO", "FALLIDO", "DUPLICADO", "ANULADO")) m.put(s, repo.countByStatus(s));
         return m;
     }
 
