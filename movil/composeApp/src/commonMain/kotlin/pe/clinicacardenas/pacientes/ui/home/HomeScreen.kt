@@ -1,6 +1,15 @@
 package pe.clinicacardenas.pacientes.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import pe.clinicacardenas.pacientes.data.remote.PendingSurveyDto
+import pe.clinicacardenas.pacientes.ui.booking.BookingScreen
+import pe.clinicacardenas.pacientes.ui.booking.BookingTarget
+import pe.clinicacardenas.pacientes.ui.components.Field
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +57,22 @@ import pe.clinicacardenas.pacientes.ui.theme.Brand
 @Composable
 fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platform: PlatformActions = koinInject()) {
     val s by vm.state.collectAsState()
+    var booking by remember { mutableStateOf<BookingTarget?>(null) }
+    var cancelling by remember { mutableStateOf<AppointmentDto?>(null) }
+    booking?.let { t ->
+        BookingScreen(t) { changed ->
+            booking = null
+            if (changed) vm.load()
+        }
+        return
+    }
+    cancelling?.let { a ->
+        CancelDialog(a, onDismiss = { cancelling = null }) { reason ->
+            cancelling = null
+            vm.cancel(a.id, reason)
+        }
+    }
+    val change: (AppointmentDto) -> Unit = { a -> booking = BookingTarget(a.id, a.dentistId, a.durationMin, a.reason) }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -56,6 +81,8 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
         item { Greeting(patient, onRefresh = vm::load) }
         if (s.offline) item { Banner("Sin conexión: mostramos las citas guardadas en tu teléfono.", Brand.NaranjaSuave, Color(0xFF7A4600)) }
         s.message?.let { m -> item { Banner(m, Brand.VerdeSuave, Brand.Verde) } }
+        s.survey?.let { p -> item { SurveyCard(p, s.busy, vm::sendSurvey) } }
+        if (s.surveySent) item { Banner("¡Gracias por tu calificación! Nos ayuda a mejorar.", Brand.VerdeSuave, Brand.Verde) }
         when {
             s.loading -> item { Loading() }
             s.data == null -> item { ErrorState(s.error ?: "No se pudieron cargar tus citas.", vm::load) }
@@ -63,8 +90,11 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
                 val data = s.data!!
                 val next = data.next
                 item {
-                    if (next != null) NextCard(next, patient, s.confirming == next.id, vm::confirm, platform)
+                    if (next != null) NextCard(next, patient, s.confirming == next.id, vm::confirm, platform, change) { cancelling = it }
                     else EmptyNext(patient, platform)
+                }
+                item {
+                    PrimaryButton("＋ Reservar una cita", { booking = BookingTarget() }, color = Brand.Naranja)
                 }
                 if (s.reminders > 0) item {
                     Text(
@@ -76,7 +106,7 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
                 val others = data.upcoming.filter { it.id != next?.id }
                 if (others.isNotEmpty()) {
                     item { SectionTitle("Próximas citas") }
-                    items(others, key = { it.id }) { a -> AppointmentRow(a, s.confirming == a.id, vm::confirm) }
+                    items(others, key = { it.id }) { a -> AppointmentRow(a, s.confirming == a.id, vm::confirm, change) { cancelling = it } }
                 }
                 if (data.past.isNotEmpty()) {
                     item { SectionTitle("Historial") }
@@ -100,7 +130,15 @@ private fun Greeting(patient: PatientDto, onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun NextCard(a: AppointmentDto, patient: PatientDto, confirming: Boolean, onConfirm: (Long) -> Unit, platform: PlatformActions) {
+private fun NextCard(
+    a: AppointmentDto,
+    patient: PatientDto,
+    confirming: Boolean,
+    onConfirm: (Long) -> Unit,
+    platform: PlatformActions,
+    onChange: (AppointmentDto) -> Unit,
+    onCancel: (AppointmentDto) -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -137,6 +175,13 @@ private fun NextCard(a: AppointmentDto, patient: PatientDto, confirming: Boolean
                 platform.openUrl(whatsapp(patient.clinic.phone, msg))
             }
         }
+        if (a.canReschedule || a.canCancel) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (a.canReschedule) WhiteButton("🔁 Cambiar horario", Modifier.weight(1f)) { onChange(a) }
+                if (a.canCancel) WhiteButton("✕ Cancelar", Modifier.weight(1f)) { onCancel(a) }
+            }
+        }
     }
 }
 
@@ -154,7 +199,7 @@ private fun WhiteButton(text: String, modifier: Modifier, onClick: () -> Unit) {
 private fun EmptyNext(patient: PatientDto, platform: PlatformActions) {
     Panel {
         Text("No tienes citas programadas", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Brand.Tinta)
-        Text("Escríbenos o llámanos y te reservamos un horario.", color = Brand.Tinta2)
+        Text("Resérvala aquí abajo, o escríbenos o llámanos.", color = Brand.Tinta2)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton("💬 WhatsApp", { platform.openUrl(whatsapp(patient.clinic.phone, "Hola, soy ${patient.fullName} y quiero reservar una cita.")) }, Modifier.weight(1f))
@@ -164,7 +209,13 @@ private fun EmptyNext(patient: PatientDto, platform: PlatformActions) {
 }
 
 @Composable
-private fun AppointmentRow(a: AppointmentDto, confirming: Boolean, onConfirm: ((Long) -> Unit)?) {
+private fun AppointmentRow(
+    a: AppointmentDto,
+    confirming: Boolean,
+    onConfirm: ((Long) -> Unit)?,
+    onChange: ((AppointmentDto) -> Unit)? = null,
+    onCancel: ((AppointmentDto) -> Unit)? = null,
+) {
     Panel(padding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(
@@ -189,6 +240,57 @@ private fun AppointmentRow(a: AppointmentDto, confirming: Boolean, onConfirm: ((
         if (onConfirm != null && a.canConfirm) {
             Spacer(Modifier.height(10.dp))
             PrimaryButton("Confirmar asistencia", { onConfirm(a.id) }, loading = confirming)
+        }
+        if ((onChange != null && a.canReschedule) || (onCancel != null && a.canCancel)) {
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onChange != null && a.canReschedule) SecondaryButton("Cambiar horario", { onChange(a) }, Modifier.weight(1f))
+                if (onCancel != null && a.canCancel) SecondaryButton("Cancelar", { onCancel(a) }, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CancelDialog(a: AppointmentDto, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var reason by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("¿Cancelar tu cita?") },
+        text = {
+            Column {
+                Text("${a.reason} · ${Fmt.dayLabel(a.startAt)} ${Fmt.hour(a.startAt)} con ${a.dentist.fullName}.", color = Brand.Tinta2)
+                Spacer(Modifier.height(8.dp))
+                Field(reason, { reason = it.take(200) }, "Motivo (opcional)")
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(reason) }) { Text("Sí, cancelar", color = Brand.Rojo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("No") } },
+    )
+}
+
+/** Encuesta: ¿cómo te atendimos? (1 a 5 estrellas y comentario). */
+@Composable
+private fun SurveyCard(p: PendingSurveyDto, busy: Boolean, onSend: (Int, String) -> Unit) {
+    var score by remember(p.appointmentId) { mutableStateOf(0) }
+    var comment by remember(p.appointmentId) { mutableStateOf("") }
+    Panel {
+        Text("¿Cómo te atendimos?", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Brand.Tinta)
+        Text("${p.reason} con ${p.dentist} · ${Fmt.shortDate(p.startAt)}", color = Brand.Tinta2, fontSize = 13.sp)
+        Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            (1..5).forEach { n ->
+                Text(
+                    if (n <= score) "★" else "☆",
+                    fontSize = 34.sp,
+                    color = if (n <= score) Brand.Naranja else Brand.Gris,
+                    modifier = Modifier.clickable { score = n },
+                )
+            }
+        }
+        if (score > 0) {
+            Field(comment, { comment = it.take(500) }, if (score <= 3) "¿Qué podemos mejorar?" else "Comentario (opcional)")
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton("Enviar calificación", { onSend(score, comment) }, loading = busy)
         }
     }
 }

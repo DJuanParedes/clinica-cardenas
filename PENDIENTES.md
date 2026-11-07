@@ -13,3 +13,10 @@ Para activarlo:
 
 ## No ejecutar las pruebas automáticas en producción
 Las pruebas de `pruebas/` crean pacientes con números inventados. En producción podrían recibir mensajes reales.
+
+## Servicios que hoy están simulados (pasar a reales cuando la clínica los contrate)
+- **Facturación SUNAT real:** certificado digital, usuario secundario SOL y homologación (u OSE). Ver `docs/PAGOS_Y_SUNAT_REAL.md`.
+- **Pagos en línea reales:** contratar Niubiz, Izipay, Culqi o Mercado Pago (hoy `PAGOS_MODO=simulado`).
+- **Notificaciones push con la app cerrada:** Firebase Cloud Messaging (hoy la app revisa avisos cada minuto mientras está abierta).
+- **Google Play:** cuenta de desarrollador (25 USD), llave de firma y política de privacidad. Ver `movil/PLAY_STORE.md`.
+- **Webhook de WhatsApp:** cuando el servidor en la nube esté arriba, registrar `https://<dominio>/webhook/whatsapp` en Meta con el `WA_VERIFY_TOKEN`.

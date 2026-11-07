@@ -16,7 +16,12 @@ object Fmt {
     private val meses = listOf("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
     private val mesesCortos = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
-    fun parse(iso: String): LocalDateTime = LocalDateTime.parse(iso.take(19))
+    /** Acepta "2026-11-10", "2026-11-10T09:00" o con segundos; si no se entiende, devuelve una fecha neutra en vez de cerrar la app. */
+    fun parse(iso: String): LocalDateTime {
+        val t = iso.trim().take(19)
+        val full = if (t.length == 10) t + "T00:00" else t
+        return runCatching { LocalDateTime.parse(full) }.getOrElse { LocalDateTime(1970, 1, 1, 0, 0) }
+    }
 
     fun hour(iso: String): String {
         val d = parse(iso)
@@ -64,12 +69,15 @@ object Fmt {
         "CANCELADA" to "Cancelada",
         "NO_ASISTIO" to "No asistió",
         "REPROGRAMADA" to "Reprogramada",
+        "EN_ESPERA" to "En sala",
+        "EN_ATENCION" to "En atención",
     )
 
     fun statusColors(status: String): Pair<Color, Color> = when (status) {
         "CONFIRMADA", "ATENDIDA" -> Brand.VerdeSuave to Brand.Verde
         "PROGRAMADA" -> Brand.NaranjaSuave to Color(0xFF9A5B00)
         "CANCELADA", "NO_ASISTIO" -> Brand.RojoSuave to Brand.Rojo
+        "EN_ESPERA" -> Color(0xFFEDE7FF) to Color(0xFF5B3CC4)
         else -> Brand.CelesteSuave to Brand.AzulOscuro
     }
 

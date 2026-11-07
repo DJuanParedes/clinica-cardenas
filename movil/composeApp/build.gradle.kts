@@ -70,17 +70,31 @@ android {
         applicationId = "pe.clinicacardenas.pacientes"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    // Firma para Google Play: la llave NO se guarda en el repositorio; se pasa por variables de entorno
+    // (CLINICA_KEYSTORE, CLINICA_KEYSTORE_PASSWORD, CLINICA_KEY_ALIAS, CLINICA_KEY_PASSWORD). Ver movil/PLAY_STORE.md.
+    val keystore = System.getenv("CLINICA_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = keystore
+                storePassword = System.getenv("CLINICA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("CLINICA_KEY_ALIAS")
+                keyPassword = System.getenv("CLINICA_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

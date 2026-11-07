@@ -5,6 +5,7 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import pe.clinicacardenas.pacientes.data.local.LocalStore
+import pe.clinicacardenas.pacientes.data.remote.*
 import pe.clinicacardenas.pacientes.data.remote.AccountDto
 import pe.clinicacardenas.pacientes.data.remote.ActivateRequest
 import pe.clinicacardenas.pacientes.data.remote.ApiClient
@@ -49,8 +50,8 @@ class ClinicRepository(
     suspend fun requestCode(docType: String, docNumber: String, birthDate: String): CodeResponse =
         api.requestCode(CodeRequest(docType, docNumber.trim(), birthDate))
 
-    suspend fun activate(docType: String, docNumber: String, code: String, password: String) {
-        session.start(api.activate(ActivateRequest(docType, docNumber.trim(), code.trim(), password)))
+    suspend fun activate(docType: String, docNumber: String, code: String, password: String, dataConsent: Boolean) {
+        session.start(api.activate(ActivateRequest(docType, docNumber.trim(), code.trim(), password, dataConsent)))
     }
 
     /** Descarga las citas, las guarda para usarlas sin conexión y programa los recordatorios del teléfono. */
@@ -77,6 +78,47 @@ class ClinicRepository(
     }
 
     suspend fun account(): AccountDto = guarded { api.account() }
+
+    // ---------------------------------------------------------------- reservas, avisos, pagos y documentos
+    suspend fun bookingOptions(): BookingOptionsDto = guarded { api.bookingOptions() }
+
+    suspend fun bookingSlots(dentistId: Long, date: String, reasonCode: String, excludeId: Long?): PortalSlotsDto =
+        guarded { api.bookingSlots(dentistId, date, reasonCode, excludeId) }
+
+    suspend fun book(dentistId: Long, startAt: String, reasonCode: String, notes: String?): String =
+        guarded { api.book(BookRequest(dentistId, startAt, reasonCode, notes?.ifBlank { null })) }.message
+
+    suspend fun reschedule(id: Long, dentistId: Long?, startAt: String): String =
+        guarded { api.reschedule(id, RescheduleRequest(dentistId, startAt)) }.message
+
+    suspend fun cancel(id: Long, reason: String): String = guarded { api.cancel(id, CancelRequest(reason)) }.message
+
+    suspend fun notices(): NoticesDto = guarded { api.notices() }
+
+    suspend fun markNoticesRead() = api.markNoticesRead()
+
+    suspend fun pay(body: PayRequest): PayResultDto = guarded { api.pay(body) }
+
+    suspend fun documents(): DocumentsDto = guarded { api.documents() }
+
+    suspend fun fileUrl(id: Long): String = api.absolute(guarded { api.fileLink(id) }.url)
+
+    suspend fun invoiceUrl(id: Long): String = api.absolute(guarded { api.invoiceLink(id) }.url)
+
+    suspend fun pendingSurvey(): PendingSurveyDto? = guarded { api.pendingSurvey() }.pending
+
+    suspend fun sendSurvey(appointmentId: Long, score: Int, comment: String?): String =
+        guarded { api.sendSurvey(SurveyRequest(appointmentId, score, comment?.ifBlank { null })) }.message
+
+    /** Avisos nuevos desde la última revisión: se muestran como notificación del teléfono. */
+    suspend fun checkNewNotices(): Int {
+        val list = guarded { api.notices() }
+        val lastSeen = store.get(KEY_LAST_NOTICE)?.toLongOrNull() ?: 0L
+        val fresh = list.items.filter { it.readAt == null && it.id > lastSeen }
+        fresh.take(3).forEach { platform.notify((it.id % 100000).toInt() + 500000, it.title, it.body) }
+        list.items.maxOfOrNull { it.id }?.let { store.put(KEY_LAST_NOTICE, it.toString()) }
+        return list.unread.toInt()
+    }
 
     suspend fun updateChannel(channel: String) {
         session.updatePatient(guarded { api.updateChannel(channel) })
@@ -119,6 +161,8 @@ class ClinicRepository(
     }
 
     companion object {
+        private const val KEY_LAST_NOTICE = "avisos.ultimo"
+
         fun epochMillis(iso: String): Long =
             LocalDateTime.parse(iso.take(19)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
     }

@@ -2,6 +2,7 @@ package pe.clinicacardenas.pacientes.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -135,5 +136,51 @@ fun ErrorState(message: String, onRetry: () -> Unit) {
         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton("Reintentar", onRetry)
         }
+    }
+}
+
+/** Encabezado de pantalla con botón para volver. */
+@Composable
+fun BackHeader(title: String, onBack: () -> Unit, subtitle: String? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        androidx.compose.material3.TextButton(onClick = onBack) { Text("‹ Volver", color = Brand.Azul, fontWeight = FontWeight.SemiBold) }
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Brand.Tinta)
+            if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Brand.Tinta2)
+        }
+    }
+}
+
+/** Opción seleccionable en forma de píldora (motivos, métodos de pago, fechas). */
+@Composable
+fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Box(
+        modifier
+            .background(if (selected) Brand.Azul else Color.White, RoundedCornerShape(50))
+            .border(1.dp, if (selected) Brand.Azul else Brand.Linea, RoundedCornerShape(50))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = when {
+                !enabled -> Brand.Gris.copy(alpha = 0.5f)
+                selected -> Color.White
+                else -> Brand.Tinta2
+            },
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+
+/** Cifra grande con su etiqueta (resúmenes de caja y dirección). */
+@Composable
+fun Stat(value: String, label: String, modifier: Modifier = Modifier, color: Color = Brand.Tinta) {
+    Column(modifier.background(Color.White, RoundedCornerShape(16.dp)).border(1.dp, Brand.Linea, RoundedCornerShape(16.dp)).padding(14.dp)) {
+        Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(label, fontSize = 13.sp, color = Brand.Tinta2)
     }
 }

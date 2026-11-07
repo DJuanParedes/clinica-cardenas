@@ -62,14 +62,19 @@ fun LoginScreen(vm: LoginViewModel = koinViewModel()) {
             Text("Tus citas, recordatorios y pagos en un solo lugar", color = Brand.Tinta2, textAlign = TextAlign.Center)
             Spacer(Modifier.height(22.dp))
 
-            Tabs(s.mode, vm::mode)
-            Spacer(Modifier.height(12.dp))
+            WhoSwitch(s.staff, vm::setStaff)
+            Spacer(Modifier.height(10.dp))
+            if (!s.staff) {
+                Tabs(s.mode, vm::mode)
+                Spacer(Modifier.height(12.dp))
+            }
 
             Panel(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                when (s.mode) {
-                    LoginMode.INGRESAR -> LoginForm(s, vm)
-                    LoginMode.ACTIVAR -> ActivateForm(s, vm)
-                    LoginMode.SERVIDOR -> ServerForm(s, vm)
+                when {
+                    s.mode == LoginMode.SERVIDOR -> ServerForm(s, vm)
+                    s.staff -> StaffForm(s, vm)
+                    s.mode == LoginMode.INGRESAR -> LoginForm(s, vm)
+                    else -> ActivateForm(s, vm)
                 }
             }
 
@@ -87,6 +92,46 @@ fun LoginScreen(vm: LoginViewModel = koinViewModel()) {
             )
         }
     }
+}
+
+/** Paciente o personal de la clínica: misma app, dos formas de ingresar. */
+@Composable
+private fun WhoSwitch(staff: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(false to "Soy paciente", true to "Soy del personal").forEach { (v, label) ->
+            val on = v == staff
+            Box(
+                Modifier
+                    .background(if (on) Brand.Naranja else Color.White, RoundedCornerShape(50))
+                    .clickable { onSelect(v) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Text(label, color = if (on) Color.White else Brand.Tinta2, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StaffForm(s: LoginState, vm: LoginViewModel) {
+    Text("Ingreso del personal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Odontólogos, recepción, caja y dirección. Usa la misma cuenta de la web.", color = Brand.Tinta2, fontSize = 14.sp)
+    Spacer(Modifier.height(12.dp))
+    Field(s.username, { v -> vm.edit { copy(username = v.trim().lowercase()) } }, "Usuario", error = s.fieldErrors["username"])
+    Field(s.staffPassword, { vm.edit { copy(staffPassword = it) } }, "Contraseña", password = true, error = s.fieldErrors["staffPassword"])
+    if (s.needCode) {
+        Banner("Tu cuenta tiene verificación en 2 pasos. Escribe el código de tu app de autenticación.", Brand.CelesteSuave, Brand.AzulOscuro, Modifier.padding(vertical = 6.dp))
+        Field(
+            value = s.staffCode,
+            onChange = { v -> vm.edit { copy(staffCode = v.filter(Char::isDigit).take(6)) } },
+            label = "Código de 6 dígitos",
+            keyboard = KeyboardType.Number,
+            error = s.fieldErrors["staffCode"],
+        )
+    }
+    s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
+    Spacer(Modifier.height(8.dp))
+    PrimaryButton("Ingresar", vm::staffLogin, loading = s.loading)
 }
 
 @Composable
@@ -187,6 +232,18 @@ private fun ActivateForm(s: LoginState, vm: LoginViewModel) {
             password = true,
             error = s.fieldErrors["newPassword"] ?: s.fieldErrors["password"],
         )
+        Row(
+            Modifier.fillMaxWidth().clickable { vm.edit { copy(consent = !consent) } }.padding(vertical = 6.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            androidx.compose.material3.Checkbox(checked = s.consent, onCheckedChange = { vm.edit { copy(consent = it) } })
+            Text(
+                "Autorizo a la Clínica Dental Cárdenas a tratar mis datos personales y de salud para mi atención, recordatorios y pagos (Ley N.° 29733).",
+                color = if (s.fieldErrors["consent"] != null) Brand.Rojo else Brand.Tinta2,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
         s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
         Spacer(Modifier.height(8.dp))
         PrimaryButton("Activar y entrar", vm::activate, loading = s.loading)

@@ -9,9 +9,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pe.clinicacardenas.pacientes.data.remote.AccountDto
 import pe.clinicacardenas.pacientes.data.remote.ApiException
+import pe.clinicacardenas.pacientes.data.remote.PayRequest
+import pe.clinicacardenas.pacientes.data.remote.PayResultDto
 import pe.clinicacardenas.pacientes.data.repository.ClinicRepository
 
-data class AccountState(val loading: Boolean = true, val data: AccountDto? = null, val error: String? = null)
+data class AccountState(
+    val loading: Boolean = true,
+    val data: AccountDto? = null,
+    val error: String? = null,
+    val paying: Boolean = false,
+    val payError: String? = null,
+    val paid: PayResultDto? = null,
+)
 
 /** Estado de cuenta del paciente: cargos, pagos y saldo pendiente. */
 class AccountViewModel(private val repo: ClinicRepository) : ViewModel() {
@@ -33,4 +42,24 @@ class AccountViewModel(private val repo: ClinicRepository) : ViewModel() {
             }
         }
     }
+
+    /** Pago en línea simulado (Yape, Plin o tarjeta). Si se aprueba, la clínica emite la boleta SUNAT al instante. */
+    fun pay(body: PayRequest) {
+        _state.update { it.copy(paying = true, payError = null) }
+        viewModelScope.launch {
+            try {
+                val r = repo.pay(body)
+                _state.update { it.copy(paid = r) }
+                load()
+            } catch (e: ApiException) {
+                _state.update { it.copy(payError = e.fields.values.firstOrNull() ?: e.message) }
+            } finally {
+                _state.update { it.copy(paying = false) }
+            }
+        }
+    }
+
+    fun clearPay() = _state.update { it.copy(paid = null, payError = null) }
+
+    suspend fun invoiceUrl(id: Long): String? = runCatching { repo.invoiceUrl(id) }.getOrNull()
 }

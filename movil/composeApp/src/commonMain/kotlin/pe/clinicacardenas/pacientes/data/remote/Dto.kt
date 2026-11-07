@@ -33,7 +33,7 @@ data class CodeRequest(val docType: String, val docNumber: String, val birthDate
 data class CodeResponse(val message: String, val sentTo: String? = null, val demoCode: String? = null)
 
 @Serializable
-data class ActivateRequest(val docType: String, val docNumber: String, val code: String, val password: String)
+data class ActivateRequest(val docType: String, val docNumber: String, val code: String, val password: String, val dataConsent: Boolean = false)
 
 @Serializable
 data class ChannelRequest(val channel: String)
@@ -51,6 +51,9 @@ data class AppointmentDto(
     val status: String,
     val dentist: DentistDto,
     val canConfirm: Boolean = false,
+    val canReschedule: Boolean = false,
+    val canCancel: Boolean = false,
+    val dentistId: Long? = null,
 )
 
 @Serializable
@@ -90,3 +93,71 @@ data class ApiErrorDto(
     val message: String? = null,
     val fields: Map<String, String>? = null,
 )
+
+// ---------------------------------------------------------------- reservas desde la app
+
+@Serializable
+data class BookingDentistDto(val id: Long, val fullName: String, val specialty: String = "", val color: String = "#00A3D4")
+
+@Serializable
+data class ReasonDto(val code: String, val label: String, val durationMin: Int)
+
+@Serializable
+data class BookingOptionsDto(val dentists: List<BookingDentistDto> = emptyList(), val reasons: List<ReasonDto> = emptyList())
+
+@Serializable
+data class PortalSlotsDto(val date: String, val durationMin: Int = 30, val works: Boolean = true, val slots: List<String> = emptyList())
+
+@Serializable
+data class BookRequest(val dentistId: Long, val startAt: String, val reasonCode: String, val notes: String? = null)
+
+@Serializable
+data class RescheduleRequest(val dentistId: Long?, val startAt: String)
+
+@Serializable
+data class CancelRequest(val reason: String)
+
+@Serializable
+data class MessageDto(val message: String = "", val id: Long? = null)
+
+// ---------------------------------------------------------------- avisos, pagos, documentos y encuesta
+
+@Serializable
+data class NoticeDto(val id: Long, val kind: String, val title: String, val body: String, val createdAt: String, val readAt: String? = null)
+
+@Serializable
+data class NoticesDto(val unread: Long = 0, val items: List<NoticeDto> = emptyList())
+
+@Serializable
+data class PayRequest(
+    val amount: Double,
+    val method: String,
+    val approvalCode: String? = null,
+    val cardNumber: String? = null,
+    val cardExpiry: String? = null,
+    val cardCvv: String? = null,
+)
+
+@Serializable
+data class PayResultDto(val operationId: String = "", val amount: Double = 0.0, val invoiceId: Long? = null, val invoice: String? = null, val message: String = "")
+
+@Serializable
+data class InvoiceItemDto(val id: Long, val number: String, val type: String, val date: String, val total: Double, val status: String)
+
+@Serializable
+data class DocFileDto(val id: Long, val kind: String, val title: String, val date: String, val contentType: String)
+
+@Serializable
+data class DocumentsDto(val invoices: List<InvoiceItemDto> = emptyList(), val files: List<DocFileDto> = emptyList())
+
+@Serializable
+data class LinkDto(val url: String)
+
+@Serializable
+data class PendingSurveyDto(val appointmentId: Long, val startAt: String, val reason: String, val dentist: String)
+
+@Serializable
+data class SurveyPendingDto(val pending: PendingSurveyDto? = null)
+
+@Serializable
+data class SurveyRequest(val appointmentId: Long, val score: Int, val comment: String?)

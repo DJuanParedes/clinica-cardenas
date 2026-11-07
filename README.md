@@ -93,6 +93,20 @@ Además de todo el Sprint 1 (detallado más abajo):
 | **HU-24** Aviso de cambio | Al reprogramar o cancelar: aviso inmediato con el nuevo horario, se anula el recordatorio anterior y se programa uno nuevo |
 | **HU-26** Roles y permisos | Seguridad → Roles y permisos: matriz de 17 permisos por rol, aplicada en cada endpoint del servidor y en el menú; el cambio rige al instante |
 
+### Mejoras sobre las 27 historias
+
+| Área | Qué hace |
+|---|---|
+| **Fotos y documentos** | Ficha del paciente → *Fotos y documentos*: radiografías, fotos intraorales y PDF (hasta 10 MB), con pieza y nota; se pueden compartir con la app del paciente. Desde la app del personal se suben con la **cámara**, la galería o un archivo |
+| **Documentos con firma** | Consentimiento informado, receta y presupuesto firmados en pantalla (dedo o mouse); se genera el PDF y queda en la ficha |
+| **Inventario** | Materiales con stock mínimo, entradas, salidas y ajustes; cada procedimiento descuenta sus insumos al marcarse como realizado. Aviso de “por agotarse” en el inicio |
+| **Seguimiento** | Pacientes que pidieron reprogramar, **lista de espera** (al cancelarse una cita se avisa a los 3 primeros), **controles por vencer** (limpieza cada 6 meses, ortodoncia mensual; envío automático los lunes) y **satisfacción** por odontólogo |
+| **Pago en cuotas** | En el plan de tratamiento: de 2 a 24 cuotas con estado pagada / pendiente / vencida y recordatorio 3 días antes |
+| **WhatsApp bidireccional** | El recordatorio dice “responde 1 para confirmar o 2 para reprogramar”; la respuesta confirma la cita o la marca en la agenda y el paciente recibe una respuesta automática. Estados **entregado** y **leído** (webhook de Meta en `/webhook/whatsapp`) |
+| **Verificación en 2 pasos** | *Mi seguridad*: código QR para Google/Microsoft Authenticator; luego el ingreso pide el código de 6 dígitos (web y app) |
+| **Ley 29733** | Consentimiento de tratamiento de datos al registrar al paciente o al activar la app, con fecha |
+| **CI** | `.github/workflows/ci.yml`: pruebas del backend, compilación de la web, revisión de los microservicios y APK como artefacto (AAB firmado si se configura la llave) |
+
 ### Microservicio de notificaciones (SP-02)
 
 `notificaciones/` es un servicio aparte (puerto **9083**) que envía por WhatsApp y correo. Los proveedores son de
@@ -245,8 +259,12 @@ Para producción hace falta además un número propio verificado en Meta Busines
 
 ## App móvil (Android e iOS)
 
-La carpeta [`movil/`](movil/README.md) tiene la app de pacientes hecha con **Kotlin Multiplatform + Compose Multiplatform**. Desde la app el paciente ve sus citas, las confirma, recibe recordatorios en el teléfono, revisa su estado de cuenta y elige por dónde le llegan los avisos.
-Para generar el APK sin Android Studio, haz doble clic en `construir-apk.bat`; el APK queda en `apk\ClinicaCardenas.apk`. Los detalles están en [movil/README.md](movil/README.md).
+La carpeta [`movil/`](movil/README.md) tiene la app hecha con **Kotlin Multiplatform + Compose Multiplatform**. Es una sola app con dos ingresos:
+
+- **Soy paciente:** próximas citas, confirmar, **reservar** (motivo, odontólogo, día y horario libre), **cambiar horario o cancelar** hasta 12 h antes, **avisos** de la clínica con notificación en el teléfono, estado de cuenta y **pago en línea** (Yape, Plin o tarjeta, simulado) con boleta SUNAT automática, **documentos** (boletas, recetas, consentimientos, radiografías), **encuesta** después de cada cita y preferencias de avisos.
+- **Soy del personal:** según el rol — **odontólogo** (su agenda, ficha con alertas e historia, plan y evolución por sesión, fotos con la cámara), **recepción** (agenda de la clínica, marcar llegada, nueva cita, pacientes), **caja** (caja del día, cobros con boleta) y **dirección** (resumen del día). Desbloqueo con **huella**, cierre de sesión tras 15 min sin uso y verificación en 2 pasos.
+
+Para generar el APK sin Android Studio, haz doble clic en `construir-apk.bat`; el APK queda en `apk\ClinicaCardenas.apk`. Detalles en [movil/README.md](movil/README.md); publicación en Google Play en [movil/PLAY_STORE.md](movil/PLAY_STORE.md); SUNAT, pagos y push reales en [docs/PAGOS_Y_SUNAT_REAL.md](docs/PAGOS_Y_SUNAT_REAL.md).
 
 ## Estructura
 

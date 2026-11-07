@@ -9,3 +9,7 @@ frontend/.angular/
 *.log
 apk/
 node_modules/
+
+# Llaves de firma de Android (nunca al repositorio)
+*.jks
+*.keystore

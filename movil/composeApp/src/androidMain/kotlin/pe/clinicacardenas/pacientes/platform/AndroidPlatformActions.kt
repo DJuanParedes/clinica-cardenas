@@ -1,6 +1,7 @@
 package pe.clinicacardenas.pacientes.platform
 
 import android.app.AlarmManager
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,8 +14,10 @@ import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
 import pe.clinicacardenas.pacientes.MainActivity
 import pe.clinicacardenas.pacientes.R
+import java.io.File
 
 class AndroidPlatformActions(private val context: Context) : PlatformActions {
     override val name = "Android"
@@ -58,6 +61,43 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
         }
         prefs.edit().putStringSet("ids", reminders.map { it.id.toString() }.toSet()).apply()
         return reminders.size
+    }
+
+    override fun notify(id: Int, title: String, body: String) = notify(context, id, title, body)
+
+    override fun pickFile(source: PickSource, onResult: (PickedFile?) -> Unit) {
+        val activity = MainActivity.current
+        if (activity == null) {
+            onResult(null)
+            return
+        }
+        activity.pick(source, onResult)
+    }
+
+    override fun openFile(name: String, mimeType: String, bytes: ByteArray) {
+        val dir = File(context.cacheDir, "compartidos").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        val safe = name.replace(Regex("[^\\w.\\- áéíóúñÁÉÍÓÚÑ]"), "_").ifBlank { "archivo" }
+        val file = File(dir, safe)
+        file.writeBytes(bytes)
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".archivos", file)
+        start(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
+
+    override val canUseBiometrics: Boolean
+        get() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+            val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            return keyguard.isDeviceSecure
+        }
+
+    override fun authenticate(reason: String, onResult: (Boolean) -> Unit) {
+        val activity = MainActivity.current
+        if (activity == null || !canUseBiometrics) {
+            onResult(false)
+            return
+        }
+        activity.authenticate(reason, onResult)
     }
 
     private fun pending(id: Int, title: String, body: String): PendingIntent =

@@ -5,6 +5,11 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.Foundation.NSDateComponents
 import platform.Foundation.NSURL
+import platform.LocalAuthentication.LAContext
+import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthentication
+import platform.UserNotifications.UNTimeIntervalNotificationTrigger
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import platform.UIKit.UIApplication
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionBadge
@@ -75,5 +80,33 @@ class IosPlatformActions : PlatformActions {
             }
         }
         return reminders.size
+    }
+
+    override fun notify(id: Int, title: String, body: String) {
+        val content = UNMutableNotificationContent().apply {
+            setTitle(title)
+            setBody(body)
+            setSound(UNNotificationSound.defaultSound)
+        }
+        val request = UNNotificationRequest.requestWithIdentifier(
+            "aviso-$id",
+            content,
+            UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(1.0, repeats = false),
+        )
+        center.addNotificationRequest(request, null)
+    }
+
+    /** En iOS la subida de archivos se hace desde la web por ahora. */
+    override fun pickFile(source: PickSource, onResult: (PickedFile?) -> Unit) = onResult(null)
+
+    override fun openFile(name: String, mimeType: String, bytes: ByteArray) = Unit
+
+    override val canUseBiometrics: Boolean
+        get() = LAContext().canEvaluatePolicy(LAPolicyDeviceOwnerAuthentication, null)
+
+    override fun authenticate(reason: String, onResult: (Boolean) -> Unit) {
+        LAContext().evaluatePolicy(LAPolicyDeviceOwnerAuthentication, reason) { ok, _ ->
+            dispatch_async(dispatch_get_main_queue()) { onResult(ok) }
+        }
     }
 }

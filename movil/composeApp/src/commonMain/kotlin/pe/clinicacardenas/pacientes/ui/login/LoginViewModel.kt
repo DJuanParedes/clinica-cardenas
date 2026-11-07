@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import pe.clinicacardenas.pacientes.data.remote.ApiException
 import pe.clinicacardenas.pacientes.data.repository.ClinicRepository
 import pe.clinicacardenas.pacientes.data.repository.SessionRepository
+import pe.clinicacardenas.pacientes.data.repository.StaffRepository
 
 enum class LoginMode { INGRESAR, ACTIVAR, SERVIDOR }
 
@@ -26,13 +27,23 @@ data class LoginState(
     val server: String = "",
     val serverInfo: String? = null,
     val serverOk: Boolean? = null,
+    val staff: Boolean = false,
+    val username: String = "",
+    val staffPassword: String = "",
+    val staffCode: String = "",
+    val needCode: Boolean = false,
+    val consent: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
 )
 
 /** HU del portal: ingreso con documento y contraseña, y activación de cuenta con código. */
-class LoginViewModel(private val repo: ClinicRepository, private val session: SessionRepository) : ViewModel() {
+class LoginViewModel(
+    private val repo: ClinicRepository,
+    private val session: SessionRepository,
+    private val staffRepo: StaffRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState(server = session.serverUrl))
     val state: StateFlow<LoginState> = _state.asStateFlow()
@@ -78,9 +89,37 @@ class LoginViewModel(private val repo: ClinicRepository, private val session: Se
             if (s.code.trim().length != 6) put("code", "El código tiene 6 dígitos.")
             if (s.newPassword.length < 8 || !s.newPassword.any { it.isDigit() } || !s.newPassword.any { it.isLetter() })
                 put("newPassword", "Mínimo 8 caracteres, con letras y números.")
+            if (!s.consent) put("consent", "Para usar la app necesitamos tu autorización.")
         }
         if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
-        run { repo.activate(s.docType, s.docNumber, s.code, s.newPassword) }
+        run { repo.activate(s.docType, s.docNumber, s.code, s.newPassword, s.consent) }
+    }
+
+    fun setStaff(on: Boolean) = _state.update { it.copy(staff = on, error = null, fieldErrors = emptyMap(), mode = if (on) LoginMode.INGRESAR else it.mode) }
+
+    /** Ingreso del personal: usuario y contraseña, y el código de 6 dígitos si activó la verificación en 2 pasos. */
+    fun staffLogin() {
+        val s = _state.value
+        val errors = buildMap {
+            if (s.username.isBlank()) put("username", "Ingresa tu usuario.")
+            if (s.staffPassword.isBlank()) put("staffPassword", "Ingresa tu contraseña.")
+            if (s.needCode && s.staffCode.trim().length != 6) put("staffCode", "El código tiene 6 dígitos.")
+        }
+        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
+        _state.update { it.copy(loading = true, error = null, fieldErrors = emptyMap()) }
+        viewModelScope.launch {
+            try {
+                staffRepo.login(s.username, s.staffPassword, if (s.needCode) s.staffCode else null)
+            } catch (e: ApiException) {
+                when (e.code) {
+                    "REQUIERE_2FA" -> _state.update { it.copy(needCode = true, error = null) }
+                    "CODIGO_2FA_INVALIDO" -> _state.update { it.copy(staffCode = "", error = e.message) }
+                    else -> _state.update { it.copy(error = e.message, staffPassword = "", needCode = false, staffCode = "") }
+                }
+            } finally {
+                _state.update { it.copy(loading = false) }
+            }
+        }
     }
 
     /** Prueba la dirección del servidor antes de guardarla. */

@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Abrir WhatsApp, el marcador y el calendario desde la app (Android 11+) -->
     <queries>
@@ -13,6 +14,13 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/pdf" />
         </intent>
         <intent>
             <action android:name="android.intent.action.INSERT" />
@@ -42,5 +50,14 @@
         </activity>
 
         <receiver android:name=".platform.ReminderReceiver" android:exported="false" />
+
+        <!-- Fotos de la cámara y archivos que se abren con otra app (PDF de recetas, radiografías) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
