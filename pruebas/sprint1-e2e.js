@@ -6,7 +6,7 @@
  * (el segundo parámetro es la API simulada de SUNAT; por defecto el mismo host en el puerto 8082)
  * También se puede pegar en la consola del navegador estando en http://localhost:8081
  */
-async function sprint1E2E(BASE, SUNAT = BASE.replace(/:\d+$/, ':8082')) {
+async function sprint1E2E(BASE, SUNAT = BASE.replace(/:(\d+)$/, (m, p) => ':' + (Number(p) + 1))) {
   const PWD = 'Clinica2026';
   const results = [];
   const uid = Date.now().toString().slice(-6);

@@ -33,7 +33,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             <button class="btn sm" type="button" (click)="shift(1)" aria-label="Día siguiente"><app-icon name="chevronRight" [size]="16" /></button>
             <input class="input datein" type="date" [ngModel]="date" (ngModelChange)="setDate($event)" aria-label="Elegir fecha" />
           </div>
-          @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+          @if (auth.can('CITAS_GESTIONAR')) {
             <a class="btn primary" routerLink="/citas/nueva" [queryParams]="{ fecha: date }"><app-icon name="plus" [size]="16" /> Nueva cita</a>
           }
         </div>
@@ -84,7 +84,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
                     <span class="t tabular">{{ hhmm(a.startAt) }}–{{ hhmm(a.endAt) }}</span>
                     <span class="n">{{ a.patient.fullName }}</span>
                     <span class="r">{{ a.reason }}</span>
-                    <span class="st">{{ label(a.status) }}</span>
+                    <span class="st">{{ label(a.status) }}@if ($any(a).rescheduleRequestedAt) { · pide reprogramar }</span>
                   </button>
                 }
               </div>
@@ -104,6 +104,9 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
           </div>
           @if (sel.notes) { <p class="small">{{ sel.notes }}</p> }
           @if (sel.statusReason) { <p class="small muted">{{ sel.statusReason }}</p> }
+          @if ($any(sel).rescheduleRequestedAt) {
+            <div class="notice amber"><span>El paciente pidió otro horario (respondió "2" por WhatsApp). Usa <strong>Reprogramar</strong> después de coordinar con él.</span></div>
+          }
           <dl class="kv">
             <dt>Documento</dt><dd>{{ sel.patient.docType }} {{ sel.patient.docNumber }}</dd>
             <dt>Teléfono</dt><dd>{{ sel.patient.phone }}</dd>
@@ -133,6 +136,13 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             }
           }
 
+          @if (auth.can('CITAS_GESTIONAR') && (sel.status === 'PROGRAMADA' || sel.status === 'CONFIRMADA')) {
+            <div class="remind">
+              <button type="button" class="btn sm" (click)="remind()" [disabled]="reminding"><app-icon name="bell" [size]="14" /> Enviar recordatorio ahora</button>
+              <span class="muted small">El recordatorio automático sale 24 h antes por {{ channelLabel(sel.patient.notifyChannel) }}.</span>
+            </div>
+          }
+
           <div class="row"><a class="small" [routerLink]="['/pacientes', sel.patient.id]">Abrir ficha del paciente</a></div>
 
           @if (history.length) {
@@ -147,6 +157,8 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
   `,
   styles: [`
     .wide { max-width: none; }
+    .remind { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; }
+    .remind .btn { align-self: flex-start; }
     .nav { gap: 6px; }
     .datein { width: 160px; height: 30px; font-size: 13px; }
     .counts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
@@ -299,10 +311,10 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
     this.nowY = ((m - this.startMin) / MIN_PER_SLOT) * SLOT_PX + 6;
   }
 
-  get canChange() { return this.auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO'); }
+  get canChange() { return this.auth.can('CITAS_ESTADO'); }
 
   canReschedule(a: Appointment) {
-    return this.auth.hasRole('ADMIN', 'RECEPCION') && ['PROGRAMADA', 'CONFIRMADA', 'EN_ESPERA'].includes(a.status);
+    return this.auth.can('CITAS_GESTIONAR') && ['PROGRAMADA', 'CONFIRMADA', 'EN_ESPERA'].includes(a.status);
   }
 
   nextStates(s: string): string[] {
@@ -354,6 +366,20 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
       error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
     });
   }
+
+  reminding = false;
+
+  /** HU-23: recordatorio manual. Si ya se envió para esta cita y hora, el sistema no lo duplica. */
+  remind() {
+    if (!this.sel) return;
+    this.reminding = true;
+    this.api.remind(this.sel.id).subscribe({
+      next: (r) => { this.reminding = false; if (r.queued > 0) this.toast.ok(r.message); else this.toast.warn(r.message); },
+      error: (e) => { this.reminding = false; this.toast.error(apiError(e).message); },
+    });
+  }
+
+  channelLabel(c?: string) { return ({ WHATSAPP: 'WhatsApp', EMAIL: 'correo', AMBOS: 'WhatsApp y correo', NINGUNO: 'ningún canal (el paciente no recibe avisos)' } as Record<string, string>)[c || 'WHATSAPP']; }
 
   label(s: string) { return STATUS_LABEL[s] || s; }
   tone(s: string) { return STATUS_TONE[s] || 'grey'; }

@@ -3,6 +3,8 @@ export type Role = 'ADMIN' | 'RECEPCION' | 'ODONTOLOGO' | 'CAJA' | 'DIRECTOR';
 export interface SessionUser {
   id: number; username: string; fullName: string; email: string;
   role: Role; roleLabel: string; dentistId?: number;
+  /** HU-26: permisos del rol, configurables por el administrador. */
+  permissions: string[];
 }
 
 export interface ApiError {
@@ -12,7 +14,7 @@ export interface ApiError {
 export interface Patient {
   id: number; docType: string; docNumber: string; firstName: string; lastName: string; fullName: string;
   birthDate: string; age: number; sex: 'F' | 'M'; phone: string; email?: string; address?: string; district?: string;
-  emergencyContactName?: string; emergencyContactPhone?: string; notes?: string; active: boolean;
+  emergencyContactName?: string; emergencyContactPhone?: string; notes?: string; active: boolean; notifyChannel?: string;
   createdAt: string; createdBy: string; updatedAt?: string; updatedBy?: string;
 }
 

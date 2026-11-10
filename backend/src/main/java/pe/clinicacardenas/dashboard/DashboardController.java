@@ -1,5 +1,6 @@
 package pe.clinicacardenas.dashboard;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,15 +29,17 @@ public class DashboardController {
     private final TreatmentItemRepository items;
     private final DentistRepository dentists;
     private final UserRepository users;
+    private final JdbcTemplate jdbc;
 
     public DashboardController(AppointmentRepository appointments, PatientRepository patients, InvoiceRepository invoices,
-                               TreatmentItemRepository items, DentistRepository dentists, UserRepository users) {
+                               TreatmentItemRepository items, DentistRepository dentists, UserRepository users, JdbcTemplate jdbc) {
         this.appointments = appointments;
         this.patients = patients;
         this.invoices = invoices;
         this.items = items;
         this.dentists = dentists;
         this.users = users;
+        this.jdbc = jdbc;
     }
 
     @GetMapping("/api/dashboard")
@@ -71,6 +74,25 @@ public class DashboardController {
         m.put("billedMonth", invoices.sumTotal(today.withDayOfMonth(1), today));
         m.put("pendingSunat", invoices.countByStatus("GENERADO") + invoices.countByStatus("ERROR"));
         m.put("pendingTreatments", items.countByStatus("PENDIENTE") + items.countByStatus("EN_PROCESO"));
+        // Caja (HU-13 / HU-14)
+        m.put("collectedToday", jdbc.queryForObject("select coalesce(sum(amount), 0) from payments where status = 'VALIDO' and paid_at >= ?",
+                java.math.BigDecimal.class, today.atStartOfDay()));
+        m.put("collectedMonth", jdbc.queryForObject("select coalesce(sum(amount), 0) from payments where status = 'VALIDO' and paid_at >= ?",
+                java.math.BigDecimal.class, today.withDayOfMonth(1).atStartOfDay()));
+        m.put("receivable", jdbc.queryForObject("""
+                select greatest(coalesce((select sum(price) from treatment_items where status = 'REALIZADO'), 0)
+                              - coalesce((select sum(amount) from payments where status = 'VALIDO'), 0), 0)
+                """, java.math.BigDecimal.class));
+        // Mejoras: inventario bajo, satisfacción, pedidos de reprogramación y lista de espera
+        m.put("lowStock", jdbc.queryForObject("select count(*) from inventory_items where active = true and stock <= min_stock", Long.class));
+        m.put("satisfaction", jdbc.queryForObject("select coalesce(round(avg(score), 2), 0) from surveys where created_at >= ?",
+                java.math.BigDecimal.class, today.minusDays(90).atStartOfDay()));
+        m.put("surveysCount", jdbc.queryForObject("select count(*) from surveys where created_at >= ?", Long.class, today.minusDays(90).atStartOfDay()));
+        m.put("rescheduleRequests", jdbc.queryForObject("""
+                select count(*) from appointments where reschedule_requested_at is not null
+                   and status in ('PROGRAMADA', 'CONFIRMADA') and start_at > now()
+                """, Long.class));
+        m.put("waitlist", jdbc.queryForObject("select count(*) from waitlist where status in ('ACTIVA', 'AVISADA')", Long.class));
         return m;
     }
 }

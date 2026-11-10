@@ -1,0 +1,37 @@
+# Ajustes para el servidor en la nube (Oracle Cloud). Se usa junto con el docker-compose.yml principal:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.nube.yml up -d --build
+# - Solo la web queda pública, por HTTPS (Caddy obtiene el certificado de Let's Encrypt solo).
+# - La base de datos y los paneles de SUNAT y notificaciones no se publican a internet.
+services:
+  db:
+    ports: !reset []
+  sunat-sim:
+    ports: !override
+      - "127.0.0.1:9082:8090"
+  notificaciones:
+    ports: !override
+      - "127.0.0.1:9083:8093"
+  backend:
+    environment:
+      NOTIF_PANEL_URL: ""
+  frontend:
+    ports: !reset []
+    volumes: !reset []
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on: [frontend]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?falta DOMINIO en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    mem_limit: 128m
+
+volumes:
+  caddy-data:
+  caddy-config:

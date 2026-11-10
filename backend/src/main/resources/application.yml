@@ -7,6 +7,10 @@ server:
 spring:
   application:
     name: clinica-cardenas
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 13MB
   main:
     banner-mode: off
   datasource:
@@ -54,6 +58,8 @@ app:
   # true: el código de recuperación de contraseña también se devuelve en la respuesta (solo demo)
   demo-mode: ${APP_DEMO_MODE:true}
   seed-demo-data: ${APP_SEED_DEMO:true}
+  # contraseña inicial de los usuarios del personal (en la nube se genera una aleatoria)
+  seed-password: ${APP_SEED_PASSWORD:Clinica2026}
   jwt:
     secret: ${JWT_SECRET:cambia-este-secreto-en-produccion-clinica-cardenas-2026}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
@@ -80,8 +86,24 @@ app:
     certificado-clave: ${SUNAT_CERTIFICADO_CLAVE:clinica-demo}
     igv-rate: 0.18
     boleta-max-sin-documento: 700.00
+  notifications:
+    # Microservicio de notificaciones (WhatsApp y correo). En docker-compose: servicio "notificaciones".
+    url: ${NOTIF_URL:http://localhost:9083}
+    enabled: ${NOTIF_ENABLED:true}
+    webhook-token: ${NOTIF_WEBHOOK_TOKEN:token-webhook-clinica-cardenas}
+    panel-url: ${NOTIF_PANEL_URL:http://localhost:9083}
+    clinic-phone: ${CLINICA_TELEFONO:987 654 000}
+
+  files:
+    # Fotos, radiografías y documentos de los pacientes (volumen de Docker en producción)
+    dir: ${FILES_DIR:./archivos}
+    max-mb: 10
+  payments:
+    # simulado: pasarela de prueba (Yape, Plin, tarjeta). Real: Culqi/Izipay con sus llaves en el .env
+    mode: ${PAGOS_MODO:simulado}
 
 logging:
   level:
     root: INFO
     org.hibernate.SQL: WARN
+    pe.clinicacardenas.notification: INFO

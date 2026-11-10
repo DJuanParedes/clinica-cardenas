@@ -1,6 +1,7 @@
 package pe.clinicacardenas.clinical;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.clinicacardenas.agenda.Dentist;
@@ -30,13 +31,17 @@ public class ClinicalService {
     private final TreatmentItemRepository items;
     private final EvolutionRepository evolutions;
     private final DentistRepository dentists;
+    private final JdbcTemplate jdbc;
     private final UserRepository users;
     private final AuditService audit;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public ClinicalService(PatientRepository patients, ClinicalHistoryRepository histories, DiagnosisRepository diagnoses,
                            OdontogramEntryRepository odontogram, ProcedureRepository procedures,
                            TreatmentPlanRepository plans, TreatmentItemRepository items, EvolutionRepository evolutions,
-                           DentistRepository dentists, UserRepository users, AuditService audit) {
+                           DentistRepository dentists, UserRepository users, AuditService audit, JdbcTemplate jdbc,
+                           org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.patients = patients;
         this.histories = histories;
         this.diagnoses = diagnoses;
@@ -48,6 +53,7 @@ public class ClinicalService {
         this.dentists = dentists;
         this.users = users;
         this.audit = audit;
+        this.jdbc = jdbc;
     }
 
     // ------------------------------------------------------------------ DTOs de entrada
@@ -68,6 +74,36 @@ public class ClinicalService {
     private Dentist currentDentist() {
         return users.findByUsernameIgnoreCase(CurrentUser.usernameOrSystem())
                 .flatMap(u -> dentists.findByUserId(u.id)).orElse(null);
+    }
+
+    /**
+     * Cambia el estado de un procedimiento registrando quién y cuándo lo realizó. Un procedimiento ya cobrado
+     * o liquidado en comisiones no puede volver a pendiente: se perdería la trazabilidad de caja.
+     */
+    private void applyItemStatus(TreatmentItem i, String status, TreatmentPlan p) {
+        boolean wasDone = "REALIZADO".equals(i.status);
+        boolean nowDone = "REALIZADO".equals(status);
+        if (wasDone && !nowDone) {
+            Long paid = jdbc.queryForObject("select count(*) from payments where treatment_item_id = ? and status = 'VALIDO'", Long.class, i.id);
+            Long settled = jdbc.queryForObject("select count(*) from commission_lines where treatment_item_id = ?", Long.class, i.id);
+            if (paid != null && paid > 0) {
+                throw ApiException.conflict("ITEM_COBRADO", "\"" + i.procedure.name + "\" ya tiene pagos registrados; no puede volver a pendiente.");
+            }
+            if (settled != null && settled > 0) {
+                throw ApiException.conflict("ITEM_LIQUIDADO", "\"" + i.procedure.name + "\" ya está incluido en una liquidación de comisiones.");
+            }
+        }
+        i.status = status;
+        if (nowDone && !wasDone) {
+            events.publishEvent(new TreatmentItemDone(i.id, i.procedure.id,
+                    i.procedure.name + (i.tooth == null ? "" : " · pieza " + i.tooth)));
+            i.doneAt = Dates.now();
+            Dentist d = currentDentist();
+            i.doneByDentistId = d != null ? d.id : (p.dentist == null ? null : p.dentist.id);
+        } else if (!nowDone) {
+            i.doneAt = null;
+            i.doneByDentistId = null;
+        }
     }
 
     private static String clean(String s) {
@@ -298,8 +334,7 @@ public class ClinicalService {
         }
         TreatmentPlan p = plan(i.planId);
         if ("ANULADO".equals(p.status)) throw ApiException.badRequest("PLAN_CERRADO", "El plan está anulado.");
-        i.status = status;
-        i.doneAt = "REALIZADO".equals(status) ? Dates.now() : null;
+        applyItemStatus(i, status, p);
         items.save(i);
         refreshPlanStatus(p);
         audit.record("HISTORIA", p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
@@ -337,8 +372,8 @@ public class ClinicalService {
         e.createdBy = CurrentUser.usernameOrSystem();
         evolutions.save(e);
         if (item != null) {
-            item.status = Boolean.TRUE.equals(r.markDone()) ? "REALIZADO" : ("PENDIENTE".equals(item.status) ? "EN_PROCESO" : item.status);
-            item.doneAt = "REALIZADO".equals(item.status) ? Dates.now() : null;
+            String next = Boolean.TRUE.equals(r.markDone()) ? "REALIZADO" : ("PENDIENTE".equals(item.status) ? "EN_PROCESO" : item.status);
+            applyItemStatus(item, next, p);
             items.save(item);
         }
         refreshPlanStatus(p);

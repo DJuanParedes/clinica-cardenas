@@ -73,6 +73,14 @@ import { LogoComponent } from '../shared/logo.component';
             @if (touched && !password) { <span class="err">Ingresa tu contraseña.</span> }
           </div>
 
+          @if (needCode) {
+            <div class="field">
+              <label for="c">Código de verificación</label>
+              <input id="c" name="code" class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6"
+                     autocomplete="one-time-code" placeholder="000000" />
+              <span class="muted small">Abre tu app de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de 6 dígitos.</span>
+            </div>
+          }
           <button class="btn primary lg block" type="submit" [disabled]="loading">
             @if (loading) { <span class="spin"></span> Verificando… } @else { Ingresar }
           </button>
@@ -86,6 +94,7 @@ import { LogoComponent } from '../shared/logo.component';
               }
             </div>
           </details>
+          <a class="patient-app" routerLink="/app/ingresar"><app-icon name="smartphone" [size]="18" /> <span><strong>¿Eres paciente?</strong> Revisa tus citas en la app</span></a>
         </form>
       </section>
     </div>
@@ -111,6 +120,7 @@ import { LogoComponent } from '../shared/logo.component';
     .card h2 { font-size: var(--step-3); }
     .mobile-brand { display: none; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 900; font-size: 20px; }
     .pw { position: relative; }
+    .code { font-size: 22px; letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
     .pw .input { padding-right: 44px; }
     .eye { position: absolute; right: 4px; top: 4px; height: 32px; width: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
     .eye:hover { color: var(--ink); background: var(--surface-2); }
@@ -119,6 +129,8 @@ import { LogoComponent } from '../shared/logo.component';
     .demo p { margin: 8px 0; }
     .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .acc { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+    .patient-app { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--orange-soft); color: var(--orange-ink); font-size: 13.5px; }
+    .patient-app:hover { text-decoration: none; filter: brightness(.98); }
     .acc:hover { border-color: var(--brand); background: var(--brand-soft); }
     @media (max-width: 900px) {
       .wrap { grid-template-columns: 1fr; }
@@ -138,6 +150,8 @@ export class LoginComponent {
   touched = false;
   error = '';
   locked = false;
+  needCode = false;
+  code = '';
 
   demo = [
     { u: 'admin', r: 'Administrador' }, { u: 'recepcion', r: 'Recepcionista' },
@@ -155,14 +169,18 @@ export class LoginComponent {
     this.error = '';
     if (!this.username || !this.password) return;
     this.loading = true;
-    this.auth.login(this.username.trim(), this.password).subscribe({
+    this.auth.login(this.username.trim(), this.password, this.needCode ? this.code.trim() : undefined).subscribe({
       next: () => this.router.navigateByUrl(this.auth.home()),
       error: (e) => {
         const err = apiError(e);
         this.loading = false;
         this.locked = err.code === 'CUENTA_BLOQUEADA';
+        if (err.code === 'REQUIERE_2FA') { this.needCode = true; this.error = ''; return; }
+        if (err.code === 'CODIGO_2FA_INVALIDO') { this.code = ''; this.error = err.message; return; }
         this.error = err.status === 0 ? 'No hay conexión con el servidor.' : err.message;
         this.password = '';
+        this.needCode = false;
+        this.code = '';
       },
     });
   }

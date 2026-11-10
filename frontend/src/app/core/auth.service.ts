@@ -28,8 +28,8 @@ export class AuthService {
     return read<string>(TOKEN_KEY);
   }
 
-  login(username: string, password: string): Observable<any> {
-    return this.http.post<any>('/api/auth/login', { username, password }).pipe(
+  login(username: string, password: string, code?: string): Observable<any> {
+    return this.http.post<any>('/api/auth/login', { username, password, code: code || null }).pipe(
       tap((res) => {
         sessionStorage.setItem(TOKEN_KEY, JSON.stringify(res.token));
         sessionStorage.setItem(USER_KEY, JSON.stringify(res.user));
@@ -58,6 +58,24 @@ export class AuthService {
       sessionStorage.removeItem(USER_KEY);
     } catch { /* almacenamiento no disponible */ }
     this.user.set(null);
+  }
+
+  /** HU-26: ¿el rol del usuario tiene alguno de estos permisos? */
+  can(...perms: string[]): boolean {
+    const u = this.user();
+    return !!u && !!u.permissions && perms.some((p) => u.permissions.includes(p));
+  }
+
+  /** Vuelve a leer el perfil: aplica al instante cambios de permisos hechos por el administrador. */
+  refresh() {
+    if (!this.token) return;
+    this.http.get<SessionUser>('/api/auth/me').subscribe({
+      next: (u) => {
+        try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } catch { /* sin almacenamiento */ }
+        this.user.set(u);
+      },
+      error: () => {},
+    });
   }
 
   hasRole(...roles: Role[]): boolean {

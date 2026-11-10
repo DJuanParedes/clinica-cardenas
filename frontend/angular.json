@@ -13,6 +13,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
+            "allowedCommonJsDependencies": ["qrcode-generator"],
             "outputPath": "dist/clinica",
             "index": "src/index.html",
             "browser": "src/main.ts",

@@ -1,6 +1,7 @@
-# Clínica Dental Cárdenas · Sprint 1
-# Uso:  docker compose up -d --build      →  http://localhost:8081
-name: clinica-cardenas
+# Clínica Dental Cárdenas · versión completa (todas las historias de usuario)
+# Uso:  docker compose up -d --build      →  http://localhost:9081
+# Usa otros puertos y otro nombre de proyecto que el Sprint 1 (8081), así ambas versiones pueden correr a la vez.
+name: clinica-cardenas-completo
 
 services:
   db:
@@ -25,7 +26,7 @@ services:
     volumes:
       - db-data:/var/lib/mysql
     ports:
-      - "3307:3306"   # acceso desde DBeaver/Workbench: localhost:3307
+      - "3308:3306"   # acceso desde DBeaver/Workbench: localhost:3308
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uclinica -p$$MYSQL_PASSWORD --silent"]
       interval: 5s
@@ -35,7 +36,7 @@ services:
     mem_limit: 384m
 
   # API simulada de SUNAT: servicio SOAP billService (sendBill / getStatusCdr) y consulta RUC.
-  # Panel con los comprobantes recibidos: http://localhost:8082
+  # Panel con los comprobantes recibidos: http://localhost:9082
   sunat-sim:
     build: ./sunat-sim
     restart: unless-stopped
@@ -46,8 +47,43 @@ services:
     volumes:
       - sunat-data:/data
     ports:
-      - "8082:8090"
+      - "9082:8090"
     mem_limit: 64m
+
+  # Microservicio de notificaciones por WhatsApp y correo (HU-23 / HU-24). Panel: http://localhost:9083
+  notificaciones:
+    build: ./notificaciones
+    restart: unless-stopped
+    environment:
+      WEBHOOK_URL: http://backend:8080/api/internal/notifications/callback
+      WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
+      TZ: America/Lima
+      # Envío real (ver README → "Mensajes reales"). Sin credenciales, el canal queda en modo de prueba.
+      WA_TOKEN: ${WA_TOKEN:-}
+      WA_PHONE_NUMBER_ID: ${WA_PHONE_NUMBER_ID:-}
+      WA_API_VERSION: ${WA_API_VERSION:-v21.0}
+      WA_PLANTILLA: ${WA_PLANTILLA:-}
+      WA_PLANTILLA_IDIOMA: ${WA_PLANTILLA_IDIOMA:-es}
+      WA_MODO: ${WA_MODO:-}
+      WA_WABA_ID: ${WA_WABA_ID:-}
+      WA_NUMEROS_PERMITIDOS: ${WA_NUMEROS_PERMITIDOS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      SMTP_REMITENTE: ${SMTP_REMITENTE:-}
+      SMTP_NOMBRE: ${SMTP_NOMBRE:-Clínica Dental Cárdenas}
+      CORREOS_PERMITIDOS: ${CORREOS_PERMITIDOS:-}
+      ENVIAR_A_TODOS: ${ENVIAR_A_TODOS:-false}
+      DESTINOS_REALES: ${DESTINOS_REALES:-}
+      # Webhook de Meta: estados entregado/leído y respuestas "1"/"2" del paciente
+      WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-}
+      WA_APP_SECRET: ${WA_APP_SECRET:-}
+    volumes:
+      - notif-data:/data
+    ports:
+      - "9083:8093"
+    mem_limit: 128m
 
   backend:
     build: ./backend
@@ -57,6 +93,8 @@ services:
         condition: service_healthy
       sunat-sim:
         condition: service_healthy
+      notificaciones:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:mysql://db:3306/clinica?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8&connectionCollation=utf8mb4_0900_ai_ci
       DB_USER: clinica
@@ -64,6 +102,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-en-produccion-clinica-cardenas-2026}
       APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
       APP_SEED_DEMO: ${APP_SEED_DEMO:-true}
+      APP_SEED_PASSWORD: ${APP_SEED_PASSWORD:-Clinica2026}
+      FILES_DIR: /data/archivos
+      PAGOS_MODO: ${PAGOS_MODO:-simulado}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
@@ -74,12 +115,17 @@ services:
       SUNAT_CONSULTA_URL: http://sunat-sim:8090/v1/ruc
       SUNAT_USUARIO: ${SUNAT_USUARIO:-MODDATOS}
       SUNAT_CLAVE: ${SUNAT_CLAVE:-MODDATOS}
+      NOTIF_URL: http://notificaciones:8093
+      NOTIF_PANEL_URL: http://localhost:9083
+      NOTIF_WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 18
       start_period: 40s
+    volumes:
+      - files-data:/data/archivos
     mem_limit: 384m
 
   frontend:
@@ -89,9 +135,14 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "8081:80"
+      - "9081:80"
+    volumes:
+      # Pruebas end-to-end ejecutables desde la consola del navegador (ver README)
+      - ./pruebas:/usr/share/nginx/html/pruebas:ro
     mem_limit: 64m
 
 volumes:
   db-data:
+  files-data:
   sunat-data:
+  notif-data:

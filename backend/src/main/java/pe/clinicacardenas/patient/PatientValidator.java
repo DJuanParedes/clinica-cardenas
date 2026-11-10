@@ -17,9 +17,17 @@ public final class PatientValidator {
 
     private PatientValidator() {}
 
+    /** dataConsent: el paciente autorizó el tratamiento de sus datos personales (Ley N.° 29733). */
     public record Input(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate,
                         String sex, String phone, String email, String address, String district,
-                        String emergencyContactName, String emergencyContactPhone, String notes) {}
+                        String emergencyContactName, String emergencyContactPhone, String notes, Boolean dataConsent) {
+        public Input(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate,
+                     String sex, String phone, String email, String address, String district,
+                     String emergencyContactName, String emergencyContactPhone, String notes) {
+            this(docType, docNumber, firstName, lastName, birthDate, sex, phone, email, address, district,
+                    emergencyContactName, emergencyContactPhone, notes, null);
+        }
+    }
 
     public static String normalizeDoc(String doc) {
         return doc == null ? "" : doc.replaceAll("\\s", "").toUpperCase();

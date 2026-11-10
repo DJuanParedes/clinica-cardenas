@@ -99,6 +99,170 @@ export class Api {
   saveSchedules(dentistId: number, blocks: { weekday: number; start: string; end: string }[]): Observable<any[]> {
     return this.http.put<any[]>(`/api/dentists/${dentistId}/schedules`, blocks);
   }
+
+  // ---------- roles y permisos (HU-26)
+  permissions(): Observable<PermissionMatrix> { return this.http.get<PermissionMatrix>('/api/permissions'); }
+  savePermissions(role: string, permissions: string[]): Observable<PermissionMatrix> {
+    return this.http.put<PermissionMatrix>(`/api/permissions/${role}`, { permissions });
+  }
+
+  // ---------- caja (HU-13, HU-14, HU-15)
+  cashMeta(): Observable<{ methods: string[]; methodLabels: Record<string, string>; expenseCategories: string[] }> { return this.http.get<any>('/api/cash/meta'); }
+  account(pid: number): Observable<Account> { return this.http.get<Account>(`/api/cash/patients/${pid}/account`); }
+  pay(body: any): Observable<{ payment: Payment; concept: string; account: Account }> { return this.http.post<any>('/api/cash/payments', body); }
+  voidPayment(id: number, reason: string): Observable<Payment> { return this.http.post<Payment>(`/api/cash/payments/${id}/void`, { reason }); }
+  addExpense(body: any): Observable<any> { return this.http.post('/api/cash/expenses', body); }
+  voidExpense(id: number, reason: string): Observable<any> { return this.http.post(`/api/cash/expenses/${id}/void`, { reason }); }
+  cashToday(): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/today'); }
+  cashReport(from: string, to: string): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/report', { params: params({ from, to }) }); }
+
+  // ---------- comisiones (HU-16, HU-17, HU-18)
+  commissionSummary(): Observable<any[]> { return this.http.get<any[]>('/api/commissions/summary'); }
+  commissionRules(dentistId?: number): Observable<CommissionRule[]> { return this.http.get<CommissionRule[]>('/api/commissions/rules', { params: params({ dentistId }) }); }
+  saveCommissionRule(id: number | null, body: any): Observable<CommissionRule> {
+    return id ? this.http.put<CommissionRule>(`/api/commissions/rules/${id}`, body) : this.http.post<CommissionRule>('/api/commissions/rules', body);
+  }
+  calculateCommissions(dentistId: number, from: string, to: string): Observable<any> {
+    return this.http.get('/api/commissions/calculate', { params: params({ dentistId, from, to }) });
+  }
+  settlements(dentistId?: number, status?: string): Observable<any[]> { return this.http.get<any[]>('/api/commissions/settlements', { params: params({ dentistId, status }) }); }
+  settle(body: any): Observable<any> { return this.http.post('/api/commissions/settlements', body); }
+  settlement(id: number): Observable<any> { return this.http.get(`/api/commissions/settlements/${id}`); }
+  paySettlement(id: number, body: any): Observable<any> { return this.http.post(`/api/commissions/settlements/${id}/payouts`, body); }
+  annulSettlement(id: number, reason: string): Observable<any> { return this.http.post(`/api/commissions/settlements/${id}/annul`, { reason }); }
+
+  // ---------- indicadores (HU-19, HU-20, HU-21)
+  incomeReport(from: string, to: string, group?: string): Observable<any> { return this.http.get('/api/reports/income', { params: params({ from, to, group }) }); }
+  appointmentsReport(from: string, to: string, dentistId?: number | null, group?: string): Observable<any> {
+    return this.http.get('/api/reports/appointments', { params: params({ from, to, dentistId, group }) });
+  }
+  treatmentsReport(from: string, to: string, dentistId?: number | null): Observable<any> {
+    return this.http.get('/api/reports/treatments', { params: params({ from, to, dentistId }) });
+  }
+
+  // ---------- notificaciones (HU-23, HU-24)
+  notifications(status?: string, type?: string): Observable<{ counters: Record<string, number>; items: NotificationItem[]; panelUrl: string }> {
+    return this.http.get<any>('/api/notifications', { params: params({ status, type }) });
+  }
+  retryNotification(id: number): Observable<NotificationItem> { return this.http.post<NotificationItem>(`/api/notifications/${id}/retry`, {}); }
+  patientNotifications(pid: number): Observable<NotificationItem[]> { return this.http.get<NotificationItem[]>(`/api/patients/${pid}/notifications`); }
+  setNotificationChannel(pid: number, channel: string): Observable<Patient> {
+    return this.http.patch<Patient>(`/api/patients/${pid}/notification-channel`, { channel });
+  }
+  remind(appointmentId: number): Observable<{ queued: number; duplicated: number; message: string }> {
+    return this.http.post<any>(`/api/appointments/${appointmentId}/remind`, {});
+  }
+
+  // ---------- archivos clínicos y documentos firmados
+  patientFiles(pid: number): Observable<PatientFile[]> { return this.http.get<PatientFile[]>(`/api/patients/${pid}/files`); }
+  uploadFile(pid: number, file: Blob, name: string, meta: { kind: string; title?: string; note?: string; tooth?: number | null; share?: boolean }): Observable<PatientFile> {
+    const fd = new FormData();
+    fd.append('file', file, name);
+    for (const [k, v] of Object.entries(meta)) if (v !== null && v !== undefined && v !== '') fd.append(k, String(v));
+    return this.http.post<PatientFile>(`/api/patients/${pid}/files`, fd);
+  }
+  createDocument(pid: number, body: { kind: string; title: string; body: string; signerName: string; signatureJpeg: string; shareWithPatient: boolean }): Observable<PatientFile> {
+    return this.http.post<PatientFile>(`/api/patients/${pid}/documents`, body);
+  }
+  fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
+  shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
+  deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }
+
+  // ---------- inventario
+  inventory(): Observable<{ items: InventoryItem[]; lowCount: number; recent: any[] }> { return this.http.get<any>('/api/inventory'); }
+  createInventoryItem(body: any): Observable<InventoryItem> { return this.http.post<InventoryItem>('/api/inventory', body); }
+  updateInventoryItem(id: number, body: any): Observable<InventoryItem> { return this.http.put<InventoryItem>(`/api/inventory/${id}`, body); }
+  inventoryMove(id: number, body: { kind: string; quantity: number; reason: string }): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
+  inventoryMoves(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/moves`); }
+  supplies(): Observable<any[]> { return this.http.get<any[]>('/api/inventory/supplies'); }
+  saveSupplies(procedureId: number, list: { itemId: number; quantity: number }[]): Observable<any> { return this.http.put(`/api/inventory/supplies/${procedureId}`, list); }
+
+  // ---------- seguimiento: lista de espera, cuotas, controles, satisfacción
+  waitlist(): Observable<any[]> { return this.http.get<any[]>('/api/waitlist'); }
+  addWaitlist(body: { patientId: number; dentistId?: number | null; reason: string; preference?: string }): Observable<any> { return this.http.post('/api/waitlist', body); }
+  closeWaitlist(id: number): Observable<any> { return this.http.post(`/api/waitlist/${id}/close`, {}); }
+  installments(planId: number): Observable<Installments> { return this.http.get<Installments>(`/api/plans/${planId}/installments`); }
+  createInstallments(planId: number, count: number, firstDueDate: string): Observable<Installments> {
+    return this.http.post<Installments>(`/api/plans/${planId}/installments`, { count, firstDueDate });
+  }
+  recalls(): Observable<any[]> { return this.http.get<any[]>('/api/recalls'); }
+  sendRecall(patientId: number, kind: string): Observable<{ queued: number; message: string }> { return this.http.post<any>(`/api/recalls/${patientId}/send`, { kind }); }
+  rescheduleRequests(): Observable<any[]> { return this.http.get<any[]>('/api/agenda/reschedule-requests'); }
+  satisfaction(days = 90): Observable<any> { return this.http.get('/api/reports/satisfaction', { params: params({ days }) }); }
+
+  // ---------- verificación en 2 pasos
+  totpSetup(): Observable<{ secret: string; otpauthUrl: string }> { return this.http.post<any>('/api/auth/2fa/setup', {}); }
+  totpEnable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/enable', { code }); }
+  totpDisable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/disable', { code }); }
+
+  // ---------- app del paciente (HU-22)
+  portalMe(): Observable<any> { return this.http.get('/api/portal/me'); }
+  portalAppointments(): Observable<{ next: PortalAppointment | null; upcoming: PortalAppointment[]; past: PortalAppointment[] }> {
+    return this.http.get<any>('/api/portal/appointments');
+  }
+  portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
+  portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
+  portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
+}
+
+export interface PatientFile {
+  id: number; patientId: number; kind: string; title: string; note?: string; tooth?: number; contentType: string; sizeBytes: number;
+  sharedWithPatient: boolean; signedAt?: string; createdAt: string; createdBy: string; image?: boolean;
+}
+
+export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; }
+
+export interface Installments {
+  planId: number; total: number; paid: number;
+  items: { id: number; number: number; dueDate: string; amount: number; status: 'PAGADA' | 'PENDIENTE' | 'VENCIDA' }[];
+}
+
+export interface PermissionMatrix {
+  permissions: { code: string; group: string; label: string }[];
+  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number }[];
+}
+
+export interface Payment {
+  id: number; patientId: number; treatmentItemId?: number; amount: number; method: string; reference?: string; notes?: string;
+  paidAt: string; cashier: string; status: string; voidReason?: string; voidedAt?: string; voidedBy?: string;
+}
+
+export interface Obligation {
+  treatmentItemId: number; procedure: string; category: string; tooth?: number; planId: number; planTitle: string;
+  status: string; doneAt?: string; price: number; paid: number; pending: number;
+}
+
+export interface Account {
+  patient: { id: number; fullName: string; docType: string; docNumber: string };
+  charges: number; credits: number; balance: number; inFavor: number; unapplied: number;
+  obligations: Obligation[];
+  movements: { date: string; type: 'CARGO' | 'ABONO'; concept: string; detail: string; charge: number; credit: number; balance: number; paymentId?: number }[];
+  payments: Payment[];
+}
+
+export interface CashReport {
+  from: string; to: string; income: number; outgo: number; net: number; incomeCount: number; outgoCount: number; voided: number;
+  byMethod: { method: string; label: string; income: number; outgo: number; net: number }[];
+  byDay: { date: string; income: number; outgo: number }[];
+  byCategory: { category: string; amount: number }[];
+  detail: { type: 'INGRESO' | 'EGRESO'; id: number; date: string; concept: string; party?: string; patientId?: number; category?: string;
+    method: string; reference?: string; amount: number; user: string }[];
+}
+
+export interface CommissionRule {
+  id: number; dentist: Dentist; procedure?: Procedure; calcType: string; value: number; base: string;
+  validFrom: string; validTo?: string; active: boolean; notes?: string; label: string; createdBy: string;
+}
+
+export interface NotificationItem {
+  id: number; patientId?: number; appointmentId?: number; type: string; operation: string; channel: string; destination: string;
+  subject?: string; body: string; idempotencyKey: string; scheduledFor?: string; status: string; attempts: number;
+  lastError?: string; providerId?: string; sentAt?: string; createdAt: string;
+}
+
+export interface PortalAppointment {
+  id: number; startAt: string; endAt: string; durationMin: number; reason: string; status: string;
+  dentist: { fullName: string; specialty: string; color: string }; canConfirm: boolean;
 }
 
 export interface InvoiceDetail {

@@ -20,7 +20,7 @@ import { IconComponent } from '../shared/icon.component';
           <h1>Pacientes</h1>
           <p class="sub">Busca por número de documento o por nombres y apellidos.</p>
         </div>
-        @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+        @if (auth.can('PACIENTES_EDITAR')) {
           <div class="actions"><a class="btn primary" routerLink="/pacientes/nuevo"><app-icon name="plus" [size]="16" /> Registrar paciente</a></div>
         }
       </div>
@@ -45,7 +45,7 @@ import { IconComponent } from '../shared/icon.component';
           <div class="empty">
             <h3>Sin resultados para "{{ q }}"</h3>
             <p>Revisa el número o prueba solo con el apellido.</p>
-            @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+            @if (auth.can('PACIENTES_EDITAR')) {
               <a class="btn primary" routerLink="/pacientes/nuevo" [queryParams]="{ doc: q }"><app-icon name="plus" [size]="16" /> Registrar paciente nuevo</a>
             }
           </div>

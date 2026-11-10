@@ -7,6 +7,10 @@ import pe.clinicacardenas.billing.AmountInWords;
 import pe.clinicacardenas.billing.InvoiceCalculator;
 import pe.clinicacardenas.billing.RucValidator;
 import pe.clinicacardenas.billing.XmlSigner;
+import pe.clinicacardenas.commission.CommissionRule;
+import pe.clinicacardenas.notification.NotificationService;
+import pe.clinicacardenas.patient.Patient;
+import pe.clinicacardenas.report.ReportService;
 import pe.clinicacardenas.clinical.OdontogramRules;
 import pe.clinicacardenas.patient.PatientValidator;
 
@@ -140,5 +144,53 @@ class ReglasDeNegocioTest {
         var ctx2 = new javax.xml.crypto.dsig.dom.DOMValidateContext(ctx.getKeySelector(),
                 doc2.getElementsByTagNameNS(javax.xml.crypto.dsig.XMLSignature.XMLNS, "Signature").item(0));
         assertFalse(javax.xml.crypto.dsig.XMLSignatureFactory.getInstance("DOM").unmarshalXMLSignature(ctx2).validate(ctx2));
+    }
+
+    // ------------------------------------------------------------------ versión completa
+
+    @Test
+    void hu23_recordatorio24HorasAntesO2HorasSiLaCitaEsPronto() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.of(2026, 11, 5, 9, 0);
+        assertEquals(java.time.LocalDateTime.of(2026, 11, 7, 10, 0), NotificationService.reminderTime(java.time.LocalDateTime.of(2026, 11, 8, 10, 0), now));
+        assertEquals(java.time.LocalDateTime.of(2026, 11, 5, 17, 0), NotificationService.reminderTime(java.time.LocalDateTime.of(2026, 11, 5, 19, 0), now));
+        assertNull(NotificationService.reminderTime(java.time.LocalDateTime.of(2026, 11, 5, 10, 30), now));
+    }
+
+    @Test
+    void hu23_canalSegunPreferenciaDelPaciente() {
+        Patient p = new Patient();
+        p.phone = "987654321";
+        p.email = "paciente@correo.pe";
+        p.notifyChannel = "AMBOS";
+        assertEquals(2, NotificationService.targets(p).size());
+        p.notifyChannel = "NINGUNO";
+        assertTrue(NotificationService.targets(p).isEmpty());
+        p.notifyChannel = "EMAIL";
+        p.email = null;
+        assertEquals("WHATSAPP", NotificationService.targets(p).get(0).channel(), "sin correo se usa WhatsApp");
+    }
+
+    @Test
+    void hu16_vigenciaDeLaRegla() {
+        CommissionRule r = new CommissionRule();
+        r.active = true;
+        r.calcType = "PORCENTAJE";
+        r.value = new BigDecimal("40");
+        r.base = "REALIZADO";
+        r.validFrom = LocalDate.of(2026, 1, 1);
+        r.validTo = LocalDate.of(2026, 6, 30);
+        assertTrue(r.appliesOn(LocalDate.of(2026, 3, 15)));
+        assertFalse(r.appliesOn(LocalDate.of(2026, 7, 1)));
+        assertEquals("40 % del precio · todos los procedimientos", r.getLabel());
+        r.active = false;
+        assertFalse(r.appliesOn(LocalDate.of(2026, 3, 15)));
+    }
+
+    @Test
+    void hu19_agrupacionAutomaticaDelPeriodo() {
+        assertEquals("day", ReportService.grouping(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30), null));
+        assertEquals("week", ReportService.grouping(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 11, 5), null));
+        assertEquals("month", ReportService.grouping(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 11, 5), null));
+        assertEquals(LocalDate.of(2026, 11, 2), ReportService.bucket(LocalDate.of(2026, 11, 5), "week"));
     }
 }

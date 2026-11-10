@@ -38,6 +38,10 @@ public class Appointment {
     @Column(name = "arrived_at")
     public LocalDateTime arrivedAt;
 
+    /** El paciente pidió reprogramar desde WhatsApp (respondió "2"); recepción debe llamarlo. */
+    @Column(name = "reschedule_requested_at")
+    public LocalDateTime rescheduleRequestedAt;
+
     @Column(name = "created_at")
     public LocalDateTime createdAt;
     @Column(name = "created_by")

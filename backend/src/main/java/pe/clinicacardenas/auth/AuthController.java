@@ -19,7 +19,10 @@ public class AuthController {
     }
 
     public record LoginRequest(@NotBlank(message = "Ingresa tu usuario.") String username,
-                               @NotBlank(message = "Ingresa tu contraseña.") String password) {}
+                               @NotBlank(message = "Ingresa tu contraseña.") String password,
+                               String code) {}
+
+    public record CodeRequest(String code) {}
 
     public record RecoverRequest(@NotBlank(message = "Ingresa tu usuario o correo.") String login) {}
 
@@ -29,12 +32,27 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthService.LoginResult login(@Valid @RequestBody LoginRequest req) {
-        return auth.login(req.username(), req.password());
+        return auth.login(req.username(), req.password(), req.code());
     }
 
     @GetMapping("/me")
     public Map<String, Object> me(Authentication authentication) {
         return auth.me(authentication.getName());
+    }
+
+    @PostMapping("/2fa/setup")
+    public Map<String, Object> setup2fa(Authentication a) {
+        return auth.setupTotp(a.getName());
+    }
+
+    @PostMapping("/2fa/enable")
+    public Map<String, Object> enable2fa(Authentication a, @RequestBody CodeRequest req) {
+        return auth.enableTotp(a.getName(), req.code());
+    }
+
+    @PostMapping("/2fa/disable")
+    public Map<String, Object> disable2fa(Authentication a, @RequestBody CodeRequest req) {
+        return auth.disableTotp(a.getName(), req.code());
     }
 
     @PostMapping("/logout")
