@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package pe.clinicacardenas.pacientes.platform
 
 import kotlinx.datetime.Instant
@@ -67,9 +69,9 @@ class IosPlatformActions : PlatformActions {
                     minute = t.minute.toLong()
                 }
                 val content = UNMutableNotificationContent().apply {
-                    title = r.title
-                    body = r.body
-                    sound = UNNotificationSound.defaultSound
+                    setTitle(r.title)
+                    setBody(r.body)
+                    setSound(UNNotificationSound.defaultSound)
                 }
                 val request = UNNotificationRequest.requestWithIdentifier(
                     "cita-${r.id}",
