@@ -9,7 +9,7 @@ if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$RAMA")" ] && [ "${1:-}"
 echo "== $(date '+%F %T') actualizando a $(git rev-parse --short "origin/$RAMA"): $(git log -1 --format=%s "origin/$RAMA")"
 bash deploy/respaldo.sh || echo "aviso: no se pudo hacer la copia previa"
 git reset -q --hard "origin/$RAMA"
-chown -R ubuntu:ubuntu . 2>/dev/null || true
+chown -R "$(getent passwd 1000 | cut -d: -f1 || echo root)": . 2>/dev/null || true
 docker compose -f docker-compose.yml -f deploy/docker-compose.nube.yml up -d --build --remove-orphans
 docker image prune -f > /dev/null
 echo "== $(date '+%F %T') listo"

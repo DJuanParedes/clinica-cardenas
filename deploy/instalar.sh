@@ -29,7 +29,8 @@ ENV
 fi
 grep -q '^WA_VERIFY_TOKEN=' .env || echo "WA_VERIFY_TOKEN=$(rand 24)" >> .env
 grep -q '^DOMINIO=' .env || echo "DOMINIO=$DOMINIO_AUTO" >> .env
-chown -R ubuntu:ubuntu "$DIR" 2>/dev/null || true
+ADMIN=$(getent passwd 1000 | cut -d: -f1 || echo root)
+chown -R "$ADMIN":"$ADMIN" "$DIR" 2>/dev/null || true
 chmod 600 .env
 git config --global --add safe.directory "$DIR"
 
@@ -95,5 +96,5 @@ Comandos útiles (en el servidor):
   sudo bash $DIR/deploy/respaldo.sh                copia de la base de datos ahora
   tail -f /var/log/clinica-actualizar.log          ver las actualizaciones
 TXT
-chown ubuntu:ubuntu "$DIR/ACCESOS.txt"; chmod 600 "$DIR/ACCESOS.txt"
+chown "$ADMIN":"$ADMIN" "$DIR/ACCESOS.txt"; chmod 600 "$DIR/ACCESOS.txt"
 echo "LISTO: https://$DOM  (accesos en $DIR/ACCESOS.txt)"
