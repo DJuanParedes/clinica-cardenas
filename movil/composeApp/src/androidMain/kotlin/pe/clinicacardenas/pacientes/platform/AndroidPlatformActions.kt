@@ -22,8 +22,8 @@ import java.io.File
 class AndroidPlatformActions(private val context: Context) : PlatformActions {
     override val name = "Android"
 
-    /** 10.0.2.2 es la computadora anfitriona vista desde el emulador de Android Studio. */
-    override val defaultServerUrl = "http://10.0.2.2:9081"
+    /** Servidor de la clínica en internet (Azure). Para la red local se cambia en la pantalla Servidor. */
+    override val defaultServerUrl = "https://clinica-cardenas.chilecentral.cloudapp.azure.com"
 
     private fun start(intent: Intent) {
         try {

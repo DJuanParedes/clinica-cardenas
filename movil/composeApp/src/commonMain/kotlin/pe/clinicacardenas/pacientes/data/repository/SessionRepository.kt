@@ -17,7 +17,12 @@ class SessionRepository(private val store: LocalStore, private val platform: Pla
 
     val token: String? get() = store.get(KEY_TOKEN)
 
-    val serverUrl: String get() = store.get(KEY_SERVER) ?: platform.defaultServerUrl
+    /** Dirección del servidor; un dominio guardado con http:// se corrige a https:// (el servidor redirige y el login fallaría). */
+    val serverUrl: String
+        get() {
+            val saved = store.get(KEY_SERVER) ?: return platform.defaultServerUrl
+            return if (saved.startsWith("http://") && saved.contains(".cloudapp.azure.com")) "https://" + saved.removePrefix("http://") else saved
+        }
 
     fun setServerUrl(url: String) {
         var u = url.trim().trimEnd('/')

@@ -127,7 +127,9 @@ class LoginViewModel(
         val url = _state.value.server.trim()
         if (url.isBlank()) return _state.update { it.copy(fieldErrors = mapOf("server" to "Escribe la dirección del servidor.")) }
         run {
-            val full = if (url.startsWith("http")) url else "http://$url"
+            // Un dominio de internet va por HTTPS; una IP o localhost de la red local, por HTTP.
+            val local = Regex("^(localhost|10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.|\\d+\\.\\d+\\.\\d+\\.\\d+)").containsMatchIn(url)
+            val full = (if (url.startsWith("http")) url else if (local) "http://$url" else "https://$url").trimEnd('/')
             val ping = repo.ping(full)
             session.setServerUrl(full)
             _state.update { it.copy(serverOk = true, server = session.serverUrl, serverInfo = "Conectado con ${ping.clinic.name}. Dirección guardada.") }

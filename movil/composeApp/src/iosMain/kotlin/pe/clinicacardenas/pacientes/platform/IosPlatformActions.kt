@@ -26,7 +26,7 @@ class IosPlatformActions : PlatformActions {
     override val name = "iOS"
 
     /** En el simulador de iOS, localhost es la propia Mac. */
-    override val defaultServerUrl = "http://localhost:9081"
+    override val defaultServerUrl = "https://clinica-cardenas.chilecentral.cloudapp.azure.com"
 
     private val center get() = UNUserNotificationCenter.currentNotificationCenter()
 
