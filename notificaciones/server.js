@@ -107,7 +107,7 @@ async function deliver(m) {
   } else {
     try {
       const r = m.canal === 'WHATSAPP'
-        ? await prov.enviarWhatsApp(clave, m.cuerpo, m.plantilla, { chat: m.tipo === 'MENSAJE' })
+        ? await prov.enviarWhatsApp(clave, m.cuerpo, m.plantilla, { chat: m.tipo === 'MENSAJE', plantillaWa: m.plantillaWa, parametrosWa: m.parametrosWa })
         : await prov.enviarCorreo(m.destinoNormalizado, m.asunto, m.cuerpo);
       m.proveedorId = r.id;
       m.via = r.via;
@@ -152,6 +152,8 @@ function create(b, scheduled) {
     intentos: 0,
     webhookPendiente: false,
     paciente: b.paciente && b.paciente.nombre ? { id: b.paciente.id ?? null, nombre: String(b.paciente.nombre), demo: Boolean(b.paciente.demo) } : null,
+    plantillaWa: typeof b.plantillaWa === 'string' && /^[a-z0-9_]{1,60}$/.test(b.plantillaWa) ? b.plantillaWa : null,
+    parametrosWa: Array.isArray(b.parametrosWa) ? b.parametrosWa.slice(0, 10).map((x) => String(x ?? '')) : null,
   };
 }
 
@@ -344,7 +346,7 @@ th{background:#f6fafc;color:var(--muted)}.tag{display:inline-block;padding:2px 8
 let data=null, who=null, mailSel=null;
 const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const fmt=s=>s?new Date(s).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba',MENSAJE:'Mensaje',ENTRANTE:'Escribió el paciente',CONTROL:'Control preventivo',LISTA_ESPERA:'Lista de espera',CUOTA:'Cuota'};
+const TYPE={RECORDATORIO:'Recordatorio',CAMBIO_CITA:'Cambio de cita',CANCELACION:'Cancelación',CODIGO_ACCESO:'Código de acceso',PRUEBA:'Prueba',MENSAJE:'Mensaje',ENTRANTE:'Escribió el paciente',CITA_REGISTRADA:'Cita registrada',CONTROL:'Control preventivo',LISTA_ESPERA:'Lista de espera',CUOTA:'Cuota'};
 const badge=m=>m.estado==='ENVIADO'?(m.real?'<span class="badge r">REAL</span>':'<span class="badge t">PRUEBA</span>'):'';
 let provDrawn=false;
 function drawProv(p){

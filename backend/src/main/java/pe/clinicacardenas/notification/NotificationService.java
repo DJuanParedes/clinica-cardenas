@@ -85,6 +85,12 @@ public class NotificationService {
         return d.substring(0, 1).toUpperCase(ES) + d.substring(1) + " a las " + t.format(HOUR);
     }
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private static String dentistText(Appointment a) {
+        return a.dentist.getFullName() + (a.dentist.specialty == null || a.dentist.specialty.isBlank() ? "" : " (" + a.dentist.specialty + ")");
+    }
+
     private String body(String channel, String intro, Appointment a, String closing) {
         String dentist = a.dentist.getFullName() + " (" + a.dentist.specialty + ")";
         if ("WHATSAPP".equals(channel)) {
@@ -122,6 +128,18 @@ public class NotificationService {
 
     private void add(Patient p, Long appointmentId, String type, String operation, Target t, String subject, String body,
                      String key, LocalDateTime scheduledFor) {
+        add(p, appointmentId, type, operation, t, subject, body, key, scheduledFor, null);
+    }
+
+    /** Plantilla de WhatsApp con formato (saltos de línea, negritas) y sus parámetros, en orden {{1}}, {{2}}… */
+    private record Wa(String template, List<String> params) {}
+
+    private Wa wa(String template, String... params) {
+        return new Wa(template, List.of(params));
+    }
+
+    private void add(Patient p, Long appointmentId, String type, String operation, Target t, String subject, String body,
+                     String key, LocalDateTime scheduledFor, Wa wa) {
         if (repo.existsByIdempotencyKey(key)) return; // ya encolado: no se duplica
         Notification n = new Notification();
         n.patientId = p.id;
@@ -134,6 +152,14 @@ public class NotificationService {
         n.body = body;
         n.idempotencyKey = key;
         n.scheduledFor = scheduledFor;
+        if (wa != null && "WHATSAPP".equals(t.channel())) {
+            n.waTemplate = wa.template();
+            try {
+                n.waParams = JSON.writeValueAsString(wa.params());
+            } catch (Exception e) {
+                n.waTemplate = null;
+            }
+        }
         n.status = "PENDIENTE";
         n.createdAt = Dates.now();
         repo.save(n);
@@ -160,7 +186,8 @@ public class NotificationService {
             add(a.patient, a.id, "RECORDATORIO", "PROGRAMAR", t, "Recordatorio de tu cita · " + clinicName,
                     body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
                             replyHint(t.channel())),
-                    reminderKey(a, t.channel()), at);
+                    reminderKey(a, t.channel()), at,
+                    wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
         }
     }
 
@@ -194,6 +221,13 @@ public class NotificationService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void appointmentCreated(Appointment a) {
+        for (Target t : targets(a.patient)) {
+            add(a.patient, a.id, "CITA_REGISTRADA", "ENVIAR", t, "Tu cita quedó registrada · " + clinicName,
+                    body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita en " + clinicName + " quedó registrada:", a,
+                            "Te enviaremos un recordatorio antes de la cita."),
+                    "registro:" + a.id + ":" + t.channel(), null,
+                    wa("cita_registrada", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
+        }
         scheduleReminder(a);
     }
 
@@ -205,7 +239,8 @@ public class NotificationService {
                     body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita del " + when(previousStart)
                             + (previousDentist.equals(a.dentist.getFullName()) ? "" : " con " + previousDentist)
                             + " cambió. Este es el nuevo horario:", a, "Si el nuevo horario no te acomoda, comunícate con nosotros."),
-                    "cambio:" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel(), null);
+                    "cambio:" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel(), null,
+                    wa("cita_reprogramada", firstName(a.patient), when(previousStart), when(a.startAt), dentistText(a), clinicAddress));
         }
         scheduleReminder(a);
     }
@@ -218,7 +253,8 @@ public class NotificationService {
                     body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita fue cancelada"
                             + (reason == null || reason.isBlank() ? "." : " (" + reason.trim() + ")."), a,
                             "Para programar una nueva cita escríbenos o llámanos al " + clinicPhone + "."),
-                    "cancelacion:" + a.id + ":" + t.channel(), null);
+                    "cancelacion:" + a.id + ":" + t.channel(), null,
+                    wa("cita_cancelada", firstName(a.patient), when(a.startAt), a.dentist.getFullName(), clinicPhone));
         }
     }
 
@@ -235,7 +271,8 @@ public class NotificationService {
             if (repo.existsByIdempotencyKey(key)) { duplicated++; continue; }
             add(a.patient, a.id, "RECORDATORIO", "ENVIAR", t, "Recordatorio de tu cita · " + clinicName,
                     body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
-                            replyHint(t.channel())), key, null);
+                            replyHint(t.channel())), key, null,
+                    wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
             queued++;
         }
         audit.record("CITA", a.id, "RECORDATORIO", queued > 0 ? "Recordatorio enviado por " + ts.stream().map(Target::channel).toList()

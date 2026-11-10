@@ -173,6 +173,10 @@ public class NotificationDispatcher {
             payload.put("cuerpo", n.body);
             payload.put("tipo", n.type);
             payload.put("referencia", n.appointmentId == null ? null : "cita-" + n.appointmentId);
+            if (n.waTemplate != null && n.waParams != null) {
+                payload.put("plantillaWa", n.waTemplate);
+                payload.put("parametrosWa", json.readValue(n.waParams, List.class));
+            }
             if (n.patientId != null) {
                 // nombre del paciente y si es real o de ejemplo: el microservicio decide si lo envía de verdad
                 patients.findById(n.patientId).ifPresent(p -> {

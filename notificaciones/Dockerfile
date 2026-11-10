@@ -3,7 +3,7 @@ FROM node:20.18-alpine
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
-COPY server.js proveedores.js ./
+COPY server.js proveedores.js crear-plantillas.js ./
 RUN mkdir -p /data && chown node:node /data
 USER node
 ENV PORT=8093 DATA_FILE=/data/notificaciones.json

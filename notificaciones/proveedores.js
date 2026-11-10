@@ -124,7 +124,9 @@ async function graph(body) {
     const e = json.error || {};
     const claro = explicarErrorMeta(e, res.status);
     const detail = e.error_data?.details || e.message || `HTTP ${res.status}`;
-    throw new Error(claro ? `${claro} [código ${e.code}]` : `WhatsApp (Meta) rechazó el envío: ${detail}${e.code ? ` [código ${e.code}]` : ''}`);
+    const err = new Error(claro ? `${claro} [código ${e.code}]` : `WhatsApp (Meta) rechazó el envío: ${detail}${e.code ? ` [código ${e.code}]` : ''}`);
+    err.codigoMeta = e.code;
+    throw err;
   }
   alerta('wa-token', null, null);
   return json.messages?.[0]?.id || null;
@@ -142,6 +144,19 @@ async function enviarWhatsApp(local, cuerpo, plantillaForzada, opciones = {}) {
   // Mensajes escritos a mano en el panel (como un chat): van como texto normal mientras la plantilla no esté
   // aprobada. Meta solo los entrega si el paciente escribió a la clínica en las últimas 24 h.
   if (opciones.chat && !plantillaForzada && WA.estadoPlantilla !== 'APPROVED') usarPlantilla = false;
+  // Plantilla propia del tipo de mensaje (recordatorio, cita registrada, reprogramada, cancelada) con saltos de
+  // línea y negritas. Si Meta aún no la aprobó, se usa la plantilla general con el texto en una sola línea.
+  if (usarPlantilla && !plantillaForzada && opciones.plantillaWa && Array.isArray(opciones.parametrosWa) && !opciones.chat) {
+    try {
+      const template = { name: opciones.plantillaWa, language: { code: WA.idioma },
+        components: [{ type: 'body', parameters: opciones.parametrosWa.map((t) => ({ type: 'text', text: flatten(t).slice(0, 300) || '-' })) }] };
+      return { id: await graph({ messaging_product: 'whatsapp', to, type: 'template', template }), via: `plantilla ${opciones.plantillaWa}` };
+    } catch (e) {
+      // 132001 plantilla inexistente / no aprobada · 132000 cantidad de parámetros distinta · 132012 formato de parámetro
+      if (![132000, 132001, 132012, 132015, 132016].includes(e.codigoMeta)) throw e;
+      console.warn(`plantilla ${opciones.plantillaWa} no disponible (${e.codigoMeta}); se usa ${nombre}`);
+    }
+  }
   if (usarPlantilla && !nombre) throw new Error('WA_MODO=plantilla pero falta WA_PLANTILLA');
   if (usarPlantilla) {
     const template = nombre === 'hello_world'

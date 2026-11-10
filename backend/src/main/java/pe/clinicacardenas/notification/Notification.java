@@ -24,6 +24,10 @@ public class Notification {
     public String destination;
     public String subject;
     public String body;
+    @Column(name = "wa_template")
+    public String waTemplate;
+    @Column(name = "wa_params")
+    public String waParams;
     @Column(name = "idempotency_key")
     public String idempotencyKey;
     @Column(name = "scheduled_for")
