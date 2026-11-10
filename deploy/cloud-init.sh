@@ -2,6 +2,7 @@
 # Clínica Dental Cárdenas: instalación automática al crear el servidor en Oracle Cloud (Ubuntu 24.04, ARM).
 # Se pega en "Script de inicialización" (cloud-init). Deja el registro en /var/log/clinica-instalacion.log
 set -eux
+export HOME=${HOME:-/root}
 exec > /var/log/clinica-instalacion.log 2>&1
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
 apt-get update -y && apt-get install -y git curl openssl

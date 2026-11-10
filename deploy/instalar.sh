@@ -1,6 +1,7 @@
 #!/bin/bash
 # Instala (o reinstala) el sistema en el servidor. Ejecutar como root:  sudo bash /opt/clinica/deploy/instalar.sh
 set -euo pipefail
+export HOME=${HOME:-/root}
 cd "$(dirname "$0")/.."
 DIR=$(pwd)
 COMPOSE="docker compose -f docker-compose.yml -f deploy/docker-compose.nube.yml"

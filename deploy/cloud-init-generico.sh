@@ -10,7 +10,7 @@ if ! swapon --show | grep -q /swapfile; then
   fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
-export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive HOME=${HOME:-/root}
 apt-get update -y && apt-get install -y git curl openssl
 curl -fsSL https://get.docker.com | sh
 # El usuario administrador de la máquina (ubuntu en AWS/Oracle, azureuser u otro en Azure) puede usar Docker
