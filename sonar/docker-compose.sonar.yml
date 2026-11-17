@@ -1,0 +1,17 @@
+# SonarQube local para analizar la calidad del código (no forma parte del sistema de la clínica).
+# Lo usa analizar-sonarqube.bat. Panel: http://localhost:9000 (usuario admin, contraseña en sonar/.clave)
+name: clinica-sonar
+services:
+  sonarqube:
+    image: sonarqube:10.7-community
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-ext:/opt/sonarqube/extensions
+    mem_limit: 3g
+volumes:
+  sonar-data:
+  sonar-ext:

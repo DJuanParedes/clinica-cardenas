@@ -145,7 +145,7 @@ public class AssistantService {
                 } else {
                     if (!simulate) markReschedule(next);
                     r.append(cancelar ? "Entendido. Registré que deseas *cancelar* tu cita del *" : "Entendido. Registré tu pedido para *reprogramar* tu cita del *")
-                            .append(when(next)).append("*. Recepción te escribirá por aquí para ").append(cancelar ? "confirmar la cancelación." : "acordar el nuevo horario.");
+                            .append(when(next)).append("*: recepción te escribirá por aquí para ").append(cancelar ? "confirmar la cancelación." : "acordar el nuevo horario.");
                     if (!cancelar) {
                         List<String> libres = freeSlots(next.dentist, p.id, next.durationMin, next.id, 3);
                         if (!libres.isEmpty()) r.append("\n\nHorarios libres cercanos con ").append(next.dentist.getFullName()).append(":\n• ").append(String.join("\n• ", libres));

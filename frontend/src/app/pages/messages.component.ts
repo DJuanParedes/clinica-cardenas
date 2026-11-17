@@ -276,7 +276,8 @@ const INTENT_LABEL: Record<string, string> = {
     .b.sys .who { color: var(--muted); }
     .meta { font-size: 11px; color: var(--muted); text-align: right; margin-top: 3px; }
     .compose { background: var(--surface); border-top: 1px solid var(--line); padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
-    .quick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .quick { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+    .quick > * { flex: none; }
     .send-row { display: flex; gap: 8px; align-items: flex-end; }
     .send-row textarea { flex: 1; resize: vertical; min-height: 44px; }
     .pick { margin: auto; text-align: center; color: var(--muted); }

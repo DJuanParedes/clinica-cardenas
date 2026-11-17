@@ -137,9 +137,18 @@ public class ConversationService {
         String preview = body.replaceAll("[*_~]", "").replaceAll("\\s+", " ");
         if (preview.length() > 190) preview = preview.substring(0, 190) + "…";
         jdbc.update("update wa_threads set last_message_at = ?, last_preview = ?" + ("IN".equals(direction) ? ", unread = unread + 1" : "") + " where phone = ?",
-                now, ("OUT".equals(direction) ? "Tú: " : "") + preview, phone);
+                now, prefix(source) + preview, phone);
         Long id = jdbc.queryForObject("select max(id) from wa_messages where phone = ?", Long.class, phone);
         return id == null ? 0 : id;
+    }
+
+    private static String prefix(String source) {
+        return switch (source) {
+            case "IA" -> "🤖 ";
+            case "PERSONAL" -> "Tú: ";
+            case "SISTEMA" -> "🔔 ";
+            default -> "";
+        };
     }
 
     private List<Map<String, Object>> recent(String phone, int n) {
