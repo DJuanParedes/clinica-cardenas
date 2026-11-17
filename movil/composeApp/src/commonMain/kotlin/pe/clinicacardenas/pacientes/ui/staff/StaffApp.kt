@@ -54,6 +54,7 @@ private enum class STab(val label: String, val icon: String, val perms: List<Str
     AGENDA("Agenda", "🗓️", listOf("AGENDA_VER")),
     PACIENTES("Pacientes", "🦷", listOf("PACIENTES_VER")),
     CAJA("Caja", "💵", listOf("CAJA_COBRAR")),
+    MAS("Más", "☰", emptyList()),
     CUENTA("Cuenta", "👤", emptyList()),
 }
 
@@ -61,6 +62,8 @@ private enum class STab(val label: String, val icon: String, val perms: List<Str
 sealed interface StaffNav {
     data class Patient(val id: Long, val section: String = "resumen") : StaffNav
     data object NewAppointment : StaffNav
+    /** Módulo de la web dentro de la app (inventario, comprobantes, usuarios, etc.). */
+    data class Web(val title: String, val path: String) : StaffNav
 }
 
 @Composable
@@ -129,11 +132,13 @@ fun StaffApp(user: StaffUserDto) {
             when (val n = nav) {
                 is StaffNav.Patient -> PatientRecordScreen(n.id, n.section, onBack = { nav = null })
                 StaffNav.NewAppointment -> NewAppointmentScreen(onClose = { nav = null })
+                is StaffNav.Web -> WebModuleScreen(n.title, n.path, onBack = { nav = null })
                 null -> when (tab) {
                     STab.RESUMEN -> DashboardScreen(user, open)
                     STab.AGENDA -> AgendaScreen(user, open)
                     STab.PACIENTES -> PatientsScreen(open)
                     STab.CAJA -> CashScreen(user, open)
+                    STab.MAS -> MoreScreen(user, open)
                     STab.CUENTA -> StaffAccountScreen(user)
                 }
             }

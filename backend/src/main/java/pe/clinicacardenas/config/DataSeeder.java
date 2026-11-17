@@ -140,6 +140,10 @@ public class DataSeeder implements ApplicationRunner {
             a.startAt = today.minusDays(7L * (i + 1)).atTime(LocalTime.of(10, 0));
             a.endAt = a.startAt.plusMinutes(30);
             a.durationMin = 30;
+            if (!appointments.findDentistOverlaps(a.dentist.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()
+                    || !appointments.findPatientOverlaps(a.patient.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()) {
+                continue;
+            }
             a.reason = "Evaluación inicial";
             a.status = AppointmentStatus.ATENDIDA;
             a.createdAt = a.startAt.minusDays(2);

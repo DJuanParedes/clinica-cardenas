@@ -56,10 +56,12 @@ class StaffApi(
 
     suspend fun dentists(): List<SDentistDto> = get("/api/dentists")
 
-    suspend fun slots(dentistId: Long, date: String, duration: Int): StaffSlotsDto = get("/api/agenda/slots") {
+    /** Con [patientId] también se ocultan las horas en que el paciente ya tiene cita con otro odontólogo. */
+    suspend fun slots(dentistId: Long, date: String, duration: Int, patientId: Long? = null): StaffSlotsDto = get("/api/agenda/slots") {
         parameter("dentistId", dentistId)
         parameter("date", date)
         parameter("duration", duration)
+        if (patientId != null) parameter("patientId", patientId)
     }
 
     suspend fun createAppointment(body: NewAppointmentRequest): SAppointmentDto = post("/api/appointments", body)

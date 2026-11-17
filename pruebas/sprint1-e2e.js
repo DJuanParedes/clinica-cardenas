@@ -230,13 +230,13 @@ async function sprint1E2E(BASE, SUNAT = BASE.replace(/:(\d+)$/, (m, p) => ':' + 
     expect(codes[0] === 201 && codes[1] === 409, 'resultado ' + codes.join('/'));
     return 'una aceptada y una rechazada (' + codes.join(' / ') + ')';
   });
-  await check('HU-09', 'Flujo de estados: confirmar → llegada → atención → atendida', async () => {
-    for (const s of ['CONFIRMADA', 'EN_ESPERA', 'EN_ATENCION', 'ATENDIDA']) {
-      const r = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: s }, s === 'EN_ATENCION' || s === 'ATENDIDA' ? odo : recep);
-      expectStatus(r, 200, 'pasar a ' + s);
-    }
-    const bad = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'CANCELADA', reason: 'x' }, recep);
-    expectStatus(bad, 409, 'cancelar una atendida');
+  await check('HU-09', 'Flujo de estados: confirmar; la llegada de otro día y la inasistencia anticipada se rechazan', async () => {
+    expectStatus(await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'CONFIRMADA' }, recep), 200, 'confirmar');
+    const early = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'EN_ESPERA' }, recep);
+    expect(early.status === 409 && early.body.code === 'FUERA_DE_FECHA', 'registró la llegada días antes: ' + early.status);
+    const ns = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'NO_ASISTIO' }, recep);
+    expect(ns.status === 409 && ns.body.code === 'CITA_NO_INICIADA', 'marcó inasistencia antes de la hora: ' + ns.status);
+    return early.body.message;
   });
   let appt2;
   await check('HU-08', 'Reprogramar exige motivo y revalida disponibilidad', async () => {

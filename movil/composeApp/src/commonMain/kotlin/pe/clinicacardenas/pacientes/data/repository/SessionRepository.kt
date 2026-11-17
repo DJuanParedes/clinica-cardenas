@@ -9,7 +9,7 @@ import pe.clinicacardenas.pacientes.data.remote.PatientDto
 import pe.clinicacardenas.pacientes.data.remote.SessionDto
 import pe.clinicacardenas.pacientes.platform.PlatformActions
 
-/** Sesión del paciente y servidor de la clínica, guardados en SQLDelight. */
+/** Sesión del paciente, guardada en SQLDelight. */
 class SessionRepository(private val store: LocalStore, private val platform: PlatformActions) {
 
     private val _patient = MutableStateFlow(readPatient())
@@ -17,18 +17,8 @@ class SessionRepository(private val store: LocalStore, private val platform: Pla
 
     val token: String? get() = store.get(KEY_TOKEN)
 
-    /** Dirección del servidor; un dominio guardado con http:// se corrige a https:// (el servidor redirige y el login fallaría). */
-    val serverUrl: String
-        get() {
-            val saved = store.get(KEY_SERVER) ?: return platform.defaultServerUrl
-            return if (saved.startsWith("http://") && saved.contains(".cloudapp.azure.com")) "https://" + saved.removePrefix("http://") else saved
-        }
-
-    fun setServerUrl(url: String) {
-        var u = url.trim().trimEnd('/')
-        if (u.isNotEmpty() && !u.startsWith("http://") && !u.startsWith("https://")) u = "http://$u"
-        store.put(KEY_SERVER, u)
-    }
+    /** Servidor de la clínica: viene fijo dentro del APK, el usuario no tiene que escribirlo. */
+    val serverUrl: String get() = platform.defaultServerUrl
 
     fun start(session: SessionDto) {
         store.put(KEY_TOKEN, session.token)
@@ -57,6 +47,5 @@ class SessionRepository(private val store: LocalStore, private val platform: Pla
     private companion object {
         const val KEY_TOKEN = "token"
         const val KEY_PATIENT = "paciente"
-        const val KEY_SERVER = "servidor"
     }
 }

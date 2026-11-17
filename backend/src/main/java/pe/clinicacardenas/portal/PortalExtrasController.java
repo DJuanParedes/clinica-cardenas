@@ -30,11 +30,11 @@ public class PortalExtrasController {
     }
 
     @GetMapping("/api/portal/booking/slots")
-    public Map<String, Object> slots(@RequestParam Long dentistId,
+    public Map<String, Object> slots(Authentication auth, @RequestParam Long dentistId,
                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                      @RequestParam(defaultValue = "EVALUACION") String reasonCode,
                                      @RequestParam(required = false) Long excludeId) {
-        return service.slots(dentistId, date, reasonCode, excludeId);
+        return service.slots(auth.getName(), dentistId, date, reasonCode, excludeId);
     }
 
     @PostMapping("/api/portal/appointments")

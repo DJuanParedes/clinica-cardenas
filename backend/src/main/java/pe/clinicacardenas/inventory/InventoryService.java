@@ -175,7 +175,16 @@ public class InventoryService {
         for (Map<String, Object> r : rows) {
             Long itemId = ((Number) r.get("item_id")).longValue();
             BigDecimal q = new BigDecimal(String.valueOf(r.get("quantity")));
-            items.lockById(itemId).ifPresent(i -> move(i, "CONSUMO", q.negate(), e.description(), e.treatmentItemId()));
+            // El stock nunca queda negativo: se descuenta lo que hay y se deja constancia de lo que faltó.
+            items.lockById(itemId).ifPresent(i -> {
+                BigDecimal used = q.min(i.stock.max(BigDecimal.ZERO));
+                String why = e.description();
+                if (used.compareTo(q) < 0) {
+                    why = (why == null ? "" : why + " · ") + "stock insuficiente: faltaron "
+                            + q.subtract(used).stripTrailingZeros().toPlainString() + " " + i.unit;
+                }
+                move(i, "CONSUMO", used.negate(), why, e.treatmentItemId());
+            });
         }
     }
 

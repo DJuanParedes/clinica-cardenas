@@ -1,6 +1,8 @@
 package pe.clinicacardenas.pacientes
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -39,6 +41,34 @@ class MainActivity : ComponentActivity() {
     }
     private val openDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         deliver(uri?.let { read(it, null, image = false) })
+    }
+
+    // Archivos que se suben desde los módulos web (fichas, consentimientos).
+    private var pendingWebPick: ((Array<Uri>?) -> Unit)? = null
+    private val webChooser = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val cb = pendingWebPick
+        pendingWebPick = null
+        val data = r.data
+        val uris: Array<Uri>? = if (r.resultCode != Activity.RESULT_OK || data == null) null else {
+            val clip = data.clipData
+            when {
+                clip != null -> Array(clip.itemCount) { clip.getItemAt(it).uri }
+                data.data != null -> arrayOf(data.data!!)
+                else -> null
+            }
+        }
+        cb?.invoke(uris)
+    }
+
+    fun chooseForWeb(intent: Intent, onResult: (Array<Uri>?) -> Unit) {
+        pendingWebPick?.invoke(null)
+        pendingWebPick = onResult
+        try {
+            webChooser.launch(intent)
+        } catch (e: Exception) {
+            pendingWebPick = null
+            onResult(null)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -38,9 +38,9 @@ export class Api {
 
   // ---------- agenda (HU-07, HU-08, HU-09)
   dentists(): Observable<Dentist[]> { return this.http.get<Dentist[]>('/api/dentists'); }
-  slots(dentistId: number, date: string, duration: number, excludeId?: number):
+  slots(dentistId: number, date: string, duration: number, excludeId?: number, patientId?: number):
       Observable<{ works: boolean; blocks: Block[]; slots: Slot[]; freeCount: number; dentist: Dentist }> {
-    return this.http.get<any>('/api/agenda/slots', { params: params({ dentistId, date, duration, excludeId }) });
+    return this.http.get<any>('/api/agenda/slots', { params: params({ dentistId, date, duration, excludeId, patientId }) });
   }
   day(date: string, dentistId?: number): Observable<{ columns: { dentist: Dentist; blocks: Block[] }[]; appointments: Appointment[]; counts: Record<string, number> }> {
     return this.http.get<any>('/api/agenda/day', { params: params({ date, dentistId }) });

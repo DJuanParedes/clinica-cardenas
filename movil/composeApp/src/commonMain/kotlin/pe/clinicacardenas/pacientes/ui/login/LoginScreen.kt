@@ -32,7 +32,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import pe.clinicacardenas.pacientes.data.repository.SessionRepository
+import pe.clinicacardenas.pacientes.platform.PlatformActions
 import pe.clinicacardenas.pacientes.ui.components.Banner
 import pe.clinicacardenas.pacientes.ui.components.Field
 import pe.clinicacardenas.pacientes.ui.components.Logo
@@ -71,7 +74,6 @@ fun LoginScreen(vm: LoginViewModel = koinViewModel()) {
 
             Panel(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
                 when {
-                    s.mode == LoginMode.SERVIDOR -> ServerForm(s, vm)
                     s.staff -> StaffForm(s, vm)
                     s.mode == LoginMode.INGRESAR -> LoginForm(s, vm)
                     else -> ActivateForm(s, vm)
@@ -79,11 +81,6 @@ fun LoginScreen(vm: LoginViewModel = koinViewModel()) {
             }
 
             Spacer(Modifier.height(10.dp))
-            if (s.mode != LoginMode.SERVIDOR) {
-                TextButton(onClick = { vm.mode(LoginMode.SERVIDOR) }) {
-                    Text("Servidor: ${s.server}", color = Brand.Gris, fontSize = 12.sp)
-                }
-            }
             Text(
                 "RUC 10102984841 · Lima, Perú",
                 color = Brand.Gris,
@@ -132,6 +129,9 @@ private fun StaffForm(s: LoginState, vm: LoginViewModel) {
     s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
     Spacer(Modifier.height(8.dp))
     PrimaryButton("Ingresar", vm::staffLogin, loading = s.loading)
+    val platform = koinInject<PlatformActions>()
+    val server = koinInject<SessionRepository>().serverUrl.trimEnd('/')
+    TextButton(onClick = { platform.openUrl("$server/recuperar") }) { Text("¿Olvidaste tu contraseña?", color = Brand.Azul) }
 }
 
 @Composable
@@ -140,7 +140,7 @@ private fun Tabs(mode: LoginMode, onSelect: (LoginMode) -> Unit) {
         Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(14.dp)).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        listOf(LoginMode.INGRESAR to "Ingresar", LoginMode.ACTIVAR to "Primera vez", LoginMode.SERVIDOR to "Servidor").forEach { (m, label) ->
+        listOf(LoginMode.INGRESAR to "Ingresar", LoginMode.ACTIVAR to "Primera vez").forEach { (m, label) ->
             val on = m == mode
             Box(
                 Modifier
@@ -248,31 +248,6 @@ private fun ActivateForm(s: LoginState, vm: LoginViewModel) {
         Spacer(Modifier.height(8.dp))
         PrimaryButton("Activar y entrar", vm::activate, loading = s.loading)
         TextButton(onClick = { vm.edit { copy(codeSent = false, code = "") } }) { Text("Pedir otro código") }
-    }
-}
-
-@Composable
-private fun ServerForm(s: LoginState, vm: LoginViewModel) {
-    Text("Dirección del servidor", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Text(
-        "En el emulador de Android usa 10.0.2.2:9081. En un teléfono real, la IP de la computadora donde corre el sistema (por ejemplo 192.168.1.20:9081), conectada al mismo Wi-Fi.",
-        color = Brand.Tinta2,
-        fontSize = 14.sp,
-    )
-    Spacer(Modifier.height(12.dp))
-    Field(
-        value = s.server,
-        onChange = { vm.edit { copy(server = it.trim(), serverOk = null, serverInfo = null) } },
-        label = "Servidor",
-        keyboard = KeyboardType.Uri,
-        error = s.fieldErrors["server"],
-    )
-    s.serverInfo?.let { Banner(it, Brand.VerdeSuave, Brand.Verde, Modifier.padding(vertical = 8.dp)) }
-    s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
-    Spacer(Modifier.height(8.dp))
-    PrimaryButton("Probar y guardar", vm::testServer, loading = s.loading)
-    if (s.serverOk == true) {
-        TextButton(onClick = { vm.mode(LoginMode.INGRESAR) }) { Text("Ir a ingresar") }
     }
 }
 

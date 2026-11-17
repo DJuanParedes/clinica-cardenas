@@ -1,6 +1,8 @@
 /*
- * Proveedores reales de envío.
- *   - WhatsApp: WhatsApp Cloud API oficial de Meta (graph.facebook.com).
+ * Proveedores de envío.
+ *   - WhatsApp: WA_PROVEEDOR=simulador (por defecto) usa el Simulador de WhatsApp propio (whatsapp-sim): la misma
+ *     API que Meta, pero ningún mensaje llega a celulares reales; se ven en su panel (http://localhost:9084).
+ *     WA_PROVEEDOR=meta usa la WhatsApp Cloud API oficial de Meta (graph.facebook.com) con WA_TOKEN y WA_PHONE_NUMBER_ID.
  *   - Correo: SMTP con nodemailer (Gmail con contraseña de aplicación, Outlook, Brevo, etc.).
  *
  * Si un proveedor no está configurado, el canal sigue en modo de prueba: el mensaje solo se ve en el panel.
@@ -19,16 +21,18 @@ const TIMEOUT_MS = Number(env('PROVEEDOR_TIMEOUT_MS', '8000'));
 const ENVIAR_A_TODOS = env('ENVIAR_A_TODOS', 'false').toLowerCase() === 'true';
 const DESTINOS = (env('DESTINOS_REALES') || (ENVIAR_A_TODOS ? 'todos' : 'permitidos')).toLowerCase();
 
-// ---------------------------------------------------------------- WhatsApp Cloud API
+// ---------------------------------------------------------------- WhatsApp (simulador propio o Cloud API de Meta)
+const SIMULADOR = env('WA_PROVEEDOR', 'simulador').toLowerCase() !== 'meta';
 const WA = {
-  token: env('WA_TOKEN'),
-  phoneId: env('WA_PHONE_NUMBER_ID'),
+  token: SIMULADOR ? env('WA_SIM_TOKEN', 'token-simulador-whatsapp') : env('WA_TOKEN'),
+  phoneId: SIMULADOR ? env('WA_SIM_PHONE_ID', '100000000000001') : env('WA_PHONE_NUMBER_ID'),
   version: env('WA_API_VERSION', 'v21.0'),
-  base: env('WA_API_BASE', 'https://graph.facebook.com'),
-  plantilla: env('WA_PLANTILLA'),
+  base: SIMULADOR ? env('WA_SIM_URL', 'http://whatsapp-sim:8094') : env('WA_API_BASE', 'https://graph.facebook.com'),
+  // En el simulador están aprobadas las 4 plantillas de la clínica y la general "aviso_clinica".
+  plantilla: SIMULADOR ? env('WA_SIM_PLANTILLA', 'aviso_clinica') : env('WA_PLANTILLA'),
   idioma: env('WA_PLANTILLA_IDIOMA', 'es'),
-  wabaId: env('WA_WABA_ID'),
-  modo: env('WA_MODO').toLowerCase(), // plantilla | texto (por defecto: plantilla si hay WA_PLANTILLA)
+  wabaId: SIMULADOR ? env('WA_SIM_WABA_ID', '200000000000001') : env('WA_WABA_ID'),
+  modo: SIMULADOR ? 'plantilla' : env('WA_MODO').toLowerCase(), // plantilla | texto (por defecto: plantilla si hay WA_PLANTILLA)
   permitidos: new Set(list('WA_NUMEROS_PERMITIDOS').map((n) => localPhone(n)).filter(Boolean)),
 };
 const waActivo = () => Boolean(WA.token && WA.phoneId);
@@ -144,6 +148,8 @@ async function enviarWhatsApp(local, cuerpo, plantillaForzada, opciones = {}) {
   // Mensajes escritos a mano en el panel (como un chat): van como texto normal mientras la plantilla no esté
   // aprobada. Meta solo los entrega si el paciente escribió a la clínica en las últimas 24 h.
   if (opciones.chat && !plantillaForzada && WA.estadoPlantilla !== 'APPROVED') usarPlantilla = false;
+  // En el simulador, las respuestas del chat van como texto (el paciente acaba de escribir: ventana de 24 h abierta).
+  if (opciones.chat && !plantillaForzada && SIMULADOR) usarPlantilla = false;
   // Plantilla propia del tipo de mensaje (recordatorio, cita registrada, reprogramada, cancelada) con saltos de
   // línea y negritas. Si Meta aún no la aprobó, se usa la plantilla general con el texto en una sola línea.
   if (usarPlantilla && !plantillaForzada && opciones.plantillaWa && Array.isArray(opciones.parametrosWa) && !opciones.chat) {
@@ -231,6 +237,8 @@ async function enviarCorreo(destino, asunto, cuerpo) {
  */
 function destinoReal(canal, destinoNormalizado, info) {
   const wa = canal === 'WHATSAPP';
+  // Con el simulador todo se envía: ningún mensaje sale a un celular real.
+  if (wa && SIMULADOR) return { real: true };
   if (wa && !waActivo()) return { real: false, motivo: 'WhatsApp en modo de prueba (sin credenciales de Meta)' };
   if (!wa && !correoActivo()) return { real: false, motivo: 'Correo en modo de prueba (sin SMTP configurado)' };
   const permitidos = wa ? WA.permitidos : SMTP.permitidos;
@@ -248,7 +256,7 @@ function estadoProveedores() {
     enviarATodos: DESTINOS === 'todos',
     destinos: DESTINOS,
     whatsapp: waActivo()
-      ? { modo: 'real', proveedor: 'WhatsApp Cloud API (Meta)', numero: WA.numero || null, estadoPlantilla: WA.estadoPlantilla || null, envio: WA.plantilla && WA.modo !== 'texto' ? `plantilla ${WA.plantilla}` : 'texto libre (ventana de 24 h)', permitidos: [...WA.permitidos].map((n) => '+51 ' + n) }
+      ? { modo: SIMULADOR ? 'simulador' : 'real', proveedor: SIMULADOR ? 'Simulador de WhatsApp (sin Meta · panel en el puerto 9084)' : 'WhatsApp Cloud API (Meta)', numero: WA.numero || null, estadoPlantilla: WA.estadoPlantilla || null, envio: WA.plantilla && WA.modo !== 'texto' ? `plantilla ${WA.plantilla}` : 'texto libre (ventana de 24 h)', permitidos: [...WA.permitidos].map((n) => '+51 ' + n) }
       : { modo: 'prueba', proveedor: 'Simulado' },
     correo: correoActivo()
       ? { modo: 'real', proveedor: `SMTP ${SMTP.host}:${SMTP.port}`, remitente: SMTP.from || SMTP.user, permitidos: [...SMTP.permitidos] }

@@ -150,6 +150,11 @@ public class HistorySeeder {
                 a.startAt = at;
                 a.durationMin = code.startsWith("END") || code.startsWith("CIR-002") || code.startsWith("EST") ? 60 : 30;
                 a.endAt = at.plusMinutes(a.durationMin);
+                // Los datos de demostración también respetan la regla: sin cruces del odontólogo ni del paciente.
+                if (!appointments.findDentistOverlaps(d.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()
+                        || !appointments.findPatientOverlaps(p.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()) {
+                    continue;
+                }
                 a.reason = (pr == null ? reasonsByCode[rnd.nextInt(reasonsByCode.length)] : pr.name);
                 a.status = st;
                 a.createdAt = at.minusDays(2 + rnd.nextInt(6));

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- El servidor de la clínica corre en la red local por HTTP (sin certificado). En producción se usaría HTTPS. -->
+<!-- La app solo habla con el servidor de la clínica en internet, por HTTPS. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
 </network-security-config>

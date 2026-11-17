@@ -40,6 +40,7 @@ La primera vez tarda unos minutos porque descarga dependencias y compila. Luego:
 - **App del paciente (celular):** http://localhost:9081/app · demo: DNI `45872196`, contraseña `Paciente2026`
 - **API simulada de SUNAT:** http://localhost:9082
 - **Microservicio de notificaciones** (bandeja de WhatsApp y correo): http://localhost:9083
+- **Simulador de WhatsApp** (chats con los pacientes, sin Meta): http://localhost:9084
 - **MySQL** (DBeaver / Workbench): `localhost:3308` · base `clinica` · usuario `clinica` · contraseña `clinica`
 
 Para ver el avance del arranque: `docker compose logs -f backend`.
@@ -195,6 +196,26 @@ SUNAT_CERTIFICADO_CLAVE=<clave del certificado>
 El certificado incluido (`backend/src/main/resources/sunat/certificado-demo.p12`) es autofirmado y solo sirve para
 la demostración. Con `SUNAT_MODE=interno` el backend valida sin red, sin usar la API simulada.
 
+## Simulador de WhatsApp (sin Meta)
+
+Igual que la API simulada de SUNAT, `whatsapp-sim/` (puerto **9084**) imita la **WhatsApp Cloud API**: el sistema le
+envía los mensajes con el mismo formato que a Meta, pero **ningún mensaje llega a un celular real**. Es el modo por
+defecto (`WA_PROVEEDOR=simulador`). Para volver a Meta: `WA_PROVEEDOR=meta` en el `.env` y `actualizar.bat`.
+
+- **Panel tipo WhatsApp:** http://localhost:9084 (en el servidor: `https://DOMINIO/whatsapp-sim/`, con usuario y
+  contraseña del personal: admin o con permiso Notificaciones). Muestra cada paciente con sus mensajes, los checks
+  ✓ enviado, ✓✓ entregado y ✓✓ azul leído, y cuántos mensajes salieron, se entregaron, se leyeron o fallaron hoy.
+- **Plantillas reales:** `recordatorio_cita`, `cita_registrada`, `cita_reprogramada`, `cita_cancelada`, `aviso_clinica`
+  y `hello_world`, con el mismo texto, emojis y negritas que en Meta. Si falta un parámetro o la plantilla no existe,
+  responde con el mismo error que Meta (132000 / 132001) y el sistema usa la plantilla general.
+- **Responder como paciente:** botones **1 · Confirmo** y **2 · Reprogramar** o texto libre. La respuesta llega al
+  sistema por el webhook (firmado como Meta si hay `WA_APP_SECRET`): "1" confirma la cita y "2" la marca para que
+  recepción llame. La respuesta automática de la clínica aparece en el mismo chat.
+- **Situaciones reales:** *Celular apagado* (queda en ✓ hasta encenderlo), *No tiene WhatsApp* (Meta acepta y luego
+  avisa "no entregado"), proveedor **Lento** (12 s) o **Caído** (503) para ver los reintentos del sistema.
+- **API:** `POST /v21.0/{id}/messages`, `GET /v21.0/{id}`, `GET|POST /v21.0/{waba}/message_templates`, y para
+  pruebas `GET /sim/chats`, `POST /sim/responder {telefono, texto}`.
+
 ## Mensajes reales por WhatsApp y correo
 
 El microservicio `notificaciones` envía mensajes reales con dos proveedores:
@@ -274,6 +295,7 @@ clinica-cardenas/
 ├── pruebas/sprint1-e2e.js           pruebas end-to-end de todas las historias y de SUNAT
 ├── pruebas/completo-e2e.js          pruebas end-to-end de las historias de la versión completa
 ├── sunat-sim/                       API simulada de SUNAT (billService SOAP, consulta RUC, panel)
+├── whatsapp-sim/                    Simulador de WhatsApp Cloud API (envíos, plantillas, webhook, panel tipo chat)
 ├── notificaciones/                  microservicio de WhatsApp y correo (recordatorios, avisos, panel)
 ├── backend/                         Spring Boot
 │   ├── src/main/resources/db/migration   V1 esquema · V2 catálogos (Flyway)

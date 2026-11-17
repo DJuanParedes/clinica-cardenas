@@ -54,7 +54,7 @@ suspend inline fun <reified T> apiCall(block: () -> HttpResponse): T {
         throw e
     } catch (e: Exception) {
         throw ApiException(
-            "No se pudo conectar con la clínica. Revisa tu internet o la dirección del servidor.",
+            "No se pudo conectar con la clínica. Revisa tu conexión a internet e inténtalo de nuevo.",
             code = "SIN_CONEXION",
         )
     }
@@ -70,7 +70,7 @@ suspend inline fun <reified T> apiCall(block: () -> HttpResponse): T {
 
 /**
  * Cliente REST de la app del paciente (U2: conectividad y CRUD REST con Ktor).
- * El servidor y el token se leen en cada llamada, así un cambio de servidor o de sesión aplica al instante.
+ * El servidor es fijo (viene en el APK) y el token se lee en cada llamada.
  */
 class ApiClient(
     private val http: HttpClient,

@@ -16,7 +16,7 @@ class PickedFile(val name: String, val mimeType: String, val bytes: ByteArray)
 interface PlatformActions {
     val name: String
 
-    /** Servidor por defecto: en el emulador de Android Studio la PC es 10.0.2.2. */
+    /** Servidor de la clínica en internet: viene fijo en la app. */
     val defaultServerUrl: String
 
     fun openUrl(url: String)

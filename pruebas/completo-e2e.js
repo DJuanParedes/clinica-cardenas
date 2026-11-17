@@ -31,6 +31,8 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     catch (e) { results.push({ hu, name, ok: false, detail: String(e.message || e) }); }
   }
   const expect = (c, m) => { if (!c) throw new Error(m); };
+  // Enviado, o ya entregado / leído (el simulador de WhatsApp confirma la entrega en segundos, como Meta).
+  const OK_ENVIO = ['ENVIADO', 'ENTREGADO', 'LEIDO'];
   const expectStatus = (r, s, ctx) => { if (r.status !== s) throw new Error(`${ctx}: esperaba ${s}, llegó ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`); };
   const login = async (u, p = PWD) => { const r = await api('POST', '/api/auth/login', { username: u, password: p }); expectStatus(r, 200, 'login ' + u); return r.body.token; };
   const randDni = () => String(40000000 + Math.floor(Math.random() * 49999999)).slice(0, 8);
@@ -292,7 +294,7 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     const a = (await api('POST', `/api/appointments/${appt.id}/remind`, {}, recep)).body;
     const b = (await api('POST', `/api/appointments/${appt.id}/remind`, {}, recep)).body;
     expect(a.queued === 2 && b.queued === 0 && b.duplicated === 2, JSON.stringify([a, b]));
-    const manual = (l) => l.filter((x) => x.idempotencyKey.startsWith('recordatorio-manual') && x.status === 'ENVIADO');
+    const manual = (l) => l.filter((x) => x.idempotencyKey.startsWith('recordatorio-manual') && OK_ENVIO.includes(x.status));
     const n = await waitFor((l) => manual(l).length === 2);
     expect(manual(n).length === 2, 'no se envió por los dos canales');
     return b.message;
@@ -302,10 +304,10 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     while (d.getDay() === 0) d.setDate(d.getDate() + 1);
     const slots = (await api('GET', `/api/agenda/slots?dentistId=${dra}&date=${iso(d)}&duration=30`, undefined, recep)).body.slots.filter((s) => s.available);
     expectStatus(await api('PUT', `/api/appointments/${appt.id}`, { dentistId: dra, startAt: slots[1].start, durationMin: 30, changeReason: 'Pidió otro día' }, recep), 200, 'reprogramar');
-    const n = await waitFor((l) => l.filter((x) => x.type === 'CAMBIO_CITA' && x.status === 'ENVIADO').length === 2
+    const n = await waitFor((l) => l.filter((x) => x.type === 'CAMBIO_CITA' && OK_ENVIO.includes(x.status)).length === 2
       && l.filter((x) => x.type === 'RECORDATORIO' && x.operation === 'PROGRAMAR' && x.status === 'PROGRAMADO').length >= 1);
     const change = n.filter((x) => x.type === 'CAMBIO_CITA');
-    expect(change.length === 2 && change.every((x) => x.status === 'ENVIADO'), 'aviso de cambio (WhatsApp y correo): ' + change.map((x) => x.status));
+    expect(change.length === 2 && change.every((x) => OK_ENVIO.includes(x.status)), 'aviso de cambio (WhatsApp y correo): ' + change.map((x) => x.status));
     const progs = n.filter((x) => x.type === 'RECORDATORIO' && x.operation === 'PROGRAMAR');
     expect(progs.some((x) => x.status === 'ANULADO') && progs.some((x) => x.status === 'PROGRAMADO'), 'recordatorios: ' + progs.map((x) => x.status));
     expect(n.some((x) => x.operation === 'ANULAR' && x.status === 'ANULADO'), 'no se anuló en el microservicio');
@@ -313,8 +315,8 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
   });
   await check('HU-24', 'Aviso al cancelar la cita', async () => {
     expectStatus(await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'CANCELADA', reason: 'Viaje' }, recep), 200, 'cancelar');
-    const n = await waitFor((l) => l.filter((x) => x.type === 'CANCELACION' && x.status === 'ENVIADO').length === 2);
-    expect(n.filter((x) => x.type === 'CANCELACION' && x.status === 'ENVIADO').length === 2, 'cancelación no enviada');
+    const n = await waitFor((l) => l.filter((x) => x.type === 'CANCELACION' && OK_ENVIO.includes(x.status)).length === 2);
+    expect(n.filter((x) => x.type === 'CANCELACION' && OK_ENVIO.includes(x.status)).length === 2, 'cancelación no enviada');
     expect(!n.some((x) => x.type === 'RECORDATORIO' && x.operation === 'PROGRAMAR' && x.status === 'PROGRAMADO'), 'quedó un recordatorio activo');
   });
   await check('HU-23', 'Preferencia de canal: sin correo no se puede elegir correo', async () => {

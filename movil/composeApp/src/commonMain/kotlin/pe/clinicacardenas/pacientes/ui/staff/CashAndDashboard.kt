@@ -234,7 +234,7 @@ fun StaffAccountScreen(user: StaffUserDto) {
                 Text("${user.roleLabel} · usuario ${user.username}", color = Brand.Tinta2)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (user.twoFactor) "🔐 Verificación en 2 pasos activada" else "Verificación en 2 pasos desactivada: actívala en la web, en Mi seguridad.",
+                    if (user.twoFactor) "🔐 Verificación en 2 pasos activada" else "Verificación en 2 pasos desactivada: actívala en Más › Mi seguridad (2 pasos).",
                     color = if (user.twoFactor) Brand.Verde else Brand.Gris,
                     fontSize = 13.sp,
                 )

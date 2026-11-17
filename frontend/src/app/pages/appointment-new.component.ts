@@ -31,7 +31,7 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
           <section class="panel">
             <div class="panel-head"><h3><span class="n">1</span> Paciente</h3></div>
             <div class="panel-body">
-              <app-patient-picker [value]="patient" (valueChange)="patient = $event" [locked]="!!editing" />
+              <app-patient-picker [value]="patient" (valueChange)="pickPatient($event)" [locked]="!!editing" />
             </div>
           </section>
 
@@ -232,7 +232,7 @@ export class AppointmentNewComponent implements OnInit {
       if (!this.reprogramar && list.length === 1) this.pickDentist(list[0]);
     });
 
-    if (this.paciente) this.api.patient(+this.paciente).subscribe((r) => (this.patient = r.patient));
+    if (this.paciente) this.api.patient(+this.paciente).subscribe((r) => { this.patient = r.patient; this.loadSlots(); });
 
     if (this.reprogramar) {
       this.loadAppointment(+this.reprogramar);
@@ -280,6 +280,8 @@ export class AppointmentNewComponent implements OnInit {
   }
 
   pickDentist(d: Dentist) { this.dentist = d; this.loadSlots(); }
+  /** Al elegir paciente se recalculan los horarios: se ocultan las horas en que ya tiene cita con otro odontólogo. */
+  pickPatient(p: Patient | null) { this.patient = p; this.loadSlots(); }
   pickDate(iso: string) { if (!iso || iso < this.todayIso) return; this.date = iso; this.loadSlots(); }
   pickDuration(m: number) { this.duration = m; this.loadSlots(); }
 
@@ -287,7 +289,7 @@ export class AppointmentNewComponent implements OnInit {
     if (!this.dentist) return;
     this.slot = null;
     this.loadingSlots = true;
-    this.api.slots(this.dentist.id, this.date, this.duration, this.editing?.id).subscribe({
+    this.api.slots(this.dentist.id, this.date, this.duration, this.editing?.id, this.patient?.id).subscribe({
       next: (r) => { this.slots = r.slots; this.works = r.works; this.loadingSlots = false; },
       error: (e) => { this.loadingSlots = false; this.toast.error(apiError(e).message); },
     });
@@ -310,7 +312,7 @@ export class AppointmentNewComponent implements OnInit {
         this.saving = false;
         const err = apiError(e);
         this.toast.error(err.message);
-        if (err.code === 'CRUCE_HORARIO' || err.code === 'FUERA_DE_HORARIO') this.loadSlots();
+        if (err.code === 'CRUCE_HORARIO' || err.code === 'CRUCE_PACIENTE' || err.code === 'FUERA_DE_HORARIO') this.loadSlots();
       },
     });
   }

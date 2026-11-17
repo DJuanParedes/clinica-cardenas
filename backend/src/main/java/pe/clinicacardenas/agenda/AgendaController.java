@@ -33,8 +33,9 @@ public class AgendaController {
     public Map<String, Object> slots(@RequestParam Long dentistId,
                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                      @RequestParam(defaultValue = "30") int duration,
-                                     @RequestParam(required = false) Long excludeId) {
-        return service.slots(dentistId, date, duration, excludeId);
+                                     @RequestParam(required = false) Long excludeId,
+                                     @RequestParam(required = false) Long patientId) {
+        return service.slots(dentistId, date, duration, excludeId, patientId);
     }
 
     @GetMapping("/agenda/day")

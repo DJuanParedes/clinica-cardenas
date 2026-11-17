@@ -162,10 +162,14 @@ public class CareService {
     public Map<String, Object> installments(Long planId) {
         TreatmentPlan p = plan(planId);
         List<Installment> list = installments.findByPlanIdOrderByNumberAsc(planId);
+        // Solo cuentan los pagos de procedimientos de ESTE plan y los pagos "a cuenta": un pago de otro
+        // tratamiento no puede dar por pagadas las cuotas de este plan.
         BigDecimal paid = jdbc.queryForObject("""
-                select coalesce(sum(amount), 0) from payments
-                 where patient_id = ? and status = 'VALIDO' and paid_at >= ?
-                """, BigDecimal.class, p.patientId, p.createdAt);
+                select coalesce(sum(py.amount), 0) from payments py
+                 where py.patient_id = ? and py.status = 'VALIDO' and py.paid_at >= ?
+                   and (py.treatment_item_id is null
+                        or py.treatment_item_id in (select ti.id from treatment_items ti where ti.plan_id = ?))
+                """, BigDecimal.class, p.patientId, p.createdAt, planId);
         if (paid == null) paid = BigDecimal.ZERO;
         BigDecimal cumulative = BigDecimal.ZERO;
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -221,6 +225,21 @@ public class CareService {
     @Transactional
     public void remindInstallments() {
         for (Installment i : installments.findByDueDateAndRemindedAtIsNull(Dates.today().plusDays(3))) {
+            // No se recuerda una cuota que ya está cubierta por los pagos del paciente.
+            boolean alreadyPaid = false;
+            try {
+                Object rows = installments(i.planId).get("items");
+                if (rows instanceof List<?> l) for (Object o : l) {
+                    if (o instanceof Map<?, ?> row && i.id.equals(row.get("id")) && "PAGADA".equals(row.get("status"))) alreadyPaid = true;
+                }
+            } catch (RuntimeException ex) {
+                log.warn("No se pudo revisar el estado de la cuota {}: {}", i.id, ex.getMessage());
+            }
+            if (alreadyPaid) {
+                i.remindedAt = Dates.now();
+                installments.save(i);
+                continue;
+            }
             plans.findById(i.planId).flatMap(p -> patients.findById(p.patientId)).ifPresent(p -> {
                 String text = "te recordamos que tu cuota " + i.number + " de S/ " + i.amount.toPlainString() + " vence el "
                         + i.dueDate.format(DAY) + ". Puedes pagarla en la app o en recepción.";

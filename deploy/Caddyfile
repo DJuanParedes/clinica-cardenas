@@ -11,6 +11,14 @@
 	handle /webhook/whatsapp {
 		reverse_proxy notificaciones:8093
 	}
+	# Panel del simulador de WhatsApp (pide usuario del personal: admin o con permiso Notificaciones).
+	# Solo el panel: la API tipo Meta del simulador queda interna.
+	redir /whatsapp-sim /whatsapp-sim/
+	handle_path /whatsapp-sim/* {
+		@api path /v*
+		respond @api 404
+		reverse_proxy whatsapp-sim:8094
+	}
 	handle {
 		reverse_proxy frontend:80
 	}

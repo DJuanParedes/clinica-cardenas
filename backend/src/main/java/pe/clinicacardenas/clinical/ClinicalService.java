@@ -354,6 +354,7 @@ public class ClinicalService {
     @Transactional
     public Map<String, Object> addEvolution(Long planId, EvolutionRequest r) {
         TreatmentPlan p = plan(planId);
+        if ("ANULADO".equals(p.status)) throw ApiException.badRequest("PLAN_CERRADO", "El plan está anulado: no se pueden registrar sesiones.");
         if (r.notes() == null || r.notes().isBlank()) throw ApiException.field("notes", "Describe lo realizado en la sesión.");
         LocalDate date = r.sessionDate() == null ? Dates.today() : r.sessionDate();
         if (date.isAfter(Dates.today())) throw ApiException.field("sessionDate", "La fecha de la sesión no puede ser futura.");

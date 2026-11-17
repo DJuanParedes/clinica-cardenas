@@ -120,12 +120,14 @@ public class PortalExtrasService {
 
     /** Horarios libres de un odontólogo para un día (solo los que el paciente puede tomar). */
     @Transactional(readOnly = true)
-    public Map<String, Object> slots(Long dentistId, LocalDate date, String reasonCode, Long excludeId) {
+    public Map<String, Object> slots(String subject, Long dentistId, LocalDate date, String reasonCode, Long excludeId) {
+        Patient p = me(subject);
         int duration = durationOf(reasonCode);
         if (date.isBefore(Dates.today()) || date.isAfter(Dates.today().plusDays(MAX_DAYS_AHEAD))) {
             return Map.of("date", date, "durationMin", duration, "slots", List.of());
         }
-        Map<String, Object> raw = agenda.slots(dentistId, date, duration, excludeId);
+        // Se ocultan también las horas en que el paciente ya tiene cita con otro odontólogo.
+        Map<String, Object> raw = agenda.slots(dentistId, date, duration, excludeId, p.id);
         LocalDateTime minStart = Dates.now().plusHours(MIN_HOURS_TO_BOOK);
         List<String> free = new ArrayList<>();
         Object list = raw.get("slots");
@@ -155,7 +157,9 @@ public class PortalExtrasService {
         return null;
     }
 
-    @Transactional
+    // READ_COMMITTED: la verificación de cruces dentro de AgendaService debe ver las citas recién confirmadas
+    // por otras transacciones (con REPEATABLE READ dos reservas simultáneas podrían aceptarse).
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Map<String, Object> book(String subject, BookRequest r) {
         Patient p = me(subject);
         String label = labelOf(r.reasonCode());
@@ -189,7 +193,7 @@ public class PortalExtrasService {
         }
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Map<String, Object> reschedule(String subject, Long id, RescheduleRequest r) {
         Patient p = me(subject);
         Appointment a = mine(p, id);

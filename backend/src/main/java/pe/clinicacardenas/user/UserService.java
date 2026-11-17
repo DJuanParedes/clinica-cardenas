@@ -3,10 +3,14 @@ package pe.clinicacardenas.user;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.clinicacardenas.agenda.Appointment;
+import pe.clinicacardenas.agenda.AppointmentRepository;
+import pe.clinicacardenas.agenda.AppointmentStatus;
 import pe.clinicacardenas.agenda.Dentist;
 import pe.clinicacardenas.agenda.DentistRepository;
 import pe.clinicacardenas.agenda.DentistSchedule;
 import pe.clinicacardenas.agenda.DentistScheduleRepository;
+import pe.clinicacardenas.agenda.SlotCalculator;
 import pe.clinicacardenas.auth.PasswordPolicy;
 import pe.clinicacardenas.common.ApiException;
 import pe.clinicacardenas.common.AuditService;
@@ -14,6 +18,7 @@ import pe.clinicacardenas.common.Dates;
 import pe.clinicacardenas.security.CurrentUser;
 
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -29,9 +34,13 @@ public class UserService {
     private final DentistScheduleRepository schedules;
     private final PasswordEncoder encoder;
     private final AuditService audit;
+    private final AppointmentRepository appointments;
+
+    private static final DateTimeFormatter DMY_HM = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     public UserService(UserRepository users, DentistRepository dentists, DentistScheduleRepository schedules,
-                       PasswordEncoder encoder, AuditService audit) {
+                       PasswordEncoder encoder, AuditService audit, AppointmentRepository appointments) {
+        this.appointments = appointments;
         this.users = users;
         this.dentists = dentists;
         this.schedules = schedules;
@@ -154,6 +163,7 @@ public class UserService {
         u.updatedBy = CurrentUser.usernameOrSystem();
         users.save(u);
         Optional<Dentist> dentist = dentists.findByUserId(u.id);
+        if (u.role != Role.ODONTOLOGO) dentist.filter(d -> d.active).ifPresent(d -> ensureNoPendingAppointments(d, "cambiarle el rol"));
         if (u.role == Role.ODONTOLOGO) {
             ensureDentist(u, r.specialty(), r.cop());
         } else {
@@ -195,6 +205,7 @@ public class UserService {
         if (!active && u.username.equals(CurrentUser.usernameOrSystem())) {
             throw ApiException.badRequest("OPERACION_NO_PERMITIDA", "No puedes desactivar tu propia cuenta.");
         }
+        if (!active) dentists.findByUserId(u.id).filter(d -> d.active).ifPresent(d -> ensureNoPendingAppointments(d, "desactivarlo"));
         u.active = active;
         u.updatedAt = Dates.now();
         u.updatedBy = CurrentUser.usernameOrSystem();
@@ -227,6 +238,16 @@ public class UserService {
         return view(u);
     }
 
+    /** Un odontólogo con citas por atender no se desactiva: esas citas quedarían sin profesional. */
+    private void ensureNoPendingAppointments(Dentist d, String action) {
+        List<Appointment> pending = appointments.findPendingForDentist(d.id, Dates.now(), AppointmentStatus.PENDING);
+        if (!pending.isEmpty()) {
+            throw ApiException.conflict("CITAS_PENDIENTES", d.getFullName() + " tiene " + pending.size()
+                    + " cita(s) pendiente(s) (la próxima: " + pending.get(0).startAt.format(DMY_HM)
+                    + "). Reprográmalas con otro odontólogo o cancélalas antes de " + action + ".");
+        }
+    }
+
     // ------------------------------------------------------------------ horarios
 
     @Transactional(readOnly = true)
@@ -249,12 +270,29 @@ public class UserService {
                 throw ApiException.badRequest("HORARIO_INVALIDO", "Usa el formato HH:mm en los horarios.");
             }
             if (!e.isAfter(s)) throw ApiException.badRequest("HORARIO_INVALIDO", "La hora de fin debe ser posterior al inicio.");
+            // Las citas empiezan en bloques de 15 minutos: un horario de 9:10 ofrecería horas que luego se rechazan.
+            if (s.getMinute() % 15 != 0 || e.getMinute() % 15 != 0 || s.getSecond() != 0 || e.getSecond() != 0) {
+                throw ApiException.badRequest("HORARIO_INVALIDO", "Usa horas en bloques de 15 minutos (por ejemplo 09:00, 09:15, 13:30).");
+            }
             for (DentistSchedule p : parsed) {
                 if (p.weekday == b.weekday() && p.startTime.isBefore(e) && p.endTime.isAfter(s)) {
                     throw ApiException.badRequest("HORARIO_INVALIDO", "Hay bloques que se superponen el mismo día.");
                 }
             }
             parsed.add(new DentistSchedule(dentistId, b.weekday(), s, e));
+        }
+        // Las citas futuras no pueden quedar fuera del nuevo horario.
+        List<Appointment> outside = new ArrayList<>();
+        for (Appointment a : appointments.findPendingForDentist(dentistId, Dates.now(), AppointmentStatus.PENDING)) {
+            int wd = a.startAt.getDayOfWeek().getValue();
+            List<SlotCalculator.Block> day = new ArrayList<>();
+            for (DentistSchedule p : parsed) if (p.weekday == wd) day.add(new SlotCalculator.Block(p.startTime, p.endTime));
+            if (!SlotCalculator.fitsInBlocks(day, a.startAt.toLocalTime(), a.endAt.toLocalTime())) outside.add(a);
+        }
+        if (!outside.isEmpty()) {
+            Appointment f = outside.get(0);
+            throw ApiException.conflict("CITAS_FUERA_DE_HORARIO", outside.size() + " cita(s) pendiente(s) quedarían fuera del nuevo horario"
+                    + " (la primera: " + f.startAt.format(DMY_HM) + " con " + f.patient.getFullName() + "). Reprográmalas antes de cambiar el horario.");
         }
         schedules.deleteByDentistId(dentistId);
         schedules.flush();

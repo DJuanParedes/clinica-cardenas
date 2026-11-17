@@ -82,7 +82,7 @@ class NewAppointmentViewModel(private val repo: StaffRepository, session: StaffS
         }
     }
 
-    fun patient(p: SPatientDto?) = _state.update { it.copy(patient = p) }
+    fun patient(p: SPatientDto?) { _state.update { it.copy(patient = p, slot = null) }; loadSlots() }
     fun dentist(id: Long) { _state.update { it.copy(dentistId = id, slot = null) }; loadSlots() }
     fun duration(d: Int) { _state.update { it.copy(duration = d, slot = null) }; loadSlots() }
     fun date(d: LocalDate) { _state.update { it.copy(date = d, slot = null) }; loadSlots() }
@@ -96,7 +96,7 @@ class NewAppointmentViewModel(private val repo: StaffRepository, session: StaffS
         _state.update { it.copy(loadingSlots = true, slots = emptyList()) }
         job = viewModelScope.launch {
             try {
-                val r = repo.guarded { slots(dentist, s.date.toString(), s.duration) }
+                val r = repo.guarded { slots(dentist, s.date.toString(), s.duration, s.patient?.id) }
                 val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).toString()
                 _state.update { it.copy(slots = r.slots.filter { x -> x.available && x.start > now }.map { x -> x.start }, works = r.works, loadingSlots = false) }
             } catch (e: ApiException) {

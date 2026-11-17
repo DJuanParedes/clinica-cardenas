@@ -51,14 +51,39 @@ services:
     mem_limit: 64m
 
   # Microservicio de notificaciones por WhatsApp y correo (HU-23 / HU-24). Panel: http://localhost:9083
+  # Simulador de WhatsApp: la misma API que WhatsApp Cloud (Meta), pero ningún mensaje sale a celulares reales.
+  # Panel tipo chat para ver los mensajes y responder como paciente: http://localhost:9084
+  whatsapp-sim:
+    build: ./whatsapp-sim
+    restart: unless-stopped
+    environment:
+      WEBHOOK_URL: http://notificaciones:8093/webhook/whatsapp
+      CONTACTOS_URL: http://notificaciones:8093/v1/contactos
+      APP_SECRET: ${WA_APP_SECRET:-}
+      SIM_TOKEN: ${WA_SIM_TOKEN:-token-simulador-whatsapp}
+      SIM_NUMERO: ${WA_SIM_NUMERO:-+51 987 654 000}
+      TZ: America/Lima
+    volumes:
+      - wa-sim-data:/data
+    ports:
+      - "9084:8094"
+    mem_limit: 64m
+
   notificaciones:
     build: ./notificaciones
     restart: unless-stopped
+    depends_on:
+      whatsapp-sim:
+        condition: service_healthy
     environment:
       WEBHOOK_URL: http://backend:8080/api/internal/notifications/callback
       WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
       TZ: America/Lima
-      # Envío real (ver README → "Mensajes reales"). Sin credenciales, el canal queda en modo de prueba.
+      # WhatsApp: "simulador" (por defecto, sin Meta: http://localhost:9084) o "meta" (envío real con WA_TOKEN).
+      WA_PROVEEDOR: ${WA_PROVEEDOR:-simulador}
+      WA_SIM_URL: http://whatsapp-sim:8094
+      WA_SIM_TOKEN: ${WA_SIM_TOKEN:-token-simulador-whatsapp}
+      # Envío real por Meta (ver README → "Mensajes reales"). Solo se usa con WA_PROVEEDOR=meta.
       WA_TOKEN: ${WA_TOKEN:-}
       WA_PHONE_NUMBER_ID: ${WA_PHONE_NUMBER_ID:-}
       WA_API_VERSION: ${WA_API_VERSION:-v21.0}
@@ -146,3 +171,4 @@ volumes:
   files-data:
   sunat-data:
   notif-data:
+  wa-sim-data:
