@@ -203,6 +203,28 @@ export class Api {
   portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
   portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
   portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
+
+  // ---------- mensajes de WhatsApp y asistente virtual
+  conversations(q?: string): Observable<{ items: ConversationThread[]; unread: number; attention: number; mode: string }> {
+    return this.http.get<any>('/api/conversations', { params: params({ q }) });
+  }
+  conversationSummary(): Observable<{ unread: number; attention: number; mode: string }> { return this.http.get<any>('/api/conversations/summary'); }
+  conversation(phone: string): Observable<ConversationDetail> { return this.http.get<ConversationDetail>(`/api/conversations/${phone}`); }
+  sendWhatsapp(phone: string, text: string): Observable<any> { return this.http.post(`/api/conversations/${phone}/messages`, { text }); }
+  updateConversation(phone: string, body: { aiEnabled?: boolean; attended?: boolean }): Observable<ConversationDetail> {
+    return this.http.patch<ConversationDetail>(`/api/conversations/${phone}`, body);
+  }
+  assistantSettings(): Observable<AssistantSettings> { return this.http.get<AssistantSettings>('/api/assistant/settings'); }
+  updateAssistantSettings(body: { mode?: string; pauseMinutes?: number }): Observable<AssistantSettings> {
+    return this.http.put<AssistantSettings>('/api/assistant/settings', body);
+  }
+  faq(): Observable<FaqItem[]> { return this.http.get<FaqItem[]>('/api/assistant/faq'); }
+  addFaq(body: Partial<FaqItem>): Observable<FaqItem[]> { return this.http.post<FaqItem[]>('/api/assistant/faq', body); }
+  updateFaq(id: number, body: Partial<FaqItem>): Observable<FaqItem[]> { return this.http.put<FaqItem[]>(`/api/assistant/faq/${id}`, body); }
+  deleteFaq(id: number): Observable<FaqItem[]> { return this.http.delete<FaqItem[]>(`/api/assistant/faq/${id}`); }
+  testAssistant(text: string, patientId?: number): Observable<AssistantTest> {
+    return this.http.post<AssistantTest>('/api/assistant/test', { text, patientId: patientId ?? null });
+  }
 }
 
 export interface PatientFile {
@@ -275,3 +297,28 @@ export interface RucInfo {
   ruc: string; razonSocial: string; estado: string; condicion: string;
   direccion: string; distrito: string; provincia: string; departamento: string; tipo: string;
 }
+
+export interface ConversationThread {
+  phone: string; patientId: number | null; name: string; aiEnabled: boolean; manualUntil: string | null;
+  needsAttention: boolean; unread: number; lastMessageAt: string | null; lastPreview: string | null;
+}
+
+export interface ConversationMessage {
+  id: string; direction: 'IN' | 'OUT'; source: 'PACIENTE' | 'IA' | 'PERSONAL' | 'SISTEMA'; body: string;
+  intent: string | null; engine: string | null; status: string | null; author: string | null; at: string;
+}
+
+export interface ConversationDetail {
+  thread: { phone: string; patientId: number | null; name: string | null; aiEnabled: boolean; manualUntil: string | null; needsAttention: boolean; silence: string | null };
+  messages: ConversationMessage[];
+  upcoming?: { id: number; startAt: string; dentist: string; reason: string; status: string }[];
+}
+
+export interface AssistantSettings {
+  mode: 'AUTOMATICO' | 'FUERA_HORARIO' | 'APAGADO'; pauseMinutes: number; openNow: boolean; schedule: string; knowledgeDocs: number;
+  model: { proveedor: string; modelo: string; externo: boolean; ultimoError: string | null };
+}
+
+export interface FaqItem { id: number; question: string; answer: string; active: boolean; updatedAt?: string; updatedBy?: string; }
+
+export interface AssistantTest { text: string; intent: string; needsHuman: boolean; engine: string; sources: string[]; ms: number; }

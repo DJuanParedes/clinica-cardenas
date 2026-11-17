@@ -1,7 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../core/auth.service';
+import { Api } from '../core/api.service';
 import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
 import { initials } from '../core/format';
@@ -15,7 +16,8 @@ const NAV: NavGroup[] = [
     { path: '/inicio', label: 'Inicio', icon: 'home', perms: [] },
     { path: '/agenda', label: 'Agenda del día', icon: 'calendar', perms: ['AGENDA_VER'] },
     { path: '/pacientes', label: 'Pacientes', icon: 'patient', perms: ['PACIENTES_VER'] },
-    { path: '/seguimiento', label: 'Seguimiento', icon: 'message', perms: ['AGENDA_VER'] },
+    { path: '/mensajes', label: 'Mensajes WhatsApp', icon: 'message', perms: ['MENSAJES'] },
+    { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
     { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
   ] },
   { title: 'Caja', items: [
@@ -61,6 +63,7 @@ const NAV: NavGroup[] = [
               <a [routerLink]="item.path" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: item.path === '/caja' }" class="nav">
                 <app-icon [name]="item.icon" />
                 <span>{{ item.label }}</span>
+                @if (item.path === '/mensajes' && unread() > 0) { <span class="badge" [attr.aria-label]="unread() + ' mensajes sin leer'">{{ unread() > 99 ? '99+' : unread() }}</span> }
               </a>
             }
           }
@@ -109,6 +112,8 @@ const NAV: NavGroup[] = [
     .nav { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px;
       color: var(--ink-2); font-size: 14px; font-weight: 600; }
     .nav:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+    .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #25d366; color: #fff;
+      font-size: 11.5px; font-weight: 800; display: grid; place-items: center; }
     .nav.on { background: var(--brand-soft); color: var(--teal-strong); font-weight: 700; }
     .nav.on::before { content: ""; position: absolute; left: -14px; top: 8px; bottom: 8px; width: 4px; border-radius: 0 4px 4px 0; background: var(--orange); }
     .place { display: flex; align-items: center; gap: 6px; margin: auto 8px 10px; font-size: 12px; color: var(--muted); }
@@ -132,10 +137,14 @@ const NAV: NavGroup[] = [
     @media print { .side, .topbar { display: none !important; } .shell { display: block; } }
   `],
 })
-export class ShellComponent {
+export class ShellComponent implements OnDestroy {
   auth = inject(AuthService);
   private router = inject(Router);
+  private api = inject(Api);
   navOpen = false;
+  /** Mensajes de WhatsApp sin leer (insignia del menú, se actualiza cada 15 s). */
+  unread = signal(0);
+  private timer: ReturnType<typeof setInterval> | undefined;
 
   nav = computed(() => {
     const u = this.auth.user();
@@ -149,5 +158,14 @@ export class ShellComponent {
   constructor() {
     this.auth.refresh(); // permisos al día (HU-26)
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => (this.navOpen = false));
+    this.pollUnread();
+    this.timer = setInterval(() => this.pollUnread(), 15000);
+  }
+
+  ngOnDestroy() { clearInterval(this.timer); }
+
+  private pollUnread() {
+    if (!this.auth.can('MENSAJES')) return;
+    this.api.conversationSummary().subscribe({ next: (s) => this.unread.set(s.unread), error: () => {} });
   }
 }

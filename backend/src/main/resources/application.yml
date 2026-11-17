@@ -94,6 +94,17 @@ app:
     panel-url: ${NOTIF_PANEL_URL:http://localhost:9083}
     clinic-phone: ${CLINICA_TELEFONO:987 654 000}
 
+  assistant:
+    # Asistente virtual de WhatsApp (RAG + modelo de lenguaje). Sin configurar usa el modelo local (siempre disponible).
+    # claude: ANTHROPIC_API_KEY · openai: API compatible (OpenAI, Groq, Ollama/LM Studio local) con ASISTENTE_URL
+    provider: ${ASISTENTE_PROVEEDOR:}
+    model: ${ASISTENTE_MODELO:}
+    api-key: ${ASISTENTE_API_KEY:}
+    anthropic-key: ${ANTHROPIC_API_KEY:}
+    url: ${ASISTENTE_URL:}
+    # el microservicio espera la respuesta 8 s: si el modelo tarda más, se envía la respuesta local
+    timeout-ms: ${ASISTENTE_TIMEOUT_MS:6000}
+
   files:
     # Fotos, radiografías y documentos de los pacientes (volumen de Docker en producción)
     dir: ${FILES_DIR:./archivos}

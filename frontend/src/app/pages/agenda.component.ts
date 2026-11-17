@@ -33,6 +33,18 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             <button class="btn sm" type="button" (click)="shift(1)" aria-label="Día siguiente"><app-icon name="chevronRight" [size]="16" /></button>
             <input class="input datein" type="date" [ngModel]="date" (ngModelChange)="setDate($event)" aria-label="Elegir fecha" />
           </div>
+          @if (auth.can('MENSAJES') && botMode) {
+            <div class="bot" title="Quién responde los mensajes de WhatsApp de los pacientes">
+              <span class="bdot" [class.on]="botMode !== 'APAGADO'"></span>
+              <label class="small" for="botmode">Asistente WhatsApp</label>
+              <select id="botmode" class="bsel" [ngModel]="botMode" (ngModelChange)="setBotMode($event)">
+                <option value="AUTOMATICO">Automático</option>
+                <option value="FUERA_HORARIO">Fuera de horario</option>
+                <option value="APAGADO">Apagado</option>
+              </select>
+              <a class="blink" routerLink="/mensajes">Mensajes @if (botUnread) { <b>{{ botUnread }}</b> }</a>
+            </div>
+          }
           @if (auth.can('CITAS_GESTIONAR')) {
             <a class="btn primary" routerLink="/citas/nueva" [queryParams]="{ fecha: date }"><app-icon name="plus" [size]="16" /> Nueva cita</a>
           }
@@ -156,6 +168,12 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     </app-modal>
   `,
   styles: [`
+    .bot { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; background: var(--surface); }
+    .bdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .bdot.on { background: #25d366; }
+    .bsel { height: 28px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
+    .blink { font-size: 13px; font-weight: 700; }
+    .blink b { background: #25d366; color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11.5px; margin-left: 2px; }
     .wide { max-width: none; }
     .remind { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; }
     .remind .btn { align-self: flex-start; }
@@ -232,7 +250,22 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
     if (me?.role === 'ODONTOLOGO' && me.dentistId) this.filter = me.dentistId;
   }
 
+  /** Parámetro del asistente virtual de WhatsApp (quién responde a los pacientes) y mensajes sin leer. */
+  botMode = '';
+  botUnread = 0;
+  private loadBot() {
+    if (!this.auth.can('MENSAJES')) return;
+    this.api.conversationSummary().subscribe({ next: (s) => { this.botMode = s.mode; this.botUnread = s.unread; }, error: () => {} });
+  }
+  setBotMode(m: string) {
+    this.api.updateAssistantSettings({ mode: m }).subscribe({
+      next: (s) => { this.botMode = s.mode; this.toast.ok('Asistente de WhatsApp: ' + ({ AUTOMATICO: 'automático', FUERA_HORARIO: 'solo fuera de horario', APAGADO: 'apagado' } as Record<string, string>)[s.mode] + '.'); },
+      error: (e) => { this.toast.error(apiError(e).message); this.loadBot(); },
+    });
+  }
+
   ngOnInit() {
+    this.loadBot();
     if (this.fecha && /^\d{4}-\d{2}-\d{2}$/.test(this.fecha)) this.date = this.fecha;
     this.load();
   }

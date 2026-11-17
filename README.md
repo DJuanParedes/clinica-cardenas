@@ -216,6 +216,35 @@ defecto (`WA_PROVEEDOR=simulador`). Para volver a Meta: `WA_PROVEEDOR=meta` en e
 - **API:** `POST /v21.0/{id}/messages`, `GET /v21.0/{id}`, `GET|POST /v21.0/{waba}/message_templates`, y para
   pruebas `GET /sim/chats`, `POST /sim/responder {telefono, texto}`.
 
+## Mensajes de WhatsApp y asistente virtual (RAG + IA)
+
+La página **Mensajes WhatsApp** (web y pestaña *Más* de la app del personal, permiso `MENSAJES`) permite conversar
+con **cualquier paciente en los dos sentidos** y en tiempo real (se actualiza cada 4 s; el menú muestra los no leídos).
+
+**Cómo responde el asistente a lo que escribe un paciente:**
+1. **Entiende la intención:** saludo, su cita, confirmar, reprogramar, cancelar, horarios libres, precios, pagos y
+   saldo, horario, ubicación, urgencia, hablar con una persona o cualquier otra consulta.
+2. **Hace solo acciones seguras:** confirma la próxima cita, registra el pedido de reprogramación (y ofrece horarios
+   libres reales, sin cruces con otras citas del paciente), consulta el saldo y avisa al personal. Nunca cancela ni cobra.
+3. **Recupera información (RAG):** busca con BM25 en la base de conocimiento: dirección, horario de cada odontólogo,
+   precios del catálogo (con sinónimos: "limpieza" → profilaxis, "brackets" → ortodoncia…), medios de pago, reglas de
+   reserva y las **preguntas frecuentes** que el personal edita desde la página.
+4. **Redacta:** con un modelo de lenguaje si está configurado, usando solo ese contexto; si no hay modelo, o tarda
+   más de 6 s, responde el **modelo local** (siempre disponible, sin costo).
+
+| Variable (`.env`) | Efecto |
+|---|---|
+| *(ninguna)* | Modelo local de intenciones + búsqueda |
+| `ANTHROPIC_API_KEY=...` | Claude redacta las respuestas (`ASISTENTE_MODELO`, por defecto `claude-haiku-5-5`) |
+| `ASISTENTE_URL=http://host.docker.internal:11434/v1` y `ASISTENTE_MODELO=llama3.2` | Modelo gratuito en tu PC con [Ollama](https://ollama.com) (o cualquier API compatible con OpenAI; `ASISTENTE_API_KEY` si la pide) |
+
+**Parámetro del asistente** (en la agenda y en Mensajes): **Automático** (responde siempre), **Fuera de horario**
+(en horario responde el personal) o **Apagado**. Cuando alguien del personal escribe en un chat, el asistente se pausa
+ahí (2 h por defecto) para no interrumpir; también se puede apagar por conversación. Las conversaciones que necesitan
+a una persona (urgencias, reprogramaciones, dudas sin respuesta) quedan marcadas **Por atender**.
+
+Pruebas: `pruebas/asistente-e2e.js` (14 casos) y `AsistenteTest` (unitarias).
+
 ## Mensajes reales por WhatsApp y correo
 
 El microservicio `notificaciones` envía mensajes reales con dos proveedores:

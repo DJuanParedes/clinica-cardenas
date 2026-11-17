@@ -143,6 +143,13 @@ services:
       NOTIF_URL: http://notificaciones:8093
       NOTIF_PANEL_URL: http://localhost:9083
       NOTIF_WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
+      # Asistente virtual de WhatsApp: sin clave usa el modelo local; con ANTHROPIC_API_KEY usa Claude;
+      # con ASISTENTE_URL una API compatible con OpenAI (p. ej. Ollama: http://host.docker.internal:11434/v1)
+      ASISTENTE_PROVEEDOR: ${ASISTENTE_PROVEEDOR:-}
+      ASISTENTE_MODELO: ${ASISTENTE_MODELO:-}
+      ASISTENTE_API_KEY: ${ASISTENTE_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ASISTENTE_URL: ${ASISTENTE_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP"]
       interval: 10s

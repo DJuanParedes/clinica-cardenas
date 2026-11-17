@@ -46,6 +46,7 @@ export const routes: Routes = [
       { path: 'usuarios', canActivate: [permGuard('USUARIOS')], loadComponent: () => import('./pages/users.component').then((m) => m.UsersComponent), title: T('Usuarios') },
       { path: 'roles', canActivate: [permGuard('ROLES')], loadComponent: () => import('./pages/roles.component').then((m) => m.RolesComponent), title: T('Roles y permisos') },
       { path: 'inventario', canActivate: [permGuard('INVENTARIO')], loadComponent: () => import('./pages/inventory.component').then((m) => m.InventoryComponent), title: T('Inventario') },
+      { path: 'mensajes', canActivate: [permGuard('MENSAJES')], loadComponent: () => import('./pages/messages.component').then((m) => m.MessagesComponent), title: T('Mensajes de WhatsApp') },
       { path: 'seguimiento', canActivate: [permGuard('AGENDA_VER')], loadComponent: () => import('./pages/followup.component').then((m) => m.FollowupComponent), title: T('Seguimiento') },
       { path: 'seguridad', loadComponent: () => import('./pages/security.component').then((m) => m.SecurityComponent), title: T('Mi seguridad') },
       { path: 'sin-permiso', loadComponent: () => import('./pages/forbidden.component').then((m) => m.ForbiddenComponent), title: T('Sin permiso') },

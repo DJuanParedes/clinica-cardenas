@@ -36,6 +36,7 @@ val WEB_MODULES = listOf(
     WebModule("General", "🏠", "Inicio", "Resumen del día y alertas", "/inicio", emptyList()),
     WebModule("General", "🗓️", "Agenda completa", "Todas las vistas y acciones de la agenda", "/agenda", listOf("AGENDA_VER")),
     WebModule("General", "➕", "Nueva cita", "Agendar una cita", "/citas/nueva", listOf("CITAS_GESTIONAR")),
+    WebModule("General", "🟢", "Mensajes WhatsApp", "Chatea con pacientes · asistente virtual con IA", "/mensajes", listOf("MENSAJES")),
     WebModule("General", "💬", "Seguimiento", "Confirmaciones, inasistencias y lista de espera", "/seguimiento", listOf("AGENDA_VER")),
     WebModule("Pacientes", "🦷", "Pacientes", "Buscar y abrir fichas completas", "/pacientes", listOf("PACIENTES_VER")),
     WebModule("Pacientes", "📝", "Registrar paciente", "Alta de un paciente nuevo", "/pacientes/nuevo", listOf("PACIENTES_EDITAR")),

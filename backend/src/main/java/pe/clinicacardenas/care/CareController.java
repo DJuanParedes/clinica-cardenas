@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import pe.clinicacardenas.assistant.ConversationService;
 import pe.clinicacardenas.common.ApiException;
 
 import java.nio.charset.StandardCharsets;
@@ -17,9 +18,12 @@ public class CareController {
 
     private final CareService service;
     private final String webhookToken;
+    private final ConversationService conversations;
 
-    public CareController(CareService service, @Value("${app.notifications.webhook-token}") String webhookToken) {
+    public CareController(CareService service, ConversationService conversations,
+                          @Value("${app.notifications.webhook-token}") String webhookToken) {
         this.service = service;
+        this.conversations = conversations;
         this.webhookToken = webhookToken;
     }
 
@@ -78,13 +82,16 @@ public class CareController {
         return service.satisfaction(days);
     }
 
-    /** Respuestas del paciente por WhatsApp (las reenvía el microservicio de notificaciones). */
+    /**
+     * Mensajes del paciente por WhatsApp (los reenvía el microservicio de notificaciones). "1" / "2" los resuelve la
+     * agenda; lo demás lo contesta el asistente virtual o queda para el personal (página Mensajes).
+     */
     @PostMapping("/internal/whatsapp/reply")
     public Map<String, Object> reply(@RequestHeader(value = "X-Webhook-Token", required = false) String token,
                                      @RequestBody CareService.ReplyRequest req) {
         if (token == null || !MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8), webhookToken.getBytes(StandardCharsets.UTF_8))) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "TOKEN_INVALIDO", "Token del webhook inválido.");
         }
-        return service.whatsappReply(req);
+        return conversations.inbound(req);
     }
 }
