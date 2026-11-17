@@ -19,7 +19,7 @@ import { IconComponent } from '../shared/icon.component';
           <div class="lbl">Tu próxima cita</div>
           <div class="day">{{ longDay(next.startAt) }}</div>
           <div class="time tabular">{{ hhmm(next.startAt) }} <span>· {{ next.durationMin }} min</span></div>
-          <div class="who"><span class="dot" [style.background]="next.dentist.color"></span>{{ next.dentist.fullName }} · {{ next.dentist.specialty }}</div>
+          <div class="who">@if (next.dentist.photoUrl) { <img class="dimg" [src]="next.dentist.photoUrl" [alt]="next.dentist.fullName" /> } @else { <span class="dot" [style.background]="next.dentist.color"></span> }{{ next.dentist.fullName }} · {{ next.dentist.specialty }}</div>
           <div class="why">{{ next.reason }}</div>
           <div class="where"><app-icon name="home" [size]="14" /> {{ clinic?.address }}</div>
           <div class="st"><span class="tag" [class]="'tag ' + tone(next.status)">{{ label(next.status) }}</span></div>
@@ -61,6 +61,7 @@ import { IconComponent } from '../shared/icon.component';
     }
   `,
   styles: [`
+    .dimg { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-right: 8px; vertical-align: middle; border: 2px solid #fff; }
     .next { background: linear-gradient(160deg, #00b0e0, #0679ac); color: #fff; border-radius: 22px; padding: 20px 20px 16px; box-shadow: 0 14px 30px -14px rgba(6, 121, 172, .7); position: relative; overflow: hidden; }
     .next::after { content: ""; position: absolute; right: -56px; top: -56px; width: 140px; height: 140px; border-radius: 50%; border: 14px solid rgba(248, 152, 24, .55); }
     .next > * { position: relative; z-index: 1; }

@@ -7,12 +7,13 @@ import { CATEGORY_LABEL, METHOD_LABEL, PERIODS, apiError, dateTime, downloadCsv,
 import { BarsComponent, BarSeries } from '../shared/bars.component';
 import { HBarsComponent } from '../shared/hbars.component';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 
 /** HU-15: ingresos y egresos de caja por período. */
 @Component({
   selector: 'app-cash-report',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent],
+  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -73,16 +74,16 @@ import { IconComponent } from '../shared/icon.component';
           <div class="panel-head">
             <h3>Detalle de movimientos</h3>
             <div class="seg sm">
-              <button type="button" [class.on]="kind === ''" (click)="kind = ''">Todos</button>
-              <button type="button" [class.on]="kind === 'INGRESO'" (click)="kind = 'INGRESO'">Ingresos</button>
-              <button type="button" [class.on]="kind === 'EGRESO'" (click)="kind = 'EGRESO'">Egresos</button>
+              <button type="button" [class.on]="kind === ''" (click)="kind = ''; pg = 1">Todos</button>
+              <button type="button" [class.on]="kind === 'INGRESO'" (click)="kind = 'INGRESO'; pg = 1">Ingresos</button>
+              <button type="button" [class.on]="kind === 'EGRESO'" (click)="kind = 'EGRESO'; pg = 1">Egresos</button>
             </div>
           </div>
           <div class="scroll">
             <table class="table">
               <thead><tr><th>Fecha</th><th>Concepto</th><th>Paciente / proveedor</th><th>Medio</th><th>Registró</th><th class="right">Importe</th></tr></thead>
               <tbody>
-                @for (d of rows; track d.type + d.id) {
+                @for (d of pageRows; track d.type + d.id) {
                   <tr>
                     <td class="tabular nowrap">{{ d.type === 'INGRESO' ? dt(d.date) : date(d.date) }}</td>
                     <td><span class="tag plain" [class]="'tag plain ' + (d.type === 'INGRESO' ? 'green' : 'gum')">{{ d.type === 'INGRESO' ? 'Ingreso' : cat(d.category) }}</span> {{ d.concept }}</td>
@@ -95,6 +96,7 @@ import { IconComponent } from '../shared/icon.component';
               </tbody>
             </table>
           </div>
+          <app-pager [total]="rows.length" [page]="pg" (pageChange)="pg = $event" />
           @if (r.voided) { <div class="panel-foot small muted">{{ r.voided }} movimiento(s) anulado(s) no se incluyen.</div> }
         </section>
       }
@@ -128,6 +130,7 @@ export class CashReportComponent implements OnInit {
   from = periodPreset('mes').from;
   to = periodPreset('mes').to;
   kind = '';
+  pg = 1;
   r: CashReport | null = null;
   labels: string[] = [];
   series: BarSeries[] = [];
@@ -148,6 +151,7 @@ export class CashReportComponent implements OnInit {
     this.api.cashReport(this.from, this.to).subscribe({
       next: (r) => {
         this.r = r;
+        this.pg = 1;
         this.labels = r.byDay.map((d) => shortDate(d.date).replace(/\s\d{4}$/, '').replace('.', ''));
         this.series = [
           { name: 'Ingresos', color: '#00a3d4', values: r.byDay.map((d) => d.income) },
@@ -160,6 +164,7 @@ export class CashReportComponent implements OnInit {
   }
 
   get rows() { return (this.r?.detail || []).filter((d) => !this.kind || d.type === this.kind); }
+  get pageRows() { return pageOf(this.rows, this.pg); }
   get margin(): string { return this.r && this.r.income ? ((this.r.net / this.r.income) * 100).toFixed(1) : '0'; }
 
   csv() {

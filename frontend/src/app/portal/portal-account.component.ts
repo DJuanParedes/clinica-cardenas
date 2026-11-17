@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Api } from '../core/api.service';
 import { dateTime, soles } from '../core/format';
 
@@ -25,7 +25,13 @@ import { dateTime, soles } from '../core/format';
           </li>
         } @empty { <li class="muted small">Aún no hay movimientos.</li> }
       </ul>
-      <p class="muted small foot">Puedes pagar en la clínica en efectivo, tarjeta, Yape o Plin.</p>
+      @if (a.balance > 0 && online) {
+        <button class="pay" type="button" (click)="payOnline()" [disabled]="paying">{{ paying ? 'Abriendo Mercado Pago…' : 'Pagar ' + money(a.balance) + ' con tarjeta o Yape' }}</button>
+        @if (charge && charge.status === 'PENDIENTE') { <p class="muted small foot">Cuando termines de pagar en Mercado Pago vuelve aquí: el pago se refleja solo.</p> }
+        @if (msg) { <p class="small foot okmsg">{{ msg }}</p> }
+        @if (online.testMode) { <p class="muted small foot">Modo de pruebas: no se cobra dinero real.</p> }
+      }
+      <p class="muted small foot">También puedes pagar en la clínica en efectivo, tarjeta, Yape o Plin.</p>
     }
   `,
   styles: [`
@@ -44,12 +50,46 @@ import { dateTime, soles } from '../core/format';
     .c { color: var(--ink); }
     .p { color: var(--green); }
     .foot { text-align: center; margin-top: 14px; }
+    .pay { display: block; width: 100%; margin-top: 16px; height: 50px; border: 0; border-radius: 14px; background: var(--teal); color: #fff; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+    .pay:disabled { opacity: .6; }
+    .okmsg { color: var(--green); font-weight: 700; }
   `],
 })
-export class PortalAccountComponent implements OnInit {
+export class PortalAccountComponent implements OnInit, OnDestroy {
   private api = inject(Api);
   a: any = null;
-  ngOnInit() { this.api.portalAccount().subscribe((a) => (this.a = a)); }
+  online: any = null;
+  charge: any = null;
+  paying = false;
+  msg = '';
+  private poll: ReturnType<typeof setInterval> | null = null;
+  ngOnInit() {
+    this.load();
+    this.api.portalOnlineConfig().subscribe({ next: (c) => (this.online = c.enabled ? c : null), error: () => {} });
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  load() { this.api.portalAccount().subscribe((a) => (this.a = a)); }
+  payOnline() {
+    this.paying = true;
+    this.msg = '';
+    const win = window.open('', '_blank');
+    this.api.portalOnlineCreate(this.a.balance).subscribe({
+      next: (c) => {
+        this.paying = false;
+        this.charge = c;
+        if (win && c.checkoutUrl) win.location.href = c.checkoutUrl; else if (c.checkoutUrl) window.location.href = c.checkoutUrl;
+        if (this.poll) clearInterval(this.poll);
+        this.poll = setInterval(() => this.api.portalOnlineStatus(c.id).subscribe((s) => {
+          this.charge = s;
+          if (s.status !== 'PENDIENTE') {
+            if (this.poll) clearInterval(this.poll);
+            if (s.status === 'APROBADO') { this.msg = 'Pago aprobado. ¡Gracias!'; this.load(); }
+          }
+        }), 4000);
+      },
+      error: (e) => { this.paying = false; win?.close(); this.msg = e?.error?.message || 'No se pudo iniciar el pago.'; },
+    });
+  }
   money = soles;
   dt = dateTime;
 }

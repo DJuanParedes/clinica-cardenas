@@ -29,7 +29,27 @@ SUNAT_CERTIFICADO_CLAVE=********
 - Conservar los XML y CDR al menos 5 años (ya se guardan en la base de datos; incluir en el respaldo diario).
 
 ## 2. Pagos en línea (Yape, Plin, tarjeta)
-La app y el backend usan `SimulatedPaymentGateway` (`PAGOS_MODO=simulado`). Para cobrar de verdad:
+
+### Ya integrado: Mercado Pago (tarjeta, Yape y saldo de Mercado Pago)
+1. Crea tu cuenta en https://www.mercadopago.com.pe (con DNI o RUC) y entra a **Tus integraciones** →
+   **Crear aplicación** (Checkout Pro). Copia el **Access Token** (de prueba `TEST-…` o de producción `APP_USR-…`).
+2. En el servidor, agrega al archivo `/opt/clinica/.env`:
+   ```
+   PAGOS_MODO=mercadopago
+   MP_ACCESS_TOKEN=TEST-xxxxxxxx      # o APP_USR-… para cobrar de verdad
+   MP_WEBHOOK_SECRET=xxxxxxxx         # clave secreta de Webhooks (opcional pero recomendado)
+   ```
+   y reinicia: `docker compose -f docker-compose.yml -f deploy/docker-compose.nube.yml up -d backend`.
+3. En Mercado Pago → tu aplicación → **Webhooks**: URL `https://DOMINIO/api/public/mercadopago/webhook`,
+   evento **Pagos**. Copia la clave secreta a `MP_WEBHOOK_SECRET`.
+4. Listo: en **Caja → Registrar cobro**, con Tarjeta o Yape aparece **Link de pago Mercado Pago**; el paciente
+   también puede pagar su saldo desde la app y el portal. Al aprobarse, el cobro se registra solo en caja.
+   Efectivo, Plin y transferencia se siguen registrando a mano con su número de operación.
+
+Con el token de prueba se usan las tarjetas de prueba de Mercado Pago (no se cobra dinero real).
+
+### Otras pasarelas
+Antes de Mercado Pago, la app usaba `SimulatedPaymentGateway` (`PAGOS_MODO=simulado`, sigue disponible). Otras opciones:
 
 | Pasarela | Yape | Tarjetas | Comisión aprox. |
 |---|---|---|---|

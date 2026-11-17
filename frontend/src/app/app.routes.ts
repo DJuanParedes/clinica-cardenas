@@ -5,6 +5,7 @@ import { ShellComponent } from './layout/shell.component';
 const T = (s: string) => `${s} · Clínica Cárdenas`;
 
 export const routes: Routes = [
+  { path: 'pago/resultado', loadComponent: () => import('./pages/payment-result.component').then((m) => m.PaymentResultComponent), title: T('Resultado del pago') },
   // ---------- HU-22: aplicación móvil del paciente
   { path: 'app/ingresar', canActivate: [portalGuestGuard], loadComponent: () => import('./portal/portal-login.component').then((m) => m.PortalLoginComponent), title: T('Mi app') },
   {

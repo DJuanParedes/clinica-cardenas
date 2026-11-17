@@ -130,6 +130,9 @@ services:
       APP_SEED_PASSWORD: ${APP_SEED_PASSWORD:-Clinica2026}
       FILES_DIR: /data/archivos
       PAGOS_MODO: ${PAGOS_MODO:-simulado}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}

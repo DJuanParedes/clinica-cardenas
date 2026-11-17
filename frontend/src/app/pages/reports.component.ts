@@ -8,6 +8,7 @@ import { ITEM_LABEL, ITEM_TONE, PERIODS, STATUS_LABEL, STATUS_TONE, apiError, da
 import { BarsComponent, BarSeries } from '../shared/bars.component';
 import { HBarsComponent } from '../shared/hbars.component';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 
 type Tab = 'ingresos' | 'citas' | 'tratamientos';
 
@@ -15,7 +16,7 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent],
+  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -120,13 +121,14 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
               <div class="scroll"><table class="table">
                 <thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Odontólogo</th><th>Motivo</th><th>Estado</th></tr></thead>
                 <tbody>
-                  @for (a of apptRows; track a.id) {
+                  @for (a of pageOf(apptRows, pgAppt); track a.id) {
                     <tr><td class="tabular nowrap">{{ dt(a.startAt) }}</td><td><a [routerLink]="['/pacientes', a.patientId]">{{ a.patient }}</a></td><td>{{ a.dentist }}</td>
                       <td>{{ a.reason }}@if (a.statusReason && a.status === 'CANCELADA') { <div class="muted small">{{ a.statusReason }}</div> }</td>
                       <td><span class="tag" [class]="'tag ' + stTone(a.status)">{{ stLabel(a.status) }}</span></td></tr>
                   } @empty { <tr><td colspan="5" class="muted">Sin citas con ese filtro.</td></tr> }
                 </tbody>
               </table></div>
+<app-pager [total]="(apptRows || []).length" [page]="pgAppt" (pageChange)="pgAppt = $event" />
             </section>
           }
 
@@ -143,13 +145,14 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
                 <div class="scroll"><table class="table">
                   <thead><tr><th>Procedimiento</th><th class="right">Realizados</th><th class="right">Monto</th><th class="right">Pendientes</th><th class="right">Monto</th></tr></thead>
                   <tbody>
-                    @for (p of data.byProcedure; track p.procedure) {
+                    @for (p of pageOf(data.byProcedure, pgProc); track p.procedure) {
                       <tr><td><div class="strong">{{ p.procedure }}</div><div class="muted small">{{ p.category }}</div></td>
                         <td class="right tabular">{{ p.done }}</td><td class="right tabular">{{ money(p.doneAmount) }}</td>
                         <td class="right tabular">{{ p.pending }}</td><td class="right tabular muted">{{ money(p.pendingAmount) }}</td></tr>
                     } @empty { <tr><td colspan="5" class="muted">Sin tratamientos.</td></tr> }
                   </tbody>
                 </table></div>
+<app-pager [total]="(data.byProcedure || []).length" [page]="pgProc" (pageChange)="pgProc = $event" />
               </section>
               <section class="panel">
                 <div class="panel-head"><h3>Por odontólogo</h3></div>
@@ -166,13 +169,14 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
               <div class="scroll"><table class="table">
                 <thead><tr><th>{{ treatView === 'done' ? 'Realizado' : 'Plan desde' }}</th><th>Paciente</th><th>Procedimiento</th><th>Odontólogo</th><th>Estado</th><th class="right">Precio</th></tr></thead>
                 <tbody>
-                  @for (t of (treatView === 'done' ? data.doneDetail : data.pendingDetail); track t.id) {
+                  @for (t of pageOf((treatView === 'done' ? data.doneDetail : data.pendingDetail), pgTreat); track t.id) {
                     <tr><td class="tabular nowrap">{{ date(t.date) }}</td><td><a [routerLink]="['/pacientes', t.patientId]">{{ t.patient }}</a></td>
                       <td>{{ t.procedure }}@if (t.plan) { <div class="muted small">{{ t.plan }}</div> }</td><td>{{ t.dentist }}</td>
                       <td><span class="tag" [class]="'tag ' + itTone(t.status)">{{ itLabel(t.status) }}</span></td><td class="right tabular">{{ money(t.price) }}</td></tr>
                   } @empty { <tr><td colspan="6" class="muted">Sin registros.</td></tr> }
                 </tbody>
               </table></div>
+<app-pager [total]="((treatView === 'done' ? data.doneDetail : data.pendingDetail) || []).length" [page]="pgTreat" (pageChange)="pgTreat = $event" />
             </section>
           }
         }
@@ -204,6 +208,10 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
   `],
 })
 export class ReportsComponent implements OnInit {
+  pageOf = pageOf;
+  pgTreat = 1;
+  pgProc = 1;
+  pgAppt = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
   private router = inject(Router);

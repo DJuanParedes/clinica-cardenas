@@ -43,7 +43,8 @@ const PERMISSIONS: { role: string; can: string }[] = [
                 <tr [class.off]="!u.active">
                   <td>
                     <div class="row">
-                      <span class="avatar">{{ ini(u.fullName) }}</span>
+                      @if (u.dentist?.photoUrl) { <img class="avatar ph" [src]="u.dentist.photoUrl" [alt]="u.fullName" /> }
+                      @else { <span class="avatar">{{ ini(u.fullName) }}</span> }
                       <div><div class="strong">{{ u.fullName }}</div><div class="muted small">{{ u.username }} · {{ u.email }}</div></div>
                     </div>
                   </td>
@@ -128,6 +129,18 @@ const PERMISSIONS: { role: string; can: string }[] = [
         <div class="danger-zone">
           @if (editing.dentist) {
             <div class="dz-row">
+              <div class="row">
+                @if (editing.dentist.photoUrl) { <img class="avatar ph lg" [src]="editing.dentist.photoUrl" alt="Foto del odontólogo" /> }
+                @else { <span class="avatar lg">{{ ini(editing.fullName) }}</span> }
+                <div><div class="strong small">Foto del odontólogo</div><div class="muted small">Se ve en la agenda y en la app del paciente al reservar. JPG, PNG o WEBP hasta 4 MB.</div></div>
+              </div>
+              <div class="row">
+                <label class="btn sm"><app-icon name="upload" [size]="14" /> {{ photoBusy ? 'Subiendo…' : (editing.dentist.photoUrl ? 'Cambiar' : 'Subir foto') }}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden (change)="uploadPhoto($event)" [disabled]="photoBusy" /></label>
+                @if (editing.dentist.photoUrl) { <button class="btn sm ghost" type="button" (click)="removePhoto()">Quitar</button> }
+              </div>
+            </div>
+            <div class="dz-row">
               <div><div class="strong small">Horario de atención</div><div class="muted small">Define los bloques en los que se pueden programar citas.</div></div>
               <button class="btn sm" type="button" (click)="openSchedule()"><app-icon name="calendar" [size]="14" /> Editar horario</button>
             </div>
@@ -187,6 +200,8 @@ const PERMISSIONS: { role: string; can: string }[] = [
     </app-modal>
   `,
   styles: [`
+    .avatar.ph { object-fit: cover; padding: 0; }
+    .avatar.lg { width: 52px; height: 52px; font-size: 16px; flex: none; }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
     tr.off td { opacity: .6; }
     .nowrap { white-space: nowrap; }
@@ -220,6 +235,7 @@ export class UsersComponent implements OnInit {
 
   modal = false;
   editing: any = null;
+  photoBusy = false;
   f: any = {};
   e: Record<string, string> = {};
   saving = false;
@@ -317,4 +333,30 @@ export class UsersComponent implements OnInit {
   roleTone(r: string) { return ROLE_TONE[r] || 'grey'; }
   ini = initials;
   dt = dateTime;
+
+  uploadPhoto(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.editing?.dentist) return;
+    this.photoBusy = true;
+    this.api.dentistPhoto(this.editing.dentist.id, file).subscribe({
+      next: (d) => { this.photoBusy = false; this.setPhoto(d.photoUrl || null); this.toast.ok('Foto actualizada.'); },
+      error: (err) => { this.photoBusy = false; this.toast.error(apiError(err).message); },
+    });
+  }
+
+  removePhoto() {
+    if (!this.editing?.dentist) return;
+    this.api.removeDentistPhoto(this.editing.dentist.id).subscribe({
+      next: () => { this.setPhoto(null); this.toast.ok('Foto quitada.'); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  private setPhoto(url: string | null) {
+    this.editing.dentist.photoUrl = url;
+    const u = this.users.find((x: any) => x.id === this.editing.id);
+    if (u?.dentist) u.dentist.photoUrl = url;
+  }
 }

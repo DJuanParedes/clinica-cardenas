@@ -5,12 +5,13 @@ import { Api, NotificationItem } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { CHANNEL_LABEL, NOTIF_STATUS, NOTIF_TONE, NOTIF_TYPE, apiError, dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 
 /** HU-23 / HU-24: bitácora de recordatorios y avisos enviados a los pacientes. */
 @Component({
   selector: 'app-notifications',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -44,7 +45,7 @@ import { IconComponent } from '../shared/icon.component';
         <table class="table">
           <thead><tr><th>Creada</th><th>Tipo</th><th>Canal y destino</th><th>Estado</th><th>Programado / enviado</th><th></th></tr></thead>
           <tbody>
-            @for (n of items; track n.id) {
+            @for (n of pageOf(items, pgNotif); track n.id) {
               <tr class="click" (click)="toggleOpen(n.id)">
                 <td class="tabular nowrap muted">{{ dt(n.createdAt) }}</td>
                 <td>
@@ -75,6 +76,7 @@ import { IconComponent } from '../shared/icon.component';
             } @empty { <tr><td colspan="6"><div class="empty small"><p>No hay notificaciones con ese filtro.</p></div></td></tr> }
           </tbody>
         </table>
+<app-pager [total]="(items || []).length" [page]="pgNotif" (pageChange)="pgNotif = $event" />
         <div class="panel-foot small muted">
           Cada mensaje lleva una clave única: si se intenta enviar dos veces el mismo aviso, el microservicio lo detecta y no lo duplica.
           Si el servicio no responde, el sistema reintenta hasta 5 veces con espera creciente.
@@ -98,6 +100,8 @@ import { IconComponent } from '../shared/icon.component';
   `],
 })
 export class NotificationsComponent implements OnInit, OnDestroy {
+  pageOf = pageOf;
+  pgNotif = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
 

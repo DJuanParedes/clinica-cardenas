@@ -25,6 +25,13 @@ public class InventoryService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
 
+    private pe.clinicacardenas.files.ImageService images;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setImages(pe.clinicacardenas.files.ImageService images) {
+        this.images = images;
+    }
+
     public InventoryService(InventoryItemRepository items, InventoryMoveRepository moves, JdbcTemplate jdbc, AuditService audit) {
         this.items = items;
         this.moves = moves;
@@ -89,6 +96,28 @@ public class InventoryService {
         if (r.unit() != null && !r.unit().isBlank()) i.unit = r.unit().trim();
         if (r.minStock() != null) i.minStock = nonNegative(r.minStock(), "minStock");
         if (r.active() != null) i.active = r.active();
+        i.updatedAt = Dates.now();
+        items.save(i);
+        return i;
+    }
+
+    @Transactional
+    public InventoryItem setImage(Long id, org.springframework.web.multipart.MultipartFile file) {
+        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        String old = i.imagePath;
+        i.imagePath = images.save("productos", file);
+        i.updatedAt = Dates.now();
+        items.save(i);
+        images.delete(old);
+        audit.record("INVENTARIO", i.id, "FOTO", i.name);
+        return i;
+    }
+
+    @Transactional
+    public InventoryItem removeImage(Long id) {
+        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        images.delete(i.imagePath);
+        i.imagePath = null;
         i.updatedAt = Dates.now();
         items.save(i);
         return i;

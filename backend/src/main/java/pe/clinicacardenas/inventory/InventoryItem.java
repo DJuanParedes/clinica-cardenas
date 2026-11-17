@@ -1,6 +1,8 @@
 package pe.clinicacardenas.inventory;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import pe.clinicacardenas.files.ImageService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,6 +23,14 @@ public class InventoryItem {
     public LocalDateTime createdAt;
     @Column(name = "updated_at")
     public LocalDateTime updatedAt;
+
+    @JsonIgnore
+    @Column(name = "image_path")
+    public String imagePath;
+
+    public String getImageUrl() {
+        return ImageService.url(imagePath);
+    }
 
     public boolean isLow() {
         return active && stock.compareTo(minStock) <= 0;

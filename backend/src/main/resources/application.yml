@@ -55,6 +55,8 @@ management:
 
 app:
   timezone: America/Lima
+  # dirección pública HTTPS del sistema (avisos de Mercado Pago y regreso después de pagar)
+  public-url: ${APP_PUBLIC_URL:}
   # true: el código de recuperación de contraseña también se devuelve en la respuesta (solo demo)
   demo-mode: ${APP_DEMO_MODE:true}
   seed-demo-data: ${APP_SEED_DEMO:true}
@@ -112,6 +114,10 @@ app:
   payments:
     # simulado: pasarela de prueba (Yape, Plin, tarjeta). Real: Culqi/Izipay con sus llaves en el .env
     mode: ${PAGOS_MODO:simulado}
+    # mercadopago: Checkout Pro (tarjeta, Yape, saldo de Mercado Pago). Llaves en https://www.mercadopago.com.pe/developers/panel
+    mercadopago:
+      access-token: ${MP_ACCESS_TOKEN:}
+      webhook-secret: ${MP_WEBHOOK_SECRET:}
 
 logging:
   level:

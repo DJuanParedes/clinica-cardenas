@@ -99,6 +99,12 @@ class ClinicRepository(
 
     suspend fun pay(body: PayRequest): PayResultDto = guarded { api.pay(body) }
 
+    suspend fun onlineConfig(): OnlineConfigDto = runCatching { api.onlineConfig() }.getOrDefault(OnlineConfigDto())
+
+    suspend fun onlinePay(amount: Double): OnlineChargeDto = guarded { api.onlinePay(amount) }
+
+    suspend fun onlineStatus(id: Long): OnlineChargeDto = guarded { api.onlineStatus(id) }
+
     suspend fun documents(): DocumentsDto = guarded { api.documents() }
 
     suspend fun fileUrl(id: Long): String = api.absolute(guarded { api.fileLink(id) }.url)

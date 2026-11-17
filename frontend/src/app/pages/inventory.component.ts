@@ -4,6 +4,8 @@ import { Api, InventoryItem } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { apiError, dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
+import { ProductThumbComponent } from '../shared/product-thumb.component';
 import { ModalComponent } from '../shared/modal.component';
 
 const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste', CONSUMO: 'Consumo en tratamiento' };
@@ -12,7 +14,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent],
   template: `
     <div class="page">
       <header class="page-head spread">
@@ -41,9 +43,10 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
         <table class="table">
           <thead><tr><th>Material</th><th class="num">Stock</th><th class="num">Mínimo</th><th>Estado</th><th class="right">Movimiento</th></tr></thead>
           <tbody>
-            @for (i of shown; track i.id) {
+            @for (i of pageOf(shown, pgItems); track i.id) {
               <tr [class.off]="!i.active">
-                <td><button type="button" class="link strong" (click)="edit(i)">{{ i.name }}</button><div class="muted small">{{ i.unit }}</div></td>
+                <td><div class="prod"><button type="button" class="ph" (click)="edit(i)" [attr.aria-label]="'Ver ' + i.name"><app-product-thumb [src]="i.imageUrl" [name]="i.name" [size]="48" /></button>
+                  <div><button type="button" class="link strong" (click)="edit(i)">{{ i.name }}</button><div class="muted small">{{ i.unit }}</div></div></div></td>
                 <td class="num tabular strong">{{ n(i.stock) }}</td>
                 <td class="num tabular muted">{{ n(i.minStock) }}</td>
                 <td>
@@ -61,13 +64,14 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
             }
           </tbody>
         </table>
+<app-pager [total]="(shown || []).length" [page]="pgItems" (pageChange)="pgItems = $event" />
       </section>
 
       <section class="panel">
         <div class="panel-head"><h3>Últimos movimientos</h3></div>
         <table class="table">
           <tbody>
-            @for (m of recent; track m.id) {
+            @for (m of pageOf(recent, pgMoves); track m.id) {
               <tr>
                 <td class="muted small nowrap tabular">{{ dt(m.createdAt) }}</td>
                 <td>{{ m.item }}<div class="muted small">{{ moveLabel(m.kind) }}@if (m.reason) { · {{ m.reason }} }</div></td>
@@ -78,6 +82,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
             } @empty { <tr><td class="muted">Aún no hay movimientos.</td></tr> }
           </tbody>
         </table>
+<app-pager [total]="(recent || []).length" [page]="pgMoves" (pageChange)="pgMoves = $event" />
       </section>
     </div>
 
@@ -100,6 +105,20 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
 
     <app-modal [open]="itemOpen" [title]="itemId ? 'Editar material' : 'Nuevo material'" (close)="itemOpen = false">
       <form class="stack" (ngSubmit)="saveItem()">
+        @if (itemId) {
+          <div class="photo">
+            <app-product-thumb [src]="itemImage" [name]="item.name" [size]="140" />
+            <div class="stack-sm">
+              <div class="strong small">Foto del producto</div>
+              <div class="muted small">JPG, PNG o WEBP hasta 4 MB. Si no tiene foto se muestra un dibujo según el tipo de material.</div>
+              <div class="row">
+                <label class="btn sm"><app-icon name="upload" [size]="14" /> {{ imgBusy ? 'Subiendo…' : (itemImage ? 'Cambiar foto' : 'Subir foto') }}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden (change)="uploadImage($event)" [disabled]="imgBusy" /></label>
+                @if (itemImage) { <button class="btn sm ghost" type="button" (click)="removeImage()">Quitar</button> }
+              </div>
+            </div>
+          </div>
+        } @else { <p class="muted small">Podrás subir la foto del producto después de guardarlo.</p> }
         <div class="field"><label for="in">Nombre</label><input id="in" class="input" name="name" [(ngModel)]="item.name" maxlength="120" /></div>
         <div class="grid two">
           <div class="field"><label for="iu">Unidad</label><input id="iu" class="input" name="unit" [(ngModel)]="item.unit" maxlength="20" placeholder="unidad, caja, par…" /></div>
@@ -144,6 +163,10 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
     </app-modal>
   `,
   styles: [`
+    .prod { display: flex; align-items: center; gap: 12px; }
+    .ph { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 10px; }
+    .photo { display: flex; gap: 16px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+    .stack-sm { display: flex; flex-direction: column; gap: 6px; }
     .page { display: flex; flex-direction: column; gap: 16px; }
     .tools { gap: 14px; flex-wrap: wrap; }
     .search { max-width: 320px; }
@@ -160,6 +183,9 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
   `],
 })
 export class InventoryComponent implements OnInit {
+  pageOf = pageOf;
+  pgMoves = 1;
+  pgItems = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
   items: InventoryItem[] = [];
@@ -173,6 +199,8 @@ export class InventoryComponent implements OnInit {
   move = { kind: 'ENTRADA', quantity: 1 as number, reason: '' };
   itemOpen = false;
   itemId: number | null = null;
+  itemImage: string | null = null;
+  imgBusy = false;
   item = { name: '', unit: 'unidad', minStock: 0, initialStock: 0, active: true };
 
   suppliesOpen = false;
@@ -206,7 +234,7 @@ export class InventoryComponent implements OnInit {
   }
 
   openNew() { this.itemId = null; this.item = { name: '', unit: 'unidad', minStock: 0, initialStock: 0, active: true }; this.itemOpen = true; }
-  edit(i: InventoryItem) { this.itemId = i.id; this.item = { name: i.name, unit: i.unit, minStock: +i.minStock, initialStock: 0, active: i.active }; this.itemOpen = true; }
+  edit(i: InventoryItem) { this.itemId = i.id; this.itemImage = i.imageUrl || null; this.item = { name: i.name, unit: i.unit, minStock: +i.minStock, initialStock: 0, active: i.active }; this.itemOpen = true; }
   saveItem() {
     if (this.busy) return;
     this.busy = true;
@@ -237,6 +265,26 @@ export class InventoryComponent implements OnInit {
         this.api.supplies().subscribe((s) => (this.allSupplies = s));
       },
       error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+
+  uploadImage(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.itemId) return;
+    this.imgBusy = true;
+    this.api.inventoryImage(this.itemId, file).subscribe({
+      next: (it) => { this.imgBusy = false; this.itemImage = it.imageUrl || null; this.toast.ok('Foto guardada.'); this.load(); },
+      error: (e) => { this.imgBusy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+
+  removeImage() {
+    if (!this.itemId) return;
+    this.api.removeInventoryImage(this.itemId).subscribe({
+      next: () => { this.itemImage = null; this.toast.ok('Foto quitada.'); this.load(); },
+      error: (e) => this.toast.error(apiError(e).message),
     });
   }
 }

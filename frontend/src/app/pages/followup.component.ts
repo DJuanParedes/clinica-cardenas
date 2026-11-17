@@ -7,6 +7,7 @@ import { ToastService } from '../core/toast.service';
 import { Dentist, Patient } from '../core/models';
 import { apiError, dateTime, shortDate } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
@@ -17,7 +18,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
 @Component({
   selector: 'app-followup',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -38,7 +39,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
             <div class="panel-head"><h3>Pidieron otro horario</h3><span class="muted small">Respondieron "2" al recordatorio o lo pidieron desde la app</span></div>
             <table class="table">
               <tbody>
-                @for (r of resched; track r.id) {
+                @for (r of pageOf(resched, pgRes); track r.id) {
                   <tr>
                     <td><span class="strong">{{ r.patient }}</span><div class="muted small tabular">{{ r.phone }}</div></td>
                     <td>{{ dt(r.startAt) }}<div class="muted small">{{ r.reason }} · {{ r.dentist }}</div></td>
@@ -50,6 +51,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">Nadie pidió reprogramar. 🎉</td></tr> }
               </tbody>
             </table>
+<app-pager [total]="(resched || []).length" [page]="pgRes" (pageChange)="pgRes = $event" />
           </section>
         }
         @case ('espera') {
@@ -61,7 +63,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
             <p class="muted small pad">Cuando se cancela una cita, se avisa por WhatsApp o correo a los 3 primeros de la lista (del mismo odontólogo o sin preferencia).</p>
             <table class="table">
               <tbody>
-                @for (w of wait; track w.entry.id) {
+                @for (w of pageOf(wait, pgWait); track w.entry.id) {
                   <tr>
                     <td><a class="strong" [routerLink]="['/pacientes', w.patient?.id]">{{ w.patient?.fullName }}</a><div class="muted small tabular">{{ w.patient?.phone }}</div></td>
                     <td>{{ w.entry.reason }}<div class="muted small">{{ w.dentist || 'Cualquier odontólogo' }}@if (w.entry.preference) { · {{ w.entry.preference }} }</div></td>
@@ -72,6 +74,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">La lista de espera está vacía.</td></tr> }
               </tbody>
             </table>
+<app-pager [total]="(wait || []).length" [page]="pgWait" (pageChange)="pgWait = $event" />
           </section>
         }
         @case ('controles') {
@@ -79,7 +82,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
             <div class="panel-head"><h3>Les toca volver</h3><span class="muted small">Sin cita futura · se envía solo cada lunes a las 10:00</span></div>
             <table class="table">
               <tbody>
-                @for (r of recalls; track r.patientId) {
+                @for (r of pageOf(recalls, pgRecall); track r.patientId) {
                   <tr>
                     <td><a class="strong" [routerLink]="['/pacientes', r.patientId]">{{ r.fullName }}</a><div class="muted small tabular">{{ r.phone }}</div></td>
                     <td>{{ recallLabel(r.kind) }}<div class="muted small">última visita {{ date(r.lastVisit) }}</div></td>
@@ -89,6 +92,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">Todos los pacientes están al día con sus controles.</td></tr> }
               </tbody>
             </table>
+<app-pager [total]="(recalls || []).length" [page]="pgRecall" (pageChange)="pgRecall = $event" />
           </section>
         }
         @case ('satisfaccion') {
@@ -169,6 +173,10 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
   `],
 })
 export class FollowupComponent implements OnInit {
+  pageOf = pageOf;
+  pgRes = 1;
+  pgWait = 1;
+  pgRecall = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
   auth = inject(AuthService);

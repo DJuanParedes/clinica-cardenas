@@ -20,7 +20,7 @@ export interface Patient {
 
 export interface UserLite { id: number; username: string; fullName: string; role: Role; active: boolean; }
 
-export interface Dentist { id: number; specialty: string; cop?: string; color: string; active: boolean; fullName: string; user: UserLite; }
+export interface Dentist { id: number; specialty: string; cop?: string; color: string; active: boolean; fullName: string; user: UserLite; photoUrl?: string | null; }
 
 export type AppointmentStatus = 'PROGRAMADA' | 'CONFIRMADA' | 'EN_ESPERA' | 'EN_ATENCION' | 'ATENDIDA' | 'CANCELADA' | 'NO_ASISTIO';
 

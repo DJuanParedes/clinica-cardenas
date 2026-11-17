@@ -108,7 +108,13 @@ public class PortalExtrasService {
     public Map<String, Object> bookingOptions() {
         List<Map<String, Object>> ds = new ArrayList<>();
         for (Dentist d : agenda.activeDentists()) {
-            ds.add(Map.of("id", d.id, "fullName", d.getFullName(), "specialty", d.specialty, "color", d.color));
+            Map<String, Object> dm = new LinkedHashMap<>();
+            dm.put("id", d.id);
+            dm.put("fullName", d.getFullName());
+            dm.put("specialty", d.specialty);
+            dm.put("color", d.color);
+            dm.put("photoUrl", d.getPhotoUrl());
+            ds.add(dm);
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("dentists", ds);

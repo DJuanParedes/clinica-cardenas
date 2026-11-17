@@ -74,7 +74,8 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             <div></div>
             @for (c of columns; track c.dentist.id) {
               <div class="dh">
-                <span class="dot" [style.background]="c.dentist.color"></span>
+                @if (c.dentist.photoUrl) { <img class="dph" [src]="c.dentist.photoUrl" [alt]="c.dentist.fullName" [style.border-color]="c.dentist.color" /> }
+                @else { <span class="dot" [style.background]="c.dentist.color"></span> }
                 <div><div class="strong">{{ c.dentist.fullName }}</div><div class="muted small">{{ c.dentist.specialty }} · {{ c.appts.length }} citas</div></div>
               </div>
             }
@@ -168,6 +169,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     </app-modal>
   `,
   styles: [`
+    .dph { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid; flex: none; }
     .bot { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; background: var(--surface); }
     .bdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
     .bdot.on { background: #25d366; }

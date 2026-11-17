@@ -155,6 +155,12 @@ class ApiClient(
 
     suspend fun pay(body: PayRequest): PayResultDto = postJson("/api/portal/payments", body)
 
+    suspend fun onlineConfig(): OnlineConfigDto = call { http.get(url("/api/portal/payments/online/config")) { auth() } }
+
+    suspend fun onlinePay(amount: Double): OnlineChargeDto = postJson("/api/portal/payments/online", OnlineAmount(amount))
+
+    suspend fun onlineStatus(id: Long): OnlineChargeDto = call { http.get(url("/api/portal/payments/online/$id")) { auth() } }
+
     suspend fun documents(): DocumentsDto = call { http.get(url("/api/portal/documents")) { auth() } }
 
     suspend fun fileLink(id: Long): LinkDto = call { http.get(url("/api/portal/documents/files/$id/link")) { auth() } }

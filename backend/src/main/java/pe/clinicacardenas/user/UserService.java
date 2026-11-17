@@ -84,6 +84,7 @@ public class UserService {
             dm.put("specialty", d.specialty);
             dm.put("cop", d.cop);
             dm.put("color", d.color);
+            dm.put("photoUrl", d.getPhotoUrl());
             m.put("dentist", dm);
         });
         return m;

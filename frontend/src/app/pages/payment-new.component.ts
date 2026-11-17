@@ -1,7 +1,7 @@
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Account, Api, Obligation, Payment } from '../core/api.service';
+import { Account, Api, Obligation, OnlineCharge, OnlineConfig, Payment } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { Patient } from '../core/models';
@@ -105,7 +105,37 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
                 </div>
                 @if (e['method']) { <span class="err">{{ e['method'] }}</span> }
               </div>
-              @if (f.method !== 'EFECTIVO') {
+              @if (online && (f.method === 'TARJETA' || f.method === 'YAPE')) {
+                <div class="field">
+                  <span class="label">¿Cómo cobras?</span>
+                  <div class="modes">
+                    <button type="button" class="mt" [class.on]="mode === 'ONLINE'" (click)="mode = 'ONLINE'">Link de pago Mercado Pago</button>
+                    <button type="button" class="mt" [class.on]="mode === 'MANUAL'" (click)="mode = 'MANUAL'">Ya cobré (POS o Yape)</button>
+                  </div>
+                  @if (mode === 'ONLINE') {
+                    <span class="hint">El paciente paga con {{ f.method === 'YAPE' ? 'Yape' : 'su tarjeta' }} en la página segura de Mercado Pago (también puede elegir tarjeta, Yape o su cuenta). Cuando se apruebe, el cobro se registra solo.
+                      @if (online.testMode) { <strong> Modo de pruebas: no se cobra dinero real.</strong> }</span>
+                  }
+                </div>
+              }
+              @if (charge) {
+                <div class="charge" [class.ok]="charge.status === 'APROBADO'" [class.bad]="charge.status === 'CANCELADO' || charge.status === 'VENCIDO'">
+                  <div class="row between"><strong>{{ money(charge.amount) }} · {{ charge.statusLabel }}</strong>
+                    @if (charge.status === 'PENDIENTE') { <span class="spin dark"></span> }</div>
+                  <div class="muted small">{{ charge.reference }} · vence {{ dt(charge.expiresAt) }}</div>
+                  @if (charge.status === 'PENDIENTE' && charge.checkoutUrl) {
+                    <input class="input small" readonly [value]="charge.checkoutUrl" (focus)="$any($event.target).select()" aria-label="Link de pago" />
+                    <div class="row wrap">
+                      <a class="btn sm primary" [href]="charge.checkoutUrl" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> Abrir página de pago</a>
+                      <button class="btn sm" type="button" (click)="copyLink()">Copiar link</button>
+                      <button class="btn sm" type="button" (click)="sendLink()" [disabled]="sending">{{ sending ? 'Enviando…' : 'Enviar por WhatsApp' }}</button>
+                      <button class="btn sm ghost" type="button" (click)="cancelCharge()">Anular</button>
+                    </div>
+                    @if (charge.mpStatus === 'rejected') { <span class="err">Mercado Pago rechazó el último intento ({{ charge.mpStatusDetail }}). El paciente puede reintentar con el mismo link.</span> }
+                  }
+                </div>
+              }
+              @if (f.method !== 'EFECTIVO' && !(online && (f.method === 'TARJETA' || f.method === 'YAPE') && mode === 'ONLINE')) {
                 <div class="field">
                   <label class="req" for="rf">{{ f.method === 'TARJETA' ? 'N.° de voucher' : 'N.° de operación' }}</label>
                   <input id="rf" name="rf" class="input tabular" [class.invalid]="e['reference']" [(ngModel)]="f.reference" [disabled]="!patient" />
@@ -122,9 +152,16 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
                 <label for="nt">Nota (opcional)</label>
                 <input id="nt" name="nt" class="input" [(ngModel)]="f.notes" [disabled]="!patient" />
               </div>
-              <button class="btn primary lg block" type="submit" [disabled]="!patient || saving || sel === null">
-                @if (saving) { <span class="spin"></span> Registrando… } @else { <app-icon name="check" [size]="16" /> Registrar cobro {{ f.amount > 0 ? money(f.amount) : '' }} }
-              </button>
+              @if (isOnline) {
+                <button class="btn primary lg block" type="submit" [disabled]="!patient || saving || sel === null || charge?.status === 'PENDIENTE'">
+                  @if (saving) { <span class="spin"></span> Generando… } @else { <app-icon name="link" [size]="16" /> Generar link de pago {{ f.amount > 0 ? money(f.amount) : '' }} }
+                </button>
+              } @else {
+                <button class="btn primary lg block" type="submit" [disabled]="!patient || saving || sel === null">
+                  @if (saving) { <span class="spin"></span> Registrando… } @else { <app-icon name="check" [size]="16" /> Registrar cobro {{ f.amount > 0 ? money(f.amount) : '' }} }
+                </button>
+              }
+              @if (f.method === 'PLIN' || f.method === 'TRANSFERENCIA') { <p class="muted small">{{ f.method === 'PLIN' ? 'Plin' : 'La transferencia' }} no tiene cobro en línea: verifica el abono en la app del banco y anota el número de operación.</p> }
               @if (patient && sel === null) { <p class="muted small">Elige qué paga el paciente.</p> }
             </form>
           </aside>
@@ -139,6 +176,13 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
     .big { font-size: 22px; font-weight: 800; height: 50px; }
     .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .mt { height: 40px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+    .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .modes .mt { height: auto; min-height: 40px; padding: 6px 8px; line-height: 1.2; }
+    .charge { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--brand-soft); }
+    .charge.ok { background: var(--green-soft); border-color: var(--green); }
+    .charge.bad { background: var(--surface-2, #f4f6f8); }
+    .charge .between { justify-content: space-between; }
+    .spin.dark { border-color: rgba(0,0,0,.15); border-top-color: var(--teal); }
     .mt.on { background: var(--teal); border-color: var(--teal); color: #fff; }
     .mt:disabled { opacity: .5; cursor: not-allowed; }
     .hint.ok { color: var(--green); font-weight: 700; }
@@ -152,7 +196,7 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
     @media print { .receipt { border: 0; box-shadow: none; } }
   `],
 })
-export class PaymentNewComponent implements OnInit {
+export class PaymentNewComponent implements OnInit, OnDestroy {
   private api = inject(Api);
   private toast = inject(ToastService);
   auth = inject(AuthService);
@@ -170,10 +214,20 @@ export class PaymentNewComponent implements OnInit {
   done: Payment | null = null;
   doneConcept = '';
   methods = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'];
+  online: OnlineConfig | null = null;
+  mode: 'ONLINE' | 'MANUAL' = 'ONLINE';
+  charge: OnlineCharge | null = null;
+  sending = false;
+  private poll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit() {
     if (this.paciente) this.api.patient(+this.paciente).subscribe((r) => this.onPatient(r.patient));
+    this.api.onlineConfig().subscribe({ next: (c) => (this.online = c.enabled ? c : null), error: () => (this.online = null) });
   }
+
+  ngOnDestroy() { this.stopPoll(); }
+
+  get isOnline() { return !!this.online && (this.f.method === 'TARJETA' || this.f.method === 'YAPE') && this.mode === 'ONLINE'; }
 
   get payable(): Obligation[] { return (this.acc?.obligations || []).filter((o) => o.pending > 0); }
   get selected(): Obligation | undefined { return this.payable.find((o) => o.treatmentItemId === this.sel); }
@@ -199,6 +253,7 @@ export class PaymentNewComponent implements OnInit {
 
   submit() {
     if (!this.patient || this.sel === null) return;
+    if (this.isOnline) { this.createCharge(); return; }
     this.saving = true;
     this.e = {};
     const body = { patientId: this.patient.id, treatmentItemId: this.sel || null, amount: this.f.amount, method: this.f.method,
@@ -215,7 +270,65 @@ export class PaymentNewComponent implements OnInit {
     });
   }
 
+  createCharge() {
+    if (!this.patient) return;
+    this.saving = true;
+    this.e = {};
+    this.api.onlineCreate({ patientId: this.patient.id, treatmentItemId: this.sel || null, amount: this.f.amount, description: this.f.notes || undefined }).subscribe({
+      next: (c) => { this.saving = false; this.charge = c; this.startPoll(); this.toast.ok('Link de pago listo. Ábrelo o envíalo al paciente.'); },
+      error: (err) => { this.saving = false; const a = apiError(err); this.e = a.fields || {}; this.toast.error(a.message); },
+    });
+  }
+
+  private startPoll() {
+    this.stopPoll();
+    this.poll = setInterval(() => {
+      if (!this.charge) return;
+      this.api.onlineStatus(this.charge.id).subscribe({ next: (c) => this.onCharge(c), error: () => {} });
+    }, 4000);
+  }
+
+  private stopPoll() { if (this.poll) { clearInterval(this.poll); this.poll = null; } }
+
+  private onCharge(c: OnlineCharge) {
+    this.charge = c;
+    if (c.status === 'PENDIENTE') return;
+    this.stopPoll();
+    if (c.status === 'APROBADO' && this.patient) {
+      const methodCode = c.method === 'yape' ? 'YAPE' : 'TARJETA';
+      this.done = { id: c.paymentId || 0, patientId: this.patient.id, amount: c.amount, method: methodCode, reference: 'MP-' + c.mpPaymentId,
+        paidAt: new Date().toISOString(), cashier: 'Mercado Pago', status: 'VALIDO' } as any;
+      this.doneConcept = c.description;
+      this.api.account(this.patient.id).subscribe((a) => (this.acc = a));
+      this.toast.ok(`Mercado Pago aprobó el pago de ${soles(c.amount)}. Quedó registrado en caja.`);
+    }
+  }
+
+  copyLink() {
+    if (!this.charge?.checkoutUrl) return;
+    navigator.clipboard?.writeText(this.charge.checkoutUrl).then(() => this.toast.ok('Link copiado.'), () => this.toast.error('No se pudo copiar; selecciónalo y cópialo.'));
+  }
+
+  sendLink() {
+    if (!this.charge) return;
+    this.sending = true;
+    this.api.onlineWhatsapp(this.charge.id).subscribe({
+      next: (r) => { this.sending = false; this.toast.ok(`Link enviado por WhatsApp al ${r.phone}.`); },
+      error: (err) => { this.sending = false; this.toast.error(apiError(err).message); },
+    });
+  }
+
+  cancelCharge() {
+    if (!this.charge) return;
+    this.api.onlineCancel(this.charge.id).subscribe({
+      next: (c) => { this.stopPoll(); this.charge = c; this.toast.ok('Link de pago anulado.'); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
   again() {
+    this.stopPoll();
+    this.charge = null;
     this.done = null;
     this.f = { amount: null, method: 'EFECTIVO', reference: '', notes: '' };
     this.received = null;

@@ -8,6 +8,7 @@ import {
   METHOD_LABEL, SETTLEMENT_LABEL, SETTLEMENT_TONE, apiError, dateTime, isoDate, periodPreset, shortDate, soles,
 } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 import { ModalComponent } from '../shared/modal.component';
 
 type Tab = 'reglas' | 'calcular' | 'liquidaciones';
@@ -16,7 +17,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
 @Component({
   selector: 'app-commissions',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -167,7 +168,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
             <table class="table">
               <thead><tr><th>N.°</th><th>Odontólogo</th><th>Período</th><th>Estado</th><th class="right">Total</th><th class="right">Pagado</th><th class="right">Pendiente</th><th></th></tr></thead>
               <tbody>
-                @for (s of settlementsList; track s.id) {
+                @for (s of pageOf(settlementsList, pgSet); track s.id) {
                   <tr class="click" (click)="openSettlement(s.id)">
                     <td class="tabular">{{ s.id }}</td>
                     <td>{{ s.dentist.fullName }}</td>
@@ -181,6 +182,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                 } @empty { <tr><td colspan="8"><div class="empty small"><p>No hay liquidaciones con ese filtro.</p></div></td></tr> }
               </tbody>
             </table>
+<app-pager [total]="(settlementsList || []).length" [page]="pgSet" (pageChange)="pgSet = $event" />
           </section>
         }
       }
@@ -350,6 +352,8 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
   `],
 })
 export class CommissionsComponent implements OnInit {
+  pageOf = pageOf;
+  pgSet = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
   private router = inject(Router);

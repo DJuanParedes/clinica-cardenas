@@ -6,13 +6,14 @@ import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { CATEGORY_LABEL, METHOD_LABEL, apiError, hhmm, isoDate, longDay, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { PagerComponent, pageOf } from '../shared/pager.component';
 import { ModalComponent } from '../shared/modal.component';
 
 /** Caja del día: cobros (HU-13) y egresos (HU-15) del turno. */
 @Component({
   selector: 'app-cash',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -51,7 +52,7 @@ import { ModalComponent } from '../shared/modal.component';
               <table class="table">
                 <thead><tr><th>Hora</th><th>Concepto</th><th>Medio</th><th class="right">Importe</th><th></th></tr></thead>
                 <tbody>
-                  @for (d of r.detail; track d.type + d.id) {
+                  @for (d of pageOf(r.detail, pgDet); track d.type + d.id) {
                     <tr>
                       <td class="tabular muted">{{ d.type === 'INGRESO' ? hhmm(d.date) : '—' }}</td>
                       <td>
@@ -75,6 +76,7 @@ import { ModalComponent } from '../shared/modal.component';
                   }
                 </tbody>
               </table>
+<app-pager [total]="(r.detail || []).length" [page]="pgDet" (pageChange)="pgDet = $event" />
             }
           </section>
 
@@ -174,6 +176,8 @@ import { ModalComponent } from '../shared/modal.component';
   `],
 })
 export class CashComponent implements OnInit {
+  pageOf = pageOf;
+  pgDet = 1;
   private api = inject(Api);
   private toast = inject(ToastService);
   auth = inject(AuthService);

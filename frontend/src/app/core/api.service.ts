@@ -110,6 +110,15 @@ export class Api {
   cashMeta(): Observable<{ methods: string[]; methodLabels: Record<string, string>; expenseCategories: string[] }> { return this.http.get<any>('/api/cash/meta'); }
   account(pid: number): Observable<Account> { return this.http.get<Account>(`/api/cash/patients/${pid}/account`); }
   pay(body: any): Observable<{ payment: Payment; concept: string; account: Account }> { return this.http.post<any>('/api/cash/payments', body); }
+  // Cobros en línea con Mercado Pago (tarjeta, Yape)
+  portalOnlineConfig(): Observable<OnlineConfig> { return this.http.get<OnlineConfig>('/api/portal/payments/online/config'); }
+  portalOnlineCreate(amount: number): Observable<OnlineCharge> { return this.http.post<OnlineCharge>('/api/portal/payments/online', { amount }); }
+  portalOnlineStatus(id: number): Observable<OnlineCharge> { return this.http.get<OnlineCharge>(`/api/portal/payments/online/${id}`); }
+  onlineConfig(): Observable<OnlineConfig> { return this.http.get<OnlineConfig>('/api/cash/online/config'); }
+  onlineCreate(body: { patientId: number; treatmentItemId: number | null; amount: number; description?: string }): Observable<OnlineCharge> { return this.http.post<OnlineCharge>('/api/cash/online', body); }
+  onlineStatus(id: number): Observable<OnlineCharge> { return this.http.get<OnlineCharge>(`/api/cash/online/${id}`); }
+  onlineCancel(id: number): Observable<OnlineCharge> { return this.http.post<OnlineCharge>(`/api/cash/online/${id}/cancel`, {}); }
+  onlineWhatsapp(id: number): Observable<{ sent: boolean; phone: string }> { return this.http.post<any>(`/api/cash/online/${id}/whatsapp`, {}); }
   voidPayment(id: number, reason: string): Observable<Payment> { return this.http.post<Payment>(`/api/cash/payments/${id}/void`, { reason }); }
   addExpense(body: any): Observable<any> { return this.http.post('/api/cash/expenses', body); }
   voidExpense(id: number, reason: string): Observable<any> { return this.http.post(`/api/cash/expenses/${id}/void`, { reason }); }
@@ -172,6 +181,10 @@ export class Api {
   inventory(): Observable<{ items: InventoryItem[]; lowCount: number; recent: any[] }> { return this.http.get<any>('/api/inventory'); }
   createInventoryItem(body: any): Observable<InventoryItem> { return this.http.post<InventoryItem>('/api/inventory', body); }
   updateInventoryItem(id: number, body: any): Observable<InventoryItem> { return this.http.put<InventoryItem>(`/api/inventory/${id}`, body); }
+  inventoryImage(id: number, file: File): Observable<InventoryItem> { const fd = new FormData(); fd.append('file', file); return this.http.post<InventoryItem>(`/api/inventory/${id}/image`, fd); }
+  removeInventoryImage(id: number): Observable<InventoryItem> { return this.http.delete<InventoryItem>(`/api/inventory/${id}/image`); }
+  dentistPhoto(id: number, file: File): Observable<Dentist> { const fd = new FormData(); fd.append('file', file); return this.http.post<Dentist>(`/api/dentists/${id}/photo`, fd); }
+  removeDentistPhoto(id: number): Observable<Dentist> { return this.http.delete<Dentist>(`/api/dentists/${id}/photo`); }
   inventoryMove(id: number, body: { kind: string; quantity: number; reason: string }): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
   inventoryMoves(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/moves`); }
   supplies(): Observable<any[]> { return this.http.get<any[]>('/api/inventory/supplies'); }
@@ -232,7 +245,7 @@ export interface PatientFile {
   sharedWithPatient: boolean; signedAt?: string; createdAt: string; createdBy: string; image?: boolean;
 }
 
-export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; }
+export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; imageUrl?: string | null; }
 
 export interface Installments {
   planId: number; total: number; paid: number;
@@ -322,3 +335,11 @@ export interface AssistantSettings {
 export interface FaqItem { id: number; question: string; answer: string; active: boolean; updatedAt?: string; updatedBy?: string; }
 
 export interface AssistantTest { text: string; intent: string; needsHuman: boolean; engine: string; sources: string[]; ms: number; }
+
+export interface OnlineConfig { provider: string; enabled: boolean; testMode: boolean; methods: string[]; message: string; }
+export interface OnlineCharge {
+  id: number; reference: string; patientId: number; treatmentItemId: number | null; amount: number; description: string;
+  status: 'PENDIENTE' | 'APROBADO' | 'CANCELADO' | 'VENCIDO'; statusLabel: string; checkoutUrl: string | null;
+  mpPaymentId: string | null; mpStatus: string | null; mpStatusDetail: string | null; method: string | null;
+  paymentId: number | null; expiresAt: string; createdAt: string; source: string; testMode: boolean;
+}

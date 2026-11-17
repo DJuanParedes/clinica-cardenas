@@ -59,6 +59,7 @@ fun AccountScreen(vm: AccountViewModel = koinViewModel(), platform: PlatformActi
             balance = s.data?.balance ?: 0.0,
             state = s,
             onPay = vm::pay,
+            onPayOnline = { amount -> vm.payOnline(amount, platform::openUrl) },
             onOpenInvoice = { id -> scope.launch { vm.invoiceUrl(id)?.let(platform::openUrl) } },
             onClose = { payOpen = false; vm.clearPay() },
         )
@@ -128,7 +129,7 @@ private val methods = listOf("YAPE" to "Yape", "PLIN" to "Plin", "TARJETA" to "T
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PayDialog(balance: Double, state: AccountState, onPay: (PayRequest) -> Unit, onOpenInvoice: (Long) -> Unit, onClose: () -> Unit) {
+private fun PayDialog(balance: Double, state: AccountState, onPay: (PayRequest) -> Unit, onPayOnline: (Double) -> Unit, onOpenInvoice: (Long) -> Unit, onClose: () -> Unit) {
     var amount by remember { mutableStateOf(((balance * 100).roundToLong() / 100.0).toString()) }
     var method by remember { mutableStateOf("YAPE") }
     var code by remember { mutableStateOf("") }
@@ -149,6 +150,15 @@ private fun PayDialog(balance: Double, state: AccountState, onPay: (PayRequest) 
                 Text("Saldo pendiente: ${Fmt.money(balance)}", color = Brand.Tinta2)
                 Spacer(Modifier.height(8.dp))
                 Field(amount, { amount = it.filter { c -> c.isDigit() || c == '.' }.take(9) }, "Monto (S/)", keyboard = KeyboardType.Decimal)
+                if (state.online) {
+                    Text("Pagarás en la página segura de Mercado Pago con tarjeta de crédito o débito, o con Yape. Al terminar vuelve a la app: tu pago se registra solo.", color = Brand.Tinta2, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    state.charge?.let { c ->
+                        Text(if (c.status == "PENDIENTE") "Esperando la confirmación de Mercado Pago…" else c.statusLabel, color = Brand.Tinta, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                        if (c.mpStatus == "rejected") Text("Mercado Pago rechazó el intento. Puedes reintentar desde la misma página.", color = Brand.Rojo, fontSize = 12.sp)
+                    }
+                    if (state.onlineTest) Text("Modo de pruebas: no se cobra dinero real.", color = Brand.Gris, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    state.payError?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(top = 8.dp)) }
+                } else {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                     methods.forEach { (k, l) -> Pill(l, method == k, { method = k }) }
                 }
@@ -169,6 +179,7 @@ private fun PayDialog(balance: Double, state: AccountState, onPay: (PayRequest) 
                 Text("Pago de demostración: no se cobra dinero real.", color = Brand.Gris, fontSize = 12.sp)
                 state.payError?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(top = 8.dp)) }
                 }
+                }
             }
         },
         confirmButton = {
@@ -176,6 +187,11 @@ private fun PayDialog(balance: Double, state: AccountState, onPay: (PayRequest) 
                 if (paid.invoiceId != null) TextButton(onClick = { onOpenInvoice(paid.invoiceId) }) { Text("Ver boleta") }
                 TextButton(onClick = onClose) { Text("Listo") }
             } else {
+                if (state.online) {
+                    TextButton(enabled = !state.paying && state.charge?.status != "PENDIENTE", onClick = { onPayOnline(amount.toDoubleOrNull() ?: 0.0) }) {
+                        Text(if (state.paying) "Abriendo…" else "Pagar con Mercado Pago")
+                    }
+                } else
                 TextButton(
                     enabled = !state.paying,
                     onClick = {

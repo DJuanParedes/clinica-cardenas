@@ -34,6 +34,16 @@ public class InventoryController {
         return service.update(id, req);
     }
 
+    @PostMapping(value = "/{id}/image", consumes = "multipart/form-data")
+    public InventoryItem image(@PathVariable Long id, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return service.setImage(id, file);
+    }
+
+    @DeleteMapping("/{id}/image")
+    public InventoryItem removeImage(@PathVariable Long id) {
+        return service.removeImage(id);
+    }
+
     @PostMapping("/{id}/moves")
     public Map<String, Object> move(@PathVariable Long id, @RequestBody InventoryService.MoveRequest req) {
         return service.registerMove(id, req);

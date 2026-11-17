@@ -142,6 +142,23 @@ data class PayRequest(
 data class PayResultDto(val operationId: String = "", val amount: Double = 0.0, val invoiceId: Long? = null, val invoice: String? = null, val message: String = "")
 
 @Serializable
+data class OnlineConfigDto(val enabled: Boolean = false, val testMode: Boolean = false, val message: String = "")
+
+@Serializable
+data class OnlineAmount(val amount: Double)
+
+@Serializable
+data class OnlineChargeDto(
+    val id: Long,
+    val amount: Double = 0.0,
+    val status: String = "PENDIENTE",
+    val statusLabel: String = "",
+    val checkoutUrl: String? = null,
+    val mpPaymentId: String? = null,
+    val mpStatus: String? = null,
+)
+
+@Serializable
 data class InvoiceItemDto(val id: Long, val number: String, val type: String, val date: String, val total: Double, val status: String)
 
 @Serializable
