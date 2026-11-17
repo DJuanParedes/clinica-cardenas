@@ -34,23 +34,24 @@ public class AssistantService {
     private static final DateTimeFormatter CUANDO = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'a las' h:mm a", ES);
     private static final DateTimeFormatter CORTO = DateTimeFormatter.ofPattern("EEE d/MM h:mm a", ES);
 
+    /** Puntaje mínimo de BM25 para responder con la base de conocimiento sin pasar la consulta al personal. */
+    private static final double MIN_SCORE = 1.6;
+
     public record Reply(String text, String intent, boolean needsHuman, boolean pauseAi, String engine, List<String> sources) {}
 
     private final KnowledgeBase kb;
     private final LanguageModel llm;
     private final AppointmentRepository appointments;
-    private final DentistRepository dentists;
     private final AgendaService agenda;
     private final CashService cash;
     private final PatientRepository patients;
     private final JdbcTemplate jdbc;
 
-    public AssistantService(KnowledgeBase kb, LanguageModel llm, AppointmentRepository appointments, DentistRepository dentists,
-                            AgendaService agenda, CashService cash, PatientRepository patients, JdbcTemplate jdbc) {
+    public AssistantService(KnowledgeBase kb, LanguageModel llm, AppointmentRepository appointments, AgendaService agenda,
+                            CashService cash, PatientRepository patients, JdbcTemplate jdbc) {
         this.kb = kb;
         this.llm = llm;
         this.appointments = appointments;
-        this.dentists = dentists;
         this.agenda = agenda;
         this.cash = cash;
         this.patients = patients;
@@ -82,159 +83,202 @@ public class AssistantService {
 
     // ------------------------------------------------------------------ 2-4. respuesta
 
+    /** Datos de un mensaje mientras se arma la respuesta. */
+    private static final class Turn {
+        final String text;
+        final boolean simulate;
+        final Patient patient;
+        final String name;
+        final List<Appointment> upcoming;
+        final Appointment next;
+        final List<TextSearch.Hit> hits;
+        final StringBuilder out = new StringBuilder();
+        boolean human;
+        boolean pause;
+
+        Turn(String text, boolean simulate, Patient patient, List<Appointment> upcoming, List<TextSearch.Hit> hits) {
+            this.text = text;
+            this.simulate = simulate;
+            this.patient = patient;
+            this.name = patient == null ? null : patient.firstName.split(" ")[0];
+            this.upcoming = upcoming;
+            this.next = upcoming.isEmpty() ? null : upcoming.get(0);
+            this.hits = hits;
+        }
+
+        String comaNombre() { return name == null ? "" : ", " + name; }
+    }
+
     /**
      * @param simulate true para el probador de la web: no ejecuta acciones (no confirma ni marca reprogramación).
      */
-    public Reply answer(String phone, String text, Long patientId, List<Map<String, Object>> history, boolean simulate) {
+    public Reply answer(String text, Long patientId, List<Map<String, Object>> history, boolean simulate) {
         String intent = intent(text);
         Patient p = patientId == null ? null : patients.findById(patientId).orElse(null);
-        String nombre = p == null ? null : p.firstName.split(" ")[0];
-        List<Appointment> proximas = p == null ? List.of() : upcoming(p.id);
-        Appointment next = proximas.isEmpty() ? null : proximas.get(0);
-
         List<TextSearch.Hit> hits = TextSearch.search(kb.docs(), text, 5);
-        List<String> sources = hits.stream().map(h -> h.doc().title().split(" ·")[0]).toList();
-        StringBuilder r = new StringBuilder();
-        boolean human = false, pause = false;
-        String hola = nombre == null ? "¡Hola! 👋" : "¡Hola, " + nombre + "! 👋";
+        Turn t = new Turn(text, simulate, p, p == null ? List.of() : upcoming(p.id), hits);
 
         switch (intent) {
-            case "SALUDO" -> {
-                r.append(hola).append(" Soy el asistente virtual de *").append(kb.clinic).append("*. ");
-                r.append("Puedo ayudarte con tus citas, horarios, precios, ubicación y pagos.");
-                if (next != null) r.append("\n\nTu próxima cita es el *").append(when(next)).append("* con ").append(next.dentist.getFullName()).append(".");
-                r.append("\n\n¿En qué te ayudo?");
-            }
-            case "GRACIAS" -> r.append("¡Con gusto").append(nombre == null ? "" : ", " + nombre).append("! 😊 Si necesitas algo más, escríbenos por aquí.");
-            case "DESPEDIDA" -> r.append("¡Hasta pronto").append(nombre == null ? "" : ", " + nombre).append("! Que tengas un excelente día 🦷✨");
-            case "MI_CITA" -> {
-                if (p == null) {
-                    r.append("No encuentro un paciente registrado con este número. Indícanos tu nombre completo y DNI, y recepción te ayudará a revisar tu cita.");
-                    human = true;
-                } else if (proximas.isEmpty()) {
-                    r.append(nombre).append(", no tienes citas pendientes. Puedes reservar desde la app de la clínica o escribir *quiero una cita* y te muestro horarios libres.");
-                } else {
-                    r.append(proximas.size() == 1 ? "Tu próxima cita:" : "Tus próximas citas:");
-                    for (Appointment a : proximas.subList(0, Math.min(3, proximas.size()))) {
-                        r.append("\n📅 *").append(when(a)).append("*\n🦷 ").append(a.dentist.getFullName()).append(" · ").append(a.reason)
-                                .append(a.status == AppointmentStatus.CONFIRMADA ? " (confirmada ✅)" : "");
-                    }
-                    r.append("\n📍 ").append(kb.address);
-                    if (next.status == AppointmentStatus.PROGRAMADA) r.append("\n\nResponde *1* para confirmar o *2* si necesitas reprogramar.");
-                }
-            }
-            case "CONFIRMAR" -> {
-                if (next == null) {
-                    r.append(p == null ? "No encuentro una cita con este número. ¿Me indicas tu nombre completo y DNI?" : "No tienes citas pendientes por confirmar.");
-                    human = p == null;
-                } else if (next.status == AppointmentStatus.CONFIRMADA) {
-                    r.append("Tu cita del *").append(when(next)).append("* ya está confirmada ✅. ¡Te esperamos!");
-                } else {
-                    boolean ok = simulate || confirm(next);
-                    r.append(ok ? "¡Listo! Tu cita del *" + when(next) + "* con " + next.dentist.getFullName() + " quedó *confirmada* ✅. ¡Te esperamos!"
-                            : "No pude confirmar tu cita automáticamente; recepción la revisará y te escribirá.");
-                    human = !ok;
-                }
-            }
-            case "REPROGRAMAR", "CANCELAR" -> {
-                boolean cancelar = "CANCELAR".equals(intent);
-                if (next == null) {
-                    r.append(p == null ? "No encuentro una cita con este número. Indícanos tu nombre completo y DNI para ayudarte."
-                            : "No tienes citas pendientes" + (cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?"));
-                    human = p == null;
-                } else {
-                    if (!simulate) markReschedule(next);
-                    r.append(cancelar ? "Entendido. Registré que deseas *cancelar* tu cita del *" : "Entendido. Registré tu pedido para *reprogramar* tu cita del *")
-                            .append(when(next)).append("*: recepción te escribirá por aquí para ").append(cancelar ? "confirmar la cancelación." : "acordar el nuevo horario.");
-                    if (!cancelar) {
-                        List<String> libres = freeSlots(next.dentist, p.id, next.durationMin, next.id, 3);
-                        if (!libres.isEmpty()) r.append("\n\nHorarios libres cercanos con ").append(next.dentist.getFullName()).append(":\n• ").append(String.join("\n• ", libres));
-                    }
-                    r.append("\n\nTambién puedes hacerlo tú mismo desde la app (Mis citas) hasta 12 horas antes.");
-                    human = true;
-                }
-            }
-            case "DISPONIBILIDAD" -> {
-                r.append("Estos son los próximos horarios libres:");
-                int n = 0;
-                for (Dentist d : agenda.activeDentists()) {
-                    List<String> libres = freeSlots(d, p == null ? null : p.id, 30, null, 2);
-                    if (libres.isEmpty()) continue;
-                    r.append("\n\n🦷 *").append(d.getFullName()).append("* (").append(d.specialty).append(")\n• ").append(String.join("\n• ", libres));
-                    n++;
-                }
-                if (n == 0) r.setLength(0);
-                if (n == 0) r.append("Por ahora no veo horarios libres en los próximos días.");
-                r.append("\n\nPuedes reservar al instante desde la app de la clínica, o dime qué horario prefieres y recepción lo agenda por ti.");
-                human = true;
-            }
-            case "PRECIO" -> {
-                List<TextSearch.Hit> precios = TextSearch.search(kb.docs().stream().filter(d -> "PRECIO".equals(d.kind())).toList(), text, 3);
-                if (precios.isEmpty()) {
-                    r.append("El costo depende del tratamiento. La *consulta de evaluación* es el primer paso: ahí el odontólogo te explica el plan y el presupuesto exacto.");
-                    kb.docs().stream().filter(d -> "PRECIO".equals(d.kind()) && TextSearch.normalize(d.title()).contains("consulta")).findFirst()
-                            .ifPresent(d -> r.append("\n\n").append(d.text()));
-                    r.append("\n\n¿Qué tratamiento te interesa? (limpieza, resina, ortodoncia, endodoncia, extracción, blanqueamiento...)");
-                } else {
-                    r.append("Precios referenciales:");
-                    for (TextSearch.Hit h : precios) r.append("\n• ").append(h.doc().text().replace(" Precio referencial; el costo final se confirma en la evaluación.", ""));
-                    r.append("\n\nEl costo final se confirma en la evaluación, según cada caso.");
-                }
-            }
-            case "PAGO" -> {
-                r.append(doc("pagos"));
-                if (p != null) {
-                    try {
-                        Map<String, Object> b = cash.balance(p.id);
-                        BigDecimal saldo = (BigDecimal) b.get("balance");
-                        BigDecimal favor = (BigDecimal) b.get("inFavor");
-                        if (saldo != null && saldo.signum() > 0) r.append("\n\nTu saldo pendiente es *S/ ").append(saldo.toPlainString()).append("*.");
-                        else if (favor != null && favor.signum() > 0) r.append("\n\nTienes *S/ ").append(favor.toPlainString()).append("* a tu favor.");
-                        else r.append("\n\nNo tienes saldo pendiente. ✅");
-                    } catch (RuntimeException e) {
-                        log.debug("saldo no disponible: {}", e.getMessage());
-                    }
-                }
-            }
-            case "HORARIO" -> r.append(doc("horario")).append("\n\n📍 ").append(kb.address).append(" · ☎ ").append(kb.phone);
-            case "UBICACION" -> r.append("📍 Estamos en *").append(kb.address).append("*.\n☎ Teléfono y WhatsApp: ").append(kb.phone).append("\n\n").append(doc("horario"));
-            case "URGENCIA" -> {
-                r.append("Lamento mucho lo que te pasa 🙏. Si el dolor es intenso, hay sangrado que no se detiene o hinchazón, *llámanos ahora al ")
-                        .append(kb.phone).append("* para atenderte lo antes posible.\n\nYa avisé a recepción para que te contacten.");
-                r.append("\n\nSi es de noche o la hinchazón dificulta respirar o tragar, acude a emergencias.");
-                human = true;
-                pause = true;
-            }
+            case "SALUDO" -> saludo(t);
+            case "GRACIAS" -> t.out.append("¡Con gusto").append(t.comaNombre()).append("! 😊 Si necesitas algo más, escríbenos por aquí.");
+            case "DESPEDIDA" -> t.out.append("¡Hasta pronto").append(t.comaNombre()).append("! Que tengas un excelente día 🦷✨");
+            case "MI_CITA" -> miCita(t);
+            case "CONFIRMAR" -> confirmar(t);
+            case "REPROGRAMAR" -> cambio(t, false);
+            case "CANCELAR" -> cambio(t, true);
+            case "DISPONIBILIDAD" -> disponibilidad(t);
+            case "PRECIO" -> precio(t);
+            case "PAGO" -> pago(t);
+            case "HORARIO" -> t.out.append(doc("horario")).append("\n\n📍 ").append(kb.address).append(" · ☎ ").append(kb.phone);
+            case "UBICACION" -> t.out.append("📍 Estamos en *").append(kb.address).append("*.\n☎ Teléfono y WhatsApp: ").append(kb.phone).append("\n\n").append(doc("horario"));
+            case "URGENCIA" -> urgencia(t);
             case "HUMANO" -> {
-                r.append("¡Claro! Ya avisé a recepción: una persona del equipo te escribirá por aquí en breve. 🙌");
-                human = true;
-                pause = true;
+                t.out.append("¡Claro! Ya avisé a recepción: una persona del equipo te escribirá por aquí en breve. 🙌");
+                t.human = true;
+                t.pause = true;
             }
-            default -> {
-                TextSearch.Hit best = hits.isEmpty() ? null : hits.get(0);
-                if (best != null && best.score() >= 1.6) {
-                    r.append(best.doc().text());
-                    if (hits.size() > 1 && hits.get(1).score() >= best.score() * 0.85 && !"FAQ".equals(hits.get(1).doc().kind())) {
-                        r.append("\n\n").append(hits.get(1).doc().text());
-                    }
-                } else {
-                    r.append("Gracias por tu mensaje").append(nombre == null ? "" : ", " + nombre)
-                            .append(". No tengo esa información a la mano, así que ya se la pasé a recepción y te responderán por aquí en breve. 🙌");
-                    human = true;
-                }
-            }
+            default -> otraConsulta(t);
         }
-        String base = r.toString().trim();
+        String base = t.out.toString().trim();
         String finalText = base;
         String engine = "local";
         if (llm.enabled() && !"GRACIAS".equals(intent) && !"DESPEDIDA".equals(intent)) {
-            String redacted = llm.complete(systemPrompt(), List.of(Map.of("role", "user", "content", userPrompt(text, base, hits, p, proximas, history))));
+            String redacted = llm.complete(systemPrompt(), List.of(Map.of("role", "user", "content", userPrompt(text, base, hits, p, t.upcoming, history))));
             if (redacted != null && redacted.length() <= 1500) {
                 finalText = redacted;
                 engine = llm.engineName();
             }
         }
-        return new Reply(finalText, intent, human, pause, engine, sources);
+        List<String> sources = hits.stream().map(h -> h.doc().title().split(" ·")[0]).toList();
+        return new Reply(finalText, intent, t.human, t.pause, engine, sources);
+    }
+
+    // ------------------------------------------------------------------ una respuesta por intención
+
+    private void saludo(Turn t) {
+        t.out.append(t.name == null ? "¡Hola! 👋" : "¡Hola, " + t.name + "! 👋")
+                .append(" Soy el asistente virtual de *").append(kb.clinic).append("*. ")
+                .append("Puedo ayudarte con tus citas, horarios, precios, ubicación y pagos.");
+        if (t.next != null) t.out.append("\n\nTu próxima cita es el *").append(when(t.next)).append("* con ").append(t.next.dentist.getFullName()).append(".");
+        t.out.append("\n\n¿En qué te ayudo?");
+    }
+
+    private void miCita(Turn t) {
+        if (t.patient == null) {
+            t.out.append("No encuentro un paciente registrado con este número. Indícanos tu nombre completo y DNI, y recepción te ayudará a revisar tu cita.");
+            t.human = true;
+            return;
+        }
+        if (t.upcoming.isEmpty()) {
+            t.out.append(t.name).append(", no tienes citas pendientes. Puedes reservar desde la app de la clínica o escribir *quiero una cita* y te muestro horarios libres.");
+            return;
+        }
+        t.out.append(t.upcoming.size() == 1 ? "Tu próxima cita:" : "Tus próximas citas:");
+        for (Appointment a : t.upcoming.subList(0, Math.min(3, t.upcoming.size()))) {
+            t.out.append("\n📅 *").append(when(a)).append("*\n🦷 ").append(a.dentist.getFullName()).append(" · ").append(a.reason)
+                    .append(a.status == AppointmentStatus.CONFIRMADA ? " (confirmada ✅)" : "");
+        }
+        t.out.append("\n📍 ").append(kb.address);
+        if (t.next.status == AppointmentStatus.PROGRAMADA) t.out.append("\n\nResponde *1* para confirmar o *2* si necesitas reprogramar.");
+    }
+
+    private void confirmar(Turn t) {
+        Appointment next = t.next;
+        if (next == null) {
+            t.out.append(t.patient == null ? "No encuentro una cita con este número. ¿Me indicas tu nombre completo y DNI?" : "No tienes citas pendientes por confirmar.");
+            t.human = t.patient == null;
+        } else if (next.status == AppointmentStatus.CONFIRMADA) {
+            t.out.append("Tu cita del *").append(when(next)).append("* ya está confirmada ✅. ¡Te esperamos!");
+        } else {
+            boolean ok = t.simulate || confirm(next);
+            t.out.append(ok ? "¡Listo! Tu cita del *" + when(next) + "* con " + next.dentist.getFullName() + " quedó *confirmada* ✅. ¡Te esperamos!"
+                    : "No pude confirmar tu cita automáticamente; recepción la revisará y te escribirá.");
+            t.human = !ok;
+        }
+    }
+
+    /** Reprogramar o cancelar: se registra el pedido y lo concreta recepción (el asistente nunca cancela solo). */
+    private void cambio(Turn t, boolean cancelar) {
+        Appointment next = t.next;
+        if (next == null) {
+            t.out.append(t.patient == null ? "No encuentro una cita con este número. Indícanos tu nombre completo y DNI para ayudarte."
+                    : "No tienes citas pendientes" + (cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?"));
+            t.human = t.patient == null;
+            return;
+        }
+        if (!t.simulate) markReschedule(next);
+        t.out.append(cancelar ? "Entendido. Registré que deseas *cancelar* tu cita del *" : "Entendido. Registré tu pedido para *reprogramar* tu cita del *")
+                .append(when(next)).append("*: recepción te escribirá por aquí para ").append(cancelar ? "confirmar la cancelación." : "acordar el nuevo horario.");
+        if (!cancelar) {
+            List<String> libres = freeSlots(next.dentist, t.patient.id, next.durationMin, next.id, 3);
+            if (!libres.isEmpty()) t.out.append("\n\nHorarios libres cercanos con ").append(next.dentist.getFullName()).append(":\n• ").append(String.join("\n• ", libres));
+        }
+        t.out.append("\n\nTambién puedes hacerlo tú mismo desde la app (Mis citas) hasta 12 horas antes.");
+        t.human = true;
+    }
+
+    private void disponibilidad(Turn t) {
+        StringBuilder libres = new StringBuilder();
+        for (Dentist d : agenda.activeDentists()) {
+            List<String> l = freeSlots(d, t.patient == null ? null : t.patient.id, 30, null, 2);
+            if (!l.isEmpty()) libres.append("\n\n🦷 *").append(d.getFullName()).append("* (").append(d.specialty).append(")\n• ").append(String.join("\n• ", l));
+        }
+        t.out.append(libres.isEmpty() ? "Por ahora no veo horarios libres en los próximos días." : "Estos son los próximos horarios libres:" + libres);
+        t.out.append("\n\nPuedes reservar al instante desde la app de la clínica, o dime qué horario prefieres y recepción lo agenda por ti.");
+        t.human = true;
+    }
+
+    private void precio(Turn t) {
+        List<TextSearch.Doc> catalogo = kb.docs().stream().filter(d -> "PRECIO".equals(d.kind())).toList();
+        List<TextSearch.Hit> precios = TextSearch.search(catalogo, t.text, 3);
+        if (precios.isEmpty()) {
+            t.out.append("El costo depende del tratamiento. La *consulta de evaluación* es el primer paso: ahí el odontólogo te explica el plan y el presupuesto exacto.");
+            catalogo.stream().filter(d -> TextSearch.normalize(d.title()).contains("consulta")).findFirst()
+                    .ifPresent(d -> t.out.append("\n\n").append(d.text()));
+            t.out.append("\n\n¿Qué tratamiento te interesa? (limpieza, resina, ortodoncia, endodoncia, extracción, blanqueamiento...)");
+            return;
+        }
+        t.out.append("Precios referenciales:");
+        for (TextSearch.Hit h : precios) t.out.append("\n• ").append(h.doc().text().replace(" Precio referencial; el costo final se confirma en la evaluación.", ""));
+        t.out.append("\n\nEl costo final se confirma en la evaluación, según cada caso.");
+    }
+
+    private void pago(Turn t) {
+        t.out.append(doc("pagos"));
+        if (t.patient == null) return;
+        try {
+            Map<String, Object> b = cash.balance(t.patient.id);
+            BigDecimal saldo = (BigDecimal) b.get("balance");
+            BigDecimal favor = (BigDecimal) b.get("inFavor");
+            if (saldo != null && saldo.signum() > 0) t.out.append("\n\nTu saldo pendiente es *S/ ").append(saldo.toPlainString()).append("*.");
+            else if (favor != null && favor.signum() > 0) t.out.append("\n\nTienes *S/ ").append(favor.toPlainString()).append("* a tu favor.");
+            else t.out.append("\n\nNo tienes saldo pendiente. ✅");
+        } catch (RuntimeException e) {
+            log.debug("saldo no disponible: {}", e.getMessage());
+        }
+    }
+
+    private void urgencia(Turn t) {
+        t.out.append("Lamento mucho lo que te pasa 🙏. Si el dolor es intenso, hay sangrado que no se detiene o hinchazón, *llámanos ahora al ")
+                .append(kb.phone).append("* para atenderte lo antes posible.\n\nYa avisé a recepción para que te contacten.")
+                .append("\n\nSi es de noche o la hinchazón dificulta respirar o tragar, acude a emergencias.");
+        t.human = true;
+        t.pause = true;
+    }
+
+    /** Cualquier otra consulta: responde con la base de conocimiento si hay una coincidencia clara; si no, pasa al personal. */
+    private void otraConsulta(Turn t) {
+        TextSearch.Hit best = t.hits.isEmpty() ? null : t.hits.get(0);
+        if (best != null && best.score() >= MIN_SCORE) {
+            t.out.append(best.doc().text());
+            if (t.hits.size() > 1 && t.hits.get(1).score() >= best.score() * 0.85 && !"FAQ".equals(t.hits.get(1).doc().kind())) {
+                t.out.append("\n\n").append(t.hits.get(1).doc().text());
+            }
+            return;
+        }
+        t.out.append("Gracias por tu mensaje").append(t.comaNombre())
+                .append(". No tengo esa información a la mano, así que ya se la pasé a recepción y te responderán por aquí en breve. 🙌");
+        t.human = true;
     }
 
     // ------------------------------------------------------------------ prompts del modelo de lenguaje

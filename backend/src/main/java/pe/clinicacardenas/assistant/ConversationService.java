@@ -199,7 +199,7 @@ public class ConversationService {
         Long pid = t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue();
         AssistantService.Reply rep;
         try {
-            rep = assistant.answer(phone, text, pid, recent(phone, 8), false);
+            rep = assistant.answer(text, pid, recent(phone, 8), false);
         } catch (RuntimeException e) {
             log.warn("El asistente falló con el mensaje de {}: {}", phone, e.toString());
             jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
@@ -371,7 +371,7 @@ public class ConversationService {
     public Map<String, Object> test(TestRequest r) {
         if (r.text() == null || r.text().isBlank()) throw ApiException.field("text", "Escribe un mensaje de prueba.");
         long t0 = System.currentTimeMillis();
-        AssistantService.Reply rep = assistant.answer(null, r.text().trim(), r.patientId(), List.of(), true);
+        AssistantService.Reply rep = assistant.answer(r.text().trim(), r.patientId(), List.of(), true);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("text", rep.text());
         m.put("intent", rep.intent());

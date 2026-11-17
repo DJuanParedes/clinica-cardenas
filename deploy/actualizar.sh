@@ -3,6 +3,9 @@
 # Lo ejecuta el temporizador clinica-actualizar cada 5 minutos. Manual:  sudo bash deploy/actualizar.sh --forzar
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# El temporizador corre como root y la carpeta es de otro usuario: sin esto git se niega ("dubious ownership")
+# y el servidor deja de actualizarse sin avisar.
+git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$(pwd)" || git config --system --add safe.directory "$(pwd)" || true
 RAMA=$(git rev-parse --abbrev-ref HEAD)
 git fetch -q origin "$RAMA"
 if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$RAMA")" ] && [ "${1:-}" != "--forzar" ]; then exit 0; fi

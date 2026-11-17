@@ -1,4 +1,4 @@
-# Análisis de calidad con SonarQube (Docker): backend Java (con pruebas y cobertura), web Angular, microservicios
+﻿# Análisis de calidad con SonarQube (Docker): backend Java (con pruebas y cobertura), web Angular, microservicios
 # Node y app Kotlin. Deja el resultado en sonar/reporte-sonar.json y sonar/resumen.txt.
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -32,16 +32,16 @@ Write-Host '[3/6] Backend Java: compilando, pruebas, cobertura y análisis (Mave
 docker run --rm --add-host=host.docker.internal:host-gateway -v "${root}\backend:/src" -v clinica-m2:/root/.m2 -w /src maven:3.9.9-eclipse-temurin-21 `
   mvn -B -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent verify org.jacoco:jacoco-maven-plugin:0.8.12:report `
   org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar `
-  "-Dsonar.host.url=http://host.docker.internal:9000" "-Dsonar.token=$token" -Dsonar.projectKey=clinica-backend "-Dsonar.projectName=Clínica Cárdenas · Backend" `
-  -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+  "-Dsonar.host.url=http://host.docker.internal:9000" "-Dsonar.token=$token" "-Dsonar.projectKey=clinica-backend" "-Dsonar.projectName=Clínica Cárdenas · Backend" `
+  "-Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml"
 if ($LASTEXITCODE -ne 0) { throw 'Falló el análisis del backend (revisa la salida de Maven arriba).' }
 
 Write-Host '[4/6] Web Angular, microservicios Node y app Kotlin...'
 docker run --rm --add-host=host.docker.internal:host-gateway -v "${root}:/usr/src" sonarsource/sonar-scanner-cli:11 `
-  "-Dsonar.host.url=http://host.docker.internal:9000" "-Dsonar.token=$token" -Dsonar.projectKey=clinica-web-servicios `
+  "-Dsonar.host.url=http://host.docker.internal:9000" "-Dsonar.token=$token" "-Dsonar.projectKey=clinica-web-servicios" `
   "-Dsonar.projectName=Clínica Cárdenas · Web, servicios y app" `
   "-Dsonar.sources=frontend/src,notificaciones,whatsapp-sim,sunat-sim,movil/composeApp/src/commonMain,movil/composeApp/src/androidMain" `
-  "-Dsonar.exclusions=**/node_modules/**,**/*.spec.ts,**/build/**,**/*.png,**/res/**" -Dsonar.sourceEncoding=UTF-8
+  "-Dsonar.exclusions=**/node_modules/**,**/*.spec.ts,**/build/**,**/*.png,**/res/**" "-Dsonar.sourceEncoding=UTF-8"
 if ($LASTEXITCODE -ne 0) { throw 'Falló el análisis de la web y los servicios.' }
 
 Write-Host '[5/6] Esperando que SonarQube procese los resultados...'

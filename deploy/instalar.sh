@@ -33,7 +33,7 @@ grep -q '^DOMINIO=' .env || echo "DOMINIO=$DOMINIO_AUTO" >> .env
 ADMIN=$(getent passwd 1000 | cut -d: -f1 || echo root)
 chown -R "$ADMIN":"$ADMIN" "$DIR" 2>/dev/null || true
 chmod 600 .env
-git config --global --add safe.directory "$DIR"
+git config --system --add safe.directory "$DIR"  # system: también vale para el temporizador (root sin HOME)
 
 $COMPOSE up -d --build --remove-orphans
 
