@@ -1,3 +1,6 @@
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+// @ts-ignore: sin tipado
+import qrcode from 'qrcode-generator';
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -91,11 +94,20 @@ import { LogoComponent } from '../shared/logo.component';
           </button>
 
           <a class="patient-app" routerLink="/app/ingresar"><app-icon name="smartphone" [size]="18" /> <span><strong>¿Eres paciente?</strong> Revisa tus citas en la app</span></a>
+          <div class="getapp">
+            <div class="qr" [innerHTML]="qr" role="img" aria-label="Código QR para descargar la app"></div>
+            <div><strong>Descarga la app para Android</strong>
+              <p class="small muted">Escanea el código con la cámara de tu celular o <a href="/app/ClinicaCardenas.apk" download>descárgala aquí</a>. Al instalar, permite "orígenes desconocidos" si Android lo pide.</p></div>
+          </div>
         </form>
       </section>
     </div>
   `,
   styles: [`
+    .getapp { display: flex; gap: 14px; align-items: center; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+    .getapp .qr { width: 104px; height: 104px; flex: none; background: #fff; }
+    .getapp .qr :is(svg) { width: 100%; height: 100%; display: block; }
+    .getapp p { margin: 4px 0 0; }
     .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; background: var(--surface); }
     .art { position: relative; overflow: hidden; background: #f4fbfe; display: flex; flex-direction: column; justify-content: center; padding: 150px 64px 140px; }
     .dot { position: absolute; border-radius: 50%; }
@@ -148,6 +160,13 @@ export class LoginComponent {
   codeHint = '';
   resend() { this.code = ''; this.needCode = false; this.submit(); }
   code = '';
+  private sanitizer = inject(DomSanitizer);
+  qr: SafeHtml = (() => {
+    const q = (qrcode as any)(0, 'M');
+    q.addData(location.origin + '/app/ClinicaCardenas.apk');
+    q.make();
+    return this.sanitizer.bypassSecurityTrustHtml(q.createSvgTag({ cellSize: 3, margin: 1, scalable: true }));
+  })();
 
 
   submit() {
