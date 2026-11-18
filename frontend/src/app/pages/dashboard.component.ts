@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -10,7 +11,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, FormsModule],
   template: `
     <div class="page">
       <div class="page-head">
@@ -41,6 +42,29 @@ import { IconComponent } from '../shared/icon.component';
         <div class="skeleton" style="height: 92px; margin-bottom: 16px"></div>
         <div class="skeleton" style="height: 320px"></div>
       } @else {
+        @if (unc?.total && canCall) {
+          <section class="panel unc" [class.hot]="unc.overdue" aria-label="Citas por confirmar">
+            <div class="panel-head"><h3><app-icon name="phone" [size]="16" /> Citas sin confirmar (próximas 24 h)</h3>
+              <span class="small">@if (unc.overdue) { <strong class="hotx">{{ unc.overdue }} ya no pueden confirmar: llama al paciente</strong> } @else { {{ unc.total }} esperando confirmación }</span></div>
+            <table class="table">
+              <tbody>
+                @for (a of unc.items.slice(0, 8); track a.id) {
+                  <tr>
+                    <td class="nowrap tabular">{{ when(a.startAt) }}<div class="muted small">{{ a.dentist }}</div></td>
+                    <td><a [routerLink]="['/pacientes', a.patientId]">{{ a.patient }}</a> <a class="small" [href]="'tel:' + a.phone">{{ a.phone }}</a>
+                      <div class="muted small">{{ a.reason }}{{ a.callNote ? ' · última llamada: ' + a.callNote : '' }}</div></td>
+                    <td>@if (a.overdue) { <span class="tag gum">Plazo vencido</span> } @else { <span class="tag amber">Puede confirmar hasta {{ hm(a.deadline) }}</span> }</td>
+                    <td class="right nowrap">
+                      <button class="btn sm primary" type="button" (click)="call(a, 'CONFIRMADA')">Confirmó</button>
+                      <button class="btn sm" type="button" (click)="call(a, 'NO_CONTESTA')">No contesta</button>
+                      <button class="btn sm ghost" type="button" (click)="call(a, 'REPROGRAMAR')">Pide cambio</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
         <section class="figures panel" aria-label="Resumen del día">
           <div class="fig">
             <span class="v tabular">{{ data.appointmentsToday }}</span>
@@ -148,6 +172,7 @@ import { IconComponent } from '../shared/icon.component';
     </div>
   `,
   styles: [`
+    .unc { margin-bottom: 16px; } .unc.hot { border-color: #f3b4ac; } .hotx { color: var(--gum); }
     .attn { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
     .attn-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--teal-strong); font-size: 13.5px; font-weight: 600; }
     .attn-item.warn { background: var(--orange-soft); color: var(--orange-ink); }
@@ -200,7 +225,22 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() { this.load(); }
 
-  load() { this.api.dashboard().subscribe((d) => (this.data = d)); }
+  load() {
+    this.api.dashboard().subscribe((d) => (this.data = d));
+    if (this.canCall) this.api.unconfirmed().subscribe({ next: (u) => (this.unc = u), error: () => {} });
+  }
+
+  unc: any = null;
+  get canCall() { return this.auth.can('CITAS_GESTIONAR') || this.auth.can('CITAS_ESTADO'); }
+  when(iso: string) { const d = new Date(iso); return d.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit' }) + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }
+  hm(iso: string) { return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }
+  call(a: any, result: string) {
+    const note = result === 'CONFIRMADA' ? '' : (prompt('Nota de la llamada (opcional)') || '');
+    this.api.callResult(a.id, result, note).subscribe({
+      next: (u) => { this.unc = u; this.toast.ok(result === 'CONFIRMADA' ? 'Cita confirmada por teléfono.' : 'Llamada registrada.'); },
+      error: (e) => this.toast.error(apiError(e).message),
+    });
+  }
 
   /** Avisos que piden acción: reprogramaciones, lista de espera, stock bajo y satisfacción. */
   alerts(): { text: string; link: string; icon: string; warn: boolean }[] {

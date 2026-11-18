@@ -102,6 +102,7 @@ import { LogoComponent } from '../shared/logo.component';
                 }
                 <div class="row wrap">
                   <button type="button" class="btn sm" (click)="print()"><app-icon name="print" [size]="15" /> Imprimir</button>
+                  <button type="button" class="btn sm" (click)="pdf()"><app-icon name="download" [size]="15" /> PDF</button>
                   <button type="button" class="btn sm" (click)="mailOpen = !mailOpen" [disabled]="d.invoice.status === 'RECHAZADO'"><app-icon name="send" [size]="15" /> Enviar por correo</button>
                 </div>
                 @if (mailOpen) {
@@ -238,6 +239,10 @@ export class InvoiceDetailComponent implements OnInit {
       next: (r: any) => { this.mailing = false; this.mailOpen = false; r.simulated ? this.toast.warn(r.message) : this.toast.ok(r.message); },
       error: (e) => { this.mailing = false; this.toast.error(apiError(e).message); },
     });
+  }
+  pdf() {
+    const inv = this.d!.invoice;
+    this.api.download(`/api/billing/invoices/${inv.id}/pdf`).subscribe({ next: (b) => saveBlob(b, `${inv.series}-${inv.number}.pdf`), error: () => this.toast.error('No se pudo generar el PDF.') });
   }
   xml() { this.file('xml'); }
   cdr() { this.file('cdr'); }
