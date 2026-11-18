@@ -7,13 +7,14 @@ import { CATEGORY_LABEL, METHOD_LABEL, PERIODS, apiError, dateTime, downloadCsv,
 import { BarsComponent, BarSeries } from '../shared/bars.component';
 import { HBarsComponent } from '../shared/hbars.component';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 
 /** HU-15: ingresos y egresos de caja por período. */
 @Component({
   selector: 'app-cash-report',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -80,6 +81,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
             </div>
           </div>
           <div class="scroll">
+            <app-table-search [(q)]="q" (qChange)="pg = 1" placeholder="Buscar concepto, paciente o medio" [total]="(r?.detail || []).length" [shown]="rows.length" />
             <table class="table">
               <thead><tr><th>Fecha</th><th>Concepto</th><th>Paciente / proveedor</th><th>Medio</th><th>Registró</th><th class="right">Importe</th></tr></thead>
               <tbody>
@@ -163,7 +165,8 @@ export class CashReportComponent implements OnInit {
     });
   }
 
-  get rows() { return (this.r?.detail || []).filter((d) => !this.kind || d.type === this.kind); }
+  q = '';
+  get rows() { return filterRows((this.r?.detail || []).filter((d) => !this.kind || d.type === this.kind), this.q); }
   get pageRows() { return pageOf(this.rows, this.pg); }
   get margin(): string { return this.r && this.r.income ? ((this.r.net / this.r.income) * 100).toFixed(1) : '0'; }
 

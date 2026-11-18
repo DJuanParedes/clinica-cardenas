@@ -6,14 +6,15 @@ import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { CATEGORY_LABEL, METHOD_LABEL, apiError, hhmm, isoDate, longDay, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 
 /** Caja del día: cobros (HU-13) y egresos (HU-15) del turno. */
 @Component({
   selector: 'app-cash',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -55,10 +56,11 @@ import { ModalComponent } from '../shared/modal.component';
               <div class="empty"><h3>Aún no hay movimientos hoy</h3><p>Los cobros y egresos aparecerán aquí al registrarse.</p>
                 @if (auth.can('CAJA_COBRAR')) { <a class="btn primary" routerLink="/caja/cobro">Registrar el primer cobro</a> }</div>
             } @else {
+              <app-table-search [(q)]="qDet" (qChange)="pgDet = 1" placeholder="Buscar concepto, paciente o medio" [total]="(r.detail || []).length" [shown]="filterRows(r.detail, qDet).length" />
               <table class="table">
                 <thead><tr><th>Hora</th><th>Concepto</th><th>Medio</th><th class="right">Importe</th><th></th></tr></thead>
                 <tbody>
-                  @for (d of pageOf(r.detail, pgDet); track d.type + d.id) {
+                  @for (d of pageOf(filterRows(r.detail, qDet), pgDet); track d.type + d.id) {
                     <tr>
                       <td class="tabular muted">{{ d.type === 'INGRESO' ? hhmm(d.date) : '—' }}</td>
                       <td>
@@ -82,7 +84,7 @@ import { ModalComponent } from '../shared/modal.component';
                   }
                 </tbody>
               </table>
-<app-pager [total]="(r.detail || []).length" [page]="pgDet" (pageChange)="pgDet = $event" />
+<app-pager [total]="filterRows(r.detail, qDet).length" [page]="pgDet" (pageChange)="pgDet = $event" />
             }
           </section>
 
@@ -116,7 +118,7 @@ import { ModalComponent } from '../shared/modal.component';
         <div class="field">
           <label class="req" for="ec">Categoría</label>
           <select id="ec" name="ec" class="input" [class.invalid]="e['category']" [(ngModel)]="x.category">
-            <option value="">Selecciona…</option>
+            <option value="">Seleccionar…</option>
             @for (c of categories; track c) { <option [value]="c">{{ cat(c) }}</option> }
           </select>
           @if (e['category']) { <span class="err">{{ e['category'] }}</span> }
@@ -134,6 +136,7 @@ import { ModalComponent } from '../shared/modal.component';
         <div class="field">
           <label class="req" for="em">Pagado con</label>
           <select id="em" name="em" class="input" [class.invalid]="e['method']" [(ngModel)]="x.method">
+            <option value="">Seleccionar…</option>
             @for (mt of methods; track mt) { <option [value]="mt">{{ method(mt) }}</option> }
           </select>
         </div>
@@ -183,6 +186,8 @@ import { ModalComponent } from '../shared/modal.component';
   `],
 })
 export class CashComponent implements OnInit {
+  filterRows = filterRows;
+  qDet = '';
   pageOf = pageOf;
   pgDet = 1;
   private api = inject(Api);
@@ -224,7 +229,7 @@ export class CashComponent implements OnInit {
   }
 
   openExpense() {
-    this.x = { expenseDate: isoDate(), category: '', concept: '', amount: null, method: 'EFECTIVO', supplier: '', reference: '' };
+    this.x = { expenseDate: isoDate(), category: '', concept: '', amount: null, method: '', supplier: '', reference: '' };
     this.e = {};
     this.expenseOpen = true;
   }

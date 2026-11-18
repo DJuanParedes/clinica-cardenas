@@ -36,7 +36,7 @@ interface Group { name: string; perms: { code: string; label: string }[]; }
         <div class="skeleton" style="height: 480px"></div>
       } @else {
         <section class="panel matrix">
-          <table class="table">
+          <table class="table keep">
             <thead>
               <tr>
                 <th class="pcol">Permiso</th>

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, permGuard, portalGuard, portalGuestGuard } from './core/guards';
+import { authGuard, guestGuard, permGuard, portalGuard, portalGuestGuard, roleGuard } from './core/guards';
 import { ShellComponent } from './layout/shell.component';
 
 const T = (s: string) => `${s} · Clínica Cárdenas`;
@@ -44,7 +44,7 @@ export const routes: Routes = [
       { path: 'insumos', canActivate: [permGuard('SOLICITAR_INSUMOS')], loadComponent: () => import('./pages/supply-requests.component').then((m) => m.SupplyRequestsComponent), title: T('Solicitar insumos') },
       { path: 'catalogo', loadComponent: () => import('./pages/catalog.component').then((m) => m.CatalogComponent), title: T('Procedimientos y promociones') },
       { path: 'perfil', loadComponent: () => import('./pages/profile.component').then((m) => m.ProfileComponent), title: T('Mi perfil') },
-      { path: 'mis-ganancias', loadComponent: () => import('./pages/my-earnings.component').then((m) => m.MyEarningsComponent), title: T('Mis ganancias') },
+      { path: 'mis-ganancias', canActivate: [roleGuard('ODONTOLOGO')], loadComponent: () => import('./pages/my-earnings.component').then((m) => m.MyEarningsComponent), title: T('Mis ganancias') },
       { path: 'comisiones', canActivate: [permGuard('COMISIONES')], loadComponent: () => import('./pages/commissions.component').then((m) => m.CommissionsComponent), title: T('Comisiones') },
       { path: 'reportes', canActivate: [permGuard('REPORTES')], loadComponent: () => import('./pages/reports.component').then((m) => m.ReportsComponent), title: T('Indicadores') },
       { path: 'notificaciones', canActivate: [permGuard('NOTIFICACIONES')], loadComponent: () => import('./pages/notifications.component').then((m) => m.NotificationsComponent), title: T('Notificaciones') },

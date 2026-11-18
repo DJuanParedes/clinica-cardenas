@@ -8,7 +8,8 @@ import { ITEM_LABEL, ITEM_TONE, PERIODS, STATUS_LABEL, STATUS_TONE, apiError, da
 import { BarsComponent, BarSeries } from '../shared/bars.component';
 import { HBarsComponent } from '../shared/hbars.component';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 
 type Tab = 'ingresos' | 'citas' | 'tratamientos';
 
@@ -16,7 +17,7 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, BarsComponent, HBarsComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -118,17 +119,18 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
                   @for (s of statusKeys; track s) { <option [value]="s">{{ stLabel(s) }}</option> }
                 </select>
               </div>
+              <app-table-search [(q)]="qAppt" (qChange)="pgAppt = 1" placeholder="Buscar paciente, odontólogo o motivo" [total]="(apptRows || []).length" [shown]="filterRows(apptRows, qAppt).length" />
               <div class="scroll"><table class="table">
                 <thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Odontólogo</th><th>Motivo</th><th>Estado</th></tr></thead>
                 <tbody>
-                  @for (a of pageOf(apptRows, pgAppt); track a.id) {
+                  @for (a of pageOf(filterRows(apptRows, qAppt), pgAppt); track a.id) {
                     <tr><td class="tabular nowrap">{{ dt(a.startAt) }}</td><td><a [routerLink]="['/pacientes', a.patientId]">{{ a.patient }}</a></td><td>{{ a.dentist }}</td>
                       <td>{{ a.reason }}@if (a.statusReason && a.status === 'CANCELADA') { <div class="muted small">{{ a.statusReason }}</div> }</td>
                       <td><span class="tag" [class]="'tag ' + stTone(a.status)">{{ stLabel(a.status) }}</span></td></tr>
                   } @empty { <tr><td colspan="5" class="muted">Sin citas con ese filtro.</td></tr> }
                 </tbody>
               </table></div>
-<app-pager [total]="(apptRows || []).length" [page]="pgAppt" (pageChange)="pgAppt = $event" />
+<app-pager [total]="filterRows(apptRows, qAppt).length" [page]="pgAppt" (pageChange)="pgAppt = $event" />
             </section>
           }
 
@@ -142,17 +144,18 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
             <div class="two">
               <section class="panel">
                 <div class="panel-head"><h3>Por procedimiento</h3></div>
+                <app-table-search [(q)]="qProc" (qChange)="pgProc = 1" placeholder="Buscar procedimiento" [total]="(data.byProcedure || []).length" [shown]="filterRows(data.byProcedure, qProc).length" />
                 <div class="scroll"><table class="table">
                   <thead><tr><th>Procedimiento</th><th class="right">Realizados</th><th class="right">Monto</th><th class="right">Pendientes</th><th class="right">Monto</th></tr></thead>
                   <tbody>
-                    @for (p of pageOf(data.byProcedure, pgProc); track p.procedure) {
+                    @for (p of pageOf(filterRows(data.byProcedure, qProc), pgProc); track p.procedure) {
                       <tr><td><div class="strong">{{ p.procedure }}</div><div class="muted small">{{ p.category }}</div></td>
                         <td class="right tabular">{{ p.done }}</td><td class="right tabular">{{ money(p.doneAmount) }}</td>
                         <td class="right tabular">{{ p.pending }}</td><td class="right tabular muted">{{ money(p.pendingAmount) }}</td></tr>
                     } @empty { <tr><td colspan="5" class="muted">Sin tratamientos.</td></tr> }
                   </tbody>
                 </table></div>
-<app-pager [total]="(data.byProcedure || []).length" [page]="pgProc" (pageChange)="pgProc = $event" />
+<app-pager [total]="filterRows(data.byProcedure, qProc).length" [page]="pgProc" (pageChange)="pgProc = $event" />
               </section>
               <section class="panel">
                 <div class="panel-head"><h3>Por odontólogo</h3></div>
@@ -166,17 +169,18 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
                   <button type="button" [class.on]="treatView === 'pending'" (click)="treatView = 'pending'">Pendientes ({{ data.pendingDetail.length }})</button>
                 </div>
               </div>
+              <app-table-search [(q)]="qTreat" (qChange)="pgTreat = 1" placeholder="Buscar paciente, procedimiento u odontólogo" [total]="((treatView === 'done' ? data.doneDetail : data.pendingDetail) || []).length" [shown]="filterRows((treatView === 'done' ? data.doneDetail : data.pendingDetail), qTreat).length" />
               <div class="scroll"><table class="table">
                 <thead><tr><th>{{ treatView === 'done' ? 'Realizado' : 'Plan desde' }}</th><th>Paciente</th><th>Procedimiento</th><th>Odontólogo</th><th>Estado</th><th class="right">Precio</th></tr></thead>
                 <tbody>
-                  @for (t of pageOf((treatView === 'done' ? data.doneDetail : data.pendingDetail), pgTreat); track t.id) {
+                  @for (t of pageOf(filterRows((treatView === 'done' ? data.doneDetail : data.pendingDetail), qTreat), pgTreat); track t.id) {
                     <tr><td class="tabular nowrap">{{ date(t.date) }}</td><td><a [routerLink]="['/pacientes', t.patientId]">{{ t.patient }}</a></td>
                       <td>{{ t.procedure }}@if (t.plan) { <div class="muted small">{{ t.plan }}</div> }</td><td>{{ t.dentist }}</td>
                       <td><span class="tag" [class]="'tag ' + itTone(t.status)">{{ itLabel(t.status) }}</span></td><td class="right tabular">{{ money(t.price) }}</td></tr>
                   } @empty { <tr><td colspan="6" class="muted">Sin registros.</td></tr> }
                 </tbody>
               </table></div>
-<app-pager [total]="((treatView === 'done' ? data.doneDetail : data.pendingDetail) || []).length" [page]="pgTreat" (pageChange)="pgTreat = $event" />
+<app-pager [total]="filterRows((treatView === 'done' ? data.doneDetail : data.pendingDetail), qTreat).length" [page]="pgTreat" (pageChange)="pgTreat = $event" />
             </section>
           }
         }
@@ -204,10 +208,14 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
     .nowrap { white-space: nowrap; }
     .seg.sm button { height: 28px; font-size: 12.5px; }
     @media (max-width: 1100px) { .three { grid-template-columns: 1fr; } }
-    @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .figures { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fig { padding: 14px; min-width: 0; } .fig .v { font-size: var(--step-2); word-break: break-word; } }
   `],
 })
 export class ReportsComponent implements OnInit {
+  filterRows = filterRows;
+  qTreat = '';
+  qProc = '';
+  qAppt = '';
   pageOf = pageOf;
   pgTreat = 1;
   pgProc = 1;

@@ -5,13 +5,14 @@ import { Api, NotificationItem } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { CHANNEL_LABEL, NOTIF_STATUS, NOTIF_TONE, NOTIF_TYPE, apiError, dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 
 /** HU-23 / HU-24: bitácora de recordatorios y avisos enviados a los pacientes. */
 @Component({
   selector: 'app-notifications',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -42,10 +43,11 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
             @for (t of typeKeys; track t) { <option [value]="t">{{ typeLabel(t) }}</option> }
           </select>
         </div>
+        <app-table-search [(q)]="qNotif" (qChange)="pgNotif = 1" placeholder="Buscar paciente, destino o mensaje" [total]="(items || []).length" [shown]="filterRows(items, qNotif).length" />
         <table class="table">
           <thead><tr><th>Creada</th><th>Tipo</th><th>Canal y destino</th><th>Estado</th><th>Programado / enviado</th><th></th></tr></thead>
           <tbody>
-            @for (n of pageOf(items, pgNotif); track n.id) {
+            @for (n of pageOf(filterRows(items, qNotif), pgNotif); track n.id) {
               <tr class="click" (click)="toggleOpen(n.id)">
                 <td class="tabular nowrap muted">{{ dt(n.createdAt) }}</td>
                 <td>
@@ -60,7 +62,8 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
                   @if (n.scheduledFor) { <div>Programado: {{ dt(n.scheduledFor) }}</div> }
                   @if (n.sentAt) { <div class="ok">Enviado: {{ dt(n.sentAt) }}</div> }
                 </td>
-                <td class="right">
+                <td class="right nowrap">
+                  <button class="btn sm ghost" type="button" (click)="toggleOpen(n.id); $event.stopPropagation()"><app-icon name="eye" [size]="14" /> {{ open === n.id ? 'Ocultar' : 'Ver' }}</button>
                   @if (n.status === 'FALLIDO' && n.operation !== 'ANULAR') {
                     <button class="btn sm" type="button" (click)="retry(n); $event.stopPropagation()"><app-icon name="send" [size]="14" /> Reenviar</button>
                   }
@@ -76,7 +79,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
             } @empty { <tr><td colspan="6"><div class="empty small"><p>No hay notificaciones con ese filtro.</p></div></td></tr> }
           </tbody>
         </table>
-<app-pager [total]="(items || []).length" [page]="pgNotif" (pageChange)="pgNotif = $event" />
+<app-pager [total]="filterRows(items, qNotif).length" [page]="pgNotif" (pageChange)="pgNotif = $event" />
         <div class="panel-foot small muted">
           Cada mensaje lleva una clave única: si se intenta enviar dos veces el mismo aviso, el microservicio lo detecta y no lo duplica.
           Si el servicio no responde, el sistema reintenta hasta 5 veces con espera creciente.
@@ -96,10 +99,13 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
     tr.body td { background: var(--surface-2); }
     pre { white-space: pre-wrap; font-family: inherit; font-size: 13.5px; margin: 6px 0; background: #e9f7e3; border-radius: 10px; padding: 10px 12px; max-width: 560px; }
     .key { font-family: ui-monospace, monospace; font-size: 11.5px; }
-    @media (max-width: 900px) { .counters { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px) { .counters { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cnt { min-width: 0; } }
+    @media (max-width: 520px) { .counters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   `],
 })
 export class NotificationsComponent implements OnInit, OnDestroy {
+  filterRows = filterRows;
+  qNotif = '';
   pageOf = pageOf;
   pgNotif = 1;
   private api = inject(Api);

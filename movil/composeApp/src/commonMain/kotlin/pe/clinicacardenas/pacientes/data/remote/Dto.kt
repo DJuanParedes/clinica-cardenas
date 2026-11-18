@@ -178,3 +178,17 @@ data class SurveyPendingDto(val pending: PendingSurveyDto? = null)
 
 @Serializable
 data class SurveyRequest(val appointmentId: Long, val score: Int, val comment: String?)
+
+/** Promoción vigente publicada por la clínica (/api/public/promotions). */
+@Serializable
+data class PromoDto(
+    val id: Long,
+    val name: String,
+    val procedure: String? = null,
+    val listPrice: Double? = null,
+    val finalPrice: Double? = null,
+    val discountType: String? = null,
+    val value: Double? = null,
+    val validTo: String? = null,
+    val conditions: String? = null,
+)

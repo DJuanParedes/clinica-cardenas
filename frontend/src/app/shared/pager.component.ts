@@ -45,3 +45,18 @@ export function pageOf<T>(list: T[] | null | undefined, page: number, size = 10)
   const p = Math.min(Math.max(1, page), last);
   return all.slice((p - 1) * size, p * size);
 }
+
+/** Filtra filas por texto libre: busca en todos los valores (también anidados), sin tildes ni mayúsculas. */
+export function filterRows<T>(list: T[] | null | undefined, q: string | null | undefined): T[] {
+  const all = list || [];
+  const n = norm(q || '');
+  if (!n) return all;
+  const terms = n.split(/\s+/);
+  return all.filter((row) => { const hay = norm(flat(row)); return terms.every((t) => hay.includes(t)); });
+}
+function norm(s: string) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function flat(v: unknown, depth = 0): string {
+  if (v == null || depth > 3) return '';
+  if (typeof v === 'object') return Object.values(v as Record<string, unknown>).map((x) => flat(x, depth + 1)).join(' ');
+  return String(v);
+}

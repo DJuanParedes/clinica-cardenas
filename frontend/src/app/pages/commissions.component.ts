@@ -8,7 +8,8 @@ import {
   METHOD_LABEL, SETTLEMENT_LABEL, SETTLEMENT_TONE, apiError, dateTime, isoDate, periodPreset, shortDate, soles,
 } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 
 type Tab = 'reglas' | 'calcular' | 'liquidaciones';
@@ -17,7 +18,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
 @Component({
   selector: 'app-commissions',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -166,10 +167,11 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                 @for (k of settlementStates; track k) { <option [value]="k">{{ sLabel(k) }}</option> }
               </select>
             </div>
+            <app-table-search [(q)]="qSet" (qChange)="pgSet = 1" placeholder="Buscar odontólogo, número o estado" [total]="(settlementsList || []).length" [shown]="filterRows(settlementsList, qSet).length" />
             <table class="table">
               <thead><tr><th>N.°</th><th>Odontólogo</th><th>Período</th><th>Estado</th><th class="right">Total</th><th class="right">Pagado</th><th class="right">Pendiente</th><th></th></tr></thead>
               <tbody>
-                @for (s of pageOf(settlementsList, pgSet); track s.id) {
+                @for (s of pageOf(filterRows(settlementsList, qSet), pgSet); track s.id) {
                   <tr class="click" (click)="openSettlement(s.id)">
                     <td class="tabular">{{ s.id }}</td>
                     <td>{{ s.dentist.fullName }}</td>
@@ -178,12 +180,12 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                     <td class="right tabular">{{ money(s.totalAmount) }}</td>
                     <td class="right tabular">{{ money(s.paidAmount) }}</td>
                     <td class="right tabular strong" [class.owe]="s.pendingAmount > 0">{{ money(s.pendingAmount) }}</td>
-                    <td class="right"><app-icon name="chevronRight" [size]="16" /></td>
+                    <td class="right"><button class="btn sm ghost" type="button" (click)="openSettlement(s.id); $event.stopPropagation()"><app-icon name="eye" [size]="14" /> Ver</button></td>
                   </tr>
                 } @empty { <tr><td colspan="8"><div class="empty small"><p>No hay liquidaciones con ese filtro.</p></div></td></tr> }
               </tbody>
             </table>
-<app-pager [total]="(settlementsList || []).length" [page]="pgSet" (pageChange)="pgSet = $event" />
+<app-pager [total]="filterRows(settlementsList, qSet).length" [page]="pgSet" (pageChange)="pgSet = $event" />
           </section>
         }
       }
@@ -194,6 +196,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
         <div class="field span-2">
           <label class="req" for="rd">Odontólogo</label>
           <select id="rd" name="rd" class="input" [class.invalid]="e['dentistId']" [(ngModel)]="rf.dentistId" [disabled]="ruleLocked">
+            <option [ngValue]="null">Seleccionar…</option>
             @for (d of dentists; track d.id) { <option [ngValue]="d.id">{{ d.fullName }} · {{ d.specialty }}</option> }
           </select>
           @if (e['dentistId']) { <span class="err">{{ e['dentistId'] }}</span> }
@@ -290,7 +293,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                 <input id="pd" name="pd" type="date" class="input" [class.invalid]="pe['paidOn']" [(ngModel)]="pf.paidOn" [max]="today" />
                 @if (pe['paidOn']) { <span class="err">{{ pe['paidOn'] }}</span> }</div>
               <div class="field"><label class="req" for="pm">Medio</label>
-                <select id="pm" name="pm" class="input" [(ngModel)]="pf.method">@for (m of methods; track m) { <option [value]="m">{{ method(m) }}</option> }</select></div>
+                <select id="pm" name="pm" class="input" [(ngModel)]="pf.method"><option value="">Seleccionar…</option>@for (m of methods; track m) { <option [value]="m">{{ method(m) }}</option> }</select></div>
               <div class="field"><label for="pr">N.° de operación</label>
                 <input id="pr" name="pr" class="input" [class.invalid]="pe['reference']" [(ngModel)]="pf.reference" />
                 @if (pe['reference']) { <span class="err">{{ pe['reference'] }}</span> }</div>
@@ -353,6 +356,8 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
   `],
 })
 export class CommissionsComponent implements OnInit {
+  filterRows = filterRows;
+  qSet = '';
   pageOf = pageOf;
   pgSet = 1;
   private api = inject(Api);
@@ -421,7 +426,7 @@ export class CommissionsComponent implements OnInit {
   newRule() {
     this.ruleEditing = null;
     this.ruleLocked = false;
-    this.rf = { dentistId: this.dentists[0]?.id ?? null, procedureId: null, calcType: 'PORCENTAJE', value: null, base: 'REALIZADO',
+    this.rf = { dentistId: null, procedureId: null, calcType: 'PORCENTAJE', value: null, base: 'REALIZADO',
       validFrom: isoDate(), validTo: null, active: true, notes: '' };
     this.e = {};
     this.ruleOpen = true;
@@ -519,7 +524,7 @@ export class CommissionsComponent implements OnInit {
 
   private showSettlement(d: any) {
     this.st = d;
-    this.pf = { amount: d.settlement.pendingAmount, paidOn: isoDate(), method: 'TRANSFERENCIA', reference: '' };
+    this.pf = { amount: d.settlement.pendingAmount, paidOn: isoDate(), method: '', reference: '' };
     this.pe = {};
     this.annulling = false;
     this.annulReason = '';

@@ -90,15 +90,6 @@ import { LogoComponent } from '../shared/logo.component';
             @if (loading) { <span class="spin"></span> Verificando… } @else { Ingresar }
           </button>
 
-          <details class="demo">
-            <summary>Cuentas de prueba</summary>
-            <p class="small muted">Contraseña para todas: <strong>Clinica2026</strong></p>
-            <div class="accounts">
-              @for (a of demo; track a.u) {
-                <button type="button" class="acc" (click)="fill(a.u)"><span class="strong">{{ a.u }}</span><span class="muted">{{ a.r }}</span></button>
-              }
-            </div>
-          </details>
           <a class="patient-app" routerLink="/app/ingresar"><app-icon name="smartphone" [size]="18" /> <span><strong>¿Eres paciente?</strong> Revisa tus citas en la app</span></a>
         </form>
       </section>
@@ -129,9 +120,6 @@ import { LogoComponent } from '../shared/logo.component';
     .pw .input { padding-right: 44px; }
     .eye { position: absolute; right: 4px; top: 4px; height: 32px; width: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
     .eye:hover { color: var(--ink); background: var(--surface-2); }
-    .demo { border-top: 1px solid var(--line); padding-top: 14px; font-size: var(--step--1); }
-    .demo summary { cursor: pointer; color: var(--ink-2); font-weight: 700; }
-    .demo p { margin: 8px 0; }
     .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .acc { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
     .patient-app { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--orange-soft); color: var(--orange-ink); font-size: 13.5px; }
@@ -161,16 +149,6 @@ export class LoginComponent {
   resend() { this.code = ''; this.needCode = false; this.submit(); }
   code = '';
 
-  demo = [
-    { u: 'admin', r: 'Administrador' }, { u: 'recepcion', r: 'Recepcionista' },
-    { u: 'dra.cardenas', r: 'Odontóloga' }, { u: 'dr.ramos', r: 'Odontólogo' },
-    { u: 'caja', r: 'Caja' }, { u: 'director', r: 'Director' },
-  ];
-
-  fill(u: string) {
-    this.username = u;
-    this.password = 'Clinica2026';
-  }
 
   submit() {
     this.touched = true;

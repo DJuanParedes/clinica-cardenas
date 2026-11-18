@@ -7,7 +7,8 @@ import { ToastService } from '../core/toast.service';
 import { Dentist, Patient } from '../core/models';
 import { apiError, dateTime, shortDate } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
@@ -18,7 +19,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
 @Component({
   selector: 'app-followup',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -37,9 +38,10 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
         @case ('reprogramar') {
           <section class="panel">
             <div class="panel-head"><h3>Pidieron otro horario</h3><span class="muted small">Respondieron "2" al recordatorio o lo pidieron desde la app</span></div>
+            <app-table-search [(q)]="qRes" (qChange)="pgRes = 1" placeholder="Buscar paciente u odontólogo" [total]="(resched || []).length" [shown]="filterRows(resched, qRes).length" />
             <table class="table">
               <tbody>
-                @for (r of pageOf(resched, pgRes); track r.id) {
+                @for (r of pageOf(filterRows(resched, qRes), pgRes); track r.id) {
                   <tr>
                     <td><span class="strong">{{ r.patient }}</span><div class="muted small tabular">{{ r.phone }}</div></td>
                     <td>{{ dt(r.startAt) }}<div class="muted small">{{ r.reason }} · {{ r.dentist }}</div></td>
@@ -51,7 +53,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">Nadie pidió reprogramar. 🎉</td></tr> }
               </tbody>
             </table>
-<app-pager [total]="(resched || []).length" [page]="pgRes" (pageChange)="pgRes = $event" />
+<app-pager [total]="filterRows(resched, qRes).length" [page]="pgRes" (pageChange)="pgRes = $event" />
           </section>
         }
         @case ('espera') {
@@ -61,9 +63,10 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
               @if (auth.can('CITAS_GESTIONAR')) { <button class="btn sm primary" type="button" (click)="openAdd()"><app-icon name="plus" [size]="14" /> Agregar</button> }
             </div>
             <p class="muted small pad">Cuando se cancela una cita, se avisa por WhatsApp o correo a los 3 primeros de la lista (del mismo odontólogo o sin preferencia).</p>
+            <app-table-search [(q)]="qWait" (qChange)="pgWait = 1" placeholder="Buscar paciente" [total]="(wait || []).length" [shown]="filterRows(wait, qWait).length" />
             <table class="table">
               <tbody>
-                @for (w of pageOf(wait, pgWait); track w.entry.id) {
+                @for (w of pageOf(filterRows(wait, qWait), pgWait); track w.entry.id) {
                   <tr>
                     <td><a class="strong" [routerLink]="['/pacientes', w.patient?.id]">{{ w.patient?.fullName }}</a><div class="muted small tabular">{{ w.patient?.phone }}</div></td>
                     <td>{{ w.entry.reason }}<div class="muted small">{{ w.dentist || 'Cualquier odontólogo' }}@if (w.entry.preference) { · {{ w.entry.preference }} }</div></td>
@@ -74,15 +77,16 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">La lista de espera está vacía.</td></tr> }
               </tbody>
             </table>
-<app-pager [total]="(wait || []).length" [page]="pgWait" (pageChange)="pgWait = $event" />
+<app-pager [total]="filterRows(wait, qWait).length" [page]="pgWait" (pageChange)="pgWait = $event" />
           </section>
         }
         @case ('controles') {
           <section class="panel">
             <div class="panel-head"><h3>Les toca volver</h3><span class="muted small">Sin cita futura · se envía solo cada lunes a las 10:00</span></div>
+            <app-table-search [(q)]="qRecall" (qChange)="pgRecall = 1" placeholder="Buscar paciente" [total]="(recalls || []).length" [shown]="filterRows(recalls, qRecall).length" />
             <table class="table">
               <tbody>
-                @for (r of pageOf(recalls, pgRecall); track r.patientId) {
+                @for (r of pageOf(filterRows(recalls, qRecall), pgRecall); track r.patientId) {
                   <tr>
                     <td><a class="strong" [routerLink]="['/pacientes', r.patientId]">{{ r.fullName }}</a><div class="muted small tabular">{{ r.phone }}</div></td>
                     <td>{{ recallLabel(r.kind) }}<div class="muted small">última visita {{ date(r.lastVisit) }}</div></td>
@@ -92,7 +96,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                 } @empty { <tr><td class="muted empty-row">Todos los pacientes están al día con sus controles.</td></tr> }
               </tbody>
             </table>
-<app-pager [total]="(recalls || []).length" [page]="pgRecall" (pageChange)="pgRecall = $event" />
+<app-pager [total]="filterRows(recalls, qRecall).length" [page]="pgRecall" (pageChange)="pgRecall = $event" />
           </section>
         }
         @case ('satisfaccion') {
@@ -173,6 +177,10 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
   `],
 })
 export class FollowupComponent implements OnInit {
+  filterRows = filterRows;
+  qRecall = '';
+  qWait = '';
+  qRes = '';
   pageOf = pageOf;
   pgRes = 1;
   pgWait = 1;

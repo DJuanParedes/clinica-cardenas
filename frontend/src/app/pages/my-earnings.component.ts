@@ -4,13 +4,14 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../core/api.service';
 import { PERIODS, apiError, dateTime, downloadCsv, periodPreset, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
-import { PagerComponent, pageOf } from '../shared/pager.component';
+import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
+import { TableSearchComponent } from '../shared/table-search.component';
 
 /** Vista del odontólogo: cuánto gana por tratamiento, por día y por mes, en soles. */
 @Component({
   selector: 'app-my-earnings',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, PagerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -53,10 +54,11 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
         </div>
         <section class="panel">
           <div class="panel-head"><h3>Detalle por tratamiento</h3></div>
+          <app-table-search [(q)]="qL" (qChange)="pg = 1" placeholder="Buscar paciente o tratamiento" [total]="(r.lines || []).length" [shown]="filterRows(r.lines, qL).length" />
           <table class="table">
             <thead><tr><th>Fecha</th><th>Paciente</th><th>Tratamiento</th><th class="num">Precio</th><th>Regla</th><th class="num">Ganas</th><th>Estado</th></tr></thead>
             <tbody>
-              @for (l of pageOf(r.lines, pg); track l.treatmentItemId) {
+              @for (l of pageOf(filterRows(r.lines, qL), pg); track l.treatmentItemId) {
                 <tr>
                   <td class="tabular nowrap small">{{ dt(l.doneAt) }}</td>
                   <td><a [routerLink]="['/pacientes', l.patientId]">{{ l.patientName }}</a></td>
@@ -69,7 +71,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
               } @empty { <tr><td colspan="7" class="muted center">Sin tratamientos con comisión en el período.</td></tr> }
             </tbody>
           </table>
-          <app-pager [total]="r.lines.length" [page]="pg" (pageChange)="pg = $event" />
+          <app-pager [total]="filterRows(r.lines, qL).length" [page]="pg" (pageChange)="pg = $event" />
         </section>
         @if (r.pendingCollection?.length || r.withoutRule?.length) {
           <section class="panel">
@@ -98,6 +100,8 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
   `],
 })
 export class MyEarningsComponent implements OnInit {
+  filterRows = filterRows;
+  qL = '';
   private api = inject(Api);
   periods = PERIODS;
   preset = 'mes';

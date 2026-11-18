@@ -130,7 +130,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
           @for (it of draft; track $index) {
             <div class="irow">
               <select class="input" [name]="'p' + $index" [(ngModel)]="it.procedureId" (ngModelChange)="onProc(it)" aria-label="Procedimiento">
-                <option [ngValue]="null">Selecciona…</option>
+                <option [ngValue]="null">Seleccionar…</option>
                 @for (g of groups; track g.name) {
                   <optgroup [label]="g.name">
                     @for (p of g.items; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }

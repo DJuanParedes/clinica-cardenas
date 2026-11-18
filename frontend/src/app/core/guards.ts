@@ -42,3 +42,4 @@ export const portalGuestGuard: CanActivateFn = () => {
   const portal = inject(PortalAuth);
   return portal.isLoggedIn() ? inject(Router).parseUrl('/app') : true;
 };
+

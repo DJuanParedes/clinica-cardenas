@@ -57,6 +57,7 @@ export class Api {
   deleteRole(code: string): Observable<any> { return this.http.delete<any>(`/api/permissions/roles/${code}`); }
   start2faEmail(): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/start', {}); }
   enable2faEmail(code: string): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/enable', { code }); }
+  publicPromotions(): Observable<any[]> { return this.http.get<any[]>('/api/public/promotions'); }
   myEarnings(from: string, to: string): Observable<any> { return this.http.get<any>('/api/me/earnings', { params: params({ from, to }) }); }
   legal(code: string): Observable<{ code: string; version: string; title: string; body: string; publishedAt: string }> { return this.http.get<any>(`/api/public/legal/${code}`); }
   patientConsents(id: number): Observable<any> { return this.http.get<any>(`/api/patients/${id}/consents`); }

@@ -478,7 +478,7 @@ export class InventoryComponent implements OnInit {
   lotsFor: InventoryItem | null = null;
   lots: any[] = [];
   buyOpen = false;
-  buy: any = null;
+  buy: any = { supplier: '', docType: '', docNumber: '', purchaseDate: '', paid: true, method: '', dueDate: null, notes: '', lines: [] };
   purchaseView: any = null;
   payFor: any = null;
   payMethod = '';

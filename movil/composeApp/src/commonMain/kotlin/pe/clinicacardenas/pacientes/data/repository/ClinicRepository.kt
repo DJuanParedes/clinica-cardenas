@@ -111,6 +111,8 @@ class ClinicRepository(
 
     suspend fun invoiceUrl(id: Long): String = api.absolute(guarded { api.invoiceLink(id) }.url)
 
+    suspend fun promotions(): List<pe.clinicacardenas.pacientes.data.remote.PromoDto> = guarded { api.promotions() }
+
     suspend fun pendingSurvey(): PendingSurveyDto? = guarded { api.pendingSurvey() }.pending
 
     suspend fun sendSurvey(appointmentId: Long, score: Int, comment: String?): String =
