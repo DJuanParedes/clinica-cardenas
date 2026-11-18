@@ -70,8 +70,8 @@ android {
         applicationId = "pe.clinicacardenas.pacientes"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 5
-        versionName = "2.3.0"
+        versionCode = 6
+        versionName = "2.4.0"
     }
     packaging {
         resources {
