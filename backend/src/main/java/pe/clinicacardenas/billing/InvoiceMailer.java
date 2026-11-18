@@ -29,6 +29,17 @@ public class InvoiceMailer {
     private final PatientRepository patients;
     private final AuditService audit;
 
+    @org.springframework.beans.factory.annotation.Value("${app.notifications.clinic-phone:987 654 000}")
+    private String phone;
+
+    /** PDF con formato SUNAT para descargar o imprimir desde la caja. */
+    public byte[] pdf(Long id) {
+        Invoice inv = billing.get(id);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> d = billing.detail(id);
+        return InvoicePdf.render(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"), phone);
+    }
+
     public InvoiceMailer(BillingService billing, MailNotifier mail, PatientRepository patients, AuditService audit) {
         this.billing = billing;
         this.mail = mail;
@@ -51,8 +62,11 @@ public class InvoiceMailer {
         String html = html(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"));
         byte[] xml = inv.xmlContent == null ? null : inv.xmlContent.getBytes(StandardCharsets.UTF_8);
         String fileBase = ((UblBuilder.Company) d.get("company")).ruc() + "-" + inv.docType + "-" + inv.getFullNumber();
-        boolean real = mail.sendHtml(email, inv.getDocTypeLabel() + " " + inv.getFullNumber() + " · Clínica Dental Cárdenas", html,
-                xml == null ? null : fileBase + ".xml", xml, "application/xml");
+        byte[] pdf = InvoicePdf.render(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"), phone);
+        java.util.Map<String, byte[]> files = new java.util.LinkedHashMap<>();
+        files.put(fileBase + ".pdf", pdf);
+        if (xml != null) files.put(fileBase + ".xml", xml);
+        boolean real = mail.sendHtml(email, inv.getDocTypeLabel() + " " + inv.getFullNumber() + " · Clínica Dental Cárdenas", html, files);
         audit.record("COMPROBANTE", inv.id, "ENVIAR_CORREO", inv.getFullNumber() + " → " + email);
         return Map.of("message", real ? "Comprobante enviado a " + email + "." : "Correo registrado (el servidor de correo no está configurado: quedó simulado).",
                 "email", email, "simulated", !real);

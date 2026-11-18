@@ -384,7 +384,12 @@ public class CareService {
             return out;
         }
         String when = next.startAt.format(WHEN);
-        if ("1".equals(option)) {
+        if ("1".equals(option) && next.status == AppointmentStatus.PROGRAMADA
+                && !next.startAt.isAfter(Dates.now().plusHours(pe.clinicacardenas.portal.PortalService.CONFIRM_HOURS))) {
+            out.put("accion", "PLAZO_VENCIDO");
+            out.put("citaId", next.id);
+            out.put("respuesta", "Tu cita del " + when + " ya no se puede confirmar por aquí (se confirma hasta 2 horas antes). Recepción te llamará en breve.");
+        } else if ("1".equals(option)) {
             if (next.status == AppointmentStatus.PROGRAMADA) {
                 agenda.changeStatus(next.id, new AgendaService.StatusRequest(AppointmentStatus.CONFIRMADA, "Confirmada por WhatsApp"));
             }
