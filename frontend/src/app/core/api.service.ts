@@ -63,7 +63,7 @@ export class Api {
   patientConsents(id: number): Observable<any> { return this.http.get<any>(`/api/patients/${id}/consents`); }
   uploadSignedConsent(id: number, file: File): Observable<any> { const fd = new FormData(); fd.append('file', file); return this.http.post<any>(`/api/patients/${id}/consents/signed`, fd); }
   dniConfig(): Observable<{ enabled: boolean }> { return this.http.get<{ enabled: boolean }>('/api/lookup/dni-config'); }
-  lookupDni(dni: string): Observable<{ firstName: string; lastName: string; source: string }> { return this.http.get<any>(`/api/lookup/dni/${dni}`); }
+  lookupDni(dni: string): Observable<{ firstName: string; lastName: string; source: string; birthDate?: string; sex?: string; address?: string; ubigeo?: string; district?: string }> { return this.http.get<any>(`/api/lookup/dni/${dni}`); }
   ubigeo(): Observable<UbigeoDep[]> { return this.http.get<UbigeoDep[]>('/ubigeo.json'); }
   createPatient(body: any): Observable<Patient> { return this.http.post<Patient>('/api/patients', body); }
   updatePatient(id: number, body: any): Observable<Patient> { return this.http.put<Patient>(`/api/patients/${id}`, body); }
