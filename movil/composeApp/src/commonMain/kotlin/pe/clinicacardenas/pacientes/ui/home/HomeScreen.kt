@@ -82,7 +82,6 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
         if (s.offline) item { Banner("Sin conexión: mostramos las citas guardadas en tu teléfono.", Brand.NaranjaSuave, Color(0xFF7A4600)) }
         s.message?.let { m -> item { Banner(m, Brand.VerdeSuave, Brand.Verde) } }
         s.survey?.let { p -> item { SurveyCard(p, s.busy, vm::sendSurvey) } }
-        if (s.promos.isNotEmpty()) item { PromosCard(s.promos) }
         if (s.surveySent) item { Banner("¡Gracias por tu calificación! Nos ayuda a mejorar.", Brand.VerdeSuave, Brand.Verde) }
         when {
             s.loading -> item { Loading() }
@@ -308,33 +307,4 @@ private fun encode(s: String): String = buildString {
         if ((c in 'a'.code..'z'.code) || (c in 'A'.code..'Z'.code) || (c in '0'.code..'9'.code) || c == '-'.code || c == '.'.code || c == '_'.code) append(c.toChar())
         else append('%').append(c.toString(16).uppercase().padStart(2, '0'))
     }
-}
-
-
-/** Promociones vigentes: precio de lista tachado, precio final y condiciones (Ley 29571). */
-@Composable
-private fun PromosCard(promos: List<pe.clinicacardenas.pacientes.data.remote.PromoDto>) {
-    Column(
-        Modifier.fillMaxWidth().background(Brand.NaranjaSuave, RoundedCornerShape(16.dp)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Promociones vigentes", fontWeight = FontWeight.Bold, color = Color(0xFF7A4600), fontSize = 15.sp)
-        promos.take(3).forEach { p ->
-            Column {
-                Text(p.name, fontWeight = FontWeight.SemiBold, color = Brand.Tinta, fontSize = 14.sp)
-                val precio = if (p.finalPrice != null && p.listPrice != null) "Antes S/ ${fmt(p.listPrice)} · ahora S/ ${fmt(p.finalPrice)}"
-                    else if (p.discountType == "PORCENTAJE" && p.value != null) "${fmt(p.value)} % de descuento" else ""
-                if (precio.isNotEmpty()) Text(precio, color = Brand.Tinta2, fontSize = 13.sp)
-                val hasta = p.validTo?.let { " · hasta el ${it.substring(8, 10)}/${it.substring(5, 7)}" } ?: ""
-                Text((p.conditions ?: "") + hasta, color = Brand.Tinta2, fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-private fun fmt(v: Double): String {
-    val c = kotlin.math.round(v * 100).toLong()
-    val e = c / 100
-    val d = c % 100
-    return if (d == 0L) e.toString() else "$e." + d.toString().padStart(2, '0')
 }
