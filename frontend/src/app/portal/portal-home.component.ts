@@ -14,16 +14,6 @@ import { IconComponent } from '../shared/icon.component';
     @if (!loaded) {
       <div class="skeleton" style="height: 220px; border-radius: 20px"></div>
     } @else {
-      @if (promos.length) {
-        <section class="promos">
-          <div class="lbl">Promociones vigentes</div>
-          @for (p of promos.slice(0, 3); track p.id) {
-            <div class="promo"><strong>{{ p.name }}</strong>
-              @if (p.finalPrice != null) { <div class="small">Antes <s>S/ {{ p.listPrice }}</s> · ahora <strong>S/ {{ p.finalPrice }}</strong></div> }
-              <div class="small muted">{{ p.conditions }}{{ p.validTo ? ' · hasta el ' + p.validTo.slice(8, 10) + '/' + p.validTo.slice(5, 7) : '' }}</div></div>
-          }
-        </section>
-      }
       @if (next) {
         <section class="next">
           <div class="lbl">Tu próxima cita</div>
@@ -71,8 +61,6 @@ import { IconComponent } from '../shared/icon.component';
     }
   `,
   styles: [`
-    .promos { background: #fff1dd; border-radius: 18px; padding: 14px 16px; margin-bottom: 14px; display: grid; gap: 10px; }
-    .promos .lbl { font-weight: 800; color: #7a4600; }
     .dimg { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-right: 8px; vertical-align: middle; border: 2px solid #fff; }
     .next { background: linear-gradient(160deg, #00b0e0, #0679ac); color: #fff; border-radius: 22px; padding: 20px 20px 16px; box-shadow: 0 14px 30px -14px rgba(6, 121, 172, .7); position: relative; overflow: hidden; }
     .next::after { content: ""; position: absolute; right: -56px; top: -56px; width: 140px; height: 140px; border-radius: 50%; border: 14px solid rgba(248, 152, 24, .55); }
@@ -120,8 +108,7 @@ export class PortalHomeComponent implements OnInit {
   get clinic() { return this.portal.patient()?.clinic; }
   get phoneDigits() { return (this.clinic?.phone || '').replace(/\D/g, ''); }
 
-  promos: any[] = [];
-  ngOnInit() { this.load(); this.api.publicPromotions().subscribe({ next: (p) => (this.promos = p), error: () => {} }); }
+  ngOnInit() { this.load(); }
 
   load() {
     this.api.portalAppointments().subscribe((r) => {

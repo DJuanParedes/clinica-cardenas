@@ -24,7 +24,6 @@ data class HomeState(
     val survey: PendingSurveyDto? = null,
     val surveySent: Boolean = false,
     val busy: Boolean = false,
-    val promos: List<pe.clinicacardenas.pacientes.data.remote.PromoDto> = emptyList(),
 )
 
 /** HU-16/HU-21/HU-22 desde el teléfono: ver próximas citas, confirmarlas y recibir recordatorios. */
@@ -40,7 +39,6 @@ class HomeViewModel(private val repo: ClinicRepository) : ViewModel() {
             try {
                 apply(repo.appointments())
                 runCatching { repo.pendingSurvey() }.onSuccess { p -> _state.update { it.copy(survey = p) } }
-                runCatching { repo.promotions() }.onSuccess { p -> _state.update { it.copy(promos = p) } }
             } catch (e: ApiException) {
                 _state.update { it.copy(error = e.message) }
             } finally {
