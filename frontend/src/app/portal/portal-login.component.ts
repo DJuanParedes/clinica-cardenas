@@ -80,7 +80,10 @@ type Mode = 'login' | 'activar' | 'codigo';
             @if (error) { <div class="notice gum small" role="alert"><app-icon name="alert" [size]="16" /><div>{{ error }}</div></div> }
             <button class="btn primary lg block" type="submit" [disabled]="busy || code.length < 6 || !password || !consent">@if (busy) { <span class="spin"></span> } Activar y entrar</button>
           </form>
-          <button type="button" class="link" (click)="go('activar')">¿No te llegó? <strong>Pedir otro código</strong></button>
+          <div class="spread">
+            <button type="button" class="link" (click)="go('activar')">← Regresar</button>
+            <button type="button" class="link" (click)="go('activar')">¿No te llegó? <strong>Pedir otro código</strong></button>
+          </div>
         }
       </section>
 

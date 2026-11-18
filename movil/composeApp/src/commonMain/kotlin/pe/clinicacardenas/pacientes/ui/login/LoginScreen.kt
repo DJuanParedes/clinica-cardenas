@@ -233,21 +233,26 @@ private fun ActivateForm(s: LoginState, vm: LoginViewModel) {
             error = s.fieldErrors["newPassword"] ?: s.fieldErrors["password"],
         )
         Row(
-            Modifier.fillMaxWidth().clickable { vm.edit { copy(consent = !consent) } }.padding(vertical = 6.dp),
+            Modifier.fillMaxWidth().clickable { if (s.consent) vm.edit { copy(consent = false) } else vm.openTerms() }.padding(vertical = 6.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            androidx.compose.material3.Checkbox(checked = s.consent, onCheckedChange = { vm.edit { copy(consent = it) } })
+            androidx.compose.material3.Checkbox(checked = s.consent, onCheckedChange = { if (it) vm.openTerms() else vm.edit { copy(consent = false) } })
             Text(
-                "Autorizo a la Clínica Dental Cárdenas a tratar mis datos personales y de salud para mi atención, recordatorios y pagos (Ley N.° 29733).",
+                if (s.consent) "Leíste y aceptaste los términos y la política de privacidad (Ley N.° 29733)."
+                else "Leer y aceptar los términos y la política de privacidad (obligatorio, Ley N.° 29733).",
                 color = if (s.fieldErrors["consent"] != null) Brand.Rojo else Brand.Tinta2,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
+        if (s.termsOpen) TermsDialog(s, vm)
         s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
         Spacer(Modifier.height(8.dp))
         PrimaryButton("Activar y entrar", vm::activate, loading = s.loading)
-        TextButton(onClick = { vm.edit { copy(codeSent = false, code = "") } }) { Text("Pedir otro código") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = vm::back) { Text("← Regresar") }
+            TextButton(onClick = { vm.back(); vm.requestCode() }, enabled = !s.loading) { Text("Pedir otro código") }
+        }
     }
 }
 
@@ -262,3 +267,27 @@ private fun formatBirth(raw: String): String {
     }
 }
 
+
+
+/** Términos completos en una ventana con desplazamiento: el botón "Acepto" se habilita al llegar al final. */
+@Composable
+private fun TermsDialog(s: LoginState, vm: LoginViewModel) {
+    val scroll = rememberScrollState()
+    val atEnd = scroll.maxValue == 0 || scroll.value >= scroll.maxValue - 8
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.edit { copy(termsOpen = false) } },
+        title = { Text(s.terms?.title ?: "Términos y política de privacidad", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+        text = {
+            Column(Modifier.height(380.dp).verticalScroll(scroll)) {
+                Text(s.terms?.body ?: "Cargando…", fontSize = 13.sp, color = Brand.Tinta2)
+                s.terms?.let { Text("Versión " + it.version, fontSize = 12.sp, color = Brand.Gris, modifier = Modifier.padding(top = 8.dp)) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { vm.edit { copy(consent = true, termsOpen = false) } }, enabled = s.terms != null && atEnd) {
+                Text(if (atEnd) "He leído y acepto" else "Desliza hasta el final")
+            }
+        },
+        dismissButton = { TextButton(onClick = { vm.edit { copy(termsOpen = false) } }) { Text("Cerrar") } },
+    )
+}

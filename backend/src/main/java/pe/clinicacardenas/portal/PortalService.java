@@ -109,15 +109,37 @@ public class PortalService {
 
     // ------------------------------------------------------------------ activación con código
 
+    private final Map<String, List<LocalDateTime>> failedLookups = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Transactional
     public Map<String, Object> requestCode(CodeRequest r) {
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("message", "Si los datos coinciden con un paciente de la clínica, enviamos un código de 6 dígitos a su WhatsApp registrado.");
+        if (r.docNumber() == null || r.docNumber().isBlank()) throw ApiException.field("docNumber", "Ingresa tu número de documento.");
         if (r.birthDate() == null) throw ApiException.field("birthDate", "Ingresa tu fecha de nacimiento.");
-        Optional<Patient> found = find(r.docType(), r.docNumber()).filter(p -> r.birthDate().equals(p.birthDate));
-        if (found.isEmpty()) return res; // misma respuesta: no se revela si el documento existe
-        Patient p = found.get();
         LocalDateTime now = Dates.now();
+        String key = (r.docType() == null ? "DNI" : r.docType().trim().toUpperCase()) + ":" + r.docNumber().trim();
+        // Freno a quien prueba documentos o fechas al azar: 5 intentos fallidos en 15 minutos por documento
+        failedLookups.entrySet().removeIf(e -> e.getValue().stream().allMatch(t -> t.isBefore(now.minusMinutes(15))));
+        List<LocalDateTime> fails = failedLookups.computeIfAbsent(key, k -> new java.util.concurrent.CopyOnWriteArrayList<>());
+        fails.removeIf(t -> t.isBefore(now.minusMinutes(15)));
+        if (fails.size() >= 5) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "DEMASIADOS_INTENTOS",
+                    "Demasiados intentos con datos que no coinciden. Espera 15 minutos o comunícate con la clínica al " + clinicPhone + ".");
+        }
+        Optional<Patient> byDoc = find(r.docType(), r.docNumber());
+        if (byDoc.isEmpty()) {
+            fails.add(now);
+            throw ApiException.field("docNumber", "Ese documento no está registrado en la clínica. Verifica el número o acércate a recepción para registrarte.");
+        }
+        if (!r.birthDate().equals(byDoc.get().birthDate)) {
+            fails.add(now);
+            throw ApiException.field("birthDate", "La fecha de nacimiento no coincide con la registrada para ese documento.");
+        }
+        Patient p = byDoc.get();
+        fails.clear();
+        if ((p.phone == null || p.phone.isBlank()) && (p.email == null || p.email.isBlank())) {
+            throw ApiException.badRequest("SIN_CONTACTO", "No tienes celular ni correo registrados para enviarte el código. Comunícate con la clínica al " + clinicPhone + ".");
+        }
         List<PortalCode> open = codes.findByPatientIdAndUsedAtIsNullOrderByCreatedAtDesc(p.id);
         long recent = open.stream().filter(c -> c.createdAt.isAfter(now.minusMinutes(15))).count();
         if (recent >= 3) {
@@ -134,7 +156,9 @@ public class PortalService {
         codes.save(pc);
         notifications.accessCode(p, code);
         audit.record("PACIENTE", p.id, "APP_CODIGO", "Código de acceso a la app enviado");
-        res.put("sentTo", mask(p.phone, p.email, p.phone == null ? "EMAIL" : "WHATSAPP"));
+        String sentTo = mask(p.phone, p.email, p.phone == null ? "EMAIL" : "WHATSAPP");
+        res.put("sentTo", sentTo);
+        res.put("message", "Listo, " + p.firstName.split(" ")[0] + ": te enviamos un código de 6 dígitos " + (p.phone == null ? "a tu correo " : "por WhatsApp al ") + sentTo + ". Vence en 15 minutos.");
         if (demoMode) res.put("demoCode", code);
         return res;
     }

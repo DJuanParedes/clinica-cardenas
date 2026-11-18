@@ -30,6 +30,8 @@ data class LoginState(
     val staffCode: String = "",
     val needCode: Boolean = false,
     val consent: Boolean = false,
+    val terms: pe.clinicacardenas.pacientes.data.remote.LegalDto? = null,
+    val termsOpen: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
@@ -44,6 +46,20 @@ class LoginViewModel(
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state.asStateFlow()
+
+    /** Abre los términos y la política vigentes: se aceptan después de leerlos (Ley 29733). */
+    fun openTerms() {
+        _state.update { it.copy(termsOpen = true) }
+        if (_state.value.terms != null) return
+        viewModelScope.launch {
+            val t = runCatching { repo.legal("TERMINOS") }.getOrNull()
+            _state.update { it.copy(terms = t ?: pe.clinicacardenas.pacientes.data.remote.LegalDto("TERMINOS", "-", "Términos y política de privacidad",
+                "No se pudo cargar el texto. Puedes leerlo en la clínica o en el portal web antes de aceptar.")) }
+        }
+    }
+
+    /** Regresa al paso anterior: de "código" a "documento y fecha". */
+    fun back() = _state.update { it.copy(codeSent = false, code = "", newPassword = "", error = null, fieldErrors = emptyMap()) }
 
     fun edit(f: LoginState.() -> LoginState) = _state.update { it.f().copy(error = null) }
 

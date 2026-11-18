@@ -47,6 +47,8 @@ class ClinicRepository(
         session.start(api.login(LoginRequest(docType, docNumber.trim(), password)))
     }
 
+    suspend fun legal(code: String): pe.clinicacardenas.pacientes.data.remote.LegalDto = api.legal(code)
+
     suspend fun requestCode(docType: String, docNumber: String, birthDate: String): CodeResponse =
         api.requestCode(CodeRequest(docType, docNumber.trim(), birthDate))
 

@@ -244,7 +244,9 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
   let pacToken;
   await check('HU-22', 'Activar la cuenta con código y fecha de nacimiento', async () => {
     const wrong = await api('POST', '/api/portal/auth/code', { docType: 'DNI', docNumber: dni, birthDate: '1980-01-01' });
-    expect(wrong.status === 200 && !wrong.body.demoCode, 'fecha incorrecta revela datos');
+    expect(wrong.status === 400 && wrong.body.fields && wrong.body.fields.birthDate && !wrong.body.demoCode, 'fecha incorrecta: debe avisar que no coincide');
+    const noDoc = await api('POST', '/api/portal/auth/code', { docType: 'DNI', docNumber: '11111111', birthDate: birth });
+    expect(noDoc.status === 400 && noDoc.body.fields && noDoc.body.fields.docNumber, 'documento inexistente: debe avisar');
     const c = await api('POST', '/api/portal/auth/code', { docType: 'DNI', docNumber: dni, birthDate: birth });
     expect(c.status === 200 && /^\d{6}$/.test(c.body.demoCode || ''), 'sin código');
     expectStatus(await api('POST', '/api/portal/auth/activate', { docType: 'DNI', docNumber: dni, code: '000000', password: 'MiClave2026' }), 400, 'código incorrecto');

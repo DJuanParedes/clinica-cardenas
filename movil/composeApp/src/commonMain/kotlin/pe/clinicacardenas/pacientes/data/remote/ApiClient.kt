@@ -167,6 +167,8 @@ class ApiClient(
 
     suspend fun invoiceLink(id: Long): LinkDto = call { http.get(url("/api/portal/documents/invoices/$id/link")) { auth() } }
 
+    suspend fun legal(code: String): LegalDto = call { http.get(url("/api/public/legal/$code")) }
+
     suspend fun promotions(): List<PromoDto> = call { http.get(url("/api/public/promotions")) }
 
     suspend fun pendingSurvey(): SurveyPendingDto = call { http.get(url("/api/portal/surveys/pending")) { auth() } }

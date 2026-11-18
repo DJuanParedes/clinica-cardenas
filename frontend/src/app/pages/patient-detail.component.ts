@@ -116,6 +116,9 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
                       @if (p.dataConsent) {
                         <span class="tag green">Consentimiento Ley 29733{{ p.consentVersion ? ' · v' + p.consentVersion : '' }}</span>
                         @if (consent?.acceptedBy) { <div class="muted small">Aceptó: {{ consent.acceptedBy }} · {{ consentChannel(p.consentChannel) }}</div> }
+                        <div class="row wrap up">
+                          <button type="button" class="btn sm" (click)="printConsent()"><app-icon name="print" [size]="14" /> Imprimir documento para firmar</button>
+                        </div>
                         @if (p.consentFileId) { <div class="small"><a (click)="go('archivos')" class="link">Copia firmada adjunta</a></div> }
                         @else if (auth.can('PACIENTES_EDITAR')) {
                           <label class="btn sm up"><app-icon name="upload" [size]="14" /> {{ uploading ? 'Subiendo…' : 'Adjuntar copia firmada' }}
@@ -278,6 +281,54 @@ export class PatientDetailComponent implements OnChanges {
 
   relLabel(r?: string) { return r === 'PADRE' ? 'Padre' : r === 'MADRE' ? 'Madre' : 'Tutor legal'; }
   consentChannel(c?: string) { return c === 'APP' ? 'en la app' : c === 'PORTAL' ? 'en el portal' : 'presencial en recepción'; }
+
+  /** Documento de consentimiento listo para imprimir y firmar: datos del paciente (o su representante), texto vigente y firmas. */
+  printConsent() {
+    const p: any = this.p;
+    if (!p) return;
+    const w = window.open('', '_blank');
+    if (!w) { this.toast.error('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.'); return; }
+    w.document.write('<p style="font-family:sans-serif">Preparando el documento…</p>');
+    this.api.legal('PRIVACIDAD').subscribe({
+      next: (doc) => {
+        const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const body = esc(doc.body).split(/\n{2,}/).map((x) => '<p>' + x.replace(/\n/g, '<br>') + '</p>').join('');
+        const today = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+        const minor = !!p.minor;
+        const signer = minor
+          ? `${esc(p.guardianName)}, ${esc(this.relLabel(p.guardianRelationship)).toLowerCase()} y representante legal de ${esc(p.firstName)} ${esc(p.lastName)}, identificado(a) con ${esc(p.guardianDocType || 'DNI')} N.° ${esc(p.guardianDocNumber)}`
+          : `${esc(p.firstName)} ${esc(p.lastName)}, identificado(a) con ${esc(p.docType)} N.° ${esc(p.docNumber)}`;
+        w.document.open();
+        w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Consentimiento · ${esc(p.firstName)} ${esc(p.lastName)}</title>
+<style>body{font-family:Georgia,serif;color:#1d2b33;max-width:720px;margin:32px auto;padding:0 24px;font-size:13.5px;line-height:1.5}
+h1{font-size:18px;text-align:center;margin:8px 0 4px}h2{font-size:14px;margin:18px 0 6px}.c{text-align:center;color:#555;font-size:12px}
+table{width:100%;border-collapse:collapse;margin:10px 0}td{border:1px solid #bbb;padding:6px 8px;font-size:12.5px}td.k{width:34%;background:#f3f6f7}
+.firmas{display:flex;gap:40px;margin-top:56px}.f{flex:1;text-align:center;border-top:1px solid #333;padding-top:6px;font-size:12px}
+.huella{width:90px;height:110px;border:1px solid #333;margin-left:auto;text-align:center;font-size:11px;padding-top:90px;box-sizing:border-box}
+.btn{position:fixed;top:12px;right:12px;padding:8px 14px;font-size:14px}@media print{.btn{display:none}body{margin:0 auto}}</style></head><body>
+<button class="btn" onclick="window.print()">Imprimir</button>
+<div class="c">CLÍNICA DENTAL CÁRDENAS</div>
+<h1>Consentimiento para el tratamiento de datos personales</h1>
+<div class="c">Ley N.° 29733 y su Reglamento (D.S. 016-2024-JUS) · ${esc(doc.title)} · versión ${esc(doc.version)}</div>
+<h2>Datos del paciente</h2>
+<table><tr><td class="k">Paciente</td><td>${esc(p.firstName)} ${esc(p.lastName)}</td></tr>
+<tr><td class="k">Documento</td><td>${esc(p.docType)} ${esc(p.docNumber)}</td></tr>
+<tr><td class="k">Fecha de nacimiento</td><td>${esc(p.birthDate)}${p.age != null ? ' (' + esc(p.age) + ' años)' : ''}</td></tr>
+<tr><td class="k">Celular / correo</td><td>${esc(p.phone)}${p.email ? ' · ' + esc(p.email) : ''}</td></tr>
+${minor ? `<tr><td class="k">Representante legal</td><td>${esc(p.guardianName)} (${esc(this.relLabel(p.guardianRelationship))}) · ${esc(p.guardianDocType || 'DNI')} ${esc(p.guardianDocNumber)} · ${esc(p.guardianPhone)}</td></tr>` : ''}
+</table>
+<h2>Política de privacidad</h2>${body}
+<h2>Declaración</h2>
+<p>Yo, ${signer}, declaro haber leído y comprendido la política de privacidad de la Clínica Dental Cárdenas y otorgo mi consentimiento libre, previo, expreso, informado e inequívoco para el tratamiento de ${minor ? 'sus' : 'mis'} datos personales y de salud con las finalidades indicadas. Sé que puedo revocarlo y ejercer mis derechos de acceso, rectificación, cancelación y oposición en cualquier momento.</p>
+<p>Chaclacayo, ${today}.</p>
+<div class="firmas"><div class="f">Firma del ${minor ? 'representante legal' : 'paciente'}<br>${minor ? esc(p.guardianName) : esc(p.firstName) + ' ' + esc(p.lastName)}<br>${minor ? esc(p.guardianDocType || 'DNI') + ' ' + esc(p.guardianDocNumber) : esc(p.docType) + ' ' + esc(p.docNumber)}</div>
+<div class="f">Firma y sello de la clínica<br>Recibido por</div><div class="huella">Huella</div></div>
+<script>setTimeout(function(){window.print()},400)</script></body></html>`);
+        w.document.close();
+      },
+      error: () => { w.close(); this.toast.error('No se pudo cargar la política vigente.'); },
+    });
+  }
 
   uploadSigned(ev: Event) {
     const input = ev.target as HTMLInputElement;

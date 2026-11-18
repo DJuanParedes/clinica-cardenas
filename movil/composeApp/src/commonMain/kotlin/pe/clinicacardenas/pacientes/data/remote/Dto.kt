@@ -192,3 +192,7 @@ data class PromoDto(
     val validTo: String? = null,
     val conditions: String? = null,
 )
+
+/** Documento legal vigente (/api/public/legal/{code}). */
+@Serializable
+data class LegalDto(val code: String, val version: String, val title: String, val body: String)
