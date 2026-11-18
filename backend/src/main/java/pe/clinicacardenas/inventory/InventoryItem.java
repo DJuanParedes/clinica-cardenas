@@ -15,6 +15,15 @@ public class InventoryItem {
     public Long id;
     public String name;
     public String unit;
+    /** INSUMO (se consume), INSTRUMENTAL (se reutiliza/esteriliza) o MEDICAMENTO. */
+    public String category = "INSUMO";
+    public String brand;
+    /** Laboratorio o proveedor habitual. */
+    public String supplier;
+    @Column(name = "unit_cost")
+    public BigDecimal unitCost;
+    @Column(name = "tracks_expiry")
+    public boolean tracksExpiry = true;
     public BigDecimal stock = BigDecimal.ZERO;
     @Column(name = "min_stock")
     public BigDecimal minStock = BigDecimal.ZERO;

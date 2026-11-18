@@ -67,6 +67,15 @@ public class CashController {
         return service.report(d, d);
     }
 
+    /** Historial: la caja de cualquier día anterior (hasta un año atrás), no solo la de hoy. */
+    @GetMapping("/day")
+    @PreAuthorize("hasAnyAuthority('CAJA_COBRAR','CAJA_EGRESOS','CAJA_REPORTE')")
+    public Map<String, Object> day(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        if (date.isAfter(Dates.today())) throw pe.clinicacardenas.common.ApiException.field("date", "La fecha no puede ser futura.");
+        if (date.isBefore(Dates.today().minusYears(1))) throw pe.clinicacardenas.common.ApiException.field("date", "Para más de un año usa el reporte de flujo de caja.");
+        return service.report(date, date);
+    }
+
     @GetMapping("/report")
     @PreAuthorize("hasAuthority('CAJA_REPORTE')")
     public Map<String, Object> report(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

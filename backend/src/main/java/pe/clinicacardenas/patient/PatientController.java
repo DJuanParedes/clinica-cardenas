@@ -29,8 +29,39 @@ public class PatientController {
     @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> search(@RequestParam(defaultValue = "") String q,
                                       @RequestParam(defaultValue = "0") int page,
-                                      @RequestParam(defaultValue = "20") int size) {
-        return service.search(q, page, size);
+                                      @RequestParam(defaultValue = "20") int size,
+                                      @RequestParam(defaultValue = "false") boolean mine) {
+        Map<String, Object> r = service.search(q, page, size, mine);
+        if (!fullAccess()) {
+            r.put("content", ((List<?>) r.get("content")).stream().map(x -> reduced((Patient) x)).toList());
+            r.put("restricted", true);
+        }
+        return r;
+    }
+
+    /**
+     * Minimización de datos (Ley 29733, art. 8 y Reglamento): quien solo cobra (caja) ve lo necesario para cobrar y
+     * emitir el comprobante: nombre, documento, correo y un teléfono enmascarado; no la dirección, fecha de nacimiento,
+     * contactos ni datos clínicos.
+     */
+    static boolean fullAccess() {
+        return pe.clinicacardenas.security.PermissionService.has("PACIENTES_EDITAR") || pe.clinicacardenas.security.PermissionService.has("HISTORIA_CLINICA");
+    }
+
+    static Map<String, Object> reduced(Patient p) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", p.id);
+        m.put("firstName", p.firstName);
+        m.put("lastName", p.lastName);
+        m.put("fullName", p.getFullName());
+        m.put("docType", p.docType);
+        m.put("docNumber", p.docNumber);
+        m.put("email", p.email);
+        m.put("phone", p.phone == null || p.phone.length() < 4 ? null : "*****" + p.phone.substring(p.phone.length() - 4));
+        m.put("minor", p.isMinor());
+        if (p.isMinor()) m.put("guardianName", p.guardianName);
+        m.put("restricted", true);
+        return m;
     }
 
     @GetMapping("/check-document")
@@ -42,8 +73,15 @@ public class PatientController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('PACIENTES_VER')")
-    public Map<String, Object> get(@PathVariable Long id) {
-        return service.summary(id);
+    public Map<String, Object> get(@PathVariable Long id, org.springframework.security.core.Authentication auth) {
+        Map<String, Object> m = service.summary(id);
+        boolean clinical = auth != null && auth.getAuthorities().stream().anyMatch(a -> "HISTORIA_CLINICA".equals(a.getAuthority()));
+        if (!clinical) {
+            m.remove("clinicalAlerts");      // datos de salud: solo el personal asistencial (Ley 29733, datos sensibles)
+            m.remove("pendingProcedures");
+        }
+        if (!fullAccess()) m.put("patient", reduced((Patient) m.get("patient")));
+        return m;
     }
 
     @PostMapping

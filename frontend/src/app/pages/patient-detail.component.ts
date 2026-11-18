@@ -41,7 +41,8 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
             @if (next) {
               <span class="muted small">Próxima cita</span>
               <span class="strong">{{ day(next.startAt) }}, {{ hhmm(next.startAt) }}</span>
-              <span class="muted small">{{ next.dentist.fullName }}</span>
+              <span class="muted small">{{ next.dentist.fullName }} · {{ next.reason }}</span>
+              @if (nextIsMine) { <span class="tag teal">Es contigo</span> }
             } @else {
               <span class="muted small">Sin citas programadas</span>
             }
@@ -61,6 +62,23 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
             }
           </div>
         </header>
+
+        @if (clinical && (alerts || pending.length)) {
+          <section class="clin panel">
+            <div class="alerts">
+              @if (alerts?.allergies) { <div class="al red"><app-icon name="alert" [size]="16" /><div><strong>Alergias</strong><div>{{ alerts.allergies }}</div></div></div> }
+              @else { <div class="al grey"><app-icon name="check" [size]="16" /><div><strong>Alergias</strong><div>{{ alerts ? 'No refiere' : 'Historia clínica sin llenar' }}</div></div></div> }
+              @if (alerts?.medication) { <div class="al amber"><app-icon name="clipboard" [size]="16" /><div><strong>Medicación actual</strong><div>{{ alerts.medication }}</div></div></div> }
+              @if (alerts?.background) { <div class="al amber"><app-icon name="activity" [size]="16" /><div><strong>Antecedentes</strong><div>{{ alerts.background }}</div></div></div> }
+            </div>
+            <div class="todo">
+              <strong>Procedimientos por realizar</strong>
+              @if (pending.length) {
+                <ul>@for (x of pending; track x.id) { <li>{{ x.procedure }}{{ x.tooth ? ' · pieza ' + x.tooth : '' }} <span class="muted small">{{ x.plan }}{{ x.dentist ? ' · ' + x.dentist : '' }}</span></li> }</ul>
+              } @else { <p class="muted small">No tiene procedimientos pendientes en su plan.</p> }
+            </div>
+          </section>
+        }
 
         <nav class="tabs" aria-label="Secciones de la ficha">
           <a [class.on]="tab === 'resumen'" (click)="go('resumen')">Datos y citas</a>
@@ -87,9 +105,25 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
                   <dl class="kv">
                     <dt>Fecha de nacimiento</dt><dd>{{ date(p.birthDate) }}</dd>
                     <dt>Dirección</dt><dd>{{ addressLine(p) }}</dd>
-                    <dt>Contacto de emergencia</dt><dd>{{ p.emergencyContactName || '—' }} {{ p.emergencyContactPhone ? '· ' + p.emergencyContactPhone : '' }}</dd>
+                    @if (p.minor) {
+                      <dt>Representante legal</dt><dd><strong>{{ p.guardianName }}</strong> · {{ relLabel(p.guardianRelationship) }}<div class="muted small">{{ p.guardianDocType }} {{ p.guardianDocNumber }} · {{ p.guardianPhone }}</div></dd>
+                    } @else {
+                      <dt>Contacto de emergencia</dt><dd>{{ p.emergencyContactName || '—' }}{{ p.emergencyContactRelationship ? ' (' + p.emergencyContactRelationship + ')' : '' }} {{ p.emergencyContactPhone ? '· ' + p.emergencyContactPhone : '' }}</dd>
+                    }
                     <dt>Notas</dt><dd>{{ p.notes || '—' }}</dd>
-                    <dt>Datos personales</dt><dd>@if ($any(p).dataConsent) { <span class="tag green">Consentimiento Ley 29733</span> } @else { <span class="tag amber">Sin consentimiento registrado</span> }</dd>
+                    <dt>Datos personales</dt>
+                    <dd>
+                      @if (p.dataConsent) {
+                        <span class="tag green">Consentimiento Ley 29733{{ p.consentVersion ? ' · v' + p.consentVersion : '' }}</span>
+                        @if (consent?.acceptedBy) { <div class="muted small">Aceptó: {{ consent.acceptedBy }} · {{ consentChannel(p.consentChannel) }}</div> }
+                        @if (p.consentFileId) { <div class="small"><a (click)="go('archivos')" class="link">Copia firmada adjunta</a></div> }
+                        @else if (auth.can('PACIENTES_EDITAR')) {
+                          <label class="btn sm up"><app-icon name="upload" [size]="14" /> {{ uploading ? 'Subiendo…' : 'Adjuntar copia firmada' }}
+                            <input type="file" accept="application/pdf,image/jpeg,image/png" hidden (change)="uploadSigned($event)" [disabled]="uploading" /></label>
+                          <div class="muted small">Imprime la política, que la firme {{ p.minor ? 'el representante legal' : 'el paciente' }} y adjunta la foto o el PDF.</div>
+                        }
+                      } @else { <span class="tag amber">Sin consentimiento registrado</span> <div class="muted small">Edita los datos del paciente para registrar su aceptación.</div> }
+                    </dd>
                     <dt>Registro</dt><dd class="muted">{{ dt(p.createdAt) }} por {{ p.createdBy }}</dd>
                     @if (p.updatedAt) { <dt>Última modificación</dt><dd class="muted">{{ dt(p.updatedAt) }} por {{ p.updatedBy }}</dd> }
                   </dl>
@@ -160,6 +194,15 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
     </div>
   `,
   styles: [`
+    .clin { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; padding: 14px 16px; margin-bottom: 14px; }
+    .alerts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .al { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 12px; min-width: 180px; flex: 1; font-size: 13px; line-height: 1.35; }
+    .al.red { background: #fde8e6; color: #8a1c12; border: 1px solid #f3b4ac; }
+    .al.amber { background: #fff4dc; color: #6b4a00; border: 1px solid #f1d38c; }
+    .al.grey { background: var(--surface-2, #f4f6f8); color: var(--ink-2); border: 1px solid var(--line); }
+    .todo ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
+    .up { margin-top: 6px; }
+    @media (max-width: 900px) { .clin { grid-template-columns: 1fr; } }
     .hero { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px 18px; padding: 20px 22px; margin-bottom: 18px;
       background: linear-gradient(100deg, #fff 55%, var(--brand-soft)); }
     .hero .actions:empty { display: none; }
@@ -187,6 +230,11 @@ export class PatientDetailComponent implements OnChanges {
 
   p: Patient | null = null;
   next: Appointment | null = null;
+  nextIsMine = false;
+  alerts: any = null;
+  pending: any[] = [];
+  consent: any = null;
+  uploading = false;
   appts: Appointment[] = [];
   audit: AuditEntry[] = [];
   notifs: NotificationItem[] = [];
@@ -217,10 +265,30 @@ export class PatientDetailComponent implements OnChanges {
     if (!this.tab || !allowed[this.tab]) this.tab = 'resumen';
     const id = +this.id;
     if (this.p?.id === id) return;
-    this.api.patient(id).subscribe((r) => { this.p = r.patient; this.next = r.nextAppointment || null; });
+    this.api.patient(id).subscribe((r: any) => {
+      this.p = r.patient; this.next = r.nextAppointment || null; this.nextIsMine = !!r.nextIsMine;
+      this.alerts = r.clinicalAlerts || null; this.pending = r.pendingProcedures || [];
+      if (this.alerts && !this.alerts.allergies && !this.alerts.medication && !this.alerts.background) this.alerts = { ...this.alerts, empty: true };
+    });
+    this.api.patientConsents(id).subscribe({ next: (c) => (this.consent = c), error: () => {} });
     this.api.patientAppointments(id).subscribe((a) => (this.appts = a));
     if (this.auth.can('PACIENTES_EDITAR')) this.api.patientAudit(id).subscribe((a) => (this.audit = a));
     this.api.patientNotifications(id).subscribe((n) => (this.notifs = n.filter((x) => x.operation !== 'ANULAR')));
+  }
+
+  relLabel(r?: string) { return r === 'PADRE' ? 'Padre' : r === 'MADRE' ? 'Madre' : 'Tutor legal'; }
+  consentChannel(c?: string) { return c === 'APP' ? 'en la app' : c === 'PORTAL' ? 'en el portal' : 'presencial en recepción'; }
+
+  uploadSigned(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.p) return;
+    this.uploading = true;
+    this.api.uploadSignedConsent(this.p.id, file).subscribe({
+      next: (c) => { this.uploading = false; this.consent = c; if (this.p) this.p.consentFileId = c.signedFileId; this.toast.ok('Copia firmada adjuntada a la ficha.'); },
+      error: (e) => { this.uploading = false; this.toast.error(apiError(e).message); },
+    });
   }
 
   go(t: Tab) {
@@ -229,7 +297,7 @@ export class PatientDetailComponent implements OnChanges {
   }
 
   addressLine(p: Patient): string {
-    return [p.address, p.district].filter((x) => !!x).join(', ') || '—';
+    return [p.address, p.district, p.province !== p.department ? p.province : null, p.department].filter((x) => !!x).join(', ') || '—';
   }
 
   ini = initials;

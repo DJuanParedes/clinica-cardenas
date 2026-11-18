@@ -20,6 +20,11 @@ public class TreatmentItem {
     public BigDecimal price;
     /** PENDIENTE, EN_PROCESO, REALIZADO */
     public String status;
+    /** Precio de lista cuando se aplicó una promoción (price es el precio final). */
+    @Column(name = "list_price")
+    public BigDecimal listPrice;
+    @Column(name = "promotion_id")
+    public Long promotionId;
     @Column(name = "done_at")
     public LocalDateTime doneAt;
     @Column(name = "invoice_id")

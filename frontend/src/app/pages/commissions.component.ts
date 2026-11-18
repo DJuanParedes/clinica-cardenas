@@ -64,7 +64,8 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                   <tr [class.off]="!r.active">
                     <td><div class="row"><span class="dot" [style.background]="r.dentist.color"></span><span class="strong">{{ r.dentist.fullName }}</span></div></td>
                     <td><div class="strong">{{ r.calcType === 'PORCENTAJE' ? r.value + ' %' : money(r.value) + ' fijo' }}</div>
-                      <div class="muted small">{{ r.procedure ? r.procedure.name : 'Todos los procedimientos' }}</div></td>
+                      <div class="muted small">{{ r.procedure ? r.procedure.name : 'Todos los procedimientos' }}</div>
+                      @if (r.calcType === 'PORCENTAJE') { <div class="small teal-ink">{{ ruleSoles(r) }}</div> }</td>
                     <td>{{ r.base === 'COBRADO' ? 'Lo cobrado' : 'Precio del procedimiento' }}</td>
                     <td class="tabular">{{ date(r.validFrom) }} – {{ r.validTo ? date(r.validTo) : 'sin fin' }}</td>
                     <td>
@@ -441,6 +442,15 @@ export class CommissionsComponent implements OnInit {
         if (d.lines.some((l: any) => l.ruleId === r.id)) this.ruleLocked = true;
       }));
     });
+  }
+
+  /** El porcentaje expresado en soles, para que el odontólogo vea cuánto gana de verdad. */
+  ruleSoles(r: any): string {
+    const v = Number(r.value);
+    const p = r.procedure ? this.procedures.find((x) => x.id === r.procedure.id) || r.procedure : null;
+    const price = p?.price != null ? Number(p.price) : null;
+    if (price != null) return `= ${soles((price * v) / 100)} por cada ${p.name} (precio ${soles(price)})`;
+    return `= ${soles((100 * v) / 100)} por cada S/ 100 de tratamiento`;
   }
 
   get preview(): string {

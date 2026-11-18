@@ -26,6 +26,30 @@ public class User {
     @Column(name = "role_code")
     public Role role;
 
+    public String phone;
+
+    /** Rol de acceso personalizado (define los permisos). Si es nulo, se usan los permisos del puesto base. */
+    @Column(name = "access_role_code")
+    public String accessRole;
+
+    /** APP (Google Authenticator) o CORREO (código enviado al correo). Nulo = sin verificación en 2 pasos. */
+    @Column(name = "two_factor_method")
+    public String twoFactorMethod;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "email_otp_hash")
+    public String emailOtpHash;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "email_otp_expires")
+    public LocalDateTime emailOtpExpires;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "email_otp_attempts")
+    public int emailOtpAttempts;
+
+    /** Código del rol cuyos permisos aplican a este usuario. */
+    public String effectiveRole() {
+        return accessRole != null && !accessRole.isBlank() ? accessRole : role.name();
+    }
+
     public boolean active = true;
 
     @Column(name = "failed_attempts")

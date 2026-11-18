@@ -50,8 +50,8 @@ export class PortalAuth {
     return this.http.post('/api/portal/auth/code', { docType, docNumber, birthDate });
   }
 
-  activate(docType: string, docNumber: string, code: string, password: string): Observable<any> {
-    return this.http.post<any>('/api/portal/auth/activate', { docType, docNumber, code, password }).pipe(tap((r) => this.store(r)));
+  activate(docType: string, docNumber: string, code: string, password: string, dataConsent = false): Observable<any> {
+    return this.http.post<any>('/api/portal/auth/activate', { docType, docNumber, code, password, dataConsent }).pipe(tap((r) => this.store(r)));
   }
 
   setPatient(p: PortalPatient) {

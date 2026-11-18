@@ -20,6 +20,12 @@ public class InventoryMove {
     public String reason;
     @Column(name = "treatment_item_id")
     public Long treatmentItemId;
+    @Column(name = "lot_id")
+    public Long lotId;
+    @Column(name = "purchase_id")
+    public Long purchaseId;
+    @Column(name = "request_id")
+    public Long requestId;
     @Column(name = "created_at")
     public LocalDateTime createdAt;
     @Column(name = "created_by")

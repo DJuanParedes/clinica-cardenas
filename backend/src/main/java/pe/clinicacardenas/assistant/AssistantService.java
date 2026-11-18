@@ -69,7 +69,7 @@ public class AssistantService {
         if (n.matches(".*\\b(reprogram\\w*|cambiar (mi |la )?(cita|hora|fecha)|mover (mi |la )?cita|otro dia|otra hora|otra fecha|postergar|adelantar)\\b.*")) return "REPROGRAMAR";
         if (n.matches("^(si|ok|okey|confirmo|confirmado|claro|perfecto|de acuerdo)( (alli|ahi) estare| asistire| gracias)?$") || n.matches(".*\\b(confirmo|si asistire|ahi estare|alli estare|confirmar (mi )?(cita|asistencia))\\b.*")) return "CONFIRMAR";
         if (n.matches(".*\\b(mi cita|mis citas|tengo cita|cuando es|a que hora (es|tengo)|proxima cita|para cuando)\\b.*")) return "MI_CITA";
-        if (n.matches(".*\\b(disponib\\w*|hay (espacio|cupo|turno)|cupos?|turnos?|separar (una )?cita|sacar (una )?cita|reservar|agendar|quiero (una )?cita|necesito (una )?cita|pedir (una )?cita|atender(me)? (hoy|manana))\\b.*")) return "DISPONIBILIDAD";
+        if (n.matches(".*\\b(disponib\\w*|hay (espacio|cupo|turno)|cupos?|turnos?|separar (una )?cita|sacar (una )?cita|reservar|agendar|quiero (una |otra |nueva )?cita|necesito (una |otra )?cita|pedir (una |otra )?cita|otra cita|nueva cita|reservar (una )?cita|atender(me)? (hoy|manana))\\b.*")) return "DISPONIBILIDAD";
         if (n.matches(".*\\b(deuda|saldo|debo|debemos|mi cuenta|pendiente de pago)\\b.*")) return "PAGO";
         if (n.matches(".*\\b(cuanto|precio\\w*|costo\\w*|cuesta|vale|tarifa\\w*|cobran)\\b.*")) return "PRECIO";
         if (n.matches(".*\\b(pagar|pago\\w*|yape|plin|tarjeta|transferencia|cuota\\w*|boleta|factura)\\b.*")) return "PAGO";
@@ -217,7 +217,19 @@ public class AssistantService {
         t.human = true;
     }
 
+    private BookingFlow booking;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setBooking(BookingFlow booking) {
+        this.booking = booking;
+    }
+
     private void disponibilidad(Turn t) {
+        // Paciente identificado: se le guía a reservar (fecha → odontólogo y hora → confirmación).
+        if (t.patient != null && booking != null) {
+            t.out.append(booking.start(t.patient.id, t.simulate));
+            return;
+        }
         StringBuilder libres = new StringBuilder();
         for (Dentist d : agenda.activeDentists()) {
             List<String> l = freeSlots(d, t.patient == null ? null : t.patient.id, 30, null, 2);

@@ -67,9 +67,23 @@ public class BillingController {
         return service.detail(id);
     }
 
+    private InvoiceMailer mailer;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMailer(InvoiceMailer mailer) {
+        this.mailer = mailer;
+    }
+
     @PostMapping("/invoices/{id}/send")
     public Map<String, Object> send(@PathVariable Long id) {
         return service.send(id);
+    }
+
+    public record EmailRequest(String email) {}
+
+    @PostMapping("/invoices/{id}/email")
+    public Map<String, Object> email(@PathVariable Long id, @RequestBody(required = false) EmailRequest r) {
+        return mailer.send(id, r == null ? null : r.email());
     }
 
     @PostMapping("/invoices/{id}/status")

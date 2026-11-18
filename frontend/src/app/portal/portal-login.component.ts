@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { PortalAuth } from '../core/portal-auth.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { LegalModalComponent } from '../shared/legal-modal.component';
 import { LogoComponent } from '../shared/logo.component';
 
 type Mode = 'login' | 'activar' | 'codigo';
@@ -13,7 +14,7 @@ type Mode = 'login' | 'activar' | 'codigo';
 @Component({
   selector: 'app-portal-login',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, IconComponent, LogoComponent],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink, IconComponent, LogoComponent, LegalModalComponent],
   template: `
     <div class="wrap">
       <div class="hero">
@@ -70,13 +71,20 @@ type Mode = 'login' | 'activar' | 'codigo';
               <input id="np" name="np" class="input lg" type="password" [(ngModel)]="password" autocomplete="new-password" />
               @if (fe['password']) { <span class="err">{{ fe['password'] }}</span> } @else { <span class="hint">Mínimo 8 caracteres, con letras y números.</span> }
             </div>
+            <div class="terms">
+              @if (consent) { <span class="tag green">Leíste y aceptaste los términos y la política de privacidad</span> }
+              @else { <button type="button" class="btn block" (click)="legalOpen = true">Leer y aceptar términos y política de privacidad</button>
+                <span class="hint">Obligatorio (Ley 29733). Tus datos de salud solo los ve el personal que te atiende.</span> }
+              @if (fe['dataConsent']) { <span class="err">{{ fe['dataConsent'] }}</span> }
+            </div>
             @if (error) { <div class="notice gum small" role="alert"><app-icon name="alert" [size]="16" /><div>{{ error }}</div></div> }
-            <button class="btn primary lg block" type="submit" [disabled]="busy || code.length < 6 || !password">@if (busy) { <span class="spin"></span> } Activar y entrar</button>
+            <button class="btn primary lg block" type="submit" [disabled]="busy || code.length < 6 || !password || !consent">@if (busy) { <span class="spin"></span> } Activar y entrar</button>
           </form>
           <button type="button" class="link" (click)="go('activar')">¿No te llegó? <strong>Pedir otro código</strong></button>
         }
       </section>
 
+      <app-legal-modal [open]="legalOpen" code="TERMINOS" (accepted)="consent = true; legalOpen = false" (closed)="legalOpen = false" />
       <p class="staff"><a routerLink="/login">Soy personal de la clínica</a></p>
     </div>
 
@@ -96,6 +104,7 @@ type Mode = 'login' | 'activar' | 'codigo';
     </ng-template>
   `,
   styles: [`
+    .terms { display: flex; flex-direction: column; gap: 4px; }
     :host { display: block; min-height: 100vh; background: #e9f3f8; }
     .wrap { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--porcelain); padding-bottom: 30px; }
     .hero { position: relative; text-align: center; padding: 46px 20px 18px; }
@@ -162,11 +171,15 @@ export class PortalLoginComponent {
     });
   }
 
+  consent = false;
+  legalOpen = false;
+
   activate() {
+    if (!this.consent) { this.legalOpen = true; return; }
     this.busy = true;
     this.error = '';
     this.fe = {};
-    this.portal.activate(this.docType, this.docNumber.trim(), this.code.trim(), this.password).subscribe({
+    this.portal.activate(this.docType, this.docNumber.trim(), this.code.trim(), this.password, true).subscribe({
       next: () => this.router.navigateByUrl('/app'),
       error: (e) => { this.busy = false; const a = apiError(e); this.fe = a.fields || {}; if (!a.fields) this.error = a.message; },
     });

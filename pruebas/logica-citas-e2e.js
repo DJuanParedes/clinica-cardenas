@@ -52,7 +52,7 @@ async function logicaCitasE2E(BASE) {
 
   const newPatient = async (k) => {
     const dni = String(60000000 + Math.floor(Math.random() * 9999999));
-    const r = await api('POST', '/api/patients', {
+    const r = await api('POST', '/api/patients', { dataConsent: true,
       docType: 'DNI', docNumber: dni, firstName: 'Prueba' + letters(uid) + 'abcdefghij'[k], lastName: 'Agenda Logica',
       birthDate: '1990-05-10', sex: 'F', phone: '9' + String(10000000 + Math.floor(Math.random() * 89999999)), district: 'Chaclacayo',
     }, recep);

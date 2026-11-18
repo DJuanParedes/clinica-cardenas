@@ -23,14 +23,19 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     <div class="page wide">
       <div class="page-head">
         <div>
-          <h1>Agenda del día</h1>
-          <p class="sub">{{ dayLabel }}</p>
+          <h1>{{ view === 'dia' ? 'Agenda del día' : view === 'semana' ? 'Agenda de la semana' : 'Agenda del mes' }}</h1>
+          <p class="sub">{{ view === 'dia' ? dayLabel : rangeLabel }}</p>
         </div>
         <div class="actions">
+          <div class="seg vsel" role="tablist" aria-label="Vista">
+            <button type="button" [class.on]="view === 'dia'" (click)="setView('dia')">Día</button>
+            <button type="button" [class.on]="view === 'semana'" (click)="setView('semana')">Semana</button>
+            <button type="button" [class.on]="view === 'mes'" (click)="setView('mes')">Mes</button>
+          </div>
           <div class="row nav">
-            <button class="btn sm" type="button" (click)="shift(-1)" aria-label="Día anterior"><app-icon name="chevronLeft" [size]="16" /></button>
+            <button class="btn sm" type="button" (click)="shift(-1)" aria-label="Anterior"><app-icon name="chevronLeft" [size]="16" /></button>
             <button class="btn sm" type="button" (click)="setDate(todayIso)" [disabled]="date === todayIso">Hoy</button>
-            <button class="btn sm" type="button" (click)="shift(1)" aria-label="Día siguiente"><app-icon name="chevronRight" [size]="16" /></button>
+            <button class="btn sm" type="button" (click)="shift(1)" aria-label="Siguiente"><app-icon name="chevronRight" [size]="16" /></button>
             <input class="input datein" type="date" [ngModel]="date" (ngModelChange)="setDate($event)" aria-label="Elegir fecha" />
           </div>
           @if (auth.can('MENSAJES') && botMode) {
@@ -51,13 +56,14 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
         </div>
       </div>
 
+      @if (view === 'dia') {
       <div class="counts">
         @for (s of statusOrder; track s) {
           <span class="tag" [class]="'tag ' + tone(s)">{{ label(s) }} <strong class="tabular">{{ counts[s] || 0 }}</strong></span>
         }
         <span class="grow"></span>
         @if (dentists.length > 1 && !auth.hasRole('ODONTOLOGO')) {
-          <select class="input dsel" [ngModel]="filter" (ngModelChange)="filter = $event; load()" aria-label="Filtrar por odontólogo">
+          <select class="input dsel" [ngModel]="filter" (ngModelChange)="filter = $event; reload()" aria-label="Filtrar por odontólogo">
             <option [ngValue]="null">Todos los odontólogos</option>
             @for (d of dentists; track d.id) { <option [ngValue]="d.id">{{ d.fullName }}</option> }
           </select>
@@ -106,6 +112,50 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
           </div>
         }
       </section>
+      } @else {
+        <div class="counts">
+          <span class="muted small">{{ rangeAppts.length }} citas · {{ activeCount }} sin cancelar</span>
+          <span class="grow"></span>
+          @if (dentists.length > 1 && !auth.hasRole('ODONTOLOGO')) {
+            <select class="input dsel" [ngModel]="filter" (ngModelChange)="filter = $event; reload()" aria-label="Filtrar por odontólogo">
+              <option [ngValue]="null">Todos los odontólogos</option>
+              @for (d of dentists; track d.id) { <option [ngValue]="d.id">{{ d.fullName }}</option> }
+            </select>
+          }
+        </div>
+        @if (loading) { <div class="skeleton" style="height: 420px"></div> }
+        @else if (view === 'semana') {
+          <section class="panel week">
+            @for (d of weekDays; track d.iso) {
+              <div class="wday" [class.today]="d.iso === todayIso">
+                <button type="button" class="wh" (click)="goDay(d.iso)"><span class="muted small">{{ d.dow }}</span><strong>{{ d.num }}</strong><span class="muted small">{{ d.list.length }} citas</span></button>
+                <div class="wl">
+                  @for (a of d.list; track a.id) {
+                    <button type="button" class="chip" [class]="'chip s-' + a.status" [style.border-left-color]="a.dentist.color" (click)="open(a)">
+                      <span class="tabular strong">{{ hhmm(a.startAt) }}</span> {{ a.patient.fullName }}
+                      <span class="muted small">{{ a.reason }}{{ filter ? '' : ' · ' + a.dentist.fullName }}</span>
+                    </button>
+                  } @empty { <span class="muted small pad">Libre</span> }
+                </div>
+              </div>
+            }
+          </section>
+        } @else {
+          <section class="panel month">
+            @for (h of ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']; track h) { <div class="mh muted small">{{ h }}</div> }
+            @for (d of monthDays; track d.iso) {
+              <button type="button" class="mday" [class.out]="!d.inMonth" [class.today]="d.iso === todayIso" (click)="goDay(d.iso)">
+                <span class="mn">{{ d.num }}</span>
+                @if (d.list.length) {
+                  <span class="mc">{{ d.list.length }} cita{{ d.list.length === 1 ? '' : 's' }}</span>
+                  @for (a of d.list.slice(0, 3); track a.id) { <span class="mi" [style.border-left-color]="a.dentist.color">{{ hhmm(a.startAt) }} {{ a.patient.firstName || a.patient.fullName }}</span> }
+                  @if (d.list.length > 3) { <span class="muted small">+{{ d.list.length - 3 }} más</span> }
+                }
+              </button>
+            }
+          </section>
+        }
+      }
     </div>
 
     <app-modal [open]="!!sel" [title]="sel?.patient?.fullName" [subtitle]="sel ? hhmm(sel.startAt) + ' – ' + hhmm(sel.endAt) + ' · ' + sel.dentist.fullName : ''" (close)="sel = null">
@@ -120,6 +170,17 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
           @if ($any(sel).rescheduleRequestedAt) {
             <div class="notice amber"><span>El paciente pidió otro horario (respondió "2" por WhatsApp). Usa <strong>Reprogramar</strong> después de coordinar con él.</span></div>
           }
+          @if (selInfo) {
+            @if (selInfo.clinicalAlerts?.allergies) { <div class="notice red small"><app-icon name="alert" [size]="16" /><span><strong>Alergias:</strong> {{ selInfo.clinicalAlerts.allergies }}</span></div> }
+            @if (selInfo.clinicalAlerts?.medication) { <div class="notice amber small"><span><strong>Medicación:</strong> {{ selInfo.clinicalAlerts.medication }}</span></div> }
+            @if (selInfo.clinicalAlerts && !selInfo.clinicalAlerts.allergies) { <p class="muted small">Alergias: no refiere.</p> }
+            @if (selInfo.pendingProcedures?.length) {
+              <div class="small"><strong>Por realizar:</strong>
+                <ul class="pp">@for (x of selInfo.pendingProcedures.slice(0, 5); track x.id) { <li>{{ x.procedure }}{{ x.tooth ? ' · pieza ' + x.tooth : '' }}</li> }</ul></div>
+            }
+            @if (selInfo.patient?.minor) { <p class="small"><span class="tag amber">Menor de edad</span> Representante: {{ selInfo.patient.guardianName }} · {{ selInfo.patient.guardianPhone }}</p> }
+          }
+          @if (mine(sel)) { <span class="tag teal small">Esta cita es contigo</span> }
           <dl class="kv">
             <dt>Documento</dt><dd>{{ sel.patient.docType }} {{ sel.patient.docNumber }}</dd>
             <dt>Teléfono</dt><dd>{{ sel.patient.phone }}</dd>
@@ -169,6 +230,31 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     </app-modal>
   `,
   styles: [`
+    .vsel { margin-right: 6px; }
+    .week { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); overflow-x: auto; }
+    .wday { border-right: 1px solid var(--line); min-height: 360px; display: flex; flex-direction: column; }
+    .wday:last-child { border-right: 0; }
+    .wday.today { background: var(--teal-soft); }
+    .wh { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer; font: inherit; }
+    .wh strong { font-size: 20px; }
+    .wl { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+    .chip { display: flex; flex-direction: column; text-align: left; gap: 2px; padding: 6px 8px; border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 8px; background: var(--surface); cursor: pointer; font: inherit; font-size: 12.5px; }
+    .chip.s-CANCELADA { opacity: .5; text-decoration: line-through; }
+    .chip.s-ATENDIDA { background: #eef8f1; }
+    .pad { padding: 6px; }
+    .month { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .mh { padding: 8px; text-align: center; border-bottom: 1px solid var(--line); font-weight: 700; }
+    .mday { min-height: 104px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); cursor: pointer; font: inherit; text-align: left; overflow: hidden; }
+    .mday:nth-of-type(7n) { border-right: 0; }
+    .mday.out { opacity: .45; }
+    .mday.today { background: var(--teal-soft); }
+    .mday:hover { outline: 2px solid var(--teal); outline-offset: -2px; }
+    .mn { font-weight: 800; }
+    .mc { font-size: 11.5px; color: var(--teal-strong); font-weight: 700; }
+    .mi { font-size: 11.5px; border-left: 3px solid var(--teal); padding-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .notice.red { background: #fde8e6; color: #8a1c12; border: 1px solid #f3b4ac; display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; }
+    .pp { margin: 4px 0 0; padding-left: 18px; }
+    @media (max-width: 760px) { .mday { min-height: 64px; } .mi { display: none; } .week { grid-template-columns: repeat(7, 150px); } }
     .dph { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid; flex: none; }
     .bot { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; background: var(--surface); }
     .bdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
@@ -269,7 +355,8 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
   ngOnInit() {
     this.loadBot();
     if (this.fecha && /^\d{4}-\d{2}-\d{2}$/.test(this.fecha)) this.date = this.fecha;
-    this.load();
+    try { const v = localStorage.getItem('cc.agendaView'); if (v === 'semana' || v === 'mes') this.view = v; } catch {}
+    this.reload();
   }
 
   ngOnChanges(ch: SimpleChanges) {
@@ -280,18 +367,70 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  view: 'dia' | 'semana' | 'mes' = 'dia';
+  rangeAppts: Appointment[] = [];
+  weekDays: { iso: string; dow: string; num: number; list: Appointment[] }[] = [];
+  monthDays: { iso: string; num: number; inMonth: boolean; list: Appointment[] }[] = [];
+  get activeCount() { return this.rangeAppts.filter((a) => a.status !== 'CANCELADA').length; }
+  get rangeLabel() {
+    const d = parseLocal(this.date);
+    if (this.view === 'mes') return new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(d);
+    const r = this.range();
+    const f = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' });
+    return f.format(parseLocal(r.from)) + ' – ' + f.format(parseLocal(r.to));
+  }
+  setView(v: 'dia' | 'semana' | 'mes') {
+    this.view = v;
+    try { localStorage.setItem('cc.agendaView', v); } catch {}
+    this.reload();
+  }
+  reload() { this.view === 'dia' ? this.load() : this.loadRange(); }
+  goDay(iso: string) { this.view = 'dia'; this.setDate(iso); }
+  private range() {
+    const d = parseLocal(this.date);
+    if (this.view === 'semana') {
+      const s = new Date(d); s.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      const e = new Date(s); e.setDate(s.getDate() + 6);
+      return { from: isoDate(s), to: isoDate(e) };
+    }
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    const s = new Date(first); s.setDate(1 - ((first.getDay() + 6) % 7));
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const e = new Date(last); e.setDate(last.getDate() + (6 - ((last.getDay() + 6) % 7)));
+    return { from: isoDate(s), to: isoDate(e) };
+  }
+  loadRange() {
+    this.loading = true;
+    const r = this.range();
+    this.api.appointmentsRange(r.from, r.to, this.filter ?? undefined).subscribe({
+      next: (list) => {
+        this.rangeAppts = list.sort((a, b) => a.startAt.localeCompare(b.startAt));
+        const by = (iso: string) => this.rangeAppts.filter((a) => a.startAt.startsWith(iso));
+        const days: string[] = [];
+        for (let x = parseLocal(r.from); isoDate(x) <= r.to; x.setDate(x.getDate() + 1)) days.push(isoDate(x));
+        const dows = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const month = parseLocal(this.date).getMonth();
+        this.weekDays = days.map((iso) => { const d = parseLocal(iso); return { iso, dow: dows[d.getDay()], num: d.getDate(), list: by(iso) }; });
+        this.monthDays = days.map((iso) => { const d = parseLocal(iso); return { iso, num: d.getDate(), inMonth: d.getMonth() === month, list: by(iso).filter((a) => a.status !== 'CANCELADA') }; });
+        this.loading = false;
+      },
+      error: () => (this.loading = false),
+    });
+  }
+
   get dayLabel() { return longDay(this.date) + (this.date === this.todayIso ? ' · hoy' : ''); }
 
   setDate(d: string) {
     if (!d) return;
     this.date = d;
     this.router.navigate([], { queryParams: { fecha: d === this.todayIso ? null : d }, replaceUrl: true });
-    this.load();
+    this.reload();
   }
 
   shift(n: number) {
     const d = parseLocal(this.date);
-    d.setDate(d.getDate() + n);
+    if (this.view === 'mes') d.setMonth(d.getMonth() + n, 1);
+    else d.setDate(d.getDate() + n * (this.view === 'semana' ? 7 : 1));
     this.setDate(isoDate(d));
   }
 
@@ -378,8 +517,15 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
     else this.change(n);
   }
 
+  selInfo: any = null;
+  mine(a: Appointment) { const me = this.auth.user(); return me?.role === 'ODONTOLOGO' && me.dentistId === a.dentist.id; }
+
   open(a: Appointment) {
     this.sel = a;
+    this.selInfo = null;
+    if (this.auth.can('HISTORIA_CLINICA') || this.auth.can('PACIENTES_EDITAR')) {
+      this.api.patient(a.patient.id).subscribe({ next: (r) => (this.selInfo = r), error: () => {} });
+    }
     this.cancelling = false;
     this.reason = '';
     this.history = [];

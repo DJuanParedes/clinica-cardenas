@@ -18,7 +18,7 @@ import { IconComponent } from '../shared/icon.component';
     <div class="page">
       <header class="page-head">
         <h1>Mi seguridad</h1>
-        <p class="muted">Protege tu cuenta con un código que cambia cada 30 segundos, además de tu contraseña.</p>
+        <p class="muted">Además de tu contraseña, al ingresar te pediremos un código de 6 dígitos. Elige cómo recibirlo: <strong>por correo</strong> (no necesitas instalar nada) o con una <strong>app de autenticación</strong> en el celular (funciona sin internet).</p>
       </header>
 
       <section class="panel box">
@@ -26,13 +26,30 @@ import { IconComponent } from '../shared/icon.component';
           <app-icon name="shield" [size]="28" />
           <div>
             <h3>Verificación en 2 pasos</h3>
-            @if (enabled) { <p><span class="tag green">Activada</span> Al iniciar sesión te pediremos el código de tu app.</p> }
+            @if (enabled) { <p><span class="tag green">Activada · {{ method === 'CORREO' ? 'código por correo' : 'app de autenticación' }}</span> Al iniciar sesión te pediremos el código {{ method === 'CORREO' ? 'que llega a tu correo' : 'de tu app' }}.</p> }
             @else { <p><span class="tag amber">Desactivada</span> Cualquiera con tu contraseña podría entrar a las historias clínicas.</p> }
           </div>
         </div>
 
-        @if (!enabled && !setup) {
-          <button class="btn primary" type="button" (click)="start()" [disabled]="busy">Activar verificación en 2 pasos</button>
+        @if (!enabled && !setup && !emailSetup) {
+          <div class="choices">
+            <button class="choice" type="button" (click)="startEmail()" [disabled]="busy">
+              <app-icon name="mail" [size]="22" /><strong>Código por correo</strong>
+              <span class="muted small">Recomendado si no quieres instalar nada. Llega a {{ auth.user()?.email }}.</span></button>
+            <button class="choice" type="button" (click)="start()" [disabled]="busy">
+              <app-icon name="smartphone" [size]="22" /><strong>App de autenticación</strong>
+              <span class="muted small">Google o Microsoft Authenticator. Más segura: no depende del correo.</span></button>
+          </div>
+        }
+
+        @if (emailSetup) {
+          <p>Enviamos un código a <strong>{{ emailSetup.email }}</strong>. Escríbelo para confirmar que el correo es tuyo:</p>
+          @if (emailSetup.demoCode) { <p class="muted small">Modo demostración: el código es {{ emailSetup.demoCode }}</p> }
+          <div class="row confirm">
+            <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código del correo" />
+            <button class="btn primary" type="button" (click)="enableEmail()" [disabled]="busy || code.length !== 6">Confirmar y activar</button>
+            <button class="btn ghost" type="button" (click)="emailSetup = null; code = ''">Cancelar</button>
+          </div>
         }
 
         @if (setup) {
@@ -56,7 +73,8 @@ import { IconComponent } from '../shared/icon.component';
             <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código actual para desactivar" />
             <button class="btn danger" type="button" (click)="disable()" [disabled]="busy || code.length !== 6">Desactivar</button>
           </div>
-          <p class="muted small">Para desactivarla escribe el código actual de tu app. Si perdiste el celular, pide al administrador que restablezca tu acceso.</p>
+          @if (method === 'CORREO') { <button class="btn sm ghost" type="button" (click)="sendDisableCode()" [disabled]="busy">Enviarme un código para desactivar</button> }
+          <p class="muted small">Para desactivarla escribe el código {{ method === 'CORREO' ? 'que te enviamos al correo' : 'actual de tu app' }}. Si perdiste el acceso, pide al administrador que restablezca tu cuenta.</p>
         }
       </section>
     </div>
@@ -71,7 +89,11 @@ import { IconComponent } from '../shared/icon.component';
     .qr { margin: 10px 0 6px; width: 200px; height: 200px; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
     .qr :is(svg, img) { width: 100%; height: 100%; display: block; }
     .key { font-size: 13px; letter-spacing: .08em; background: var(--surface-2); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
-    .confirm { gap: 10px; margin-top: 8px; }
+    .confirm { gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+    .choice { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; font: inherit; color: var(--ink); }
+    .choice:hover { border-color: var(--teal); }
+    @media (max-width: 640px) { .choices { grid-template-columns: 1fr; } }
     .code { width: 150px; font-size: 20px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
   `],
 })
@@ -86,6 +108,30 @@ export class SecurityComponent {
   busy = false;
 
   get enabled() { return !!(this.auth.user() as any)?.twoFactor; }
+  get method() { return (this.auth.user() as any)?.twoFactorMethod || 'APP'; }
+  emailSetup: any = null;
+
+  startEmail() {
+    this.busy = true;
+    this.api.start2faEmail().subscribe({
+      next: (r) => { this.busy = false; this.emailSetup = r; this.code = ''; },
+      error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+  sendDisableCode() {
+    this.busy = true;
+    this.api.start2faEmail().subscribe({
+      next: (r) => { this.busy = false; this.toast.ok(r.message + (r.demoCode ? ' (demo: ' + r.demoCode + ')' : '')); },
+      error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+  enableEmail() {
+    this.busy = true;
+    this.api.enable2faEmail(this.code).subscribe({
+      next: (r) => { this.busy = false; this.emailSetup = null; this.code = ''; this.toast.ok(r.message); this.auth.refresh(); },
+      error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
+    });
+  }
 
   start() {
     this.busy = true;

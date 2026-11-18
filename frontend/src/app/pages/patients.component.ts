@@ -30,10 +30,17 @@ import { IconComponent } from '../shared/icon.component';
         <input class="input" [(ngModel)]="q" (ngModelChange)="search$.next($event)" placeholder="Ej. 45872196 o Quispe Huamán"
                aria-label="Buscar paciente" autofocus />
       </div>
+      @if (isDentist) {
+        <div class="seg mine">
+          <button type="button" [class.on]="mine" (click)="setMine(true)">Mis pacientes</button>
+          <button type="button" [class.on]="!mine" (click)="setMine(false)">Todos</button>
+        </div>
+      }
       <p class="mode muted small">
         @if (loading) { Buscando… }
         @else if (page) {
-          @if (page.mode === 'recientes') { Últimos pacientes registrados }
+          @if (page.mode === 'mis-pacientes') { {{ page.total }} pacientes que atiendes o atendiste }
+          @else if (page.mode === 'recientes') { Últimos pacientes registrados }
           @else if (page.mode === 'documento') { {{ page.total }} {{ page.total === 1 ? 'resultado' : 'resultados' }} por número de documento }
           @else { {{ page.total }} {{ page.total === 1 ? 'resultado' : 'resultados' }} por nombre }
           @if (elapsed !== null) { · {{ elapsed }} ms }
@@ -68,7 +75,7 @@ import { IconComponent } from '../shared/icon.component';
                     </div>
                   </td>
                   <td class="tabular"><span class="muted">{{ p.docType }}</span> {{ p.docNumber }}</td>
-                  <td>{{ p.age }} años</td>
+                  <td>@if (p.age != null) { {{ p.age }} años } @else { <span class="muted">—</span> }</td>
                   <td class="tabular">{{ p.phone }}</td>
                   <td class="muted">{{ date(p.createdAt) }}</td>
                 </tr>
@@ -90,6 +97,7 @@ import { IconComponent } from '../shared/icon.component';
   `,
   styles: [`
     .mode { margin: 10px 2px 14px; min-height: 20px; }
+    .mine { margin-top: 10px; }
   `],
 })
 export class PatientsComponent implements OnInit, OnDestroy {
@@ -106,7 +114,12 @@ export class PatientsComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
   private started = 0;
 
+  get isDentist() { return this.auth.user()?.role === 'ODONTOLOGO'; }
+  mine = false;
+  setMine(v: boolean) { this.mine = v; try { localStorage.setItem('cc.mine', v ? '1' : '0'); } catch {} this.go(0); }
+
   ngOnInit() {
+    try { this.mine = this.isDentist && localStorage.getItem('cc.mine') !== '0'; } catch { this.mine = this.isDentist; }
     this.q = this.route.snapshot.queryParamMap.get('q') || '';
     this.sub = this.search$.pipe(
       debounceTime(250),
@@ -119,7 +132,7 @@ export class PatientsComponent implements OnInit, OnDestroy {
   private fetch(q: string, page: number) {
     this.loading = true;
     this.started = performance.now();
-    return this.api.searchPatients(q.trim(), page).pipe(catchError(() => of(null)));
+    return this.api.searchPatients(q.trim(), page, 20, this.mine).pipe(catchError(() => of(null)));
   }
 
   private done(p: Page<Patient> | null) {

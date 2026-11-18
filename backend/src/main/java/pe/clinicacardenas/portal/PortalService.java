@@ -48,6 +48,12 @@ public class PortalService {
     private final JwtService jwt;
     private final AuditService audit;
     private final boolean demoMode;
+    private pe.clinicacardenas.patient.ConsentService consents;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setConsents(pe.clinicacardenas.patient.ConsentService consents) {
+        this.consents = consents;
+    }
     private final String clinicName;
     private final String clinicAddress;
     private final String clinicPhone;
@@ -147,6 +153,9 @@ public class PortalService {
             int left = MAX_ATTEMPTS - pc.attempts;
             throw ApiException.field("code", left > 0 ? "Código incorrecto. Te quedan " + left + " intentos." : "Código bloqueado. Pide uno nuevo.");
         }
+        if (!Boolean.TRUE.equals(r.dataConsent())) {
+            throw ApiException.field("dataConsent", "Para usar la app debes leer y aceptar los términos y la política de privacidad.");
+        }
         PasswordPolicy.check("password", r.password());
         PatientAccount acc = accounts.findById(p.id).orElseGet(() -> {
             PatientAccount a = new PatientAccount();
@@ -162,11 +171,10 @@ public class PortalService {
         accounts.save(acc);
         pc.usedAt = now;
         codes.save(pc);
-        if (Boolean.TRUE.equals(r.dataConsent()) && !p.dataConsent) {
-            p.dataConsent = true;     // aceptó el tratamiento de datos personales (Ley N.° 29733) en la app
-            p.dataConsentAt = now;
-            patients.save(p);
-            audit.record("PACIENTE", p.id, "CONSENTIMIENTO_DATOS", "Aceptó el tratamiento de datos personales en la app");
+        // Aceptó términos y política de privacidad (Ley N.° 29733) al activar: queda registro con versión y canal.
+        consents.record(p, "TERMINOS", "APP", "paciente:" + p.id, null);
+        if (!p.dataConsent || !consents.currentVersion("PRIVACIDAD").equals(p.consentVersion)) {
+            consents.record(p, "PRIVACIDAD", "APP", "paciente:" + p.id, null);
         }
         audit.record("PACIENTE", p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
         return session(p, acc);

@@ -96,15 +96,30 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENCIALES_INVALIDAS",
                     "Usuario o contraseña incorrectos. Te " + (left == 1 ? "queda 1 intento." : "quedan " + left + " intentos."));
         }
-        // Verificación en 2 pasos: además de la contraseña, el código de 6 dígitos de la app de autenticación
-        if (u.totpEnabled) {
+        // Verificación en 2 pasos: además de la contraseña, un código de 6 dígitos.
+        //   APP    → el de Google Authenticator / Microsoft Authenticator (cambia cada 30 s)
+        //   CORREO → uno de un solo uso que se envía al correo de la cuenta (vence en 10 min); no hay que instalar nada
+        String method = u.twoFactorMethod != null ? u.twoFactorMethod : (u.totpEnabled ? "APP" : null);
+        if ("APP".equals(method)) {
             if (code == null || code.isBlank()) {
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.");
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.", Map.of("method", "APP"));
             }
             if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
                 u.failedAttempts++;
                 users.save(u);
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Usa el código actual de tu app.");
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Usa el código actual de tu app.", Map.of("method", "APP"));
+            }
+        } else if ("CORREO".equals(method)) {
+            if (code == null || code.isBlank()) {
+                sendEmailCode(u, "Tu código para ingresar");
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA",
+                        "Te enviamos un código de 6 dígitos a " + mask(u.email) + ". Escríbelo para ingresar.",
+                        Map.of("method", "CORREO", "email", mask(u.email)));
+            }
+            if (!checkEmailCode(u, code)) {
+                u.failedAttempts++;
+                users.save(u);
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Pide uno nuevo.", Map.of("method", "CORREO"));
             }
         }
         u.failedAttempts = 0;
@@ -121,10 +136,57 @@ public class AuthService {
         return users.findByUsernameIgnoreCase(username).orElseThrow(() -> ApiException.notFound("El usuario"));
     }
 
+    private String sendEmailCode(User u, String subject) {
+        String c = String.format("%06d", random.nextInt(1_000_000));
+        u.emailOtpHash = encoder.encode(c);
+        u.emailOtpExpires = Dates.now().plusMinutes(10);
+        u.emailOtpAttempts = 0;
+        users.save(u);
+        mail.send(u.email, subject + " · Clínica Cárdenas",
+                "Hola " + u.fullName + ",\n\nTu código de verificación es: " + c + "\nVence en 10 minutos. Si no fuiste tú, cambia tu contraseña.\n\nClínica Dental Cárdenas");
+        return c;
+    }
+
+    private boolean checkEmailCode(User u, String code) {
+        if (u.emailOtpHash == null || u.emailOtpExpires == null || u.emailOtpExpires.isBefore(Dates.now()) || u.emailOtpAttempts >= 5) return false;
+        if (!encoder.matches(code.trim(), u.emailOtpHash)) {
+            u.emailOtpAttempts++;
+            users.save(u);
+            return false;
+        }
+        u.emailOtpHash = null;
+        u.emailOtpExpires = null;
+        users.save(u);
+        return true;
+    }
+
+    /** Paso 1 para activar (o desactivar) el código por correo: se envía un código de prueba. */
+    @Transactional
+    public Map<String, Object> startEmail2fa(String username) {
+        User u = user(username);
+        String c = sendEmailCode(u, "Confirma la verificación por correo");
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("email", mask(u.email));
+        m.put("message", "Enviamos un código a " + mask(u.email) + ".");
+        if (demoMode) m.put("demoCode", c);
+        return m;
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public Map<String, Object> enableEmail2fa(String username, String code) {
+        User u = user(username);
+        if (u.twoFactorMethod != null) throw ApiException.conflict("2FA_ACTIVA", "Ya tienes la verificación en 2 pasos activa. Desactívala primero para cambiar de método.");
+        if (code == null || !checkEmailCode(u, code)) throw ApiException.field("code", "El código no coincide o venció. Pide uno nuevo.");
+        u.twoFactorMethod = "CORREO";
+        users.save(u);
+        audit.record("USUARIO", u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos por correo");
+        return Map.of("enabled", true, "method", "CORREO", "message", "Listo: cada vez que ingreses te enviaremos un código al correo.");
+    }
+
     @Transactional
     public Map<String, Object> setupTotp(String username) {
         User u = user(username);
-        if (u.totpEnabled) throw ApiException.conflict("2FA_ACTIVA", "La verificación en 2 pasos ya está activa.");
+        if (u.totpEnabled || u.twoFactorMethod != null) throw ApiException.conflict("2FA_ACTIVA", "La verificación en 2 pasos ya está activa.");
         u.totpSecret = Totp.newSecret();
         users.save(u);
         String label = java.net.URLEncoder.encode("Clínica Cárdenas:" + u.username, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
@@ -142,6 +204,7 @@ public class AuthService {
             throw ApiException.field("code", "El código no coincide. Revisa la hora de tu teléfono e inténtalo de nuevo.");
         }
         u.totpEnabled = true;
+        u.twoFactorMethod = "APP";
         users.save(u);
         audit.record("USUARIO", u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
         return Map.of("enabled", true, "message", "Verificación en 2 pasos activada.");
@@ -150,12 +213,15 @@ public class AuthService {
     @Transactional
     public Map<String, Object> disableTotp(String username, String code) {
         User u = user(username);
-        if (!u.totpEnabled) return Map.of("enabled", false);
-        if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
+        if (u.twoFactorMethod == null && !u.totpEnabled) return Map.of("enabled", false);
+        boolean ok = "CORREO".equals(u.twoFactorMethod) ? code != null && checkEmailCode(u, code)
+                : Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000);
+        if (!ok) {
             throw ApiException.field("code", "El código no es correcto.");
         }
         u.totpEnabled = false;
         u.totpSecret = null;
+        u.twoFactorMethod = null;
         users.save(u);
         audit.record("USUARIO", u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
         return Map.of("enabled", false, "message", "Verificación en 2 pasos desactivada.");
@@ -169,9 +235,13 @@ public class AuthService {
         m.put("email", u.email);
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
-        m.put("twoFactor", u.totpEnabled);
+        m.put("phone", u.phone);
+        m.put("twoFactor", u.twoFactorMethod != null);
+        m.put("twoFactorMethod", u.twoFactorMethod);
+        m.put("accessRole", u.effectiveRole());
+        m.put("accessRoleLabel", permissions.label(u.effectiveRole()));
         dentists.findByUserId(u.id).ifPresent(d -> m.put("dentistId", d.id));
-        m.put("permissions", permissions.forRole(u.role.name()));
+        m.put("permissions", permissions.forRole(u.effectiveRole()));
         return m;
     }
 

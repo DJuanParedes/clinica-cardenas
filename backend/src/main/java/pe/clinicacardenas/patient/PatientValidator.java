@@ -17,10 +17,26 @@ public final class PatientValidator {
 
     private PatientValidator() {}
 
-    /** dataConsent: el paciente autorizó el tratamiento de sus datos personales (Ley N.° 29733). */
+    public static final java.util.Set<String> GUARDIAN_RELATIONSHIPS = java.util.Set.of("PADRE", "MADRE", "TUTOR_LEGAL");
+
+    /**
+     * dataConsent: el paciente (o su representante legal si es menor) aceptó la política de privacidad (Ley N.° 29733).
+     * Menores de 18 años: guardian* = representante legal (Código Civil: patria potestad o tutela); los adultos
+     * registran, si desean, un contacto de emergencia.
+     */
     public record Input(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate,
                         String sex, String phone, String email, String address, String district,
-                        String emergencyContactName, String emergencyContactPhone, String notes, Boolean dataConsent) {
+                        String emergencyContactName, String emergencyContactPhone, String notes, Boolean dataConsent,
+                        String ubigeo, String emergencyContactRelationship,
+                        String guardianName, String guardianDocType, String guardianDocNumber, String guardianRelationship,
+                        String guardianPhone) {
+        public Input(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate,
+                     String sex, String phone, String email, String address, String district,
+                     String emergencyContactName, String emergencyContactPhone, String notes, Boolean dataConsent) {
+            this(docType, docNumber, firstName, lastName, birthDate, sex, phone, email, address, district,
+                    emergencyContactName, emergencyContactPhone, notes, dataConsent, null, null, null, null, null, null, null);
+        }
+
         public Input(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate,
                      String sex, String phone, String email, String address, String district,
                      String emergencyContactName, String emergencyContactPhone, String notes) {
@@ -69,9 +85,34 @@ public final class PatientValidator {
         if (in.email() != null && !in.email().isBlank() && !EMAIL.matcher(in.email().trim()).matches()) {
             e.put("email", "Ingresa un correo válido.");
         }
-        if (in.emergencyContactPhone() != null && !in.emergencyContactPhone().isBlank()
+        boolean minor = in.birthDate() != null && !in.birthDate().isAfter(today) && in.birthDate().plusYears(18).isAfter(today);
+        if (minor) {
+            // Menor de edad: el representante legal es obligatorio y es quien acepta y firma por el paciente.
+            if (in.guardianName() == null || !NAME.matcher(in.guardianName().trim()).matches()) {
+                e.put("guardianName", "Paciente menor de edad: ingresa el nombre completo del padre, madre o tutor legal.");
+            }
+            if (in.guardianRelationship() == null || !GUARDIAN_RELATIONSHIPS.contains(in.guardianRelationship())) {
+                e.put("guardianRelationship", "Selecciona el vínculo: padre, madre o tutor legal.");
+            }
+            String gType = in.guardianDocType() == null ? "DNI" : in.guardianDocType().trim().toUpperCase();
+            String gDoc = normalizeDoc(in.guardianDocNumber());
+            boolean gOk = switch (gType) {
+                case "DNI" -> DNI.matcher(gDoc).matches();
+                case "CE" -> CE.matcher(gDoc).matches();
+                case "PAS" -> PAS.matcher(gDoc).matches();
+                default -> false;
+            };
+            if (!gOk) e.put("guardianDocNumber", "Ingresa el documento del representante legal (DNI de 8 dígitos).");
+            else if (gType.equals(type) && gDoc.equals(doc)) e.put("guardianDocNumber", "El representante legal no puede ser el mismo paciente.");
+            if (!PHONE.matcher(normalizePhone(in.guardianPhone())).matches()) {
+                e.put("guardianPhone", "Ingresa el celular del representante legal.");
+            }
+        } else if (in.emergencyContactPhone() != null && !in.emergencyContactPhone().isBlank()
                 && !PHONE.matcher(normalizePhone(in.emergencyContactPhone())).matches()) {
             e.put("emergencyContactPhone", "Ingresa un teléfono válido.");
+        }
+        if (in.ubigeo() != null && !in.ubigeo().isBlank() && !Ubigeo.exists(in.ubigeo())) {
+            e.put("ubigeo", "Selecciona un distrito válido.");
         }
         return e;
     }

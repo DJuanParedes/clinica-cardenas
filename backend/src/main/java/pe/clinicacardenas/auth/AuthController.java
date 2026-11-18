@@ -50,6 +50,16 @@ public class AuthController {
         return auth.enableTotp(a.getName(), req.code());
     }
 
+    @PostMapping("/2fa/email/start")
+    public Map<String, Object> startEmail(Authentication a) {
+        return auth.startEmail2fa(a.getName());
+    }
+
+    @PostMapping("/2fa/email/enable")
+    public Map<String, Object> enableEmail(Authentication a, @RequestBody CodeRequest req) {
+        return auth.enableEmail2fa(a.getName(), req.code());
+    }
+
     @PostMapping("/2fa/disable")
     public Map<String, Object> disable2fa(Authentication a, @RequestBody CodeRequest req) {
         return auth.disableTotp(a.getName(), req.code());

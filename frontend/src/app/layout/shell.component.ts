@@ -7,7 +7,7 @@ import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
 import { initials } from '../core/format';
 
-interface NavItem { path: string; label: string; icon: string; perms: string[]; }
+interface NavItem { path: string; label: string; icon: string; perms: string[]; roles?: string[]; }
 interface NavGroup { title: string; items: NavItem[]; }
 
 /** Menú según los permisos del rol (HU-26). */
@@ -18,7 +18,10 @@ const NAV: NavGroup[] = [
     { path: '/pacientes', label: 'Pacientes', icon: 'patient', perms: ['PACIENTES_VER'] },
     { path: '/mensajes', label: 'Mensajes WhatsApp', icon: 'message', perms: ['MENSAJES'] },
     { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
+    { path: '/mis-ganancias', label: 'Mis ganancias', icon: 'coins', perms: [], roles: ['ODONTOLOGO'] },
     { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
+    { path: '/insumos', label: 'Solicitar insumos', icon: 'box', perms: ['SOLICITAR_INSUMOS'] },
+    { path: '/catalogo', label: 'Procedimientos y promociones', icon: 'tag', perms: ['PROMOCIONES', 'PLAN_TRATAMIENTO'] },
   ] },
   { title: 'Caja', items: [
     { path: '/caja', label: 'Caja del día', icon: 'wallet', perms: ['CAJA_COBRAR', 'CAJA_EGRESOS'] },
@@ -31,8 +34,9 @@ const NAV: NavGroup[] = [
     { path: '/notificaciones', label: 'Notificaciones', icon: 'bell', perms: ['NOTIFICACIONES'] },
   ] },
   { title: 'Seguridad', items: [
-    { path: '/usuarios', label: 'Usuarios y accesos', icon: 'shield', perms: ['USUARIOS'] },
+    { path: '/usuarios', label: 'Personal', icon: 'shield', perms: ['USUARIOS'] },
     { path: '/roles', label: 'Roles y permisos', icon: 'key', perms: ['ROLES'] },
+    { path: '/perfil', label: 'Mi perfil', icon: 'user', perms: [] },
     { path: '/seguridad', label: 'Mi seguridad (2 pasos)', icon: 'lock', perms: [] },
   ] },
 ];
@@ -149,7 +153,7 @@ export class ShellComponent implements OnDestroy {
   nav = computed(() => {
     const u = this.auth.user();
     if (!u) return [];
-    const ok = (n: NavItem) => !n.perms.length || n.perms.some((p) => (u.permissions || []).includes(p));
+    const ok = (n: NavItem) => (!n.roles || n.roles.includes(u.role)) && (!n.perms.length || n.perms.some((p) => (u.permissions || []).includes(p)));
     return NAV.map((g) => ({ title: g.title, items: g.items.filter(ok) })).filter((g) => g.items.length);
   });
   canCreateAppointment = computed(() => !!this.auth.user() && this.auth.can('CITAS_GESTIONAR'));

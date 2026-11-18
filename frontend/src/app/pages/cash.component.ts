@@ -18,8 +18,14 @@ import { ModalComponent } from '../shared/modal.component';
     <div class="page">
       <div class="page-head">
         <div>
-          <p class="muted">{{ today }}</p>
-          <h1>Caja del día</h1>
+          <p class="muted">{{ dayLabel }}</p>
+          <h1>{{ isToday ? 'Caja del día' : 'Historial de caja' }}</h1>
+          <div class="row hist">
+            <button class="btn sm ghost" type="button" (click)="shift(-1)" aria-label="Día anterior"><app-icon name="chevronLeft" [size]="16" /></button>
+            <input class="input" type="date" [max]="todayIso" [(ngModel)]="day" (ngModelChange)="load()" aria-label="Ver la caja de otro día" />
+            <button class="btn sm ghost" type="button" (click)="shift(1)" [disabled]="isToday" aria-label="Día siguiente"><app-icon name="chevronRight" [size]="16" /></button>
+            @if (!isToday) { <button class="btn sm" type="button" (click)="day = todayIso; load()">Volver a hoy</button> }
+          </div>
         </div>
         <div class="actions">
           @if (auth.can('CAJA_REPORTE')) { <a class="btn" routerLink="/caja/reporte"><app-icon name="chart" [size]="16" /> Flujo por período</a> }
@@ -33,8 +39,8 @@ import { ModalComponent } from '../shared/modal.component';
         <div class="skeleton" style="height: 320px"></div>
       } @else {
         <section class="figures panel" aria-label="Resumen de caja de hoy">
-          <div class="fig"><span class="v tabular in">{{ money(r.income) }}</span><span class="l">cobrado hoy</span><span class="meta">{{ r.incomeCount }} cobros</span></div>
-          <div class="fig"><span class="v tabular out">{{ money(r.outgo) }}</span><span class="l">egresos de hoy</span><span class="meta">{{ r.outgoCount }} registros</span></div>
+          <div class="fig"><span class="v tabular in">{{ money(r.income) }}</span><span class="l">cobrado {{ isToday ? 'hoy' : 'ese día' }}</span><span class="meta">{{ r.incomeCount }} cobros</span></div>
+          <div class="fig"><span class="v tabular out">{{ money(r.outgo) }}</span><span class="l">egresos {{ isToday ? 'de hoy' : 'del día' }}</span><span class="meta">{{ r.outgoCount }} registros</span></div>
           <div class="fig"><span class="v tabular">{{ money(r.net) }}</span><span class="l">saldo del día</span><span class="meta">ingresos menos egresos</span></div>
           <div class="fig">
             <span class="v tabular">{{ money(cashInHand) }}</span><span class="l">efectivo en caja</span>
@@ -159,6 +165,7 @@ import { ModalComponent } from '../shared/modal.component';
     </app-modal>
   `,
   styles: [`
+    .hist { gap: 6px; margin-top: 6px; } .hist .input { width: 170px; }
     .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
     .fig { display: flex; flex-direction: column; padding: 18px 22px; border-right: 1px solid var(--line); }
     .fig:last-child { border-right: 0; }
@@ -197,7 +204,19 @@ export class CashComponent implements OnInit {
 
   ngOnInit() { this.load(); }
 
-  load() { this.api.cashToday().subscribe((r) => (this.r = r)); }
+  day = isoDate();
+  get isToday() { return this.day === this.todayIso; }
+  get dayLabel() { return longDay(this.day || this.todayIso); }
+  shift(n: number) {
+    const d = new Date(this.day + 'T12:00:00'); d.setDate(d.getDate() + n);
+    const iso = isoDate(d);
+    if (iso > this.todayIso) return;
+    this.day = iso; this.load();
+  }
+  load() {
+    this.r = null;
+    (this.isToday ? this.api.cashToday() : this.api.cashDay(this.day)).subscribe({ next: (r) => (this.r = r), error: (e) => this.toast.error(apiError(e).message) });
+  }
 
   get cashInHand(): number {
     const c = this.r?.byMethod.find((m) => m.method === 'EFECTIVO');

@@ -49,7 +49,24 @@ public class UserService {
     }
 
     public record UserRequest(String username, String email, String fullName, Role role, String password,
-                              String specialty, String cop) {}
+                              String specialty, String cop, String phone, String accessRole) {
+        public UserRequest(String username, String email, String fullName, Role role, String password, String specialty, String cop) {
+            this(username, email, fullName, role, password, specialty, cop, null, null);
+        }
+    }
+
+    public record ProfileRequest(String fullName, String email, String phone) {}
+
+    public record PasswordChange(String currentPassword, String newPassword) {}
+
+    private pe.clinicacardenas.security.PermissionService permissions;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setPermissions(pe.clinicacardenas.security.PermissionService permissions) {
+        this.permissions = permissions;
+    }
+
+    private static final Pattern PHONE = Pattern.compile("^9\\d{8}$");
 
     public record ScheduleBlock(int weekday, String start, String end) {}
 
@@ -72,6 +89,10 @@ public class UserService {
         m.put("fullName", u.fullName);
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
+        m.put("phone", u.phone);
+        m.put("accessRole", u.accessRole);
+        m.put("accessRoleLabel", u.accessRole == null ? u.role.label : permissions.label(u.accessRole));
+        m.put("twoFactorMethod", u.twoFactorMethod);
         m.put("active", u.active);
         m.put("locked", u.lockedUntil != null && u.lockedUntil.isAfter(Dates.now()));
         m.put("lastLoginAt", u.lastLoginAt);
@@ -120,6 +141,13 @@ public class UserService {
         if (r.role() == Role.ODONTOLOGO && (r.specialty() == null || r.specialty().isBlank())) {
             errors.put("specialty", "Indica la especialidad del odontólogo.");
         }
+        if (r.phone() != null && !r.phone().isBlank() && !PHONE.matcher(r.phone().replaceAll("\\s", "")).matches()) {
+            errors.put("phone", "Celular de 9 dígitos que empiece con 9.");
+        }
+        if (r.accessRole() != null && !r.accessRole().isBlank() && r.role() != null
+                && !r.accessRole().equals(r.role().name()) && !permissions.isCustomFor(r.accessRole(), r.role())) {
+            errors.put("accessRole", "Ese rol no corresponde al puesto elegido.");
+        }
         if (!errors.isEmpty()) {
             throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION",
                     "Revisa los campos marcados.", errors);
@@ -134,6 +162,8 @@ public class UserService {
         u.email = r.email().trim().toLowerCase();
         u.fullName = r.fullName().trim();
         u.role = r.role();
+        u.phone = phone(r.phone());
+        u.accessRole = access(r);
         u.passwordHash = encoder.encode(r.password());
         u.active = true;
         u.createdAt = Dates.now();
@@ -160,6 +190,10 @@ public class UserService {
         u.fullName = r.fullName().trim();
         u.email = r.email().trim().toLowerCase();
         u.role = r.role();
+        if (r.phone() != null) u.phone = phone(r.phone());
+        String acc = access(r);
+        if (!Objects.equals(acc, u.accessRole)) changes.add("rol de acceso → " + (acc == null ? u.role.label : permissions.label(acc)));
+        u.accessRole = acc;
         u.updatedAt = Dates.now();
         u.updatedBy = CurrentUser.usernameOrSystem();
         users.save(u);
@@ -172,6 +206,51 @@ public class UserService {
         }
         audit.record("USUARIO", u.id, "EDITAR", changes.isEmpty() ? "Datos revisados sin cambios" : String.join(", ", changes));
         return view(u);
+    }
+
+    private static String phone(String p) {
+        return p == null || p.isBlank() ? null : p.replaceAll("\\s", "");
+    }
+
+    private static String access(UserRequest r) {
+        return r.accessRole() == null || r.accessRole().isBlank() || r.accessRole().equals(r.role().name()) ? null : r.accessRole();
+    }
+
+    // ------------------------------------------------------------------ mi perfil (cada usuario)
+
+    @Transactional
+    public Map<String, Object> updateOwnProfile(ProfileRequest r) {
+        User u = users.findByUsernameIgnoreCase(CurrentUser.usernameOrSystem()).orElseThrow(() -> ApiException.notFound("El usuario"));
+        Map<String, String> errors = new LinkedHashMap<>();
+        if (r.fullName() == null || r.fullName().trim().length() < 3) errors.put("fullName", "Ingresa nombres y apellidos.");
+        if (r.email() == null || !EMAIL.matcher(r.email().trim()).matches()) errors.put("email", "Ingresa un correo válido.");
+        else users.findByEmailIgnoreCase(r.email().trim()).ifPresent(o -> { if (!o.id.equals(u.id)) errors.put("email", "Ese correo ya pertenece a otra cuenta."); });
+        if (r.phone() != null && !r.phone().isBlank() && !PHONE.matcher(r.phone().replaceAll("\\s", "")).matches()) errors.put("phone", "Celular de 9 dígitos que empiece con 9.");
+        if (!errors.isEmpty()) throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
+        u.fullName = r.fullName().trim();
+        u.email = r.email().trim().toLowerCase();
+        u.phone = phone(r.phone());
+        u.updatedAt = Dates.now();
+        u.updatedBy = u.username;
+        users.save(u);
+        audit.record("USUARIO", u.id, "PERFIL", "Actualizó sus datos personales");
+        return view(u);
+    }
+
+    /** Cambio de contraseña por el propio usuario: exige la actual. */
+    @Transactional
+    public void changeOwnPassword(PasswordChange r) {
+        User u = users.findByUsernameIgnoreCase(CurrentUser.usernameOrSystem()).orElseThrow(() -> ApiException.notFound("El usuario"));
+        if (r.currentPassword() == null || !encoder.matches(r.currentPassword(), u.passwordHash)) {
+            throw ApiException.field("currentPassword", "La contraseña actual no es correcta.");
+        }
+        PasswordPolicy.check("newPassword", r.newPassword());
+        if (encoder.matches(r.newPassword(), u.passwordHash)) throw ApiException.field("newPassword", "La nueva contraseña debe ser distinta a la actual.");
+        u.passwordHash = encoder.encode(r.newPassword());
+        u.updatedAt = Dates.now();
+        u.updatedBy = u.username;
+        users.save(u);
+        audit.record("USUARIO", u.id, "CAMBIO_CLAVE", "Cambió su contraseña");
     }
 
     private void ensureDentist(User u, String specialty, String cop) {

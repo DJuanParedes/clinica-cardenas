@@ -45,4 +45,30 @@ public class MailNotifier {
             log.warn("No se pudo enviar el correo a {}: {}", to, e.getMessage());
         }
     }
+
+    /** Correo HTML con un adjunto opcional (p. ej. el XML del comprobante). Devuelve false si quedó simulado o falló. */
+    public boolean sendHtml(String to, String subject, String html, String attachmentName, byte[] attachment, String attachmentType) {
+        if (!isConfigured()) {
+            log.info("[correo simulado] Para: {} | Asunto: {} | HTML {} caracteres{}", to, subject, html.length(),
+                    attachmentName == null ? "" : " | adjunto " + attachmentName);
+            return false;
+        }
+        try {
+            JavaMailSender s = sender.getObject();
+            jakarta.mail.internet.MimeMessage msg = s.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper h = new org.springframework.mail.javamail.MimeMessageHelper(msg, true, "UTF-8");
+            h.setTo(to);
+            h.setSubject(subject);
+            h.setText(html.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim(), html);
+            if (attachmentName != null && attachment != null) {
+                h.addAttachment(attachmentName, new org.springframework.core.io.ByteArrayResource(attachment), attachmentType);
+            }
+            s.send(msg);
+            return true;
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo a {}: {}", to, e.getMessage());
+            throw new pe.clinicacardenas.common.ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "CORREO_NO_ENVIADO",
+                    "No se pudo enviar el correo: " + e.getMessage());
+        }
+    }
 }

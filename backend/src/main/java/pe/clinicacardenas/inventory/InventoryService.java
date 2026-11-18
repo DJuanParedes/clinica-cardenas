@@ -14,11 +14,19 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 
-/** Inventario de materiales: stock, entradas, salidas, consumo automático por procedimiento y alertas de stock bajo. */
+/**
+ * Inventario de materiales: stock por lotes con fecha de vencimiento (las salidas consumen primero el lote que vence
+ * antes, FEFO), compras a proveedores que generan el egreso en caja, consumo automático por procedimiento, alertas
+ * de stock bajo y de vencimiento. Todo cambio de stock bloquea la fila del material (SELECT … FOR UPDATE), así dos
+ * personas descontando a la vez no pueden dejar el stock negativo ni perder un movimiento.
+ */
 @Service
 public class InventoryService {
 
     public static final List<String> MOVE_KINDS = List.of("ENTRADA", "SALIDA", "AJUSTE");
+    public static final List<String> CATEGORIES = List.of("INSUMO", "INSTRUMENTAL", "MEDICAMENTO");
+    /** Días de anticipación para avisar que un lote está por vencer. */
+    public static final int EXPIRY_WARNING_DAYS = 60;
 
     private final InventoryItemRepository items;
     private final InventoryMoveRepository moves;
@@ -39,9 +47,20 @@ public class InventoryService {
         this.audit = audit;
     }
 
-    public record ItemRequest(String name, String unit, BigDecimal minStock, BigDecimal initialStock, Boolean active) {}
+    public record ItemRequest(String name, String unit, BigDecimal minStock, BigDecimal initialStock, Boolean active,
+                              String category, String brand, String supplier, BigDecimal unitCost, Boolean tracksExpiry,
+                              String lotCode, java.time.LocalDate expiresOn) {
+        public ItemRequest(String name, String unit, BigDecimal minStock, BigDecimal initialStock, Boolean active) {
+            this(name, unit, minStock, initialStock, active, null, null, null, null, null, null, null);
+        }
+    }
 
-    public record MoveRequest(String kind, BigDecimal quantity, String reason) {}
+    public record MoveRequest(String kind, BigDecimal quantity, String reason, String lotCode, java.time.LocalDate expiresOn,
+                              BigDecimal unitCost) {
+        public MoveRequest(String kind, BigDecimal quantity, String reason) {
+            this(kind, quantity, reason, null, null, null);
+        }
+    }
 
     public record SupplyRequest(Long itemId, BigDecimal quantity) {}
 
@@ -52,6 +71,12 @@ public class InventoryService {
         m.put("items", all);
         m.put("lowCount", all.stream().filter(InventoryItem::isLow).count());
         m.put("recent", recentMoves());
+        List<Map<String, Object>> exp = expiring();
+        m.put("expiring", exp);
+        m.put("expiredCount", exp.stream().filter(x -> Boolean.TRUE.equals(x.get("expired"))).count());
+        m.put("nextExpiry", nextExpiryByItem());
+        m.put("value", jdbc.queryForObject("select coalesce(sum(l.remaining * coalesce(l.unit_cost, i.unit_cost, 0)), 0) from inventory_lots l join inventory_items i on i.id = l.item_id where l.remaining > 0", BigDecimal.class));
+        m.put("pendingRequests", jdbc.queryForObject("select count(*) from supply_requests where status = 'PENDIENTE'", Long.class));
         return m;
     }
 
@@ -62,6 +87,43 @@ public class InventoryService {
                   from inventory_moves m join inventory_items i on i.id = m.item_id
                  order by m.id desc limit 40
                 """);
+    }
+
+    /** Lotes con saldo que ya vencieron o vencen en los próximos 60 días. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> expiring() {
+        java.time.LocalDate today = Dates.today();
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                select l.id, l.item_id as itemId, i.name as item, i.unit, i.brand, l.lot_code as lotCode, l.expires_on as expiresOn,
+                       l.remaining
+                  from inventory_lots l join inventory_items i on i.id = l.item_id
+                 where l.remaining > 0 and l.expires_on is not null and l.expires_on <= ? and i.active = true
+                 order by l.expires_on
+                """, today.plusDays(EXPIRY_WARNING_DAYS));
+        for (Map<String, Object> r : rows) {
+            java.time.LocalDate d = ((java.sql.Date) r.get("expiresOn")).toLocalDate();
+            long days = java.time.temporal.ChronoUnit.DAYS.between(today, d);
+            r.put("days", days);
+            r.put("expired", days < 0);
+        }
+        return rows;
+    }
+
+    private Map<Long, Object> nextExpiryByItem() {
+        Map<Long, Object> m = new HashMap<>();
+        jdbc.query("select item_id, min(expires_on) from inventory_lots where remaining > 0 and expires_on is not null group by item_id",
+                rs -> { m.put(rs.getLong(1), rs.getDate(2).toLocalDate()); });
+        return m;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> lots(Long itemId) {
+        return jdbc.queryForList("""
+                select l.id, l.lot_code as lotCode, l.expires_on as expiresOn, l.quantity, l.remaining, l.unit_cost as unitCost,
+                       l.created_at as createdAt, p.supplier, p.doc_type as docType, p.doc_number as docNumber
+                  from inventory_lots l left join inventory_purchases p on p.id = l.purchase_id
+                 where l.item_id = ? order by (l.remaining > 0) desc, l.expires_on is null, l.expires_on, l.id
+                """, itemId);
     }
 
     public long lowCount() {
@@ -77,11 +139,16 @@ public class InventoryService {
         i.name = name;
         i.unit = r.unit() == null || r.unit().isBlank() ? "unidad" : r.unit().trim();
         i.minStock = nonNegative(r.minStock(), "minStock");
+        applyDetails(i, r);
         i.stock = BigDecimal.ZERO;
         i.createdAt = Dates.now();
         items.save(i);
         BigDecimal initial = nonNegative(r.initialStock(), "initialStock");
-        if (initial.signum() > 0) move(i, "ENTRADA", initial, "Stock inicial", null);
+        if (initial.signum() > 0) {
+            checkExpiry(i, r.expiresOn());
+            Long lot = newLot(i, null, r.lotCode(), r.expiresOn(), initial, i.unitCost);
+            move(i, "ENTRADA", initial, "Stock inicial", null, lot, null, null);
+        }
         audit.record("INVENTARIO", i.id, "CREAR", name);
         return i;
     }
@@ -96,9 +163,95 @@ public class InventoryService {
         if (r.unit() != null && !r.unit().isBlank()) i.unit = r.unit().trim();
         if (r.minStock() != null) i.minStock = nonNegative(r.minStock(), "minStock");
         if (r.active() != null) i.active = r.active();
+        applyDetails(i, r);
         i.updatedAt = Dates.now();
         items.save(i);
         return i;
+    }
+
+    private void applyDetails(InventoryItem i, ItemRequest r) {
+        if (r.category() != null && !r.category().isBlank()) {
+            String c = r.category().trim().toUpperCase();
+            if (!CATEGORIES.contains(c)) throw ApiException.field("category", "Elige insumo, instrumental o medicamento.");
+            i.category = c;
+        }
+        if (r.brand() != null) i.brand = blank(r.brand(), 80);
+        if (r.supplier() != null) i.supplier = blank(r.supplier(), 120);
+        if (r.unitCost() != null) i.unitCost = nonNegative(r.unitCost(), "unitCost");
+        if (r.tracksExpiry() != null) i.tracksExpiry = r.tracksExpiry();
+        else if (i.id == null) i.tracksExpiry = !"INSTRUMENTAL".equals(i.category);
+    }
+
+    private static String blank(String v, int max) {
+        String t = v == null ? null : v.trim();
+        if (t == null || t.isEmpty()) return null;
+        return t.length() > max ? t.substring(0, max) : t;
+    }
+
+    private void checkExpiry(InventoryItem i, java.time.LocalDate expiresOn) {
+        if (expiresOn != null && expiresOn.isBefore(Dates.today())) {
+            throw ApiException.field("expiresOn", "Ese lote ya está vencido: no debe ingresar al inventario (DIGEMID).");
+        }
+        if (i.tracksExpiry && "MEDICAMENTO".equals(i.category) && expiresOn == null) {
+            throw ApiException.field("expiresOn", "Los medicamentos deben registrarse con su fecha de vencimiento.");
+        }
+    }
+
+    private Long newLot(InventoryItem i, Long purchaseId, String lotCode, java.time.LocalDate expiresOn, BigDecimal q, BigDecimal unitCost) {
+        org.springframework.jdbc.support.GeneratedKeyHolder kh = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbc.update(c -> {
+            java.sql.PreparedStatement ps = c.prepareStatement(
+                    "insert into inventory_lots (item_id, purchase_id, lot_code, expires_on, quantity, remaining, unit_cost, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
+                    java.sql.Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, i.id);
+            ps.setObject(2, purchaseId);
+            ps.setString(3, blank(lotCode, 40));
+            ps.setObject(4, expiresOn);
+            ps.setBigDecimal(5, q);
+            ps.setBigDecimal(6, q);
+            ps.setBigDecimal(7, unitCost);
+            ps.setObject(8, Dates.now());
+            return ps;
+        }, kh);
+        return kh.getKey().longValue();
+    }
+
+    /** Descuenta de los lotes: primero el que vence antes (FEFO); los vencidos no se usan en pacientes. Devuelve el primer lote tocado. */
+    private Long consumeLots(InventoryItem i, BigDecimal qty, boolean allowExpired) {
+        BigDecimal left = qty;
+        Long first = null;
+        List<Map<String, Object>> lots = jdbc.queryForList(
+                "select id, remaining, expires_on from inventory_lots where item_id = ? and remaining > 0 order by expires_on is null, expires_on, id for update", i.id);
+        for (Map<String, Object> l : lots) {
+            if (left.signum() <= 0) break;
+            Object exp = l.get("expires_on");
+            if (!allowExpired && exp != null && ((java.sql.Date) exp).toLocalDate().isBefore(Dates.today())) continue;
+            BigDecimal rem = (BigDecimal) l.get("remaining");
+            BigDecimal take = rem.min(left);
+            jdbc.update("update inventory_lots set remaining = remaining - ? where id = ?", take, l.get("id"));
+            if (first == null) first = ((Number) l.get("id")).longValue();
+            left = left.subtract(take);
+        }
+        // Stock sin lote (registros antiguos): se descuenta igual del total
+        return first;
+    }
+
+    /** Ingreso de un lote comprado (lo usa la compra a proveedor). El material ya viene bloqueado. */
+    void receive(InventoryItem i, Long purchaseId, BigDecimal q, BigDecimal unitCost, String lotCode, java.time.LocalDate expiresOn, String reason) {
+        if (i.tracksExpiry && "MEDICAMENTO".equals(i.category) && expiresOn == null) {
+            throw ApiException.field("lines", i.name + ": los medicamentos se registran con su fecha de vencimiento.");
+        }
+        Long lot = newLot(i, purchaseId, lotCode, expiresOn, q, unitCost);
+        move(i, "ENTRADA", q, reason, null, lot, purchaseId, null);
+    }
+
+    /** Entrega de una solicitud del odontólogo: salida FEFO sin usar lotes vencidos. */
+    void deliver(InventoryItem i, BigDecimal q, Long requestId, String reason) {
+        if (i.stock.compareTo(q) < 0) {
+            throw ApiException.field("quantity", "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
+        }
+        Long lot = consumeLots(i, q, false);
+        move(i, "SALIDA", q.negate(), reason, null, lot, null, requestId);
     }
 
     @Transactional
@@ -141,11 +294,25 @@ public class InventoryService {
             throw ApiException.field("quantity", "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
         }
         String reason = r.reason() == null || r.reason().isBlank() ? null : r.reason().trim();
-        move(i, kind, delta, reason, null);
+        if ("SALIDA".equals(kind) && reason == null) throw ApiException.field("reason", "Indica el motivo de la salida (merma, vencido, préstamo…).");
+        Long lot = null;
+        if (delta.signum() > 0) {
+            checkExpiry(i, r.expiresOn());
+            lot = newLot(i, null, r.lotCode(), r.expiresOn(), delta, r.unitCost() != null ? r.unitCost() : i.unitCost);
+        } else if (delta.signum() < 0) {
+            // Una salida manual puede retirar lotes vencidos (para darlos de baja); el consumo clínico no.
+            lot = consumeLots(i, delta.abs(), true);
+        }
+        move(i, kind, delta, reason, null, lot, null, null);
         return Map.of("item", i, "message", "Movimiento registrado.");
     }
 
     private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId) {
+        move(i, kind, delta, reason, treatmentItemId, null, null, null);
+    }
+
+    private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId,
+                      Long lotId, Long purchaseId, Long requestId) {
         i.stock = i.stock.add(delta).setScale(2, RoundingMode.HALF_UP);
         i.updatedAt = Dates.now();
         items.save(i);
@@ -156,6 +323,9 @@ public class InventoryService {
         m.stockAfter = i.stock;
         m.reason = reason;
         m.treatmentItemId = treatmentItemId;
+        m.lotId = lotId;
+        m.purchaseId = purchaseId;
+        m.requestId = requestId;
         m.createdAt = Dates.now();
         m.createdBy = CurrentUser.usernameOrSystem();
         moves.save(m);
@@ -212,7 +382,8 @@ public class InventoryService {
                     why = (why == null ? "" : why + " · ") + "stock insuficiente: faltaron "
                             + q.subtract(used).stripTrailingZeros().toPlainString() + " " + i.unit;
                 }
-                move(i, "CONSUMO", used.negate(), why, e.treatmentItemId());
+                Long lot = used.signum() > 0 ? consumeLots(i, used, false) : null;
+                move(i, "CONSUMO", used.negate(), why, e.treatmentItemId(), lot, null, null);
             });
         }
     }

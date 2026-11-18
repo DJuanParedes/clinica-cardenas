@@ -29,6 +29,31 @@ public class Patient {
     public String email;
     public String address;
     public String district;
+    /** Código UBIGEO (INEI) del distrito y nombres de su departamento y provincia. */
+    public String ubigeo;
+    public String department;
+    public String province;
+    @Column(name = "emergency_contact_relationship")
+    public String emergencyContactRelationship;
+    /** Menores de 18 años: representante legal (padre, madre o tutor) que decide y firma por el paciente. */
+    @Column(name = "guardian_name")
+    public String guardianName;
+    @Column(name = "guardian_doc_type")
+    public String guardianDocType;
+    @Column(name = "guardian_doc_number")
+    public String guardianDocNumber;
+    @Column(name = "guardian_relationship")
+    public String guardianRelationship;
+    @Column(name = "guardian_phone")
+    public String guardianPhone;
+    @Column(name = "consent_version")
+    public String consentVersion;
+    @Column(name = "consent_channel")
+    public String consentChannel;
+    @Column(name = "consent_by")
+    public String consentBy;
+    @Column(name = "consent_file_id")
+    public Long consentFileId;
     @Column(name = "emergency_contact_name")
     public String emergencyContactName;
     @Column(name = "emergency_contact_phone")
@@ -48,6 +73,12 @@ public class Patient {
     /** Paciente de ejemplo creado al instalar (no recibe mensajes reales). */
     @Column(name = "demo")
     public boolean demo;
+
+    /** Menor de 18 años (Código Civil): requiere representante legal. */
+    public boolean isMinor() {
+        Integer a = getAge();
+        return a != null && a < 18;
+    }
 
     @Column(name = "created_at")
     public LocalDateTime createdAt;

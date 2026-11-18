@@ -170,6 +170,13 @@ public class ConversationService {
         return null;
     }
 
+    private BookingFlow booking;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setBooking(BookingFlow booking) {
+        this.booking = booking;
+    }
+
     /** Mensaje entrante del paciente (lo reenvía el microservicio de notificaciones). Devuelve la respuesta a enviar. */
     public Map<String, Object> inbound(CareService.ReplyRequest r) {
         String phone = phone(r.telefono());
@@ -177,6 +184,25 @@ public class ConversationService {
         if (phone == null || text.isEmpty()) return Map.of("accion", "IGNORADO");
         Map<String, Object> t = ensureThread(phone);
         record(phone, "IN", "PACIENTE", text, null, null, null, null);
+
+        // Reserva por WhatsApp en curso: los números que escribe son opciones de fecha/hora, no "1 confirma / 2 reprograma".
+        Long bookingPid = t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue();
+        if (booking != null && silenceReason(t) == null && booking.active(bookingPid)) {
+            String reply;
+            try {
+                reply = booking.handle(bookingPid, text);
+            } catch (RuntimeException e) {
+                log.warn("Reserva por WhatsApp falló para {}: {}", phone, e.toString());
+                jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
+                reply = "Tuve un problema al revisar la agenda. Recepción te escribirá para terminar tu reserva.";
+            }
+            record(phone, "OUT", "IA", reply, "RESERVA", "agenda", "ENVIADO", null);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("accion", "ASISTENTE");
+            out.put("intencion", "RESERVA");
+            out.put("respuesta", reply);
+            return out;
+        }
 
         // "1" confirma y "2" pide reprogramar: lo resuelve la agenda como siempre.
         Map<String, Object> agendaReply = care.whatsappReply(r);

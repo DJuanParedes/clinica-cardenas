@@ -84,7 +84,7 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
   // ---------------------------------------------------------------- preparación: paciente con plan
   const dni = randDni();
   const birth = '1990-06-15';
-  const patRes = await api('POST', '/api/patients', { docType: 'DNI', docNumber: dni, firstName: 'Prueba', lastName: 'Completa ' + tag,
+  const patRes = await api('POST', '/api/patients', { dataConsent: true, docType: 'DNI', docNumber: dni, firstName: 'Prueba', lastName: 'Completa ' + tag,
     birthDate: birth, sex: 'F', phone: '987' + uid.slice(0, 6), email: 'prueba' + uid + '@correo.pe', district: 'Chaclacayo' }, recep);
   if (patRes.status !== 201) throw new Error('No se pudo crear el paciente de prueba: ' + JSON.stringify(patRes.body));
   const pat = patRes.body;
@@ -250,7 +250,7 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     expectStatus(await api('POST', '/api/portal/auth/activate', { docType: 'DNI', docNumber: dni, code: '000000', password: 'MiClave2026' }), 400, 'código incorrecto');
     const weak = await api('POST', '/api/portal/auth/activate', { docType: 'DNI', docNumber: dni, code: c.body.demoCode, password: 'corta' });
     expectStatus(weak, 400, 'contraseña débil');
-    const ok = await api('POST', '/api/portal/auth/activate', { docType: 'DNI', docNumber: dni, code: c.body.demoCode, password: 'MiClave2026' });
+    const ok = await api('POST', '/api/portal/auth/activate', { docType: 'DNI', docNumber: dni, code: c.body.demoCode, password: 'MiClave2026', dataConsent: true });
     expectStatus(ok, 200, 'activar'); pacToken = ok.body.token;
     expectStatus(await api('POST', '/api/portal/auth/login', { docType: 'DNI', docNumber: dni, password: 'mala' }), 401, 'contraseña incorrecta');
     expectStatus(await api('POST', '/api/portal/auth/login', { docType: 'DNI', docNumber: dni, password: 'MiClave2026' }), 200, 'login');
@@ -320,7 +320,7 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     expect(!n.some((x) => x.type === 'RECORDATORIO' && x.operation === 'PROGRAMAR' && x.status === 'PROGRAMADO'), 'quedó un recordatorio activo');
   });
   await check('HU-23', 'Preferencia de canal: sin correo no se puede elegir correo', async () => {
-    const p2 = (await api('POST', '/api/patients', { docType: 'DNI', docNumber: randDni(), firstName: 'Sin', lastName: 'Correo ' + tag, birthDate: '1985-01-01', sex: 'M', phone: '912345678' }, recep)).body;
+    const p2 = (await api('POST', '/api/patients', { dataConsent: true, docType: 'DNI', docNumber: randDni(), firstName: 'Sin', lastName: 'Correo ' + tag, birthDate: '1985-01-01', sex: 'M', phone: '912345678' }, recep)).body;
     expectStatus(await api('PATCH', `/api/patients/${p2.id}/notification-channel`, { channel: 'EMAIL' }, recep), 400, 'correo sin email');
     const r = await api('PATCH', `/api/patients/${p2.id}/notification-channel`, { channel: 'NINGUNO' }, recep);
     expect(r.status === 200 && r.body.notifyChannel === 'NINGUNO', 'canal');

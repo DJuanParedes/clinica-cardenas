@@ -1,4 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ModalComponent } from '../shared/modal.component';
 import { Api, PermissionMatrix } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
@@ -11,15 +13,16 @@ interface Group { name: string; perms: { code: string; label: string }[]; }
 @Component({
   selector: 'app-roles',
   standalone: true,
-  imports: [IconComponent],
+  imports: [IconComponent, FormsModule, ModalComponent],
   template: `
     <div class="page wide">
       <div class="page-head">
         <div>
           <h1>Roles y permisos</h1>
-          <p class="sub">Marca qué puede hacer cada rol. El cambio rige al instante, también en el servidor.</p>
+          <p class="sub">Marca qué puede hacer cada rol. Además de los 5 puestos base puedes crear roles propios (p. ej. "Asistente dental" o "Recepción sin caja") y asignarlos en Usuarios y accesos.</p>
         </div>
         <div class="actions">
+          <button class="btn" type="button" (click)="openNew()"><app-icon name="plus" [size]="16" /> Nuevo rol</button>
           @if (dirtyRoles.length) {
             <button class="btn" type="button" (click)="discard()">Descartar</button>
             <button class="btn primary" type="button" (click)="saveAll()" [disabled]="saving">
@@ -42,6 +45,10 @@ interface Group { name: string; perms: { code: string; label: string }[]; }
                     <div class="rn">{{ r.label }}</div>
                     <div class="muted small">{{ r.users }} {{ r.users === 1 ? 'persona' : 'personas' }}</div>
                     @if (r.locked) { <span class="tag plain grey small"><app-icon name="lock" [size]="12" /> Todos</span> }
+                    @if (r.custom) {
+                      <div class="muted small">basado en {{ r.baseRoleLabel }}</div>
+                      <button type="button" class="btn sm ghost del" (click)="remove(r)" [disabled]="r.users > 0" [attr.title]="r.users > 0 ? 'Tiene usuarios asignados' : 'Eliminar rol'"><app-icon name="x" [size]="12" /> Eliminar</button>
+                    }
                   </th>
                 }
               </tr>
@@ -73,6 +80,21 @@ interface Group { name: string; perms: { code: string; label: string }[]; }
         </p>
       }
     </div>
+
+    <app-modal [open]="newOpen" title="Nuevo rol" subtitle="Parte de los permisos de un puesto base; luego ajústalos en la matriz." (close)="newOpen = false">
+      <form class="stack" (ngSubmit)="create()">
+        <div class="field"><label class="req" for="rn">Nombre del rol</label><input id="rn" class="input" name="rn" [(ngModel)]="nf.name" maxlength="60" placeholder="Asistente dental" /></div>
+        <div class="field"><label class="req" for="rb">Puesto base</label>
+          <select id="rb" class="input" name="rb" [(ngModel)]="nf.baseRole"><option value="">Seleccionar…</option>
+            <option value="RECEPCION">Recepcionista</option><option value="ODONTOLOGO">Odontólogo</option><option value="CAJA">Responsable de caja</option><option value="DIRECTOR">Director de la clínica</option></select>
+          <span class="muted small">El puesto define cómo funciona la cuenta (por ejemplo, un odontólogo tiene agenda propia); el rol define qué puede ver y hacer.</span></div>
+        <div class="field"><label for="rd">Descripción</label><input id="rd" class="input" name="rd" [(ngModel)]="nf.description" maxlength="255" /></div>
+      </form>
+      <ng-container modal-actions>
+        <button class="btn" type="button" (click)="newOpen = false">Cancelar</button>
+        <button class="btn primary" type="button" (click)="create()" [disabled]="saving || !nf.name || !nf.baseRole">Crear rol</button>
+      </ng-container>
+    </app-modal>
   `,
   styles: [`
     .matrix { overflow-x: auto; }
@@ -88,6 +110,7 @@ interface Group { name: string; perms: { code: string; label: string }[]; }
     .box.locked { cursor: not-allowed; }
     .box input { width: 18px; height: 18px; accent-color: var(--teal); cursor: inherit; }
     .code { font-family: ui-monospace, monospace; font-size: 11px; }
+    .del { margin-top: 4px; font-size: 12px; }
     .note { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; max-width: 900px; }
   `],
 })
@@ -102,6 +125,23 @@ export class RolesComponent implements OnInit {
   saving = false;
 
   ngOnInit() { this.load(); }
+
+  newOpen = false;
+  nf = { name: '', baseRole: '', description: '' };
+  openNew() { this.nf = { name: '', baseRole: '', description: '' }; this.newOpen = true; }
+  create() {
+    this.saving = true;
+    this.api.createRole(this.nf).subscribe({
+      next: (m) => { this.saving = false; this.newOpen = false; this.apply(m); this.toast.ok('Rol creado. Ajusta sus permisos y guarda.'); },
+      error: (e) => { this.saving = false; const a = apiError(e); this.toast.error(a.fields ? Object.values(a.fields)[0] : a.message); },
+    });
+  }
+  remove(r: any) {
+    this.api.deleteRole(r.code).subscribe({
+      next: (m) => { this.apply(m); this.toast.ok('Rol eliminado.'); },
+      error: (e) => this.toast.error(apiError(e).message),
+    });
+  }
 
   load() {
     this.api.permissions().subscribe((m) => this.apply(m));

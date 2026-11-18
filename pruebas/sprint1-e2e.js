@@ -135,7 +135,7 @@ async function sprint1E2E(BASE, SUNAT = BASE.replace(/:(\d+)$/, (m, p) => ':' + 
   // ---------------------------------------------------------------- HU-01 / HU-02 / HU-03 pacientes
   const dni = randDni();
   let patient;
-  const patientBody = { docType: 'DNI', docNumber: dni, firstName: 'lucía fernanda', lastName: 'ñahui céspedes', birthDate: '1990-04-12', sex: 'F', phone: '987 111 222', email: 'lucia' + uid + '@correo.pe', district: 'Chaclacayo' };
+  const patientBody = { dataConsent: true, docType: 'DNI', docNumber: dni, firstName: 'lucía fernanda', lastName: 'ñahui céspedes', birthDate: '1990-04-12', sex: 'F', phone: '987 111 222', email: 'lucia' + uid + '@correo.pe', district: 'Chaclacayo' };
   await check('HU-01', 'Registrar paciente con DNI válido', async () => {
     const r = await api('POST', '/api/patients', patientBody, recep);
     expectStatus(r, 201, 'registrar'); patient = r.body;

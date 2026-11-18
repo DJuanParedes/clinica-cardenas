@@ -25,6 +25,18 @@ public class RoleController {
         return service.matrix();
     }
 
+    @PostMapping("/roles")
+    @PreAuthorize("hasAuthority('ROLES')")
+    public Map<String, Object> create(@RequestBody PermissionService.NewRole r) {
+        return service.createRole(r);
+    }
+
+    @DeleteMapping("/roles/{code}")
+    @PreAuthorize("hasAuthority('ROLES')")
+    public Map<String, Object> delete(@PathVariable String code) {
+        return service.deleteRole(code);
+    }
+
     @PutMapping("/{role}")
     @PreAuthorize("hasAuthority('ROLES')")
     public Map<String, Object> update(@PathVariable String role, @RequestBody UpdateRequest req) {

@@ -36,7 +36,7 @@ async function asistenteE2E(BASE, WEBHOOK_TOKEN = 'token-webhook-clinica-cardena
 
   // Paciente de prueba con una cita en los próximos días.
   const tel = '9' + String(10000000 + Math.floor(Math.random() * 89999999));
-  const p = (await api('POST', '/api/patients', { docType: 'DNI', docNumber: String(60000000 + Math.floor(Math.random() * 9999999)),
+  const p = (await api('POST', '/api/patients', { dataConsent: true, docType: 'DNI', docNumber: String(60000000 + Math.floor(Math.random() * 9999999)),
     firstName: 'Asistente', lastName: 'Prueba Ia', birthDate: '1990-01-01', sex: 'F', phone: tel, district: 'Chaclacayo' }, recep)).body;
   const ds = (await api('GET', '/api/dentists', undefined, recep)).body;
   let cita = null;

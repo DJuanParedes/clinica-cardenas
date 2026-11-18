@@ -78,7 +78,12 @@ import { LogoComponent } from '../shared/logo.component';
               <label for="c">Código de verificación</label>
               <input id="c" name="code" class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6"
                      autocomplete="one-time-code" placeholder="000000" />
-              <span class="muted small">Abre tu app de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de 6 dígitos.</span>
+              @if (codeMethod === 'CORREO') {
+                <span class="muted small">{{ codeHint || 'Te enviamos un código de 6 dígitos a tu correo.' }} Vence en 10 minutos.</span>
+                <button type="button" class="btn sm ghost" (click)="resend()" [disabled]="loading">Enviar otro código</button>
+              } @else {
+                <span class="muted small">Abre tu app de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de 6 dígitos.</span>
+              }
             </div>
           }
           <button class="btn primary lg block" type="submit" [disabled]="loading">
@@ -151,6 +156,9 @@ export class LoginComponent {
   error = '';
   locked = false;
   needCode = false;
+  codeMethod = 'APP';
+  codeHint = '';
+  resend() { this.code = ''; this.needCode = false; this.submit(); }
   code = '';
 
   demo = [
@@ -175,7 +183,12 @@ export class LoginComponent {
         const err = apiError(e);
         this.loading = false;
         this.locked = err.code === 'CUENTA_BLOQUEADA';
-        if (err.code === 'REQUIERE_2FA') { this.needCode = true; this.error = ''; return; }
+        if (err.code === 'REQUIERE_2FA') {
+          this.needCode = true; this.error = '';
+          this.codeMethod = err.fields?.['method'] || 'APP';
+          this.codeHint = this.codeMethod === 'CORREO' ? err.message : '';
+          return;
+        }
         if (err.code === 'CODIGO_2FA_INVALIDO') { this.code = ''; this.error = err.message; return; }
         this.error = err.status === 0 ? 'No hay conexión con el servidor.' : err.message;
         this.password = '';

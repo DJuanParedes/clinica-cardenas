@@ -133,6 +133,8 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public List<Appointment> range(LocalDate from, LocalDate to, Long dentistId) {
+        if (to.isBefore(from)) throw pe.clinicacardenas.common.ApiException.field("to", "La fecha final debe ser posterior a la inicial.");
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) > 62) throw pe.clinicacardenas.common.ApiException.field("to", "Consulta como máximo dos meses a la vez.");
         return appointments.findInRange(from.atStartOfDay(), to.plusDays(1).atStartOfDay(), dentistId);
     }
 

@@ -236,7 +236,15 @@ public class ClinicalService {
 
     // ------------------------------------------------------------------ HU-06 plan y evolución
 
+    private PromotionService promotions;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setPromotions(PromotionService promotions) {
+        this.promotions = promotions;
+    }
+
     public List<Procedure> procedures() {
+        if (promotions != null) return promotions.catalog(false);
         return procedures.findByActiveTrueOrderByCategoryAscNameAsc();
     }
 
@@ -282,9 +290,19 @@ public class ClinicalService {
         if (r.tooth() != null && !OdontogramRules.isValidTooth(r.tooth())) {
             throw ApiException.field("items", "La pieza " + r.tooth() + " no existe en la notación FDI.");
         }
-        BigDecimal price = r.price() == null ? proc.price : r.price();
+        BigDecimal price = r.price();
+        PromotionService.Applied promo = null;
+        if (price == null && promotions != null) {
+            promo = promotions.priceFor(proc, Dates.today());
+            price = promo.price();
+        }
+        if (price == null) price = proc.price;
         if (price.signum() < 0) throw ApiException.field("items", "El precio no puede ser negativo.");
         TreatmentItem i = new TreatmentItem();
+        if (promo != null && promo.promotionId() != null) {
+            i.listPrice = promo.listPrice();
+            i.promotionId = promo.promotionId();
+        }
         i.planId = planId;
         i.procedure = proc;
         i.tooth = r.tooth();

@@ -22,8 +22,8 @@ export class Api {
   dashboard(): Observable<any> { return this.http.get('/api/dashboard'); }
 
   // ---------- pacientes (HU-01, HU-02, HU-03)
-  searchPatients(q: string, page = 0, size = 20): Observable<Page<Patient>> {
-    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size }) });
+  searchPatients(q: string, page = 0, size = 20, mine = false): Observable<Page<Patient>> {
+    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: mine ? 'true' : undefined }) });
   }
   patient(id: number): Observable<{ patient: Patient; nextAppointment?: Appointment; lastVisit?: Appointment; appointmentsCount: number }> {
     return this.http.get<any>(`/api/patients/${id}`);
@@ -31,6 +31,39 @@ export class Api {
   checkDocument(type: string, number: string, excludeId?: number): Observable<{ exists: boolean; patient?: { id: number; fullName: string } }> {
     return this.http.get<any>('/api/patients/check-document', { params: params({ type, number, excludeId }) });
   }
+  emailInvoice(id: number, email: string): Observable<any> { return this.http.post<any>(`/api/billing/invoices/${id}/email`, { email: email || null }); }
+  cashDay(date: string): Observable<any> { return this.http.get<any>('/api/cash/day', { params: params({ date }) }); }
+  // inventario: lotes, compras, solicitudes
+  inventoryLots(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/lots`); }
+  purchases(from?: string, to?: string): Observable<any[]> { return this.http.get<any[]>('/api/inventory/purchases', { params: params({ from, to }) }); }
+  purchase(id: number): Observable<any> { return this.http.get<any>(`/api/inventory/purchases/${id}`); }
+  createPurchase(body: any): Observable<any> { return this.http.post<any>('/api/inventory/purchases', body); }
+  payPurchase(id: number, body: any): Observable<any> { return this.http.post<any>(`/api/inventory/purchases/${id}/pay`, body); }
+  supplyCatalog(): Observable<any[]> { return this.http.get<any[]>('/api/supply-requests/catalog'); }
+  supplyRequests(status?: string, mine = false): Observable<any[]> { return this.http.get<any[]>('/api/supply-requests', { params: params({ status, mine: mine ? 'true' : undefined }) }); }
+  createSupplyRequest(body: any): Observable<any> { return this.http.post<any>('/api/supply-requests', body); }
+  answerSupplyRequest(id: number, body: any): Observable<any> { return this.http.post<any>(`/api/supply-requests/${id}/answer`, body); }
+  cancelSupplyRequest(id: number): Observable<any> { return this.http.post<any>(`/api/supply-requests/${id}/cancel`, {}); }
+  // catálogo y promociones
+  catalogProcedures(all = false): Observable<any[]> { return this.http.get<any[]>('/api/catalog/procedures', { params: params({ all: all ? 'true' : undefined }) }); }
+  saveProcedure(id: number | null, body: any): Observable<any> { return id ? this.http.put<any>(`/api/catalog/procedures/${id}`, body) : this.http.post<any>('/api/catalog/procedures', body); }
+  promotions(): Observable<any[]> { return this.http.get<any[]>('/api/catalog/promotions'); }
+  savePromotion(id: number | null, body: any): Observable<any[]> { return id ? this.http.put<any[]>(`/api/catalog/promotions/${id}`, body) : this.http.post<any[]>('/api/catalog/promotions', body); }
+  // mi perfil y roles personalizados
+  myProfile(): Observable<any> { return this.http.get<any>('/api/me/profile'); }
+  updateMyProfile(body: any): Observable<any> { return this.http.put<any>('/api/me/profile', body); }
+  changeMyPassword(body: any): Observable<any> { return this.http.post<any>('/api/me/password', body); }
+  createRole(body: any): Observable<any> { return this.http.post<any>('/api/permissions/roles', body); }
+  deleteRole(code: string): Observable<any> { return this.http.delete<any>(`/api/permissions/roles/${code}`); }
+  start2faEmail(): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/start', {}); }
+  enable2faEmail(code: string): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/enable', { code }); }
+  myEarnings(from: string, to: string): Observable<any> { return this.http.get<any>('/api/me/earnings', { params: params({ from, to }) }); }
+  legal(code: string): Observable<{ code: string; version: string; title: string; body: string; publishedAt: string }> { return this.http.get<any>(`/api/public/legal/${code}`); }
+  patientConsents(id: number): Observable<any> { return this.http.get<any>(`/api/patients/${id}/consents`); }
+  uploadSignedConsent(id: number, file: File): Observable<any> { const fd = new FormData(); fd.append('file', file); return this.http.post<any>(`/api/patients/${id}/consents/signed`, fd); }
+  dniConfig(): Observable<{ enabled: boolean }> { return this.http.get<{ enabled: boolean }>('/api/lookup/dni-config'); }
+  lookupDni(dni: string): Observable<{ firstName: string; lastName: string; source: string }> { return this.http.get<any>(`/api/lookup/dni/${dni}`); }
+  ubigeo(): Observable<UbigeoDep[]> { return this.http.get<UbigeoDep[]>('/ubigeo.json'); }
   createPatient(body: any): Observable<Patient> { return this.http.post<Patient>('/api/patients', body); }
   updatePatient(id: number, body: any): Observable<Patient> { return this.http.put<Patient>(`/api/patients/${id}`, body); }
   patientAppointments(id: number): Observable<Appointment[]> { return this.http.get<Appointment[]>(`/api/patients/${id}/appointments`); }
@@ -44,6 +77,9 @@ export class Api {
   }
   day(date: string, dentistId?: number): Observable<{ columns: { dentist: Dentist; blocks: Block[] }[]; appointments: Appointment[]; counts: Record<string, number> }> {
     return this.http.get<any>('/api/agenda/day', { params: params({ date, dentistId }) });
+  }
+  appointmentsRange(from: string, to: string, dentistId?: number): Observable<Appointment[]> {
+    return this.http.get<Appointment[]>('/api/appointments', { params: params({ from, to, dentistId }) });
   }
   appointment(id: number): Observable<Appointment> { return this.http.get<Appointment>(`/api/appointments/${id}`); }
   createAppointment(body: any): Observable<Appointment> { return this.http.post<Appointment>('/api/appointments', body); }
@@ -185,7 +221,7 @@ export class Api {
   removeInventoryImage(id: number): Observable<InventoryItem> { return this.http.delete<InventoryItem>(`/api/inventory/${id}/image`); }
   dentistPhoto(id: number, file: File): Observable<Dentist> { const fd = new FormData(); fd.append('file', file); return this.http.post<Dentist>(`/api/dentists/${id}/photo`, fd); }
   removeDentistPhoto(id: number): Observable<Dentist> { return this.http.delete<Dentist>(`/api/dentists/${id}/photo`); }
-  inventoryMove(id: number, body: { kind: string; quantity: number; reason: string }): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
+  inventoryMove(id: number, body: any): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
   inventoryMoves(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/moves`); }
   supplies(): Observable<any[]> { return this.http.get<any[]>('/api/inventory/supplies'); }
   saveSupplies(procedureId: number, list: { itemId: number; quantity: number }[]): Observable<any> { return this.http.put(`/api/inventory/supplies/${procedureId}`, list); }
@@ -245,7 +281,8 @@ export interface PatientFile {
   sharedWithPatient: boolean; signedAt?: string; createdAt: string; createdBy: string; image?: boolean;
 }
 
-export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; imageUrl?: string | null; }
+export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; imageUrl?: string | null;
+  category?: string; brand?: string | null; supplier?: string | null; unitCost?: number | null; tracksExpiry?: boolean; }
 
 export interface Installments {
   planId: number; total: number; paid: number;
@@ -254,7 +291,7 @@ export interface Installments {
 
 export interface PermissionMatrix {
   permissions: { code: string; group: string; label: string }[];
-  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number }[];
+  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number; custom?: boolean; baseRole?: string; baseRoleLabel?: string; description?: string }[];
 }
 
 export interface Payment {
@@ -343,3 +380,8 @@ export interface OnlineCharge {
   mpPaymentId: string | null; mpStatus: string | null; mpStatusDetail: string | null; method: string | null;
   paymentId: number | null; expiresAt: string; createdAt: string; source: string; testMode: boolean;
 }
+
+/** [código, nombre, hijos] — departamentos → provincias → distritos (INEI). */
+export type UbigeoDist = [string, string];
+export type UbigeoProv = [string, string, UbigeoDist[]];
+export type UbigeoDep = [string, string, UbigeoProv[]];

@@ -273,3 +273,5 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   body { background: #fff; }
   .no-print { display: none !important; }
 }
+.teal-ink { color: var(--teal-strong); }
+.input.search { max-width: 360px; }
