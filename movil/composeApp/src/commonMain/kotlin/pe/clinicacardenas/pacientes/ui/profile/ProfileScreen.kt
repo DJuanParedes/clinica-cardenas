@@ -49,9 +49,21 @@ fun ProfileScreen(vm: ProfileViewModel = koinViewModel()) {
         Panel {
             Text(patient.fullName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Brand.Tinta)
             Text("${if (patient.docType == "PAS") "Pasaporte" else patient.docType} ${patient.docNumber}", color = Brand.Tinta2)
-            patient.phone?.let { Text("Celular: $it", color = Brand.Tinta2) }
-            patient.email?.let { Text("Correo: $it", color = Brand.Tinta2) }
-            Text("¿Algún dato cambió? Avísanos en recepción para actualizarlo.", color = Brand.Gris, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+            if (!s.editing) {
+                patient.phone?.let { Text("Celular: $it", color = Brand.Tinta2) }
+                patient.email?.let { Text("Correo: $it", color = Brand.Tinta2) }
+                androidx.compose.material3.TextButton(onClick = vm::startEdit) { Text("✏️ Cambiar celular o correo") }
+            } else {
+                pe.clinicacardenas.pacientes.ui.components.Field(value = s.phone, onChange = vm::editPhone, label = "Celular",
+                    keyboard = androidx.compose.ui.text.input.KeyboardType.Number, error = s.errors["phone"])
+                pe.clinicacardenas.pacientes.ui.components.Field(value = s.email, onChange = vm::editEmail, label = "Correo",
+                    keyboard = androidx.compose.ui.text.input.KeyboardType.Email, error = s.errors["email"])
+                androidx.compose.foundation.layout.Row {
+                    androidx.compose.material3.TextButton(onClick = vm::cancelEdit) { Text("Cancelar") }
+                    pe.clinicacardenas.pacientes.ui.components.PrimaryButton("Guardar", vm::saveContact, loading = s.busy)
+                }
+            }
+            Text("Tu nombre, documento y fecha de nacimiento son los de tu DNI (RENIEC); si hay un error, corrígelo en recepción.", color = Brand.Gris, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
         }
 
         SectionTitle("¿Por dónde te avisamos?")

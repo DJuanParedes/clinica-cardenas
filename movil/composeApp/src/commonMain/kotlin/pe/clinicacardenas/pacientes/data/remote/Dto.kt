@@ -196,3 +196,47 @@ data class PromoDto(
 /** Documento legal vigente (/api/public/legal/{code}). */
 @Serializable
 data class LegalDto(val code: String, val version: String, val title: String, val body: String)
+
+// ---------- Mi historia: tratamientos, pagos y ficha (/api/portal/treatments)
+@Serializable
+data class PortalItemDto(val id: Long, val procedure: String, val tooth: Int? = null, val price: Double = 0.0, val status: String = "",
+                         val doneAt: String? = null, val doneBy: String? = null, val paid: Double = 0.0, val balance: Double = 0.0)
+
+@Serializable
+data class PortalSessionDto(val date: String? = null, val notes: String? = null, val dentist: String? = null, val procedure: String? = null)
+
+@Serializable
+data class PortalPlanDto(val id: Long, val title: String, val status: String = "", val createdAt: String? = null, val dentist: String? = null,
+                         val items: List<PortalItemDto> = emptyList(), val sessions: List<PortalSessionDto> = emptyList(),
+                         val total: Double = 0.0, val paid: Double = 0.0, val balance: Double = 0.0, val doneCount: Int = 0, val itemCount: Int = 0)
+
+@Serializable
+data class PortalPaymentDto(val id: Long, val paidAt: String? = null, val amount: Double = 0.0, val method: String = "", val status: String = "", val procedure: String? = null)
+
+@Serializable
+data class PortalVisitDto(val date: String? = null, val reason: String? = null, val status: String = "", val dentist: String? = null)
+
+@Serializable
+data class ClinicalSummaryDto(val allergies: String? = null, val medication: String? = null, val background: String? = null, val bloodType: String? = null, val updatedAt: String? = null)
+
+@Serializable
+data class TreatmentsDto(val plans: List<PortalPlanDto> = emptyList(), val total: Double = 0.0, val paid: Double = 0.0, val balance: Double = 0.0,
+                         val payments: List<PortalPaymentDto> = emptyList(), val visits: List<PortalVisitDto> = emptyList(), val clinical: ClinicalSummaryDto? = null)
+
+// ---------- consentimientos y archivos solicitados
+@Serializable
+data class ConsentRecordDto(val id: Long, val code: String, val version: String = "", val channel: String? = null, val acceptedBy: String? = null,
+                            val acceptedAt: String? = null, val fileId: Long? = null, val title: String? = null)
+
+@Serializable
+data class ConsentsDto(val records: List<ConsentRecordDto> = emptyList(), val signedFileId: Long? = null)
+
+@Serializable
+data class FileRequestDto(val id: Long, val title: String, val description: String? = null, val kind: String = "", val status: String = "",
+                          val dueDate: String? = null, val fileId: Long? = null, val planTitle: String? = null, val requestedAt: String? = null)
+
+@Serializable
+data class ContactRequest(val phone: String, val email: String)
+
+@Serializable
+data class ContactResult(val phone: String = "", val email: String = "", val message: String = "")
