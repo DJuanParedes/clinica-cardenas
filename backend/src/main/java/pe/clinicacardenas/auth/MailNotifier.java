@@ -48,9 +48,15 @@ public class MailNotifier {
 
     /** Correo HTML con un adjunto opcional (p. ej. el XML del comprobante). Devuelve false si quedó simulado o falló. */
     public boolean sendHtml(String to, String subject, String html, String attachmentName, byte[] attachment, String attachmentType) {
+        java.util.Map<String, byte[]> m = new java.util.LinkedHashMap<>();
+        if (attachmentName != null && attachment != null) m.put(attachmentName, attachment);
+        return sendHtml(to, subject, html, m);
+    }
+
+    /** Correo HTML con varios adjuntos (nombre → contenido; el tipo se deduce de la extensión). */
+    public boolean sendHtml(String to, String subject, String html, java.util.Map<String, byte[]> attachments) {
         if (!isConfigured()) {
-            log.info("[correo simulado] Para: {} | Asunto: {} | HTML {} caracteres{}", to, subject, html.length(),
-                    attachmentName == null ? "" : " | adjunto " + attachmentName);
+            log.info("[correo simulado] Para: {} | Asunto: {} | HTML {} caracteres | adjuntos {}", to, subject, html.length(), attachments.keySet());
             return false;
         }
         try {
@@ -60,8 +66,9 @@ public class MailNotifier {
             h.setTo(to);
             h.setSubject(subject);
             h.setText(html.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim(), html);
-            if (attachmentName != null && attachment != null) {
-                h.addAttachment(attachmentName, new org.springframework.core.io.ByteArrayResource(attachment), attachmentType);
+            for (java.util.Map.Entry<String, byte[]> a : attachments.entrySet()) {
+                String type = a.getKey().endsWith(".pdf") ? "application/pdf" : a.getKey().endsWith(".xml") ? "application/xml" : "application/octet-stream";
+                h.addAttachment(a.getKey(), new org.springframework.core.io.ByteArrayResource(a.getValue()), type);
             }
             s.send(msg);
             return true;

@@ -326,27 +326,16 @@ public class PortalExtrasService {
         return Map.of("url", files.signedPath("/api/public/invoices/", i.id));
     }
 
-    /** Representación impresa (PDF) de una boleta o factura electrónica. */
+    /** Representación impresa (PDF) de una boleta o factura electrónica, con formato SUNAT. */
     @Transactional(readOnly = true)
     public byte[] invoicePdf(Long invoiceId) {
         Invoice i = billing.get(invoiceId);
-        SimplePdf pdf = new SimplePdf()
-                .header(clinicName, clinicAddress + " · RUC 10102984841")
-                .title(i.getDocTypeLabel() + "  " + i.getFullNumber())
-                .paragraph("Fecha de emisión: " + i.issueDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "  " + i.issueTime, 10, false)
-                .paragraph("Cliente: " + i.customerName + "  ·  Documento: " + i.customerDocNumber, 10, false)
-                .space(8);
-        for (InvoiceItem it : invoiceItems.findByInvoiceIdOrderByLineNumberAsc(i.id)) {
-            pdf.paragraph(it.quantity.stripTrailingZeros().toPlainString() + " x " + it.description + "    S/ " + it.lineTotal.toPlainString(), 10, false);
-        }
-        pdf.space(8)
-                .paragraph("Op. gravada: S/ " + i.taxableAmount.toPlainString() + "    IGV (18%): S/ " + i.igvAmount.toPlainString(), 10, false)
-                .paragraph("TOTAL: S/ " + i.totalAmount.toPlainString(), 13, true)
-                .space(10)
-                .paragraph("Estado SUNAT: " + i.status + (i.sunatDescription == null ? "" : " · " + i.sunatDescription), 9, false)
-                .paragraph("Representación impresa del comprobante electrónico. Hash: " + (i.hash == null ? "-" : i.hash), 8, false);
-        return pdf.build();
+        return pe.clinicacardenas.billing.InvoicePdf.render(i, invoiceItems.findByInvoiceIdOrderByLineNumberAsc(i.id), billing.company(),
+                pe.clinicacardenas.billing.AmountInWords.of(i.totalAmount), clinicPhone);
     }
+
+    @org.springframework.beans.factory.annotation.Value("${app.notifications.clinic-phone:987 654 000}")
+    private String clinicPhone;
 
     // ------------------------------------------------------------------ encuesta
 

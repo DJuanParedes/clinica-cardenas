@@ -86,6 +86,14 @@ public class BillingController {
         return mailer.send(id, r == null ? null : r.email());
     }
 
+    @GetMapping("/invoices/{id}/pdf")
+    public ResponseEntity<byte[]> pdf(@PathVariable Long id) {
+        Invoice inv = service.get(id);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+                .header("Content-Disposition", "inline; filename=\"" + inv.series + "-" + inv.number + ".pdf\"")
+                .body(mailer.pdf(id));
+    }
+
     @PostMapping("/invoices/{id}/status")
     public Map<String, Object> checkStatus(@PathVariable Long id) {
         return service.checkStatus(id);
