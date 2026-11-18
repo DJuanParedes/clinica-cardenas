@@ -27,6 +27,7 @@ SELECT (SELECT COUNT(*) FROM demo_p) AS pacientes, (SELECT COUNT(*) FROM demo_a)
 DELETE FROM surveys WHERE patient_id IN (SELECT id FROM demo_p) OR appointment_id IN (SELECT id FROM demo_a);
 DELETE FROM notifications WHERE patient_id IN (SELECT id FROM demo_p) OR appointment_id IN (SELECT id FROM demo_a);
 DELETE FROM assistant_bookings WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE FROM file_requests WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM consent_records WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM portal_codes WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM patient_notices WHERE patient_id IN (SELECT id FROM demo_p);
