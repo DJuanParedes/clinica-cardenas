@@ -10,6 +10,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.engine.HttpClientEngine
@@ -166,6 +168,32 @@ class ApiClient(
     suspend fun fileLink(id: Long): LinkDto = call { http.get(url("/api/portal/documents/files/$id/link")) { auth() } }
 
     suspend fun invoiceLink(id: Long): LinkDto = call { http.get(url("/api/portal/documents/invoices/$id/link")) { auth() } }
+
+    suspend fun treatments(): TreatmentsDto = call { http.get(url("/api/portal/treatments")) { auth() } }
+
+    suspend fun consents(): ConsentsDto = call { http.get(url("/api/portal/consents")) { auth() } }
+
+    suspend fun consentPdf(id: Long): ByteArray = call { http.get(url("/api/portal/consents/$id/pdf")) { auth() } }
+
+    suspend fun ownFileLink(id: Long): LinkDto = call { http.get(url("/api/portal/files/$id/link")) { auth() } }
+
+    suspend fun fileRequests(): List<FileRequestDto> = call { http.get(url("/api/portal/file-requests")) { auth() } }
+
+    suspend fun uploadRequest(id: Long, name: String, mime: String, bytes: ByteArray): List<FileRequestDto> = call {
+        http.submitFormWithBinaryData(
+            url = url("/api/portal/file-requests/$id/upload"),
+            formData = io.ktor.client.request.forms.formData {
+                append("file", bytes, io.ktor.http.Headers.build {
+                    append(HttpHeaders.ContentType, mime)
+                    append(HttpHeaders.ContentDisposition, "filename=\"${name.replace("\"", "")}\"")
+                })
+            },
+        ) { auth() }
+    }
+
+    suspend fun updateContact(body: ContactRequest): ContactResult = call {
+        http.put(url("/api/portal/me/contact")) { auth(); contentType(ContentType.Application.Json); setBody(body) }
+    }
 
     suspend fun legal(code: String): LegalDto = call { http.get(url("/api/public/legal/$code")) }
 
