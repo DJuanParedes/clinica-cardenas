@@ -47,7 +47,7 @@ import pe.clinicacardenas.pacientes.ui.theme.ClinicaTheme
 private enum class Tab(val label: String, val icon: String) {
     CITAS("Citas", "🗓️"),
     AVISOS("Avisos", "🔔"),
-    PAGOS("Pagos", "💳"),
+    PAGOS("Mi historia", "🦷"),
     DOCUMENTOS("Documentos", "📄"),
     PERFIL("Perfil", "👤"),
 }
@@ -121,7 +121,7 @@ private fun MainTabs(current: PatientDto) {
             when (tab) {
                 Tab.CITAS -> HomeScreen(current)
                 Tab.AVISOS -> NoticesScreen(notices)
-                Tab.PAGOS -> AccountScreen()
+                Tab.PAGOS -> pe.clinicacardenas.pacientes.ui.history.HistoryScreen()
                 Tab.DOCUMENTOS -> DocumentsScreen()
                 Tab.PERFIL -> ProfileScreen()
             }
