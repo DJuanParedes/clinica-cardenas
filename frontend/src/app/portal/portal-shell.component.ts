@@ -21,6 +21,7 @@ import { LogoComponent } from '../shared/logo.component';
       <main><router-outlet /></main>
       <nav aria-label="Navegación de la app">
         <a routerLink="/app" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="on"><app-icon name="calendar" [size]="22" /><span>Mis citas</span></a>
+        <a routerLink="/app/historia" routerLinkActive="on"><app-icon name="clipboard" [size]="22" /><span>Mi historia</span></a>
         <a routerLink="/app/cuenta" routerLinkActive="on"><app-icon name="wallet" [size]="22" /><span>Mi cuenta</span></a>
         <a routerLink="/app/perfil" routerLinkActive="on"><app-icon name="patient" [size]="22" /><span>Perfil</span></a>
       </nav>
