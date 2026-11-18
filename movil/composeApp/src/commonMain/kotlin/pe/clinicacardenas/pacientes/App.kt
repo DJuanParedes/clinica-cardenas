@@ -46,9 +46,10 @@ import pe.clinicacardenas.pacientes.ui.theme.ClinicaTheme
 
 private enum class Tab(val label: String, val icon: String) {
     CITAS("Citas", "🗓️"),
+    PAGOS("Historia", "🦷"),
+    DOCUMENTOS("Docs", "📄"),
+    PROMOS("Promos", "🏷️"),
     AVISOS("Avisos", "🔔"),
-    PAGOS("Mi historia", "🦷"),
-    DOCUMENTOS("Documentos", "📄"),
     PERFIL("Perfil", "👤"),
 }
 
@@ -106,7 +107,7 @@ private fun MainTabs(current: PatientDto) {
                                 Text(t.icon, fontSize = 20.sp)
                             }
                         },
-                        label = { Text(t.label, fontSize = 11.sp, maxLines = 1) },
+                        label = { Text(t.label, fontSize = 10.sp, maxLines = 1, softWrap = false) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedTextColor = Brand.Azul,
                             indicatorColor = Brand.CelesteSuave,
@@ -123,6 +124,7 @@ private fun MainTabs(current: PatientDto) {
                 Tab.AVISOS -> NoticesScreen(notices)
                 Tab.PAGOS -> pe.clinicacardenas.pacientes.ui.history.HistoryScreen()
                 Tab.DOCUMENTOS -> DocumentsScreen()
+                Tab.PROMOS -> pe.clinicacardenas.pacientes.ui.promos.PromosScreen()
                 Tab.PERFIL -> ProfileScreen()
             }
         }
