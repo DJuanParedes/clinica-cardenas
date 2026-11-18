@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api.service';
 import { PortalAuth } from '../core/portal-auth.service';
 import { ToastService } from '../core/toast.service';
@@ -9,14 +10,25 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-portal-profile',
   standalone: true,
-  imports: [IconComponent],
+  imports: [IconComponent, FormsModule],
   template: `
     @if (p(); as me) {
       <section class="card">
         <div class="strong big">{{ me.fullName }}</div>
         <div class="muted small">{{ me.docType }} {{ me.docNumber }}</div>
-        <div class="kv2"><app-icon name="phone" [size]="15" /> {{ me.phone }}</div>
-        <div class="kv2"><app-icon name="mail" [size]="15" /> {{ me.email || 'Sin correo registrado' }}</div>
+        @if (!editing) {
+          <div class="kv2"><app-icon name="phone" [size]="15" /> {{ me.phone }}</div>
+          <div class="kv2"><app-icon name="mail" [size]="15" /> {{ me.email || 'Sin correo registrado' }}</div>
+          <button class="btn sm edit" type="button" (click)="startEdit(me)"><app-icon name="edit" [size]="14" /> Cambiar celular o correo</button>
+        } @else {
+          <div class="field"><label for="cp">Celular</label><input id="cp" class="input" inputmode="numeric" maxlength="9" [(ngModel)]="phone" />
+            @if (fe['phone']) { <span class="err">{{ fe['phone'] }}</span> }</div>
+          <div class="field"><label for="ce">Correo</label><input id="ce" class="input" type="email" [(ngModel)]="email" />
+            @if (fe['email']) { <span class="err">{{ fe['email'] }}</span> }</div>
+          <div class="row"><button class="btn" type="button" (click)="editing = false">Cancelar</button>
+            <button class="btn primary" type="button" (click)="saveContact()" [disabled]="busy">Guardar</button></div>
+        }
+        <p class="muted small">Tu nombre, documento y fecha de nacimiento son los de tu documento de identidad (RENIEC): si hay un error, corrígelo en recepción con tu DNI.</p>
       </section>
 
       <h3>¿Cómo quieres recibir tus recordatorios?</h3>
@@ -45,6 +57,7 @@ import { IconComponent } from '../shared/icon.component';
     }
   `,
   styles: [`
+    .edit { align-self: flex-start; margin-top: 6px; } .err { color: var(--gum); font-size: 12.5px; } .field { display: grid; gap: 4px; }
     .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
     .big { font-size: 18px; font-family: var(--font-display); }
     .kv2 { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); }
@@ -77,6 +90,19 @@ export class PortalProfileComponent {
     this.api.portalChannel(ch).subscribe({
       next: (p) => { this.busy = false; this.portal.setPatient(p); this.toast.ok('Preferencia guardada.'); },
       error: (e) => { this.busy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+
+  editing = false;
+  phone = '';
+  email = '';
+  fe: Record<string, string> = {};
+  startEdit(me: any) { this.phone = me.phone || ''; this.email = me.email || ''; this.fe = {}; this.editing = true; }
+  saveContact() {
+    this.busy = true; this.fe = {};
+    this.api.portalContact(this.phone, this.email).subscribe({
+      next: (r) => { this.busy = false; this.editing = false; const cur: any = this.portal.patient(); this.portal.setPatient({ ...cur, phone: r.phone, email: r.email }); this.toast.ok(r.message); },
+      error: (e) => { this.busy = false; const a = apiError(e); this.fe = a.fields || {}; this.toast.error(a.message); },
     });
   }
 

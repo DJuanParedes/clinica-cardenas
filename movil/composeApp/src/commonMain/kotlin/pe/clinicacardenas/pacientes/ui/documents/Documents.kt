@@ -42,7 +42,10 @@ import pe.clinicacardenas.pacientes.ui.components.Panel
 import pe.clinicacardenas.pacientes.ui.components.SectionTitle
 import pe.clinicacardenas.pacientes.ui.theme.Brand
 
-data class DocumentsState(val loading: Boolean = true, val data: DocumentsDto? = null, val error: String? = null, val opening: Boolean = false)
+data class DocumentsState(val loading: Boolean = true, val data: DocumentsDto? = null, val error: String? = null, val opening: Boolean = false,
+                          val requests: List<pe.clinicacardenas.pacientes.data.remote.FileRequestDto> = emptyList(),
+                          val consents: pe.clinicacardenas.pacientes.data.remote.ConsentsDto? = null,
+                          val uploading: Long? = null, val message: String? = null)
 
 /** Boletas y facturas SUNAT, recetas, consentimientos y radiografías que la clínica compartió. */
 class DocumentsViewModel(private val repo: ClinicRepository, private val platform: PlatformActions) : ViewModel() {
@@ -55,9 +58,46 @@ class DocumentsViewModel(private val repo: ClinicRepository, private val platfor
         viewModelScope.launch {
             try {
                 _state.update { it.copy(data = repo.documents(), loading = false, error = null) }
+                runCatching { repo.fileRequests() }.onSuccess { r -> _state.update { it.copy(requests = r) } }
+                runCatching { repo.consents() }.onSuccess { c -> _state.update { it.copy(consents = c) } }
             } catch (e: ApiException) {
                 _state.update { it.copy(loading = false, error = e.message) }
             }
+        }
+    }
+
+    /** Sube (foto o PDF) el archivo que la clínica pidió: placa, radiografía, informe… */
+    fun upload(requestId: Long, source: pe.clinicacardenas.pacientes.platform.PickSource) {
+        platform.pickFile(source) { f ->
+            if (f == null) return@pickFile
+            _state.update { it.copy(uploading = requestId, error = null, message = null) }
+            viewModelScope.launch {
+                try {
+                    val list = repo.uploadRequest(requestId, f.name, f.mimeType, f.bytes)
+                    _state.update { it.copy(requests = list, message = "Archivo enviado a la clínica. ¡Gracias!") }
+                } catch (e: ApiException) {
+                    _state.update { it.copy(error = e.message) }
+                } finally {
+                    _state.update { it.copy(uploading = null) }
+                }
+            }
+        }
+    }
+
+    fun openOwn(fileId: Long) {
+        _state.update { it.copy(opening = true, error = null) }
+        viewModelScope.launch {
+            try { platform.openUrl(repo.ownFileUrl(fileId)) } catch (e: ApiException) { _state.update { it.copy(error = e.message) } }
+            finally { _state.update { it.copy(opening = false) } }
+        }
+    }
+
+    fun consentPdf(id: Long, code: String, version: String) {
+        _state.update { it.copy(opening = true, error = null) }
+        viewModelScope.launch {
+            try { platform.openFile("consentimiento-${code.lowercase()}-v$version.pdf", "application/pdf", repo.consentPdf(id)) }
+            catch (e: ApiException) { _state.update { it.copy(error = e.message) } }
+            finally { _state.update { it.copy(opening = false) } }
         }
     }
 
@@ -99,6 +139,38 @@ fun DocumentsScreen(vm: DocumentsViewModel = koinViewModel()) {
             data == null -> item { ErrorState(s.error ?: "No se pudieron cargar tus documentos.", vm::load) }
             else -> {
                 s.error?.let { e -> item { Banner(e, Brand.RojoSuave, Brand.Rojo) } }
+                s.message?.let { m -> item { Banner(m, Brand.VerdeSuave, Brand.Verde) } }
+                item { SectionTitle("Archivos que te pide la clínica") }
+                if (s.requests.isEmpty()) item { Text("La clínica no te ha pedido archivos.", color = Brand.Tinta2) }
+                items(s.requests, key = { "r${it.id}" }) { r ->
+                    Panel(padding = PaddingValues(14.dp)) {
+                        Text(r.title, fontWeight = FontWeight.SemiBold, color = Brand.Tinta)
+                        val extra = listOfNotNull(r.planTitle?.let { "Para: $it" }, r.description, r.dueDate?.let { "Antes del ${Fmt.shortDate(it)}" }).joinToString(" · ")
+                        if (extra.isNotBlank()) Text(extra, color = Brand.Gris, fontSize = 13.sp)
+                        if (r.status == "PENDIENTE") {
+                            if (s.uploading == r.id) Text("Subiendo…", color = Brand.Azul)
+                            else Row {
+                                TextButton(onClick = { vm.upload(r.id, pe.clinicacardenas.pacientes.platform.PickSource.CAMARA) }) { Text("📷 Tomar foto") }
+                                TextButton(onClick = { vm.upload(r.id, pe.clinicacardenas.pacientes.platform.PickSource.GALERIA) }) { Text("🖼️ Galería") }
+                                TextButton(onClick = { vm.upload(r.id, pe.clinicacardenas.pacientes.platform.PickSource.DOCUMENTO) }) { Text("📄 PDF") }
+                            }
+                        } else Row(verticalAlignment = Alignment.CenterVertically) {
+                            Chip("Recibido", Brand.VerdeSuave, Brand.Verde)
+                            r.fileId?.let { id -> TextButton(onClick = { vm.openOwn(id) }) { Text("Ver") } }
+                        }
+                    }
+                }
+                item { SectionTitle("Consentimientos firmados") }
+                val cs = s.consents
+                if (cs == null || cs.records.isEmpty()) item { Text("Sin registros.", color = Brand.Tinta2) }
+                else items(cs.records, key = { "c${it.id}" }) { c ->
+                    Panel(padding = PaddingValues(14.dp)) {
+                        Text(c.title ?: c.code, fontWeight = FontWeight.SemiBold, color = Brand.Tinta)
+                        Text("v${c.version} · ${c.acceptedAt?.let { Fmt.shortDate(it) } ?: ""} · ${c.acceptedBy ?: ""}", color = Brand.Gris, fontSize = 13.sp)
+                        TextButton(onClick = { vm.consentPdf(c.id, c.code, c.version) }) { Text("📄 Ver constancia") }
+                    }
+                }
+                cs?.signedFileId?.let { id -> item { TextButton(onClick = { vm.openOwn(id) }) { Text("✍️ Ver mi copia firmada") } } }
                 item { SectionTitle("Recetas, consentimientos e imágenes") }
                 if (data.files.isEmpty()) item { Text("Tu odontólogo aún no compartió documentos contigo.", color = Brand.Tinta2) }
                 items(data.files, key = { "f${it.id}" }) { f ->

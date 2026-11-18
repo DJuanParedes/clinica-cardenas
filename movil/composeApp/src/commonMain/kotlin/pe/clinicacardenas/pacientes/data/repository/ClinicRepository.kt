@@ -47,6 +47,14 @@ class ClinicRepository(
         session.start(api.login(LoginRequest(docType, docNumber.trim(), password)))
     }
 
+    suspend fun treatments(): pe.clinicacardenas.pacientes.data.remote.TreatmentsDto = guarded { api.treatments() }
+    suspend fun consents(): pe.clinicacardenas.pacientes.data.remote.ConsentsDto = guarded { api.consents() }
+    suspend fun consentPdf(id: Long): ByteArray = guarded { api.consentPdf(id) }
+    suspend fun ownFileUrl(id: Long): String = api.absolute(guarded { api.ownFileLink(id) }.url)
+    suspend fun fileRequests(): List<pe.clinicacardenas.pacientes.data.remote.FileRequestDto> = guarded { api.fileRequests() }
+    suspend fun uploadRequest(id: Long, name: String, mime: String, bytes: ByteArray) = guarded { api.uploadRequest(id, name, mime, bytes) }
+    suspend fun updateContact(phone: String, email: String) = guarded { api.updateContact(pe.clinicacardenas.pacientes.data.remote.ContactRequest(phone, email)) }
+
     suspend fun legal(code: String): pe.clinicacardenas.pacientes.data.remote.LegalDto = api.legal(code)
 
     suspend fun requestCode(docType: String, docNumber: String, birthDate: String): CodeResponse =

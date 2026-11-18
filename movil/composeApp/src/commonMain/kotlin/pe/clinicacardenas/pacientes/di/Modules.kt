@@ -51,6 +51,7 @@ val appModule = module {
     viewModel { BookingViewModel(get()) }
     viewModel { NoticesViewModel(get()) }
     viewModel { DocumentsViewModel(get(), get()) }
+    viewModel { pe.clinicacardenas.pacientes.ui.history.HistoryViewModel(get()) }
     viewModel { AgendaViewModel(get(), get()) }
     viewModel { PatientSearchViewModel(get()) }
     viewModel { PatientRecordViewModel(get(), get(), get()) }

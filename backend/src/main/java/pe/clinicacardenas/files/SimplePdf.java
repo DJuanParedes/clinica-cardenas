@@ -114,6 +114,47 @@ public final class SimplePdf {
         return this;
     }
 
+    // ------------------------------------------------------------------ dibujo libre (coordenadas desde abajo-izquierda)
+
+    public static float pageWidth() { return W; }
+    public static float pageHeight() { return H; }
+
+    /** Texto en una posición; align: L (izquierda), C (centro) o R (derecha, x = borde derecho). */
+    public SimplePdf text(String t, float x, float yy, float size, boolean bold, String rgb, char align) {
+        String s = t == null ? "" : t;
+        float w = s.length() * size * (bold ? 0.55f : 0.5f);
+        float xx = align == 'C' ? x - w / 2 : align == 'R' ? x - w : x;
+        textAt(s, xx, yy, size, bold, rgb);
+        return this;
+    }
+
+    public SimplePdf rect(float x, float yy, float w, float h, String fillRgb, String strokeRgb, float lineWidth) {
+        page.append("q ");
+        if (fillRgb != null) page.append(fillRgb).append(" rg ");
+        if (strokeRgb != null) page.append(strokeRgb).append(" RG ").append(lineWidth).append(" w ");
+        page.append(x).append(' ').append(yy).append(' ').append(w).append(' ').append(h).append(" re ")
+                .append(fillRgb != null && strokeRgb != null ? "B" : fillRgb != null ? "f" : "S").append(" Q\n");
+        return this;
+    }
+
+    public SimplePdf line(float x1, float y1, float x2, float y2, String rgb, float lineWidth) {
+        page.append("q ").append(rgb).append(" RG ").append(lineWidth).append(" w ").append(x1).append(' ').append(y1)
+                .append(" m ").append(x2).append(' ').append(y2).append(" l S Q\n");
+        return this;
+    }
+
+    /** Matriz de módulos (por ejemplo, un código QR) dibujada con cuadrados negros. */
+    public SimplePdf modules(boolean[][] m, float x, float yy, float size) {
+        int n = m.length;
+        float cell = size / n;
+        page.append("q 0 0 0 rg ");
+        for (int r = 0; r < n; r++) for (int c = 0; c < n; c++) if (m[r][c]) {
+            page.append(x + c * cell).append(' ').append(yy + size - (r + 1) * cell).append(' ').append(cell).append(' ').append(cell).append(" re ");
+        }
+        page.append("f Q\n");
+        return this;
+    }
+
     /** Línea para firma con el texto debajo. */
     public SimplePdf signatureLine(String label) {
         ensure(30);

@@ -13,7 +13,8 @@ import pe.clinicacardenas.pacientes.data.repository.ClinicRepository
 import pe.clinicacardenas.pacientes.data.repository.SessionRepository
 import pe.clinicacardenas.pacientes.platform.PlatformActions
 
-data class ProfileState(val saving: String? = null, val message: String? = null, val loggingOut: Boolean = false)
+data class ProfileState(val saving: String? = null, val message: String? = null, val loggingOut: Boolean = false,
+    val editing: Boolean = false, val phone: String = "", val email: String = "", val errors: Map<String, String> = emptyMap(), val busy: Boolean = false)
 
 /** HU-23: el paciente elige por dónde recibir los recordatorios; también datos de contacto de la clínica. */
 class ProfileViewModel(
@@ -42,6 +43,28 @@ class ProfileViewModel(
                 _state.update { it.copy(message = e.message) }
             } finally {
                 _state.update { it.copy(saving = null) }
+            }
+        }
+    }
+
+    fun startEdit() = _state.update { it.copy(editing = true, phone = patient.value?.phone ?: "", email = patient.value?.email ?: "", errors = emptyMap(), message = null) }
+    fun cancelEdit() = _state.update { it.copy(editing = false, errors = emptyMap()) }
+    fun editPhone(v: String) = _state.update { it.copy(phone = v.filter(Char::isDigit).take(9)) }
+    fun editEmail(v: String) = _state.update { it.copy(email = v.trim()) }
+
+    /** El paciente actualiza su celular y correo; nombre, documento y fecha de nacimiento no (vienen de su DNI). */
+    fun saveContact() {
+        val s = _state.value
+        _state.update { it.copy(busy = true, errors = emptyMap()) }
+        viewModelScope.launch {
+            try {
+                val r = repo.updateContact(s.phone, s.email)
+                runCatching { repo.refreshProfile() }
+                _state.update { it.copy(editing = false, message = r.message) }
+            } catch (e: ApiException) {
+                _state.update { it.copy(errors = e.fields, message = e.message) }
+            } finally {
+                _state.update { it.copy(busy = false) }
             }
         }
     }

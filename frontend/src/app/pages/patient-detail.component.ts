@@ -144,6 +144,36 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
               </section>
 
               <section class="panel">
+                <div class="panel-head"><h3>Archivos solicitados al paciente</h3>
+                  @if (canRequest) { <button class="btn sm" type="button" (click)="reqOpen = !reqOpen"><app-icon name="plus" [size]="14" /> Pedir archivo</button> }</div>
+                <div class="panel-body small">
+                  @if (reqOpen) {
+                    <form class="reqform" (ngSubmit)="createReq()">
+                      <input class="input" name="rt" [(ngModel)]="rq.title" placeholder="Ej. Radiografía panorámica" maxlength="150" />
+                      <select class="input" name="rk" [(ngModel)]="rq.kind"><option value="RADIOGRAFIA">Radiografía / placa</option><option value="DOCUMENTO">Documento / informe</option><option value="FOTO">Foto</option></select>
+                      <input class="input" name="rd" [(ngModel)]="rq.description" placeholder="Para qué (opcional)" maxlength="500" />
+                      <input class="input" name="rdue" type="date" [(ngModel)]="rq.dueDate" />
+                      <button class="btn primary sm" type="submit" [disabled]="busyReq || !rq.title">Pedir</button>
+                    </form>
+                    <p class="muted">El paciente lo verá en "Mi historia → Documentos" de la app y podrá subirlo; también puedes subirlo tú.</p>
+                  }
+                  @for (r of reqs; track r.id) {
+                    <div class="reqrow">
+                      <div class="grow"><strong>{{ r.title }}</strong> <span class="muted">· pedido por {{ r.requestedBy }} el {{ date(r.requestedAt) }}{{ r.dueDate ? ' · para el ' + date(r.dueDate) : '' }}</span>
+                        @if (r.description) { <div class="muted">{{ r.description }}</div> }</div>
+                      @if (r.status === 'PENDIENTE') {
+                        <span class="tag amber">Pendiente</span>
+                        @if (canRequest) {
+                          <label class="btn sm"><app-icon name="upload" [size]="14" /> Subir<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden (change)="uploadReq(r, $event)" /></label>
+                          <button class="btn sm ghost" type="button" (click)="cancelReq(r)">Anular</button>
+                        }
+                      } @else { <span class="tag green">Recibido · {{ r.fulfilledBy }}</span> <a class="link" (click)="go('archivos')">Ver en Archivos</a> }
+                    </div>
+                  } @empty { <span class="muted">No se le pidieron archivos.</span> }
+                </div>
+              </section>
+
+              <section class="panel">
                 <div class="panel-head"><h3>Citas</h3><span class="muted small">{{ appts.length }} en total</span></div>
                 @if (appts.length === 0) {
                   <div class="empty small"><p>Este paciente aún no tiene citas.</p></div>
@@ -197,6 +227,9 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
     </div>
   `,
   styles: [`
+    .reqform { display: grid; grid-template-columns: 2fr 1.3fr 2fr 1fr auto; gap: 6px; margin-bottom: 6px; }
+    .reqrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); } .reqrow:last-child { border-bottom: 0; }
+    @media (max-width: 900px) { .reqform { grid-template-columns: 1fr; } }
     .clin { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; padding: 14px 16px; margin-bottom: 14px; }
     .alerts { display: flex; flex-wrap: wrap; gap: 8px; }
     .al { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 12px; min-width: 180px; flex: 1; font-size: 13px; line-height: 1.35; }
@@ -273,10 +306,32 @@ export class PatientDetailComponent implements OnChanges {
       this.alerts = r.clinicalAlerts || null; this.pending = r.pendingProcedures || [];
       if (this.alerts && !this.alerts.allergies && !this.alerts.medication && !this.alerts.background) this.alerts = { ...this.alerts, empty: true };
     });
+    this.loadReqs(id);
     this.api.patientConsents(id).subscribe({ next: (c) => (this.consent = c), error: () => {} });
     this.api.patientAppointments(id).subscribe((a) => (this.appts = a));
     if (this.auth.can('PACIENTES_EDITAR')) this.api.patientAudit(id).subscribe((a) => (this.audit = a));
     this.api.patientNotifications(id).subscribe((n) => (this.notifs = n.filter((x) => x.operation !== 'ANULAR')));
+  }
+
+  reqs: any[] = [];
+  reqOpen = false;
+  busyReq = false;
+  rq: any = { title: '', kind: 'RADIOGRAFIA', description: '', dueDate: null };
+  get canRequest() { return this.auth.can('PACIENTES_EDITAR') || this.auth.can('HISTORIA_CLINICA'); }
+  loadReqs(id: number) { this.api.fileRequests(id).subscribe({ next: (r) => (this.reqs = r), error: () => {} }); }
+  createReq() {
+    if (!this.p) return;
+    this.busyReq = true;
+    this.api.createFileRequest(this.p.id, { ...this.rq, dueDate: this.rq.dueDate || null }).subscribe({
+      next: (r) => { this.busyReq = false; this.reqs = r; this.reqOpen = false; this.rq = { title: '', kind: 'RADIOGRAFIA', description: '', dueDate: null }; this.toast.ok('Pedido enviado: el paciente lo verá en su app.'); },
+      error: (e) => { this.busyReq = false; this.toast.error(apiError(e).message); },
+    });
+  }
+  cancelReq(r: any) { if (this.p) this.api.cancelFileRequest(this.p.id, r.id).subscribe({ next: (x) => (this.reqs = x), error: (e) => this.toast.error(apiError(e).message) }); }
+  uploadReq(r: any, ev: Event) {
+    const input = ev.target as HTMLInputElement; const file = input.files?.[0]; input.value = '';
+    if (!file || !this.p) return;
+    this.api.uploadFileRequest(this.p.id, r.id, file).subscribe({ next: (x) => { this.reqs = x; this.toast.ok('Archivo guardado en la ficha.'); }, error: (e) => this.toast.error(apiError(e).message) });
   }
 
   relLabel(r?: string) { return r === 'PADRE' ? 'Padre' : r === 'MADRE' ? 'Madre' : 'Tutor legal'; }
