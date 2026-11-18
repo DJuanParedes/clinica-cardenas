@@ -59,9 +59,15 @@ interface Form {
                      [attr.inputmode]="f.docType === 'DNI' ? 'numeric' : 'text'" autocomplete="off" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }
               @else if (id) { <span class="hint">El documento no se modifica después del registro.</span> }
-              @else if (dniEnabled && f.docType === 'DNI') {
-                <button type="button" class="btn sm lookup" (click)="lookup()" [disabled]="looking || !validDni">
-                  <app-icon name="search" [size]="14" /> {{ looking ? 'Consultando RENIEC…' : 'Autocompletar con RENIEC' }}</button>
+              @else if (f.docType === 'DNI') {
+                @if (!dniEnabled) { <span class="hint">Escribe los datos a mano: la consulta a RENIEC no está activada en el servidor.</span> }
+                @else if (looking) { <span class="hint reniec">Consultando RENIEC…</span> }
+                @else if (reniecName) { <span class="hint reniec ok">✓ RENIEC: {{ reniecName }}{{ reniecExtra ? ' · ' + reniecExtra : '' }}</span> }
+                @else if (reniecError) {
+                  <span class="hint reniec bad">{{ reniecError }}
+                    @if (validDni) { <button type="button" class="linkish" (click)="lookup(true)">Reintentar</button> }</span>
+                }
+                @else { <span class="hint">Al completar los 8 dígitos se buscan los nombres en RENIEC.</span> }
               }
             </div>
             <div class="field">
@@ -160,7 +166,8 @@ interface Form {
               </div>
               <div class="field">
                 <label class="req" for="gdn">Número</label>
-                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" />
+                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" />
+                @if (guardianInfo && !e['guardianDocNumber']) { <span class="hint reniec" [class.ok]="guardianInfo.startsWith('✓')">{{ guardianInfo }}</span> }
                 @if (e['guardianDocNumber']) { <span class="err">{{ e['guardianDocNumber'] }}</span> }
               </div>
               <div class="field">
@@ -239,7 +246,10 @@ interface Form {
     .consent.invalid { border-color: var(--red, #c0392b); }
     .guardian { border: 1px solid var(--amber, #d4a017); }
     .guardian .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .lookup { margin-top: 6px; align-self: flex-start; }
+    .reniec { color: var(--azul, #2563eb); }
+    .reniec.ok { color: var(--verde, #15803d); font-weight: 500; }
+    .reniec.bad { color: var(--rojo, #b91c1c); }
+    .linkish { background: none; border: 0; padding: 0 0 0 6px; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
     .narrow { max-width: 980px; }
     form { display: flex; flex-direction: column; gap: 16px; }
     .dup { margin-bottom: 16px; align-items: center; }
@@ -267,6 +277,13 @@ export class PatientFormComponent implements OnInit {
   prov = '';
   dniEnabled = false;
   looking = false;
+  reniecName = '';
+  reniecExtra = '';
+  reniecError = '';
+  guardianInfo = '';
+  private lastLooked = '';
+  private autoFill: Partial<Record<'firstName' | 'lastName' | 'birthDate' | 'sex' | 'address', string>> = {};
+  private lastGuardian = '';
   legalOpen = false;
   consentVersion = '';
   e: Record<string, string> = {};
@@ -285,7 +302,10 @@ export class PatientFormComponent implements OnInit {
         if (!ok || this.id) return of(null);
         return this.api.checkDocument(this.f.docType, n).pipe(catchError(() => of(null)));
       }),
-    ).subscribe((r) => (this.duplicate = r && r.exists ? r.patient! : null));
+    ).subscribe((r) => {
+      this.duplicate = r && r.exists ? r.patient! : null;
+      if (!this.duplicate) this.lookup(); // documento nuevo: buscar en RENIEC
+    });
   }
 
   get age(): number | null {
@@ -307,11 +327,52 @@ export class PatientFormComponent implements OnInit {
 
   get validDni() { return /^\d{8}$/.test(this.f.docNumber.trim()); }
 
-  lookup() {
-    this.looking = true;
-    this.api.lookupDni(this.f.docNumber.trim()).subscribe({
-      next: (r) => { this.looking = false; this.f.firstName = r.firstName; this.f.lastName = r.lastName; this.toast.ok('Nombres completados con RENIEC. Revísalos antes de guardar.'); },
-      error: (err) => { this.looking = false; this.toast.error(apiError(err).message); },
+  /** Al completar el DNI se consulta RENIEC y se llenan los campos vacíos (lo ya escrito no se pisa). */
+  lookup(force = false) {
+    const dni = this.f.docNumber.trim();
+    if (!this.dniEnabled || this.id || this.f.docType !== 'DNI' || !/^\d{8}$/.test(dni)) return;
+    if (!force && dni === this.lastLooked) return;
+    this.lastLooked = dni;
+    this.looking = true; this.reniecError = ''; this.reniecName = ''; this.reniecExtra = '';
+    this.api.lookupDni(dni).subscribe({
+      next: (r) => {
+        if (this.f.docNumber.trim() !== dni) return;
+        this.looking = false;
+        const replace = force || !this.f.firstName.trim() || !this.f.lastName.trim();
+        const fill: typeof this.autoFill = {};
+        if (replace) { this.f.firstName = fill.firstName = r.firstName; this.f.lastName = fill.lastName = r.lastName; }
+        const extra: string[] = [];
+        if (r.birthDate && !this.f.birthDate) { this.f.birthDate = fill.birthDate = r.birthDate; extra.push('fecha de nacimiento'); }
+        if (r.sex && !this.f.sex) { this.f.sex = fill.sex = r.sex; extra.push('sexo'); }
+        if (r.address && !this.f.address) { this.f.address = fill.address = r.address; extra.push('dirección'); }
+        this.autoFill = fill;
+        if (r.ubigeo) { this.setUbigeo(r.ubigeo); extra.push('distrito'); }
+        this.reniecName = `${r.firstName} ${r.lastName}`;
+        this.reniecExtra = extra.length ? 'también se completó ' + extra.join(', ') : '';
+        this.e['firstName'] = ''; this.e['lastName'] = '';
+      },
+      error: (err) => {
+        if (this.f.docNumber.trim() !== dni) return;
+        this.looking = false;
+        this.reniecError = apiError(err).message;
+      },
+    });
+  }
+
+  lookupGuardian() {
+    const dni = this.f.guardianDocNumber.trim();
+    if (this.f.guardianDocType !== 'DNI' || !/^\d{8}$/.test(dni)) { this.guardianInfo = ''; return; }
+    if (!this.dniEnabled || dni === this.lastGuardian) return;
+    this.lastGuardian = dni;
+    this.guardianInfo = 'Consultando RENIEC…';
+    this.api.lookupDni(dni).subscribe({
+      next: (r) => {
+        if (this.f.guardianDocNumber.trim() !== dni) return;
+        if (!this.f.guardianName.trim()) this.f.guardianName = `${r.firstName} ${r.lastName}`;
+        this.guardianInfo = `✓ RENIEC: ${r.firstName} ${r.lastName}`;
+        this.e['guardianName'] = '';
+      },
+      error: (err) => { if (this.f.guardianDocNumber.trim() === dni) this.guardianInfo = apiError(err).message; },
     });
   }
 
@@ -354,6 +415,13 @@ export class PatientFormComponent implements OnInit {
   checkDoc() {
     this.e['docNumber'] = '';
     this.duplicate = null;
+    if (this.f.docNumber.trim() !== this.lastLooked) {
+      this.reniecName = ''; this.reniecExtra = ''; this.reniecError = '';
+      // quita lo que RENIEC completó para el número anterior (si no se editó a mano)
+      for (const [k, v] of Object.entries(this.autoFill)) if ((this.f as any)[k] === v) (this.f as any)[k] = '';
+      this.autoFill = {};
+      this.lastLooked = '';
+    }
     this.check$.next();
   }
 

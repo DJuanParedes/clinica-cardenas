@@ -81,6 +81,19 @@ async function portalE2E(BASE) {
     const txt = Buffer.from(await r.arrayBuffer()).toString('latin1');
     expect(r.status === 200 && txt.startsWith('%PDF') && txt.includes('R.U.C.') && txt.includes('SON:') && txt.includes('IMPORTE TOTAL'), 'pdf incompleto');
   });
+  await check('Consulta RENIEC al registrar: autocompleta o explica por qué no', async () => {
+    const cfg = (await j('GET', '/api/lookup/dni-config', null, st)).b;
+    const bad = await j('GET', '/api/lookup/dni/123', null, st);
+    expect(bad.s === 400, 'formato ' + bad.s);
+    if (!cfg.enabled) {
+      const r = await j('GET', '/api/lookup/dni/71234567', null, st);
+      expect(r.s === 503 && r.b.code === 'CONSULTA_NO_CONFIGURADA', 'sin token ' + r.s);
+      return 'sin token configurado: el formulario pide escribir a mano';
+    }
+    const r = await j('GET', '/api/lookup/dni/71234567', null, st);
+    expect(r.s === 200 && r.b.firstName && r.b.lastName, 'consulta ' + r.s + ' ' + JSON.stringify(r.b).slice(0, 120));
+    return `${r.b.firstName} ${r.b.lastName}`;
+  });
   await check('Promociones públicas y APK descargable', async () => {
     const pr = await j('GET', '/api/public/promotions');
     expect(pr.s === 200 && Array.isArray(pr.b), 'promos ' + pr.s);

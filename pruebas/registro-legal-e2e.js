@@ -63,7 +63,8 @@ async function registroLegalE2E(BASE) {
   await check('Consulta de DNI: si no hay token, avisa sin romper el registro', async () => {
     const c = (await api('GET', '/api/lookup/dni-config', undefined, recep)).body;
     const r = await api('GET', '/api/lookup/dni/45872196', undefined, recep);
-    expect(c.enabled ? r.status === 200 : r.status === 503, `config ${c.enabled}, respuesta ${r.status}`);
+    // con token: 200 si RENIEC lo tiene o 404 DNI_NO_ENCONTRADO si no; sin token: 503 con aviso
+    expect(c.enabled ? (r.status === 200 || (r.status === 404 && r.body.code === 'DNI_NO_ENCONTRADO')) : r.status === 503, `config ${c.enabled}, respuesta ${r.status}`);
   });
   const passed = results.filter((r) => r.ok).length;
   return { passed, failed: results.length - passed, total: results.length, results };
