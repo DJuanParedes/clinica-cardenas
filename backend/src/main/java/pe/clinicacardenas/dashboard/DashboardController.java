@@ -68,6 +68,10 @@ public class DashboardController {
         m.put("statusCounts", counts);
         m.put("upcoming", upcoming);
         m.put("waiting", waiting);
+        // Citas sin confirmar en las próximas 24 h; vencidas = ya pasó el plazo de 2 h: recepción debe llamar
+        String unconf = "select count(*) from appointments where status = 'PROGRAMADA' and start_at > ? and start_at <= ? and (? is null or dentist_id = ?)";
+        m.put("unconfirmed24h", jdbc.queryForObject(unconf, Long.class, now, now.plusHours(24), dentistId, dentistId));
+        m.put("unconfirmedOverdue", jdbc.queryForObject(unconf, Long.class, now, now.plusHours(pe.clinicacardenas.portal.PortalService.CONFIRM_HOURS), dentistId, dentistId));
         m.put("patientsTotal", patients.countByActiveTrue());
         m.put("patientsThisMonth", patients.countByCreatedAtGreaterThanEqual(today.withDayOfMonth(1).atStartOfDay()));
         m.put("billedToday", invoices.sumTotal(today, today));

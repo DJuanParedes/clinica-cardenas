@@ -246,6 +246,9 @@ public class PortalService {
 
     // ------------------------------------------------------------------ datos del paciente autenticado
 
+    /** Horas de anticipación máximas para que el paciente confirme su cita. */
+    public static final int CONFIRM_HOURS = 2;
+
     public static Long patientIdFrom(String subject) {
         if (subject == null || !subject.startsWith(PatientAccount.SUBJECT_PREFIX)) throw new ApiException(HttpStatus.FORBIDDEN, "SIN_PERMISO", "Acceso solo para pacientes.");
         return Long.parseLong(subject.substring(PatientAccount.SUBJECT_PREFIX.length()));
@@ -283,7 +286,9 @@ public class PortalService {
         m.put("reason", a.reason);
         m.put("status", a.status);
         m.put("dentist", Map.of("fullName", a.dentist.getFullName(), "specialty", a.dentist.specialty, "color", a.dentist.color));
-        m.put("canConfirm", a.status == AppointmentStatus.PROGRAMADA && a.startAt.isAfter(now));
+        // El paciente confirma hasta 2 horas antes; después, recepción lo llama (ver Agenda → por confirmar).
+        m.put("canConfirm", a.status == AppointmentStatus.PROGRAMADA && a.startAt.isAfter(now.plusHours(CONFIRM_HOURS)));
+        m.put("confirmDeadline", a.startAt.minusHours(CONFIRM_HOURS));
         boolean changeable = (a.status == AppointmentStatus.PROGRAMADA || a.status == AppointmentStatus.CONFIRMADA)
                 && a.startAt.isAfter(now.plusHours(PortalExtrasService.MIN_HOURS_TO_CHANGE));
         m.put("canReschedule", changeable);
@@ -317,6 +322,9 @@ public class PortalService {
         if (!a.patient.id.equals(p.id)) throw ApiException.notFound("La cita"); // no se revela que existe
         if (a.status != AppointmentStatus.PROGRAMADA || !a.startAt.isAfter(Dates.now())) {
             throw ApiException.conflict("NO_CONFIRMABLE", "Esta cita ya no se puede confirmar.");
+        }
+        if (!a.startAt.isAfter(Dates.now().plusHours(CONFIRM_HOURS))) {
+            throw ApiException.conflict("PLAZO_VENCIDO", "La confirmación se hace hasta 2 horas antes de la cita. Recepción te llamará; también puedes escribirnos al " + clinicPhone + ".");
         }
         agenda.changeStatus(a.id, new AgendaService.StatusRequest(AppointmentStatus.CONFIRMADA, "Confirmada por el paciente desde la app"));
         return appointments(subject);
