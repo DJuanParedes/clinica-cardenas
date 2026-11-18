@@ -253,6 +253,22 @@ export class Api {
   portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
   portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
   portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
+  portalContact(phone: string, email: string): Observable<any> { return this.http.put('/api/portal/me/contact', { phone, email }); }
+  portalTreatments(): Observable<any> { return this.http.get('/api/portal/treatments'); }
+  portalConsents(): Observable<any> { return this.http.get('/api/portal/consents'); }
+  portalConsentPdf(id: number): Observable<Blob> { return this.http.get(`/api/portal/consents/${id}/pdf`, { responseType: 'blob' }); }
+  portalFileLink(id: number): Observable<{ url: string }> { return this.http.get<{ url: string }>(`/api/portal/files/${id}/link`); }
+  portalDocuments(): Observable<any> { return this.http.get('/api/portal/documents'); }
+  portalInvoiceLink(id: number): Observable<{ url: string }> { return this.http.get<{ url: string }>(`/api/portal/documents/invoices/${id}/link`); }
+  portalFileRequests(): Observable<any[]> { return this.http.get<any[]>('/api/portal/file-requests'); }
+  portalUploadRequest(id: number, file: File): Observable<any[]> { const f = new FormData(); f.append('file', file); return this.http.post<any[]>(`/api/portal/file-requests/${id}/upload`, f); }
+  // archivos solicitados y seguimiento de confirmaciones (personal)
+  fileRequests(patientId: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${patientId}/file-requests`); }
+  createFileRequest(patientId: number, body: any): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${patientId}/file-requests`, body); }
+  cancelFileRequest(patientId: number, id: number): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${patientId}/file-requests/${id}/cancel`, {}); }
+  uploadFileRequest(patientId: number, id: number, file: File): Observable<any[]> { const f = new FormData(); f.append('file', file); return this.http.post<any[]>(`/api/patients/${patientId}/file-requests/${id}/upload`, f); }
+  unconfirmed(): Observable<any> { return this.http.get('/api/agenda/unconfirmed'); }
+  callResult(id: number, result: string, note: string): Observable<any> { return this.http.post(`/api/appointments/${id}/call`, { result, note }); }
 
   // ---------- mensajes de WhatsApp y asistente virtual
   conversations(q?: string): Observable<{ items: ConversationThread[]; unread: number; attention: number; mode: string }> {
