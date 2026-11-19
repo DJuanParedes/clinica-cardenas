@@ -18,6 +18,7 @@ main                         ← entregas cerradas (fin de sprint / evaluación)
 | Versión | `release/<versión>` | rama de despliegue | rama de despliegue (PR) |
 | Funcionalidad | `feat/<versión>/<área>` | `release/<versión>` | `release/<versión>` (PR) |
 | Corrección | `fix/<versión>/<tema>` | `release/<versión>` o rama de despliegue | la rama de la que nació |
+| Solo documentación | `docs/<versión>/<tema>` | rama de despliegue | rama de despliegue (PR) |
 
 Áreas: `api`, `web`, `movil`, `deploy`, `pruebas`. La versión es la misma que muestra la app (`versionName` en `movil/composeApp/build.gradle.kts`).
 
