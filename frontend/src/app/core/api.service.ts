@@ -251,6 +251,19 @@ export class Api {
     return this.http.get<any>('/api/portal/appointments');
   }
   portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
+  portalNotices(): Observable<{ unread: number; items: any[] }> { return this.http.get<any>('/api/portal/notices'); }
+  portalReadNotices(): Observable<any> { return this.http.post('/api/portal/notices/read', {}); }
+  portalBookingOptions(): Observable<any> { return this.http.get('/api/portal/booking/options'); }
+  portalBookingSlots(dentistId: number, date: string, reasonCode: string): Observable<{ slots: string[]; durationMin: number; works: boolean }> {
+    return this.http.get<any>('/api/portal/booking/slots', { params: params({ dentistId, date, reasonCode }) });
+  }
+  portalBook(body: { dentistId: number; startAt: string; reasonCode: string; notes?: string }): Observable<any> {
+    return this.http.post('/api/portal/appointments', body);
+  }
+  portalReschedule(id: number, body: { dentistId?: number; startAt: string }): Observable<any> {
+    return this.http.post(`/api/portal/appointments/${id}/reschedule`, body);
+  }
+  portalCancel(id: number, reason?: string): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/cancel`, { reason }); }
   portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
   portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
   portalContact(phone: string, email: string): Observable<any> { return this.http.put('/api/portal/me/contact', { phone, email }); }

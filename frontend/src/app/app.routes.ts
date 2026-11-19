@@ -13,7 +13,9 @@ export const routes: Routes = [
     canActivate: [portalGuard],
     loadComponent: () => import('./portal/portal-shell.component').then((m) => m.PortalShellComponent),
     children: [
-      { path: '', loadComponent: () => import('./portal/portal-home.component').then((m) => m.PortalHomeComponent), title: T('Mis citas') },
+      { path: '', loadComponent: () => import('./portal/portal-dashboard.component').then((m) => m.PortalDashboardComponent), title: T('Inicio') },
+      { path: 'citas', loadComponent: () => import('./portal/portal-home.component').then((m) => m.PortalHomeComponent), title: T('Mis citas') },
+      { path: 'agendar', loadComponent: () => import('./portal/portal-booking.component').then((m) => m.PortalBookingComponent), title: T('Agendar cita') },
       { path: 'historia', loadComponent: () => import('./portal/portal-history.component').then((m) => m.PortalHistoryComponent), title: T('Mi historia') },
       { path: 'promociones', loadComponent: () => import('./portal/portal-promos.component').then((m) => m.PortalPromosComponent), title: T('Promociones') },
       { path: 'cuenta', loadComponent: () => import('./portal/portal-account.component').then((m) => m.PortalAccountComponent), title: T('Mi cuenta') },

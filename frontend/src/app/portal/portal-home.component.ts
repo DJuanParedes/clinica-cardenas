@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Api, PortalAppointment } from '../core/api.service';
 import { PortalAuth } from '../core/portal-auth.service';
 import { ToastService } from '../core/toast.service';
@@ -9,7 +10,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-portal-home',
   standalone: true,
-  imports: [IconComponent],
+  imports: [IconComponent, RouterLink],
   template: `
     @if (!loaded) {
       <div class="skeleton" style="height: 220px; border-radius: 20px"></div>
@@ -28,6 +29,7 @@ import { IconComponent } from '../shared/icon.component';
               <button class="btn accent lg" type="button" (click)="confirm(next)" [disabled]="busy"><app-icon name="check" [size]="18" /> Confirmar asistencia</button>
             }
             <button class="btn lg" type="button" (click)="ics(next)"><app-icon name="calendar" [size]="18" /> Agregar a mi calendario</button>
+            @if (next.canReschedule) { <a class="btn lg" routerLink="/app/agendar">Reprogramar cita</a> }
           </div>
           <a class="call" [href]="'https://wa.me/51' + phoneDigits" target="_blank" rel="noopener"><app-icon name="message" [size]="16" /> ¿No puedes asistir? Escríbenos por WhatsApp</a>
         </section>
@@ -35,8 +37,8 @@ import { IconComponent } from '../shared/icon.component';
         <section class="none">
           <app-icon name="calendar" [size]="34" />
           <h2>No tienes citas programadas</h2>
-          <p class="muted">Para separar una cita escríbenos o llámanos.</p>
-          <a class="btn primary lg" [href]="'https://wa.me/51' + phoneDigits" target="_blank" rel="noopener"><app-icon name="message" [size]="18" /> Pedir cita por WhatsApp</a>
+          <p class="muted">Elige un horario disponible o escríbenos por WhatsApp.</p>
+          <a class="btn primary lg" routerLink="/app/agendar"><app-icon name="calendar" [size]="18" /> Agendar cita</a>
         </section>
       }
 
