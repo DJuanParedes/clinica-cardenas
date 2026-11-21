@@ -278,6 +278,8 @@ export class PatientFormComponent implements OnInit {
 
   @Input() id?: string;
   @Input() doc?: string;
+  /** v2.7: registrar un lead del embudo como paciente (precarga sus datos y lo vincula al guardar). */
+  @Input() lead?: string;
 
   docTypes = DOC_TYPES;
   today = isoDate();
@@ -405,6 +407,17 @@ export class PatientFormComponent implements OnInit {
     });
     this.api.dniConfig().subscribe({ next: (c) => (this.dniEnabled = c.enabled), error: () => {} });
     if (!this.id) this.api.patientProfileOptions().subscribe({ next: (o) => (this.sources = o.sources), error: () => {} });
+    if (!this.id && this.lead) this.api.lead(+this.lead).subscribe({ next: (l) => {
+      const parts = String(l.fullName || '').trim().split(/\s+/);
+      if (!l.fullName.startsWith('Contacto WhatsApp')) {
+        const n = parts.length > 3 ? 2 : 1;
+        this.f.firstName = parts.slice(0, n).join(' ');
+        this.f.lastName = parts.slice(n).join(' ');
+      }
+      this.f.phone = l.phone || '';
+      this.f.email = l.email || '';
+      this.source = l.source || '';
+    }, error: () => {} });
     if (this.id) {
       this.api.patient(+this.id).subscribe(({ patient: p }) => {
         this.f = {
@@ -484,6 +497,11 @@ export class PatientFormComponent implements OnInit {
         // v2.5: la fuente de captación se guarda en la ficha ampliada (no bloquea el registro si falla)
         if (!this.id && this.source) {
           this.api.updatePatientProfile(p.id, { source: this.source, sourceDetail: this.sourceDetail }).subscribe({ error: () => {} });
+        }
+        if (!this.id && this.lead) {
+          this.api.linkLeadPatient(+this.lead, p.id).subscribe({ error: () => {} });
+          this.router.navigate(['/embudo'], { queryParams: { lead: this.lead } });
+          return;
         }
         this.router.navigate(['/pacientes', p.id]);
       },
