@@ -4,7 +4,7 @@ Fuera de las 24 horas desde el último mensaje del paciente, WhatsApp solo entre
 El sistema elige la plantilla de cada aviso; si Meta todavía no la aprobó, usa la plantilla general `aviso_clinica`
 con el texto en una sola línea (y Meta puede rechazarla si es publicidad).
 
-Se crean en **WhatsApp Manager → Plantillas de mensajes → Crear plantilla**, idioma **Spanish (es)**.
+Las tres de v2.9 se enviaron a revisión el 21/11/2026. Se crean en **WhatsApp Manager → Plantillas de mensajes → Crear plantilla**, idioma **Spanish (es)**.
 El nombre debe ser exactamente el de la tabla. Los ejemplos son los valores que pide Meta para revisar.
 
 ## Avisos de citas (desde v2.3)
@@ -42,7 +42,7 @@ Hola {{1}}, *{{2}}* te envía el documento *{{3}}* para que lo revises y firmes 
 El enlace vence en {{5}} días. Si tienes dudas, escríbenos por aquí antes de firmar.
 ```
 Ejemplos: {{1}} `Sofía` · {{2}} `Clínica Dental Cárdenas` · {{3}} `consentimiento informado de endodoncia` ·
-{{4}} `https://clinica-cardenas.duckdns.org/firmar/abc123` · {{5}} `7`
+{{4}} `https://clinica-cardenas.chilecentral.cloudapp.azure.com/firmar/abc123` · {{5}} `7`
 
 ## Notas
 - Las plantillas de **Marketing** solo se envían a pacientes con permiso de publicidad (campañas) o que no lo
