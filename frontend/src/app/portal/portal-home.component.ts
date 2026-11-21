@@ -29,7 +29,7 @@ import { IconComponent } from '../shared/icon.component';
               <button class="btn accent lg" type="button" (click)="confirm(next)" [disabled]="busy"><app-icon name="check" [size]="18" /> Confirmar asistencia</button>
             }
             <button class="btn lg" type="button" (click)="ics(next)"><app-icon name="calendar" [size]="18" /> Agregar a mi calendario</button>
-            @if (next.canReschedule) { <a class="btn lg" routerLink="/app/agendar">Reprogramar cita</a> }
+            @if (next.canReschedule) { <a class="btn lg" routerLink="/app/agendar" [queryParams]="{ reprogramar: next.id, odontologo: next.dentistId }">Reprogramar cita</a> }
           </div>
           <a class="call" [href]="'https://wa.me/51' + phoneDigits" target="_blank" rel="noopener"><app-icon name="message" [size]="16" /> ¿No puedes asistir? Escríbenos por WhatsApp</a>
         </section>

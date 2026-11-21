@@ -254,8 +254,8 @@ export class Api {
   portalNotices(): Observable<{ unread: number; items: any[] }> { return this.http.get<any>('/api/portal/notices'); }
   portalReadNotices(): Observable<any> { return this.http.post('/api/portal/notices/read', {}); }
   portalBookingOptions(): Observable<any> { return this.http.get('/api/portal/booking/options'); }
-  portalBookingSlots(dentistId: number, date: string, reasonCode: string): Observable<{ slots: string[]; durationMin: number; works: boolean }> {
-    return this.http.get<any>('/api/portal/booking/slots', { params: params({ dentistId, date, reasonCode }) });
+  portalBookingSlots(dentistId: number, date: string, reasonCode: string, excludeId?: number | null): Observable<{ slots: string[]; durationMin: number; works: boolean }> {
+    return this.http.get<any>('/api/portal/booking/slots', { params: params({ dentistId, date, reasonCode, excludeId: excludeId ?? undefined }) });
   }
   portalBook(body: { dentistId: number; startAt: string; reasonCode: string; notes?: string }): Observable<any> {
     return this.http.post('/api/portal/appointments', body);
@@ -365,6 +365,7 @@ export interface NotificationItem {
 export interface PortalAppointment {
   id: number; startAt: string; endAt: string; durationMin: number; reason: string; status: string;
   dentist: { fullName: string; specialty: string; color: string }; canConfirm: boolean;
+  canReschedule?: boolean; canCancel?: boolean; dentistId?: number; confirmDeadline?: string;
 }
 
 export interface InvoiceDetail {
