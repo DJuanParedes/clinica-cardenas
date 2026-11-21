@@ -102,11 +102,12 @@ import { PUBLIC_STYLES } from './public-styles';
           </form>
         }
         <p class="foot">¿Es tu primera vez? También puedes <a routerLink="/registro">llenar tu ficha antes de venir</a>.</p>
+        <p class="foot lrb"><a routerLink="/libro-reclamaciones"><img src="libro-reclamaciones.svg" alt="" width="34" height="34" /> Libro de Reclamaciones</a></p>
       }
     </main>
     <app-legal-modal [open]="legalOpen" code="PRIVACIDAD" [who]="(p.firstName + ' ' + p.lastName).trim()" (accepted)="p.dataConsent = true; legalOpen = false" (closed)="legalOpen = false" />
   `,
-  styles: [PUBLIC_STYLES],
+  styles: [PUBLIC_STYLES + `.lrb a { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--teal-strong); }`],
 })
 export class PublicBookingComponent implements OnInit {
   private api = inject(Api);
