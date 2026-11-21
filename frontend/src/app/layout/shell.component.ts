@@ -19,6 +19,7 @@ const NAV: NavGroup[] = [
     { path: '/mensajes', label: 'Mensajes WhatsApp', icon: 'message', perms: ['MENSAJES'] },
     { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
     { path: '/mis-ganancias', label: 'Mis ganancias', icon: 'coins', perms: [], roles: ['ODONTOLOGO'] },
+    { path: '/laboratorio', label: 'Laboratorio', icon: 'tooth', perms: ['LABORATORIO', 'CAJA_EGRESOS'] },
     { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
     { path: '/insumos', label: 'Solicitar insumos', icon: 'box', perms: ['SOLICITAR_INSUMOS'] },
     { path: '/catalogo', label: 'Procedimientos y promociones', icon: 'tag', perms: ['PROMOCIONES', 'PLAN_TRATAMIENTO'] },
