@@ -148,6 +148,14 @@ function metaError(res, status, code, message, details) {
 /** Arma el texto que vería el paciente. Devuelve {error} con el mismo código que usaría Meta si algo no cuadra. */
 function texto(body) {
   if (body.type === 'text') return { texto: String(body.text?.body || ''), plantilla: null };
+  if (body.type === 'interactive') {
+    // Igual que Meta: mensaje con hasta 3 botones de respuesta de máximo 20 caracteres.
+    const it = body.interactive || {};
+    const bts = (it.action && it.action.buttons) || [];
+    if (it.type !== 'button' || !bts.length || bts.length > 3) return { error: [400, 131009, '(#131009) Parameter value is not valid', 'Los mensajes interactivos llevan de 1 a 3 botones.'] };
+    if (bts.some((b) => !b.reply || !b.reply.title || String(b.reply.title).length > 20)) return { error: [400, 131009, '(#131009) Parameter value is not valid', 'Cada botón necesita un título de hasta 20 caracteres.'] };
+    return { texto: String(it.body?.text || ''), plantilla: null, botones: bts.map((b) => ({ id: String(b.reply.id || ''), titulo: String(b.reply.title) })) };
+  }
   if (body.type === 'template') {
     const t = body.template || {};
     const def = PLANTILLAS[t.name];
@@ -176,13 +184,13 @@ async function enviar(req, res, body) {
   if (!tel) return metaError(res, 400, 131026, 'Message undeliverable.', 'El número no es un celular peruano válido (51 9XX XXX XXX).');
   const t = texto(body);
   if (t && t.error) return metaError(res, t.error[0], t.error[1], t.error[2], t.error[3]);
-  if (!t) return metaError(res, 400, 131051, 'Unsupported message type.', 'El simulador acepta mensajes de tipo text y template.');
+  if (!t) return metaError(res, 400, 131051, 'Unsupported message type.', 'El simulador acepta mensajes de tipo text, template e interactive.');
   if (body.type === 'text' && !t.texto.trim()) return metaError(res, 400, 100, '(#100) Param text[\'body\'] must be a non-empty string.');
   const c = chat(tel);
-  if (VENTANA_24H && body.type === 'text' && (!c.ultimoEntrante || Date.now() - Date.parse(c.ultimoEntrante) > 24 * 3600_000)) {
+  if (VENTANA_24H && (body.type === 'text' || body.type === 'interactive') && (!c.ultimoEntrante || Date.now() - Date.parse(c.ultimoEntrante) > 24 * 3600_000)) {
     return metaError(res, 400, 131047, 'Re-engagement message', 'Más de 24 horas desde el último mensaje del paciente: usa una plantilla.');
   }
-  const m = { id: wamid(), dir: 'out', telefono: tel, texto: t.texto.slice(0, 4096), plantilla: t.plantilla, estado: null, creadoEn: nowIso() };
+  const m = { id: wamid(), dir: 'out', telefono: tel, texto: t.texto.slice(0, 4096), plantilla: t.plantilla, botones: t.botones || null, estado: null, creadoEn: nowIso() };
   c.mensajes.push(m);
   if (c.mensajes.length > 500) c.mensajes.splice(0, c.mensajes.length - 500);
   save();
@@ -213,10 +221,12 @@ async function responder(body) {
   c.mensajes.push(m);
   c.ultimoEntrante = m.creadoEn;
   save();
-  const ok = await webhook({
-    contacts: [{ profile: { name: nombreDe(tel) || 'Paciente' }, wa_id: '51' + tel }],
-    messages: [{ from: '51' + tel, id: m.id, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: m.texto } }],
-  });
+  const boton = body.boton && body.boton.id ? { id: String(body.boton.id), title: txt.slice(0, 20) } : null;
+  if (boton) m.boton = true;
+  const entrante = boton
+    ? { from: '51' + tel, id: m.id, timestamp: String(Math.floor(Date.now() / 1000)), type: 'interactive', interactive: { type: 'button_reply', button_reply: boton } }
+    : { from: '51' + tel, id: m.id, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: m.texto } };
+  const ok = await webhook({ contacts: [{ profile: { name: nombreDe(tel) || 'Paciente' }, wa_id: '51' + tel }], messages: [entrante] });
   return { status: 200, body: { enviado: true, entregadoAlSistema: ok, id: m.id } };
 }
 
@@ -254,6 +264,7 @@ aside{background:#fff;display:flex;flex-direction:column;min-height:0;border-rig
 .dia{text-align:center;margin:10px 0}.dia span{background:#fff;border-radius:7px;padding:5px 12px;font-size:12.5px;color:#54656f;box-shadow:0 1px .5px rgba(11,20,26,.13)}
 .b{max-width:min(560px,75%);margin:3px 0;padding:6px 8px 8px 9px;border-radius:7.5px;position:relative;white-space:pre-wrap;line-height:1.38;box-shadow:0 1px .5px rgba(11,20,26,.13);word-wrap:break-word;clear:both}
 .b.in{background:#fff;float:left;border-top-left-radius:0}.b.out{background:#d9fdd3;float:right;border-top-right-radius:0}
+.bts{display:flex;flex-direction:column;gap:1px;margin:8px -8px -8px -9px;border-top:1px solid rgba(0,0,0,.08)}.bt{border:0;background:#fff;color:#027eb5;font:inherit;font-weight:600;padding:9px;cursor:pointer}.bt:hover{background:#f5f6f6}.b.out .bt{background:#e9fbe5}
 .b.fail{background:#ffe3e3}
 .fila{overflow:hidden}
 .b .h{float:right;margin:8px 0 -5px 10px;font-size:11px;color:#667781;white-space:nowrap}
@@ -316,7 +327,7 @@ function pintarChat(){
   let dia='',html='';
   for(const m of c.mensajes){const d=dd(m.creadoEn);if(d!==dia){dia=d;html+='<div class="dia"><span>'+d+'</span></div>';}
     const f=m.estado==='failed';
-    html+='<div class="fila"><div class="b '+m.dir+(f?' fail':'')+'" title="'+(m.dir==='out'?esc(est(m)):'Escrito por el paciente')+'">'+(m.plantilla?'<span class="tpl">Plantilla · '+esc(m.plantilla)+'</span><br>':'')+wa(m.texto)+(f?'<span class="err">⚠ '+esc(m.error||'No se pudo entregar')+'</span>':'')+'<span class="h">'+hh(m.creadoEn)+(m.dir==='out'?tk(m):'')+'</span></div></div>';}
+    html+='<div class="fila"><div class="b '+m.dir+(f?' fail':'')+'" title="'+(m.dir==='out'?esc(est(m)):'Escrito por el paciente')+'">'+(m.plantilla?'<span class="tpl">Plantilla · '+esc(m.plantilla)+'</span><br>':'')+wa(m.texto)+(f?'<span class="err">⚠ '+esc(m.error||'No se pudo entregar')+'</span>':'')+'<span class="h">'+hh(m.creadoEn)+(m.dir==='out'?tk(m):'')+'</span>'+(m.botones&&m.botones.length?'<div class="bts">'+m.botones.map(b=>'<button class="bt" data-bid="'+esc(b.id)+'" data-bt="'+esc(b.titulo)+'">↩ '+esc(b.titulo)+'</button>').join('')+'</div>':'')+'</div></div>';}
   box.innerHTML='<div class="cab"><div class="av">'+esc(ini(c.nombre))+'</div><div class="q"><b>'+esc(c.nombre||'Paciente sin registrar')+'</b><small>'+fmtTel(c.telefono)+'</small></div>'+
     '<label class="chk" title="Los mensajes quedan con un solo check hasta que se encienda"><input type="checkbox" id="apag" '+(c.apagado?'checked':'')+'> Celular apagado</label>'+
     '<label class="chk" title="Meta acepta el envío y luego avisa que no se entregó"><input type="checkbox" id="sinwa" '+(c.sinWhatsapp?'checked':'')+'> No tiene WhatsApp</label></div>'+
@@ -330,6 +341,7 @@ function pintarChat(){
   document.getElementById('env').onclick=()=>enviar(txt.value);
   txt.onkeydown=e=>{if(e.key==='Enter')enviar(txt.value);};
   box.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>enviar(b.dataset.r));
+  box.querySelectorAll('[data-bid]').forEach(b=>b.onclick=async()=>{const r=await api('sim/responder',{telefono:sel,texto:b.dataset.bt,boton:{id:b.dataset.bid}});if(r.error)alert(r.error);firma='';setTimeout(load,300);setTimeout(load,1500);setTimeout(load,3500);});
   document.getElementById('apag').onchange=async e=>{await api('sim/telefono',{telefono:sel,apagado:e.target.checked});firma='';load();};
   document.getElementById('sinwa').onchange=async e=>{await api('sim/sin-whatsapp',{telefono:sel,activo:e.target.checked});firma='';load();};
 }
