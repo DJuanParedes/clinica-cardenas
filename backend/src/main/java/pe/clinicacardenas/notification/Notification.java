@@ -28,6 +28,11 @@ public class Notification {
     public String waTemplate;
     @Column(name = "wa_params")
     public String waParams;
+    /** v2.6: plantilla de la que salió el texto y botones de respuesta rápida de WhatsApp (JSON). */
+    @Column(name = "template_code")
+    public String templateCode;
+    @Column(name = "wa_buttons")
+    public String waButtons;
     @Column(name = "idempotency_key")
     public String idempotencyKey;
     @Column(name = "scheduled_for")
