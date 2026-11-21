@@ -44,6 +44,8 @@ public class PublicPatientService {
     private final SurveyRepository surveys;
     private final SurveyLinks links;
     private final AuditService audit;
+    @org.springframework.beans.factory.annotation.Autowired @org.springframework.context.annotation.Lazy
+    private pe.clinicacardenas.crm.MarketingService marketing;
     private final String clinicName, clinicAddress, clinicPhone;
     private final Map<String, Deque<Long>> hits = new ConcurrentHashMap<>();
 
@@ -69,7 +71,7 @@ public class PublicPatientService {
     public record PersonData(String docType, String docNumber, String firstName, String lastName, LocalDate birthDate, String sex,
                              String phone, String email, String address, String ubigeo, String guardianName, String guardianDocNumber,
                              String guardianRelationship, String guardianPhone, String emergencyContactName, String emergencyContactPhone,
-                             String source, Boolean dataConsent) {}
+                             String source, Boolean dataConsent, Boolean marketingConsent) {}
 
     public record BookingRequest(PersonData person, Long dentistId, LocalDateTime startAt, String reasonCode, String notes) {}
 
@@ -128,6 +130,7 @@ public class PublicPatientService {
         if (r.startAt().isBefore(Dates.now().plusHours(MIN_HOURS))) throw ApiException.field("startAt", "Reserva con al menos " + MIN_HOURS + " horas de anticipación.");
         if (r.startAt().toLocalDate().isAfter(Dates.today().plusDays(MAX_DAYS))) throw ApiException.field("startAt", "Puedes reservar hasta " + MAX_DAYS + " días antes.");
         Patient p = findOrCreate(r.person(), ip);
+        marketingOptIn(p, r.person(), ip);
         limit("tel:" + p.id, PHONE_PER_DAY, 86_400_000L, "Ya hiciste reservas hoy. Si necesitas otra cita, llámanos al " + clinicPhone + ".");
         long open = appointments.findByPatientIdOrderByStartAtDesc(p.id).stream().filter(a -> !a.status.isFinal() && a.endAt.isAfter(Dates.now())).count();
         if (open >= MAX_OPEN) {
@@ -208,6 +211,7 @@ public class PublicPatientService {
             throw ApiException.conflict("YA_REGISTRADO", "Ya estás registrado en la clínica. Si cambiaron tus datos, te los actualizamos en recepción. Puedes reservar tu cita desde " + links.bookingUrl() + ".");
         }
         Patient p = findOrCreate(d, ip);
+        marketingOptIn(p, d, ip);
         Map<String, Object> form = preregisterForm();
         if (form.get("templateId") != null && r.answers() != null && !r.answers().isEmpty()) {
             try {
@@ -298,5 +302,11 @@ public class PublicPatientService {
         if (s == null || s.isBlank()) return null;
         String t = s.trim();
         return t.length() > max ? t.substring(0, max) : t;
+    }
+
+    /** v2.7: casilla opcional "acepto recibir promociones" (aparte del consentimiento de datos). */
+    private void marketingOptIn(Patient p, PersonData d, String ip) {
+        if (Boolean.TRUE.equals(d.marketingConsent()) && !Boolean.TRUE.equals(p.marketingConsent))
+            marketing.applyConsent(p, true, "WEB", "paciente (enlace web)", ip);
     }
 }

@@ -189,6 +189,58 @@ public class NotificationService {
         try { return action.get(); } finally { CREATED_TEMPLATE.remove(); }
     }
 
+    /** v2.7: variables que no dependen de una cita (campañas y cumpleaños). */
+    public Map<String, String> patientVars(Patient p) {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put("paciente", firstName(p));
+        v.put("paciente_completo", p.getFullName());
+        v.put("clinica", clinicName);
+        v.put("direccion", clinicAddress);
+        v.put("telefono_clinica", clinicPhone);
+        v.put("enlace_citas", links.bookingUrl());
+        return v;
+    }
+
+    public static final List<String> PATIENT_VARS = List.of("paciente", "paciente_completo", "clinica", "direccion", "telefono_clinica", "enlace_citas");
+
+    /** Destinos según el canal de la campaña: PREFERIDO (el del paciente), WHATSAPP o EMAIL. */
+    public static List<Target> targets(Patient p, String channel) {
+        if (channel == null || "PREFERIDO".equals(channel)) return targets(p);
+        if ("NINGUNO".equals(p.notifyChannel)) return List.of();
+        if ("WHATSAPP".equals(channel)) return p.phone == null || p.phone.isBlank() ? List.of() : List.of(new Target("WHATSAPP", p.phone));
+        if ("EMAIL".equals(channel)) return p.email == null || p.email.isBlank() ? List.of() : List.of(new Target("EMAIL", p.email));
+        return List.of();
+    }
+
+    public record Sent(String channel, Long notificationId) {}
+
+    /**
+     * v2.7: mensaje de marketing (campaña o cumpleaños) con su texto ya escrito y variables del paciente.
+     * Lleva al final cómo darse de baja. La clave evita repetir el envío. Devuelve lo que quedó en cola.
+     */
+    @Transactional
+    public List<Sent> marketing(Patient p, String type, String templateCode, String subject, String body, String channel, String key) {
+        Map<String, String> v = patientVars(p);
+        String subj = pe.clinicacardenas.messaging.MessageTemplateService.fill(subject, v);
+        String text = pe.clinicacardenas.messaging.MessageTemplateService.fill(body, v);
+        List<Sent> out = new ArrayList<>();
+        for (Target t : targets(p, channel)) {
+            String k = key + ":" + t.channel();
+            if (repo.existsByIdempotencyKey(k)) continue;
+            String b = "WHATSAPP".equals(t.channel())
+                    ? text + "\n\n_Responde *BAJA* si no deseas recibir más promociones._"
+                    : text.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone
+                      + "\n\nSi no deseas recibir más promociones, respóndenos BAJA por WhatsApp o avísanos en recepción.";
+            add(p, null, type, "ENVIAR", t, subj, b, k, null);
+            repo.findByIdempotencyKey(k).ifPresent(n -> {
+                n.templateCode = templateCode;
+                repo.save(n);
+                out.add(new Sent(t.channel(), n.id));
+            });
+        }
+        return out;
+    }
+
     /** Variables de la plantilla para una cita. */
     public Map<String, String> vars(Appointment a) {
         Map<String, String> v = new LinkedHashMap<>();

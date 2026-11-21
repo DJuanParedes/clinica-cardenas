@@ -42,6 +42,13 @@ import { IconComponent } from '../shared/icon.component';
         <div class="skeleton" style="height: 92px; margin-bottom: 16px"></div>
         <div class="skeleton" style="height: 320px"></div>
       } @else {
+        @if (ts && (ts.mineOverdue || ts.mineToday)) {
+          <a class="task-strip" routerLink="/tareas" [class.hot]="ts.mineOverdue">
+            <app-icon name="checks" [size]="18" />
+            <span><strong>{{ ts.mineToday }} tarea{{ ts.mineToday === 1 ? '' : 's' }} para hoy</strong>{{ ts.mineOverdue ? ' · ' + ts.mineOverdue + ' vencida' + (ts.mineOverdue === 1 ? '' : 's') : '' }}{{ ts.unassigned ? ' · ' + ts.unassigned + ' sin asignar' : '' }}</span>
+            <span class="go">Ver mis tareas →</span>
+          </a>
+        }
         @if (unc?.total && canCall) {
           <section class="panel unc" [class.hot]="unc.overdue" aria-label="Citas por confirmar">
             <div class="panel-head"><h3><app-icon name="phone" [size]="16" /> Citas sin confirmar (próximas 24 h)</h3>
@@ -172,6 +179,10 @@ import { IconComponent } from '../shared/icon.component';
     </div>
   `,
   styles: [`
+    .task-strip { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: var(--radius);
+      background: var(--teal-soft); color: var(--ink); text-decoration: none; }
+    .task-strip.hot { background: var(--gum-soft); border-color: #efc3cf; }
+    .task-strip .go { margin-left: auto; color: var(--teal-strong); font-weight: 700; font-size: var(--step--1); }
     .unc { margin-bottom: 16px; } .unc.hot { border-color: #f3b4ac; } .hotx { color: var(--gum); }
     .attn { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
     .attn-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--teal-strong); font-size: 13.5px; font-weight: 600; }
@@ -227,10 +238,12 @@ export class DashboardComponent implements OnInit {
 
   load() {
     this.api.dashboard().subscribe((d) => (this.data = d));
+    if (this.auth.can('TAREAS')) this.api.taskSummary().subscribe({ next: (t) => (this.ts = t), error: () => {} });
     if (this.canCall) this.api.unconfirmed().subscribe({ next: (u) => (this.unc = u), error: () => {} });
   }
 
   unc: any = null;
+  ts: any = null;
   get canCall() { return this.auth.can('CITAS_GESTIONAR') || this.auth.can('CITAS_ESTADO'); }
   when(iso: string) { const d = new Date(iso); return d.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit' }) + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }
   hm(iso: string) { return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }

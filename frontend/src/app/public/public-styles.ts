@@ -28,6 +28,7 @@ export const PUBLIC_STYLES = `
   .slots button.on { background: var(--teal, #0aa5c9); border-color: var(--teal, #0aa5c9); color: #fff; }
   .back { background: none; border: 0; color: var(--teal-strong); padding: 0; font: inherit; font-size: 14px; cursor: pointer; justify-self: start; }
   .consent { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line, #e2e8f0); border-radius: 14px; padding: 12px; font-size: 14px; }
+  .consent.opt { cursor: pointer; color: var(--muted, #64748b); }
   .consent.ok { border-color: #bfe0ca; background: var(--green-soft, #ecf8f0); }
   .consent.invalid { border-color: var(--gum, #c0264d); }
   .done { text-align: center; padding: 28px 18px; }

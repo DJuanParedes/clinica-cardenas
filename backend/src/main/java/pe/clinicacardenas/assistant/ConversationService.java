@@ -33,6 +33,8 @@ public class ConversationService {
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
     public static final List<String> MODES = List.of("AUTOMATICO", "FUERA_HORARIO", "APAGADO");
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false) @org.springframework.context.annotation.Lazy
+    private pe.clinicacardenas.crm.LeadService leads;
     private final JdbcTemplate jdbc;
     private final CareService care;
     private final AssistantService assistant;
@@ -184,6 +186,8 @@ public class ConversationService {
         if (phone == null || text.isEmpty()) return Map.of("accion", "IGNORADO");
         Map<String, Object> t = ensureThread(phone);
         record(phone, "IN", "PACIENTE", text, null, null, null, null);
+        // v2.7: quien escribe sin ser paciente entra al embudo de ventas como lead nuevo
+        if (t.get("patient_id") == null && leads != null) leads.fromWhatsApp(phone, text);
 
         // Reserva por WhatsApp en curso: los números que escribe son opciones de fecha/hora, no "1 confirma / 2 reprograma".
         Long bookingPid = t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue();

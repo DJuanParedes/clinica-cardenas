@@ -84,6 +84,12 @@ public class Patient {
     @Column(name = "data_consent_at")
     public LocalDateTime dataConsentAt;
 
+    /** v2.7: consentimiento aparte para publicidad. null = no se le preguntó; false = no aceptó o pidió la baja. */
+    @Column(name = "marketing_consent")
+    public Boolean marketingConsent;
+    @Column(name = "marketing_consent_at")
+    public LocalDateTime marketingConsentAt;
+
     /** Paciente de ejemplo creado al instalar (no recibe mensajes reales). */
     @Column(name = "demo")
     public boolean demo;

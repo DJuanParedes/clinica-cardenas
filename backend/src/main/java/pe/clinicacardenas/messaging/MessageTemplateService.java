@@ -150,7 +150,7 @@ public class MessageTemplateService {
         return jdbc.queryForList(sql.toString(), args.toArray());
     }
 
-    static String fill(String text, Map<String, String> vars) {
+    public static String fill(String text, Map<String, String> vars) {
         if (text == null) return "";
         Matcher m = VAR.matcher(text);
         StringBuilder sb = new StringBuilder();
@@ -162,7 +162,7 @@ public class MessageTemplateService {
         return sb.toString();
     }
 
-    static List<String> unknownVars(String text) {
+    public static List<String> unknownVars(String text) {
         List<String> out = new ArrayList<>();
         Matcher m = VAR.matcher(text == null ? "" : text);
         while (m.find()) if (!VARIABLES.containsKey(m.group(1)) && !out.contains(m.group(1))) out.add(m.group(1));
