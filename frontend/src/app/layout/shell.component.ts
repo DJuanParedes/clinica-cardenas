@@ -32,6 +32,7 @@ const NAV: NavGroup[] = [
   { title: 'Gestión', items: [
     { path: '/reportes', label: 'Indicadores', icon: 'chart', perms: ['REPORTES'] },
     { path: '/comisiones', label: 'Comisiones', icon: 'percent', perms: ['COMISIONES'] },
+    { path: '/comunicacion', label: 'Comunicación con pacientes', icon: 'send', perms: ['AUTOMATIZACIONES'] },
     { path: '/notificaciones', label: 'Notificaciones', icon: 'bell', perms: ['NOTIFICACIONES'] },
   ] },
   { title: 'Seguridad', items: [

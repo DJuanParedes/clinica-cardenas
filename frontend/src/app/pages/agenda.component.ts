@@ -101,7 +101,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
                           [style.top.px]="y(time(a.startAt)) + 1" [style.height.px]="y(time(a.endAt)) - y(time(a.startAt)) - 2"
                           [style.border-left-color]="c.dentist.color" (click)="open(a)">
                     <span class="t tabular">{{ hhmm(a.startAt) }}–{{ hhmm(a.endAt) }}</span>
-                    <span class="n">{{ a.patient.fullName }}</span>
+                    <span class="n">{{ a.patient.fullName }}@if (a.bookedVia === 'WEB') { <span class="webtag" title="Reservada por el enlace público">Web</span> }</span>
                     <span class="r">{{ a.reason }}</span>
                     <span class="st">{{ label(a.status) }}@if ($any(a).rescheduleRequestedAt) { · pide reprogramar }</span>
                   </button>
@@ -132,7 +132,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
                 <div class="wl">
                   @for (a of d.list; track a.id) {
                     <button type="button" class="chip" [class]="'chip s-' + a.status" [style.border-left-color]="a.dentist.color" (click)="open(a)">
-                      <span class="tabular strong">{{ hhmm(a.startAt) }}</span> {{ a.patient.fullName }}
+                      <span class="tabular strong">{{ hhmm(a.startAt) }}</span> {{ a.patient.fullName }}@if (a.bookedVia === 'WEB') { <span class="webtag" title="Reservada por el enlace público">Web</span> }
                       <span class="muted small">{{ a.reason }}{{ filter ? '' : ' · ' + a.dentist.fullName }}</span>
                     </button>
                   } @empty { <span class="muted small pad">Libre</span> }
@@ -230,6 +230,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     </app-modal>
   `,
   styles: [`
+    .webtag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; background: #efe7ff; color: #5b3fb0; font-size: 10.5px; font-weight: 800; vertical-align: middle; }
     .vsel { margin-right: 6px; }
     .week { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); overflow-x: auto; }
     .wday { border-right: 1px solid var(--line); min-height: 360px; display: flex; flex-direction: column; }
