@@ -241,6 +241,7 @@ export class LeadsComponent implements OnInit {
     this.load();
     const id = this.route.snapshot.queryParamMap.get('lead');
     if (id) this.open(+id);
+    if (this.route.snapshot.queryParamMap.get('nuevo')) setTimeout(() => this.newLead());
   }
   load() {
     this.api.leads({ q: this.q.trim() || undefined, source: this.source || undefined, assigneeId: this.assigneeId ?? undefined }).subscribe((r) => { this.stages = r.stages; this.opts = r.options; });

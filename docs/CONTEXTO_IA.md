@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.7.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.8.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -49,8 +49,8 @@ N° de historia clínica, datos fiscales y familiares) ·
 `payment` (Mercado Pago, modo simulado) · `portal` (API del paciente: citas, historia, documentos, archivos
 solicitados, contacto) · `report` · `security` (JWT, roles y 17+ permisos editables) · `user` (usuarios y perfil).
 
-Base de datos: migraciones Flyway `V1`…`V18` en `backend/src/main/resources/db/migration/`. **Nunca edites una
-migración ya publicada**: crea la siguiente (`V19__descripcion.sql`). Errores de negocio con `ApiException`
+Base de datos: migraciones Flyway `V1`…`V22` en `backend/src/main/resources/db/migration/`. **Nunca edites una
+migración ya publicada**: crea la siguiente (`V23__descripcion.sql`). Errores de negocio con `ApiException`
 (`ApiException.field("campo", "mensaje")` para errores de formulario; el frontend los muestra bajo el campo).
 
 ### Frontend (`frontend/src/app/`)
@@ -101,7 +101,25 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.7.0)
+## Estado actual (noviembre 2026, versión 2.8.0)
+
+Versión 2.8.0: operación y detalles de uso (migraciones V19 a V22).
+- Kardex valorizado (V19, permiso `INVENTARIO_COSTOS`): cada movimiento de `inventory_moves` guarda `unit_cost`,
+  `total_cost` (con signo) y `value_after`. Las salidas se valorizan al costo de los lotes que consumen (FEFO); el
+  consumo clínico guarda `patient_id` y `procedure_id`. `KardexService`: kardex por material, valor del inventario y
+  consumo por servicio (con % del precio en materiales), por paciente y por material. Pestañas en /inventario.
+- Ortodoncia (V20, paquete `ortho`, permiso `HISTORIA_CLINICA`): `ortho_cases`, `ortho_controls` (arcos, elásticos,
+  higiene) y `ortho_photos`, que solo enlazan `patient_files` por etapa y vista. Pestaña "Ortodoncia" en la ficha
+  (álbum y comparación por etapas) y lista /ortodoncia con controles atrasados.
+- Consentimientos informados (V21, paquete `consent`, clase `InformedConsentService` para no chocar con el
+  `ConsentService` de datos personales): plantillas editables (permiso `CONSENTIMIENTOS`), envío por WhatsApp,
+  correo o tablet con enlace HMAC `/firmar/{token}` (vence en 7 días). La firma genera un PDF en la ficha con la
+  constancia (fecha, IP, a dónde se envió y SHA-256 del texto). Menores: firma el apoderado. API `/api/informed-consents`.
+- Ficha (V22): notas fijas (`patient_notes`) y franja fija con alergias y medicación (`/flags`; el detalle médico
+  solo con `HISTORIA_CLINICA`). Botón global "Crear" en el menú. Reporte anual `/reportes/anual` con PDF
+  (`SimplePdf.table` y `bars`) y CSV (`AnnualReportService`).
+- Prueba: `pruebas/version-2-8-e2e.js`. Pendiente solo si la clínica lo pide: doble moneda, multisede, chat interno
+  y pantalla de sala de espera.
 
 Versión 2.7.0: seguimiento y marketing (paquete `crm` del backend, migración V18).
 - Tareas (`tasks`, permiso `TAREAS`, todos los roles): llamar, cobrar, recordar…, de un paciente, de un lead o generales,
@@ -117,7 +135,7 @@ Versión 2.7.0: seguimiento y marketing (paquete `crm` del backend, migración V
   ASISTIO → GANADO / PERDIDO. Avanza solo con los eventos de la agenda (`LeadService.onAppointment`). Quien escribe por
   WhatsApp sin ser paciente entra como lead (`leads_whatsapp_auto`). No se vincula al paciente solo por el celular:
   se sugiere y recepción confirma.
-- Prueba: `pruebas/version-2-7-e2e.js`. Siguiente en la hoja de ruta: 2.8.0.
+- Prueba: `pruebas/version-2-7-e2e.js`.
 
 Versión 2.6.0: comunicación con el paciente (`/comunicacion`, permiso `AUTOMATIZACIONES`, solo administración).
 - Plantillas de mensajes editables (`message_templates`) con variables `{paciente}`, `{fecha_hora}`, `{odontologo}`,

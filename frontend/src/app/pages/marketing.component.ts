@@ -355,6 +355,7 @@ export class MarketingComponent implements OnInit {
     this.changed();
     this.loadCampaigns();
     if (this.view === 'cumpleanos') this.loadBd();
+    if (qp.get('nueva')) setTimeout(() => this.newCampaign(false), 300);
   }
   setView(v: string) {
     this.view = v;
