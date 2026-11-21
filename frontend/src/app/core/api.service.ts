@@ -125,6 +125,18 @@ export class Api {
   deletePatientNote(pid: number, id: number): Observable<any> { return this.http.delete(`/api/patients/${pid}/notes/${id}`); }
   annualReport(year: number): Observable<any> { return this.http.get('/api/reports/annual', { params: params({ year }) }); }
   annualReportFile(year: number, kind: 'pdf' | 'csv'): Observable<Blob> { return this.http.get(`/api/reports/annual/${kind}`, { params: params({ year }), responseType: 'blob' }); }
+  // v2.9: libro de reclamaciones
+  complaintInfo(): Observable<any> { return this.http.get('/api/public/complaints/info'); }
+  fileComplaint(body: any): Observable<any> { return this.http.post('/api/public/complaints', body); }
+  lookupComplaint(code: string, doc: string): Observable<any> { return this.http.get(`/api/public/complaints/${encodeURIComponent(code)}`, { params: params({ doc }) }); }
+  publicComplaintPdf(code: string, doc: string): Observable<Blob> { return this.http.get(`/api/public/complaints/${encodeURIComponent(code)}/pdf`, { params: params({ doc }), responseType: 'blob' }); }
+  complaints(status?: string, year?: number, q?: string): Observable<any[]> { return this.http.get<any[]>('/api/complaints', { params: params({ status, year, q }) }); }
+  complaintSummary(): Observable<any> { return this.http.get('/api/complaints/summary'); }
+  complaintSettings(body: any): Observable<any> { return this.http.put('/api/complaints/settings', body); }
+  updateComplaint(id: number, body: any): Observable<any> { return this.http.put(`/api/complaints/${id}`, body); }
+  respondComplaint(id: number, body: any): Observable<any> { return this.http.post(`/api/complaints/${id}/respond`, body); }
+  complaintPdf(id: number): Observable<Blob> { return this.http.get(`/api/complaints/${id}/pdf`, { responseType: 'blob' }); }
+  complaintsCsv(year: number): Observable<Blob> { return this.http.get('/api/complaints/export', { params: params({ year }), responseType: 'blob' }); }
 
   // v2.7: tareas
   tasks(f: { scope?: string; status?: string; kind?: string; assigneeId?: number; patientId?: number; leadId?: number; q?: string }): Observable<{ items: any[]; counts: any }> {

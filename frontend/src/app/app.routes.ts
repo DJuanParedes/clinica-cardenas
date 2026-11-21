@@ -10,6 +10,7 @@ export const routes: Routes = [
   { path: 'reservar', loadComponent: () => import('./public/public-booking.component').then((m) => m.PublicBookingComponent), title: T('Reserva tu cita') },
   { path: 'registro', loadComponent: () => import('./public/public-register.component').then((m) => m.PublicRegisterComponent), title: T('Llena tu ficha') },
   { path: 'firmar/:token', loadComponent: () => import('./public/public-sign.component').then((m) => m.PublicSignComponent), title: T('Firma tu consentimiento') },
+  { path: 'libro-reclamaciones', loadComponent: () => import('./public/public-complaints.component').then((m) => m.PublicComplaintsComponent), title: T('Libro de Reclamaciones') },
   { path: 'encuesta/:token', loadComponent: () => import('./public/public-survey.component').then((m) => m.PublicSurveyComponent), title: T('¿Cómo te atendimos?') },
   // ---------- HU-22: aplicación móvil del paciente
   { path: 'app/ingresar', canActivate: [portalGuestGuard], loadComponent: () => import('./portal/portal-login.component').then((m) => m.PortalLoginComponent), title: T('Mi app') },
@@ -46,6 +47,7 @@ export const routes: Routes = [
       { path: 'reportes/anual', canActivate: [permGuard('REPORTES')], loadComponent: () => import('./pages/annual-report.component').then((m) => m.AnnualReportComponent), title: T('Reporte anual') },
       { path: 'ortodoncia', canActivate: [permGuard('HISTORIA_CLINICA')], loadComponent: () => import('./pages/ortho-cases.component').then((m) => m.OrthoCasesComponent), title: T('Ortodoncia') },
       { path: 'consentimientos', canActivate: [permGuard('HISTORIA_CLINICA', 'PACIENTES_EDITAR')], loadComponent: () => import('./pages/consents.component').then((m) => m.ConsentsComponent), title: T('Consentimientos informados') },
+      { path: 'reclamos', canActivate: [permGuard('RECLAMOS')], loadComponent: () => import('./pages/complaints.component').then((m) => m.ComplaintsComponent), title: T('Libro de reclamaciones') },
       { path: 'tareas', canActivate: [permGuard('TAREAS')], loadComponent: () => import('./pages/tasks.component').then((m) => m.TasksComponent), title: T('Tareas') },
       { path: 'marketing', canActivate: [permGuard('MARKETING')], loadComponent: () => import('./pages/marketing.component').then((m) => m.MarketingComponent), title: T('Marketing y campañas') },
       { path: 'embudo', canActivate: [permGuard('LEADS')], loadComponent: () => import('./pages/leads.component').then((m) => m.LeadsComponent), title: T('Embudo de ventas') },
