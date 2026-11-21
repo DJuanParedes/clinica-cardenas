@@ -116,6 +116,71 @@ public final class SimplePdf {
 
     // ------------------------------------------------------------------ dibujo libre (coordenadas desde abajo-izquierda)
 
+    /** v2.8: tabla con encabezado sombreado; align por columna: L o R. Salta de página si no entra. */
+    public SimplePdf table(String[] headers, float[] widths, List<String[]> rows, char[] align, float size) {
+        float rowH = size * 1.9f;
+        float total = 0;
+        for (float w : widths) total += w;
+        float scale = (W - 2 * MARGIN) / total;
+        Runnable head = () -> {
+            ensure(rowH * 2);
+            y -= rowH;
+            rect(MARGIN, y - size * 0.55f, W - 2 * MARGIN, rowH, "0.90 0.96 0.97", null, 0);
+            float x = MARGIN;
+            for (int i = 0; i < headers.length; i++) {
+                float w = widths[i] * scale;
+                text(headers[i], align[i] == 'R' ? x + w - 4 : x + 4, y, size, true, "0.05 0.30 0.35", align[i] == 'R' ? 'R' : 'L');
+                x += w;
+            }
+        };
+        head.run();
+        for (String[] r : rows) {
+            if (y - rowH < MARGIN) { newPage(); head.run(); }
+            y -= rowH;
+            float x = MARGIN;
+            for (int i = 0; i < r.length && i < widths.length; i++) {
+                float w = widths[i] * scale;
+                int max = (int) (w / (size * 0.5f)) - 1;
+                String t = r[i] == null ? "" : r[i].length() > max ? r[i].substring(0, Math.max(1, max - 1)) + "…" : r[i];
+                text(t, align[i] == 'R' ? x + w - 4 : x + 4, y, size, false, "0.1 0.1 0.1", align[i] == 'R' ? 'R' : 'L');
+                x += w;
+            }
+            line(MARGIN, y - size * 0.6f, W - MARGIN, y - size * 0.6f, "0.88 0.90 0.92", 0.5f);
+        }
+        y -= size;
+        return this;
+    }
+
+    /** v2.8: gráfico de barras verticales simple (una serie). */
+    public SimplePdf bars(String[] labels, double[] values, String rgb, String unitPrefix) {
+        float h = 120, top;
+        ensure(h + 40);
+        top = y - 10;
+        double max = 0;
+        for (double v : values) max = Math.max(max, v);
+        if (max <= 0) max = 1;
+        float slot = (W - 2 * MARGIN) / labels.length;
+        float base = top - h;
+        line(MARGIN, base, W - MARGIN, base, "0.75 0.78 0.80", 0.6f);
+        for (int i = 0; i < labels.length; i++) {
+            float bh = (float) (values[i] / max * (h - 18));
+            float x = MARGIN + i * slot + slot * 0.18f;
+            if (bh > 0) rect(x, base, slot * 0.64f, bh, rgb, null, 0);
+            text(labels[i], x + slot * 0.32f, base - 11, 7.5f, false, "0.35 0.38 0.40", 'C');
+            if (values[i] > 0) text(compact(values[i], unitPrefix), x + slot * 0.32f, base + bh + 3, 6.5f, false, "0.25 0.28 0.30", 'C');
+        }
+        y = base - 24;
+        return this;
+    }
+
+    private static String compact(double v, String prefix) {
+        String p = prefix == null ? "" : prefix;
+        if (v >= 1_000_000) return p + String.format(java.util.Locale.US, "%.1fM", v / 1_000_000);
+        if (v >= 10_000) return p + String.format(java.util.Locale.US, "%.0fk", v / 1000);
+        if (v >= 1000) return p + String.format(java.util.Locale.US, "%.1fk", v / 1000);
+        return p + String.format(java.util.Locale.US, "%.0f", v);
+    }
+
     public static float pageWidth() { return W; }
     public static float pageHeight() { return H; }
 
@@ -166,7 +231,7 @@ public final class SimplePdf {
         return this;
     }
 
-    static int[] jpegSize(byte[] b) {
+    public static int[] jpegSize(byte[] b) {
         int i = 2;
         while (i + 9 < b.length) {
             if ((b[i] & 0xFF) != 0xFF) { i++; continue; }

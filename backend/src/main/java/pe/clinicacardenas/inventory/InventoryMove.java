@@ -28,6 +28,17 @@ public class InventoryMove {
     public Long requestId;
     @Column(name = "created_at")
     public LocalDateTime createdAt;
+    /** v2.8: kardex valorizado. */
+    @Column(name = "unit_cost")
+    public BigDecimal unitCost;
+    @Column(name = "total_cost")
+    public BigDecimal totalCost;
+    @Column(name = "value_after")
+    public BigDecimal valueAfter;
+    @Column(name = "patient_id")
+    public Long patientId;
+    @Column(name = "procedure_id")
+    public Long procedureId;
     @Column(name = "created_by")
     public String createdBy;
 }

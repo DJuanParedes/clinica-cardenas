@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../core/api.service';
 import { apiError, isoDate, shortDate } from '../core/format';
 import { ToastService } from '../core/toast.service';
@@ -129,7 +129,9 @@ export class TasksComponent implements OnInit {
   result = '';
   originLabel: Record<string, string> = { SEGMENTO: 'Segmento', CUMPLEANOS: 'Cumpleaños', LEAD: 'Embudo', CAMPANA: 'Campaña' };
 
+  private route = inject(ActivatedRoute);
   ngOnInit() {
+    if (this.route.snapshot.queryParamMap.get('nueva')) { this.edit = null; this.formOpen = true; }
     this.api.taskOptions().subscribe((o) => { this.kinds = Object.entries(o.kinds) as [string, string][]; this.assignees = o.assignees; this.me = o.me; });
     this.load();
   }

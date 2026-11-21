@@ -141,6 +141,12 @@ public class FileService {
         return f;
     }
 
+    /** v2.8: guarda un PDF ya generado (consentimiento firmado a distancia). */
+    @Transactional
+    public PatientFile storeSigned(Long patientId, byte[] pdf, String kind, String title, java.time.LocalDateTime signedAt) {
+        return store(patient(patientId), pdf, "application/pdf", kind, title, null, null, true, signedAt);
+    }
+
     private PatientFile store(Patient p, byte[] bytes, String type, String kind, String title, String note, Integer tooth,
                               boolean share, java.time.LocalDateTime signedAt) {
         String name = UUID.randomUUID().toString().replace("-", "") + TYPES.get(type);

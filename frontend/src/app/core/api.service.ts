@@ -91,6 +91,41 @@ export class Api {
       task: filters.task, next: filters.next, budget: filters.budget, debt: filters.debt || undefined, visit: filters.visit }) });
   }
 
+  // v2.8: kardex y consumo de materiales
+  kardex(itemId: number, from: string, to: string): Observable<any> { return this.http.get(`/api/inventory/${itemId}/kardex`, { params: params({ from, to }) }); }
+  inventoryValuation(): Observable<any> { return this.http.get('/api/inventory/valuation'); }
+  inventoryConsumption(from: string, to: string, patientId?: number): Observable<any> { return this.http.get('/api/inventory/consumption', { params: params({ from, to, patientId }) }); }
+  // v2.8: ortodoncia
+  orthoOptions(): Observable<any> { return this.http.get('/api/ortho/options'); }
+  orthoCases(dentistId?: number): Observable<any[]> { return this.http.get<any[]>('/api/ortho/cases', { params: params({ dentistId }) }); }
+  patientOrtho(pid: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${pid}/ortho`); }
+  createOrtho(pid: number, body: any): Observable<any> { return this.http.post(`/api/patients/${pid}/ortho`, body); }
+  updateOrtho(id: number, body: any): Observable<any> { return this.http.put(`/api/ortho/cases/${id}`, body); }
+  orthoControl(id: number, body: any): Observable<any> { return this.http.post(`/api/ortho/cases/${id}/controls`, body); }
+  orthoUpload(id: number, file: Blob, name: string, stage: string, view: string, takenOn: string): Observable<any> {
+    const fd = new FormData(); fd.append('file', file, name); fd.append('stage', stage); fd.append('view', view); if (takenOn) fd.append('takenOn', takenOn);
+    return this.http.post(`/api/ortho/cases/${id}/photos`, fd);
+  }
+  orthoLink(id: number, body: any): Observable<any> { return this.http.post(`/api/ortho/cases/${id}/photos/link`, body); }
+  orthoMovePhoto(id: number, photoId: number, body: any): Observable<any> { return this.http.put(`/api/ortho/cases/${id}/photos/${photoId}`, body); }
+  orthoUnlink(id: number, photoId: number): Observable<any> { return this.http.delete(`/api/ortho/cases/${id}/photos/${photoId}`); }
+  // v2.8: consentimientos informados con firma a distancia
+  consentTemplates(all = false): Observable<any[]> { return this.http.get<any[]>('/api/informed-consents/templates', { params: params({ all: all || undefined }) }); }
+  saveConsentTemplate(id: number | null, body: any): Observable<any> { return id ? this.http.put(`/api/informed-consents/templates/${id}`, body) : this.http.post('/api/informed-consents/templates', body); }
+  informedConsents(status?: string): Observable<any[]> { return this.http.get<any[]>('/api/informed-consents', { params: params({ status }) }); }
+  patientInformedConsents(pid: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${pid}/informed-consents`); }
+  sendInformedConsent(pid: number, body: any): Observable<any> { return this.http.post(`/api/patients/${pid}/informed-consents`, body); }
+  cancelInformedConsent(id: number, reason: string): Observable<any> { return this.http.post(`/api/informed-consents/${id}/cancel`, { reason }); }
+  publicConsent(token: string): Observable<any> { return this.http.get(`/api/public/consent/${token}`); }
+  signPublicConsent(token: string, body: any): Observable<any> { return this.http.post(`/api/public/consent/${token}`, body); }
+  // v2.8: notas fijas y alertas de la ficha; reporte anual
+  patientFlags(pid: number): Observable<any> { return this.http.get(`/api/patients/${pid}/flags`); }
+  addPatientNote(pid: number, body: any): Observable<any> { return this.http.post(`/api/patients/${pid}/notes`, body); }
+  updatePatientNote(pid: number, id: number, body: any): Observable<any> { return this.http.put(`/api/patients/${pid}/notes/${id}`, body); }
+  deletePatientNote(pid: number, id: number): Observable<any> { return this.http.delete(`/api/patients/${pid}/notes/${id}`); }
+  annualReport(year: number): Observable<any> { return this.http.get('/api/reports/annual', { params: params({ year }) }); }
+  annualReportFile(year: number, kind: 'pdf' | 'csv'): Observable<Blob> { return this.http.get(`/api/reports/annual/${kind}`, { params: params({ year }), responseType: 'blob' }); }
+
   // v2.7: tareas
   tasks(f: { scope?: string; status?: string; kind?: string; assigneeId?: number; patientId?: number; leadId?: number; q?: string }): Observable<{ items: any[]; counts: any }> {
     return this.http.get<any>('/api/tasks', { params: params(f) });

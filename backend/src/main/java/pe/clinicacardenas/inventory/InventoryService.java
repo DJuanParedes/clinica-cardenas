@@ -56,11 +56,14 @@ public class InventoryService {
     }
 
     public record MoveRequest(String kind, BigDecimal quantity, String reason, String lotCode, java.time.LocalDate expiresOn,
-                              BigDecimal unitCost) {
+                              BigDecimal unitCost, Long patientId) {
         public MoveRequest(String kind, BigDecimal quantity, String reason) {
-            this(kind, quantity, reason, null, null, null);
+            this(kind, quantity, reason, null, null, null, null);
         }
     }
+
+    /** v2.8: costo de lo que sale de los lotes (FEFO) y el primer lote tocado. */
+    private record Take(Long lot, BigDecimal cost) {}
 
     public record SupplyRequest(Long itemId, BigDecimal quantity) {}
 
@@ -217,11 +220,12 @@ public class InventoryService {
     }
 
     /** Descuenta de los lotes: primero el que vence antes (FEFO); los vencidos no se usan en pacientes. Devuelve el primer lote tocado. */
-    private Long consumeLots(InventoryItem i, BigDecimal qty, boolean allowExpired) {
+    private Take consumeLots(InventoryItem i, BigDecimal qty, boolean allowExpired) {
         BigDecimal left = qty;
+        BigDecimal cost = BigDecimal.ZERO;
         Long first = null;
         List<Map<String, Object>> lots = jdbc.queryForList(
-                "select id, remaining, expires_on from inventory_lots where item_id = ? and remaining > 0 order by expires_on is null, expires_on, id for update", i.id);
+                "select id, remaining, expires_on, unit_cost from inventory_lots where item_id = ? and remaining > 0 order by expires_on is null, expires_on, id for update", i.id);
         for (Map<String, Object> l : lots) {
             if (left.signum() <= 0) break;
             Object exp = l.get("expires_on");
@@ -230,10 +234,29 @@ public class InventoryService {
             BigDecimal take = rem.min(left);
             jdbc.update("update inventory_lots set remaining = remaining - ? where id = ?", take, l.get("id"));
             if (first == null) first = ((Number) l.get("id")).longValue();
+            BigDecimal uc = l.get("unit_cost") == null ? averageCost(i) : (BigDecimal) l.get("unit_cost");
+            cost = cost.add(take.multiply(uc));
             left = left.subtract(take);
         }
-        // Stock sin lote (registros antiguos): se descuenta igual del total
-        return first;
+        // Stock sin lote (registros antiguos): se descuenta igual del total, al costo promedio
+        if (left.signum() > 0) cost = cost.add(left.multiply(averageCost(i)));
+        return new Take(first, cost.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    /** Costo promedio actual: valor del stock / cantidad; si no hay, el último costo registrado. */
+    BigDecimal averageCost(InventoryItem i) {
+        List<BigDecimal> v = jdbc.queryForList("select value_after from inventory_moves where item_id = ? order by id desc limit 1", BigDecimal.class, i.id);
+        if (!v.isEmpty() && v.get(0) != null && i.stock.signum() > 0 && v.get(0).signum() > 0)
+            return v.get(0).divide(i.stock, 4, RoundingMode.HALF_UP);
+        return i.unitCost == null ? BigDecimal.ZERO : i.unitCost;
+    }
+
+    /** Valor del stock antes del movimiento; sin historial, el stock actual al último costo. */
+    private BigDecimal lastValue(InventoryItem i) {
+        List<BigDecimal> v = jdbc.queryForList("select value_after from inventory_moves where item_id = ? order by id desc limit 1", BigDecimal.class, i.id);
+        if (v.isEmpty() || v.get(0) == null)
+            return i.stock.max(BigDecimal.ZERO).multiply(i.unitCost == null ? BigDecimal.ZERO : i.unitCost).setScale(2, RoundingMode.HALF_UP);
+        return v.get(0);
     }
 
     /** Ingreso de un lote comprado (lo usa la compra a proveedor). El material ya viene bloqueado. */
@@ -242,7 +265,7 @@ public class InventoryService {
             throw ApiException.field("lines", i.name + ": los medicamentos se registran con su fecha de vencimiento.");
         }
         Long lot = newLot(i, purchaseId, lotCode, expiresOn, q, unitCost);
-        move(i, "ENTRADA", q, reason, null, lot, purchaseId, null);
+        move(i, "ENTRADA", q, reason, null, lot, purchaseId, null, q.multiply(unitCost == null ? BigDecimal.ZERO : unitCost).setScale(2, RoundingMode.HALF_UP), null, null);
     }
 
     /** Entrega de una solicitud del odontólogo: salida FEFO sin usar lotes vencidos. */
@@ -250,8 +273,8 @@ public class InventoryService {
         if (i.stock.compareTo(q) < 0) {
             throw ApiException.field("quantity", "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
         }
-        Long lot = consumeLots(i, q, false);
-        move(i, "SALIDA", q.negate(), reason, null, lot, null, requestId);
+        Take t = consumeLots(i, q, false);
+        move(i, "SALIDA", q.negate(), reason, null, t.lot(), null, requestId, t.cost().negate(), null, null);
     }
 
     @Transactional
@@ -296,14 +319,23 @@ public class InventoryService {
         String reason = r.reason() == null || r.reason().isBlank() ? null : r.reason().trim();
         if ("SALIDA".equals(kind) && reason == null) throw ApiException.field("reason", "Indica el motivo de la salida (merma, vencido, préstamo…).");
         Long lot = null;
+        BigDecimal cost = BigDecimal.ZERO;
+        if (r.unitCost() != null && r.unitCost().signum() < 0) throw ApiException.field("unitCost", "El costo no puede ser negativo.");
+        if (r.patientId() != null && (!"SALIDA".equals(kind)
+                || jdbc.queryForObject("select count(*) from patients where id = ?", Integer.class, r.patientId()) == 0))
+            throw ApiException.field("patientId", "Solo una salida puede atribuirse a un paciente existente.");
         if (delta.signum() > 0) {
             checkExpiry(i, r.expiresOn());
-            lot = newLot(i, null, r.lotCode(), r.expiresOn(), delta, r.unitCost() != null ? r.unitCost() : i.unitCost);
+            BigDecimal uc = r.unitCost() != null ? r.unitCost() : averageCost(i);
+            lot = newLot(i, null, r.lotCode(), r.expiresOn(), delta, uc);
+            cost = delta.multiply(uc).setScale(2, RoundingMode.HALF_UP);
         } else if (delta.signum() < 0) {
             // Una salida manual puede retirar lotes vencidos (para darlos de baja); el consumo clínico no.
-            lot = consumeLots(i, delta.abs(), true);
+            Take t = consumeLots(i, delta.abs(), true);
+            lot = t.lot();
+            cost = t.cost().negate();
         }
-        move(i, kind, delta, reason, null, lot, null, null);
+        move(i, kind, delta, reason, null, lot, null, null, cost, r.patientId(), null);
         return Map.of("item", i, "message", "Movimiento registrado.");
     }
 
@@ -313,6 +345,13 @@ public class InventoryService {
 
     private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId,
                       Long lotId, Long purchaseId, Long requestId) {
+        move(i, kind, delta, reason, treatmentItemId, lotId, purchaseId, requestId, delta.multiply(averageCost(i)).setScale(2, RoundingMode.HALF_UP), null, null);
+    }
+
+    /** {@code cost}: valor que entra (+) o sale (-) del inventario con este movimiento. */
+    private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId,
+                      Long lotId, Long purchaseId, Long requestId, BigDecimal cost, Long patientId, Long procedureId) {
+        BigDecimal before = lastValue(i);
         i.stock = i.stock.add(delta).setScale(2, RoundingMode.HALF_UP);
         i.updatedAt = Dates.now();
         items.save(i);
@@ -326,6 +365,12 @@ public class InventoryService {
         m.lotId = lotId;
         m.purchaseId = purchaseId;
         m.requestId = requestId;
+        m.totalCost = cost == null ? BigDecimal.ZERO : cost.setScale(2, RoundingMode.HALF_UP);
+        m.unitCost = delta.signum() == 0 ? null : m.totalCost.abs().divide(delta.abs(), 4, RoundingMode.HALF_UP);
+        // sin stock no queda valor (evita restos por redondeo)
+        m.valueAfter = i.stock.signum() <= 0 ? BigDecimal.ZERO : before.add(m.totalCost).max(BigDecimal.ZERO);
+        m.patientId = patientId;
+        m.procedureId = procedureId;
         m.createdAt = Dates.now();
         m.createdBy = CurrentUser.usernameOrSystem();
         moves.save(m);
@@ -371,6 +416,9 @@ public class InventoryService {
         if (moves.existsByTreatmentItemIdAndKind(e.treatmentItemId(), "CONSUMO")) return;
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "select item_id, quantity from procedure_supplies where procedure_id = ?", e.procedureId());
+        List<Long> pat = jdbc.queryForList("select tp.patient_id from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id where ti.id = ?",
+                Long.class, e.treatmentItemId());
+        Long patientId = pat.isEmpty() ? null : pat.get(0);
         for (Map<String, Object> r : rows) {
             Long itemId = ((Number) r.get("item_id")).longValue();
             BigDecimal q = new BigDecimal(String.valueOf(r.get("quantity")));
@@ -382,8 +430,8 @@ public class InventoryService {
                     why = (why == null ? "" : why + " · ") + "stock insuficiente: faltaron "
                             + q.subtract(used).stripTrailingZeros().toPlainString() + " " + i.unit;
                 }
-                Long lot = used.signum() > 0 ? consumeLots(i, used, false) : null;
-                move(i, "CONSUMO", used.negate(), why, e.treatmentItemId(), lot, null, null);
+                Take t = used.signum() > 0 ? consumeLots(i, used, false) : new Take(null, BigDecimal.ZERO);
+                move(i, "CONSUMO", used.negate(), why, e.treatmentItemId(), t.lot(), null, null, t.cost().negate(), patientId, e.procedureId());
             });
         }
     }
