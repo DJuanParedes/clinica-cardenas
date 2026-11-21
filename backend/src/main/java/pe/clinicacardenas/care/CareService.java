@@ -364,7 +364,9 @@ public class CareService {
         String phone = r.telefono() == null ? "" : r.telefono().replaceAll("\\D", "");
         if (phone.startsWith("51") && phone.length() == 11) phone = phone.substring(2);
         String text = r.texto() == null ? "" : r.texto().trim().toLowerCase();
-        String option = text.matches("^1\\b.*|^s[ií]\\b.*|^confirmo.*") ? "1" : text.matches("^2\\b.*|^reprogram.*") ? "2" : null;
+        // v2.6: también los botones "Confirmar" / "No podré asistir" de los recordatorios
+        String option = text.matches("^1\\b.*|^s[ií]\\b.*|^confirm(o|ar|ado)\\b.*") ? "1"
+                : text.matches("^2\\b.*|^reprogram.*|^no podr[eé] asistir.*|^no puedo.*") ? "2" : null;
         Map<String, Object> out = new LinkedHashMap<>();
         if (phone.length() != 9) return Map.of("accion", "IGNORADO");
         List<Long> ids = jdbc.queryForList("select id from patients where replace(replace(phone, ' ', ''), '-', '') = ? and active = true",

@@ -143,6 +143,20 @@ async function graph(body) {
  */
 async function enviarWhatsApp(local, cuerpo, plantillaForzada, opciones = {}) {
   const to = '51' + local;
+  // v2.6: botones de respuesta rápida (Confirmar / No podré asistir). Meta solo acepta mensajes interactivos dentro
+  // de la ventana de 24 h; fuera de ella se envía como siempre y se agrega "Responde 1… 2…" (el sistema entiende
+  // tanto el número como el texto del botón).
+  const botones = Array.isArray(opciones.botones) ? opciones.botones.map((b) => String(b || '').trim()).filter(Boolean).slice(0, 3) : [];
+  if (botones.length && !plantillaForzada && !opciones.chat) {
+    const interactive = { type: 'button', body: { text: String(cuerpo).slice(0, 1024) },
+      action: { buttons: botones.map((b, i) => ({ type: 'reply', reply: { id: 'btn_' + (i + 1), title: b.slice(0, 20) } })) } };
+    try {
+      return { id: await graph({ messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive', interactive }), via: 'botones' };
+    } catch (e) {
+      if (![131047, 131051].includes(e.codigoMeta)) throw e;
+      cuerpo = String(cuerpo) + '\n\n' + botones.map((b, i) => `Responde *${i + 1}* para "${b}"`).join(' · ');
+    }
+  }
   const nombre = plantillaForzada || WA.plantilla;
   let usarPlantilla = plantillaForzada || (WA.modo ? WA.modo === 'plantilla' : Boolean(WA.plantilla));
   // Mensajes escritos a mano en el panel (como un chat): van como texto normal mientras la plantilla no esté

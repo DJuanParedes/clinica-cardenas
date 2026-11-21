@@ -285,6 +285,9 @@ public class AgendaService {
         if (a.status == AppointmentStatus.CANCELADA) {
             notifications.appointmentCancelled(a, r.reason());   // HU-24
         }
+        if (a.status == AppointmentStatus.ATENDIDA) {
+            notifications.appointmentAttended(a);                 // v2.6: agradecimiento y encuesta
+        }
         events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.STATUS));
         return a;
     }

@@ -137,8 +137,30 @@ public class NotificationDispatcher {
         final String fStatus = status, fError = error, fProvider = providerId;
         final LocalDateTime fSent = sentAt;
         final boolean fRetry = retry;
-        tx.executeWithoutResult(s -> repo.findById(id).ifPresent(x -> {
-            if (!"PENDIENTE".equals(x.status)) return; // anulada mientras se enviaba
+        tx.executeWithoutResult(s -> repo.lockById(id).ifPresent(x -> {
+            if (!"PENDIENTE".equals(x.status)) {
+                // Anulada mientras se enviaba: si el microservicio alcanzó a programarla, se pide anularla allá también.
+                if ("ANULADO".equals(x.status) && "PROGRAMAR".equals(x.operation) && "PROGRAMADO".equals(fStatus)) {
+                    String key = "anular:" + x.idempotencyKey;
+                    if (!repo.existsByIdempotencyKey(key)) {
+                        Notification c = new Notification();
+                        c.patientId = x.patientId;
+                        c.appointmentId = x.appointmentId;
+                        c.type = "RECORDATORIO";
+                        c.operation = "ANULAR";
+                        c.channel = x.channel;
+                        c.destination = x.destination;
+                        c.subject = "Anular recordatorio";
+                        c.body = "Se anula el recordatorio " + x.idempotencyKey;
+                        c.idempotencyKey = key;
+                        c.status = "PENDIENTE";
+                        c.createdAt = Dates.now();
+                        repo.save(c);
+                        again.set(true);
+                    }
+                }
+                return;
+            }
             x.attempts++;
             x.updatedAt = Dates.now();
             x.lastError = fError;
@@ -177,6 +199,7 @@ public class NotificationDispatcher {
                 payload.put("plantillaWa", n.waTemplate);
                 payload.put("parametrosWa", json.readValue(n.waParams, List.class));
             }
+            if (n.waButtons != null) payload.put("botonesWa", json.readValue(n.waButtons, List.class));
             if (n.patientId != null) {
                 // nombre del paciente y si es real o de ejemplo: el microservicio decide si lo envía de verdad
                 patients.findById(n.patientId).ifPresent(p -> {
