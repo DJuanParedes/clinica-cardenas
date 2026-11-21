@@ -54,6 +54,10 @@ const PLANTILLAS = {
   cita_registrada: { texto: 'Hola {{1}} 👋\n\nTu cita en *Clínica Dental Cárdenas* quedó registrada ✅\n\n📅 *{{2}}*\n🦷 {{3}}\n📍 {{4}}\n\nTe enviaremos un recordatorio antes de tu cita.' },
   cita_reprogramada: { texto: 'Hola {{1}}, tu cita en *Clínica Dental Cárdenas* fue reprogramada 🔁\n\nAntes: {{2}}\n📅 Nuevo horario: *{{3}}*\n🦷 {{4}}\n📍 {{5}}\n\nSi el nuevo horario no te acomoda, respóndenos por aquí.' },
   cita_cancelada: { texto: 'Hola {{1}}, tu cita del *{{2}}* con {{3}} en *Clínica Dental Cárdenas* fue cancelada.\n\nPara programar una nueva cita, reserva desde la app o llámanos al {{4}}. ¡Te esperamos!' },
+  // v2.9: campañas, cumpleaños y documentos por firmar (fuera de la ventana de 24 h)
+  novedad_clinica: { categoria: 'MARKETING', texto: 'Hola, te escribe *{{1}}* con una novedad para ti:\n\n{{2}}\n\nPuedes responder a este mensaje para separar tu cita. Si ya no deseas recibir promociones, responde BAJA.' },
+  cumpleanos_clinica: { categoria: 'MARKETING', texto: '¡Feliz cumpleaños! 🎂 Te saluda todo el equipo de *{{1}}*:\n\n{{2}}\n\nSi ya no deseas recibir estos mensajes, responde BAJA.' },
+  documento_por_firmar: { categoria: 'UTILITY', texto: 'Hola {{1}}, *{{2}}* te envía el documento *{{3}}* para que lo revises y firmes desde tu celular:\n\n{{4}}\n\nEl enlace vence en {{5}} días. Si tienes dudas, escríbenos por aquí antes de firmar.' },
 };
 for (const [n, t] of Object.entries(load().plantillas || {})) PLANTILLAS[n] = t;
 for (const p of Object.values(PLANTILLAS)) p.parametros = new Set((p.texto.match(/\{\{\d+\}\}/g) || [])).size;
