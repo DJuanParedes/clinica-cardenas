@@ -1,3 +1,5 @@
+import { InventoryCostsComponent } from './inventory-costs.component';
+import { AuthService } from '../core/auth.service';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, InventoryItem } from '../core/api.service';
@@ -14,7 +16,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent, InventoryCostsComponent],
   template: `
     <div class="page">
       <header class="page-head spread">
@@ -43,6 +45,10 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
         <button type="button" [class.on]="tab === 'buy'" (click)="tab = 'buy'; loadPurchases()">Compras</button>
         <button type="button" [class.on]="tab === 'req'" (click)="tab = 'req'; loadRequests()">Solicitudes de odontólogos @if (pendingRequests) { <span class="count">{{ pendingRequests }}</span> }</button>
         <button type="button" [class.on]="tab === 'moves'" (click)="tab = 'moves'">Movimientos</button>
+        @if (auth.can('INVENTARIO_COSTOS')) {
+          <button type="button" [class.on]="tab === 'kardex'" (click)="tab = 'kardex'">Kardex valorizado</button>
+          <button type="button" [class.on]="tab === 'consumo'" (click)="tab = 'consumo'">Consumo por paciente y servicio</button>
+        }
       </nav>
 
       @if (tab === 'items') {
@@ -172,6 +178,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
         </section>
       }
 
+      @if (tab === 'kardex' || tab === 'consumo') { <app-inventory-costs [view]="tab === 'kardex' ? 'kardex' : 'consumo'" [items]="items" /> }
       @if (tab === 'moves') {
       <section class="panel">
         <div class="panel-head spread"><h3>Últimos movimientos</h3>
@@ -444,6 +451,7 @@ export class InventoryComponent implements OnInit {
   pgMoves = 1;
   pgItems = 1;
   private api = inject(Api);
+  auth = inject(AuthService);
   private toast = inject(ToastService);
   items: InventoryItem[] = [];
   recent: any[] = [];
@@ -461,7 +469,7 @@ export class InventoryComponent implements OnInit {
   item: any = this.emptyItem();
   emptyItem() { return { name: '', unit: 'unidad', minStock: 0, initialStock: 0, active: true, category: '', brand: '', supplier: '', unitCost: null, tracksExpiry: true, lotCode: '', expiresOn: null }; }
 
-  tab: 'items' | 'exp' | 'buy' | 'req' | 'moves' = 'items';
+  tab: 'items' | 'exp' | 'buy' | 'req' | 'moves' | 'kardex' | 'consumo' = 'items';
   cat = '';
   expiring: any[] = [];
   expiredCount = 0;
