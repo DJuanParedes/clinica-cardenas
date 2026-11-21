@@ -39,10 +39,23 @@ public class NotificationService {
     private final String clinicAddress;
     private final String clinicPhone;
 
+    private final pe.clinicacardenas.messaging.MessageTemplateService templates;
+    private final pe.clinicacardenas.messaging.AutomationService automations;
+    private final pe.clinicacardenas.messaging.SurveyLinks links;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     public NotificationService(NotificationRepository repo, ApplicationEventPublisher events, AuditService audit,
                                @Value("${app.company.trade-name}") String clinicName,
                                @Value("${app.company.address}") String clinicAddress,
-                               @Value("${app.notifications.clinic-phone:987 654 000}") String clinicPhone) {
+                               @Value("${app.notifications.clinic-phone:987 654 000}") String clinicPhone,
+                               pe.clinicacardenas.messaging.MessageTemplateService templates,
+                               @org.springframework.context.annotation.Lazy pe.clinicacardenas.messaging.AutomationService automations,
+                               pe.clinicacardenas.messaging.SurveyLinks links,
+                               org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.templates = templates;
+        this.automations = automations;
+        this.links = links;
+        this.jdbc = jdbc;
         this.repo = repo;
         this.events = events;
         this.audit = audit;
@@ -166,6 +179,114 @@ public class NotificationService {
         events.publishEvent(new Queued());
     }
 
+    // ------------------------------------------------------------------ v2.6: plantillas editables
+
+    /** Plantilla que reemplaza a "Cita registrada" en esta petición (p. ej. RESERVA_WEB desde el enlace público). */
+    private static final ThreadLocal<String> CREATED_TEMPLATE = new ThreadLocal<>();
+
+    public static <T> T withCreatedTemplate(String code, java.util.function.Supplier<T> action) {
+        CREATED_TEMPLATE.set(code);
+        try { return action.get(); } finally { CREATED_TEMPLATE.remove(); }
+    }
+
+    /** Variables de la plantilla para una cita. */
+    public Map<String, String> vars(Appointment a) {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put("paciente", firstName(a.patient));
+        v.put("paciente_completo", a.patient.getFullName());
+        String d = a.startAt.format(DAY);
+        v.put("fecha", d.substring(0, 1).toUpperCase(ES) + d.substring(1));
+        v.put("hora", a.startAt.format(HOUR));
+        v.put("fecha_hora", when(a.startAt));
+        v.put("odontologo", dentistText(a));
+        v.put("especialidad", a.dentist.specialty == null ? "" : a.dentist.specialty);
+        v.put("motivo", a.reason == null ? "" : a.reason);
+        v.put("clinica", clinicName);
+        v.put("direccion", clinicAddress);
+        v.put("telefono_clinica", clinicPhone);
+        v.put("enlace_citas", links.bookingUrl());
+        v.put("enlace_encuesta", links.surveyUrl(a.id));
+        return v;
+    }
+
+    /** Arma el aviso desde la plantilla. En WhatsApp real se usa la plantilla aprobada por Meta solo si el texto no se editó. */
+    private void addFromTemplate(Patient p, Long appointmentId, String type, String operation, Target t, String templateCode,
+                                 Map<String, String> vars, String key, LocalDateTime scheduledFor, Wa metaTemplate) {
+        var r = templates.render(templateCode, vars);
+        String body = "WHATSAPP".equals(t.channel()) ? r.body()
+                : r.body().replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
+        if (repo.existsByIdempotencyKey(key)) return;
+        add(p, appointmentId, type, operation, t, r.subject(), body, key, scheduledFor, r.customized() ? null : metaTemplate);
+        repo.findByIdempotencyKey(key).ifPresent(n -> {
+            n.templateCode = templateCode;
+            if ("WHATSAPP".equals(t.channel()) && !r.buttons().isEmpty()) {
+                try { n.waButtons = JSON.writeValueAsString(r.buttons()); } catch (Exception ignored) { }
+            }
+            repo.save(n);
+        });
+    }
+
+    /** Programa en el microservicio los avisos "antes" y "el día" de la cita según las automatizaciones activas. */
+    private void scheduleAutomations(Appointment a) {
+        LocalDateTime now = Dates.now();
+        for (var rule : automations.rules()) {
+            if (!rule.active() || "DESPUES".equals(rule.kind())) continue;
+            LocalDateTime at = rule.when(a.startAt, a.endAt, now);
+            if (at == null) continue;
+            for (Target t : targets(a.patient)) {
+                String base = "AUTO_1D".equals(rule.code()) ? reminderKey(a, t.channel())
+                        : "auto:" + rule.code() + ":" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel();
+                // si ese aviso se anuló (regla o texto editados), se programa de nuevo con otra clave
+                String key = base;
+                for (int i = 2; repo.findByIdempotencyKey(key).map(x -> "ANULADO".equals(x.status)).orElse(false); i++) key = base + ":r" + i;
+                Wa meta = "AUTO_1D".equals(rule.code()) ? wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress) : null;
+                addFromTemplate(a.patient, a.id, rule.notifType(), "PROGRAMAR", t, rule.templateCode(), vars(a), key, at, meta);
+            }
+        }
+    }
+
+    /** Al quedar atendida: agradecimiento y encuesta según las automatizaciones "después". */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appointmentAttended(Appointment a) {
+        LocalDateTime now = Dates.now();
+        for (var rule : automations.rules()) {
+            if (!rule.active() || !"DESPUES".equals(rule.kind())) continue;
+            LocalDateTime at = rule.when(a.startAt, a.endAt, now);
+            if (at == null) continue;
+            boolean immediate = !at.isAfter(now.plusMinutes(5));
+            for (Target t : targets(a.patient)) {
+                addFromTemplate(a.patient, a.id, rule.notifType(), immediate ? "ENVIAR" : "PROGRAMAR", t, rule.templateCode(), vars(a),
+                        "auto:" + rule.code() + ":" + a.id + ":" + t.channel(), immediate ? null : at, null);
+            }
+        }
+    }
+
+    /**
+     * Tras editar una automatización o una plantilla: se vuelven a programar los avisos de las citas futuras (60 días)
+     * con el horario y el texto nuevos. Devuelve cuántas citas se reprogramaron.
+     */
+    @Transactional
+    public int rescheduleFuture() {
+        List<Long> ids = jdbc.queryForList("select id from appointments where status in ('PROGRAMADA','CONFIRMADA') and start_at > ? and start_at < ?",
+                Long.class, Dates.now(), Dates.now().plusDays(60));
+        int n = 0;
+        for (Long id : ids) {
+            Appointment a = appointmentLoader.apply(id);
+            if (a == null) continue;
+            unscheduleReminders(a);
+            scheduleAutomations(a);
+            n++;
+        }
+        return n;
+    }
+
+    private java.util.function.Function<Long, Appointment> appointmentLoader = id -> null;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAppointmentLoader(@org.springframework.context.annotation.Lazy pe.clinicacardenas.agenda.AppointmentRepository appts) {
+        this.appointmentLoader = id -> appts.findById(id).orElse(null);
+    }
+
     /** Momento del recordatorio: 24 h antes; si la cita es antes de eso, 2 h antes; si ya no da tiempo, ninguno. */
     public static LocalDateTime reminderTime(LocalDateTime start, LocalDateTime now) {
         LocalDateTime d24 = start.minusHours(24);
@@ -180,15 +301,7 @@ public class NotificationService {
     }
 
     private void scheduleReminder(Appointment a) {
-        LocalDateTime at = reminderTime(a.startAt, Dates.now());
-        if (at == null) return;
-        for (Target t : targets(a.patient)) {
-            add(a.patient, a.id, "RECORDATORIO", "PROGRAMAR", t, "Recordatorio de tu cita · " + clinicName,
-                    body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
-                            replyHint(t.channel())),
-                    reminderKey(a, t.channel()), at,
-                    wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
-        }
+        scheduleAutomations(a);
     }
 
     /** Anula los recordatorios programados de la cita (al reprogramarla o cancelarla). */
@@ -221,12 +334,10 @@ public class NotificationService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void appointmentCreated(Appointment a) {
+        String code = CREATED_TEMPLATE.get() == null ? "CITA_REGISTRADA" : CREATED_TEMPLATE.get();
         for (Target t : targets(a.patient)) {
-            add(a.patient, a.id, "CITA_REGISTRADA", "ENVIAR", t, "Tu cita quedó registrada · " + clinicName,
-                    body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita en " + clinicName + " quedó registrada:", a,
-                            "Te enviaremos un recordatorio antes de la cita."),
-                    "registro:" + a.id + ":" + t.channel(), null,
-                    wa("cita_registrada", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
+            addFromTemplate(a.patient, a.id, "CITA_REGISTRADA", "ENVIAR", t, code, vars(a), "registro:" + a.id + ":" + t.channel(), null,
+                    "CITA_REGISTRADA".equals(code) ? wa("cita_registrada", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress) : null);
         }
         scheduleReminder(a);
     }
@@ -234,11 +345,10 @@ public class NotificationService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void appointmentRescheduled(Appointment a, LocalDateTime previousStart, String previousDentist) {
         unscheduleReminders(a);
+        Map<String, String> v = vars(a);
+        v.put("fecha_anterior", when(previousStart) + (previousDentist.equals(a.dentist.getFullName()) ? "" : " con " + previousDentist));
         for (Target t : targets(a.patient)) {
-            add(a.patient, a.id, "CAMBIO_CITA", "ENVIAR", t, "Tu cita fue reprogramada · " + clinicName,
-                    body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita del " + when(previousStart)
-                            + (previousDentist.equals(a.dentist.getFullName()) ? "" : " con " + previousDentist)
-                            + " cambió. Este es el nuevo horario:", a, "Si el nuevo horario no te acomoda, comunícate con nosotros."),
+            addFromTemplate(a.patient, a.id, "CAMBIO_CITA", "ENVIAR", t, "CAMBIO_CITA", v,
                     "cambio:" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel(), null,
                     wa("cita_reprogramada", firstName(a.patient), when(previousStart), when(a.startAt), dentistText(a), clinicAddress));
         }
@@ -248,12 +358,10 @@ public class NotificationService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void appointmentCancelled(Appointment a, String reason) {
         unscheduleReminders(a);
+        Map<String, String> v = vars(a);
+        v.put("motivo_cancelacion", reason == null || reason.isBlank() ? "" : " (" + reason.trim() + ")");
         for (Target t : targets(a.patient)) {
-            add(a.patient, a.id, "CANCELACION", "ENVIAR", t, "Tu cita fue cancelada · " + clinicName,
-                    body(t.channel(), "Hola " + firstName(a.patient) + ", tu cita fue cancelada"
-                            + (reason == null || reason.isBlank() ? "." : " (" + reason.trim() + ")."), a,
-                            "Para programar una nueva cita escríbenos o llámanos al " + clinicPhone + "."),
-                    "cancelacion:" + a.id + ":" + t.channel(), null,
+            addFromTemplate(a.patient, a.id, "CANCELACION", "ENVIAR", t, "CANCELACION", v, "cancelacion:" + a.id + ":" + t.channel(), null,
                     wa("cita_cancelada", firstName(a.patient), when(a.startAt), a.dentist.getFullName(), clinicPhone));
         }
     }
@@ -269,9 +377,7 @@ public class NotificationService {
         for (Target t : ts) {
             String key = "recordatorio-manual:" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel();
             if (repo.existsByIdempotencyKey(key)) { duplicated++; continue; }
-            add(a.patient, a.id, "RECORDATORIO", "ENVIAR", t, "Recordatorio de tu cita · " + clinicName,
-                    body(t.channel(), "Hola " + firstName(a.patient) + ", te recordamos tu cita en " + clinicName + ":", a,
-                            replyHint(t.channel())), key, null,
+            addFromTemplate(a.patient, a.id, "RECORDATORIO", "ENVIAR", t, "RECORDATORIO", vars(a), key, null,
                     wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
             queued++;
         }

@@ -185,6 +185,8 @@ public class PortalExtrasService {
         String notes = "Reservada por el paciente desde la app" + (r.notes() == null || r.notes().isBlank() ? "" : ": " + r.notes().trim());
         Appointment a = agenda.create(new AgendaService.AppointmentRequest(p.id, r.dentistId(), r.startAt(),
                 durationOf(r.reasonCode()), label, notes.length() > 480 ? notes.substring(0, 480) : notes, null));
+        a.bookedVia = "APP";
+        appointments.save(a);
         audit.record("CITA", a.id, "RESERVA_APP", "Reservada por " + p.getFullName() + " desde la app");
         return Map.of("id", a.id, "startAt", a.startAt, "message", "¡Listo! Tu cita quedó reservada.");
     }
