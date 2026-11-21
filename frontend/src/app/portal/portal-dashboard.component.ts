@@ -17,12 +17,12 @@ import { IconComponent } from '../shared/icon.component';
         </section>
       } @else { <section class="empty"><app-icon name="calendar" [size]="34" /><h2>¿Qué necesitas hoy?</h2><p class="muted">Agenda tu próxima atención en pocos pasos.</p><a class="btn primary" routerLink="/app/agendar">Agendar cita</a></section> }
 
-      @for (notice of notices; track notice.id) { <section class="notice"><app-icon name="alert" [size]="18" /><div><strong>{{ notice.title || 'Aviso de la clínica' }}</strong><p>{{ notice.message }}</p></div></section> }
+      @for (notice of notices; track notice.id) { <section class="notice"><app-icon name="alert" [size]="18" /><div><strong>{{ notice.title || 'Aviso de la clínica' }}</strong><p>{{ notice.body }}</p></div></section> }
 
       <h3>Accesos directos</h3><div class="quick">
         <a routerLink="/app/agendar"><app-icon name="calendar" [size]="23" /><span>Agendar cita</span></a>
-        <a routerLink="/app/historia"><app-icon name="clipboard" [size]="23" /><span>Resultados y tratamientos</span></a>
-        <a routerLink="/app/historia"><app-icon name="file" [size]="23" /><span>Tratamientos y documentos</span></a>
+        <a routerLink="/app/historia"><app-icon name="clipboard" [size]="23" /><span>Tratamientos y documentos</span></a>
+        <a routerLink="/app/promociones"><app-icon name="tag" [size]="23" /><span>Promociones</span></a>
         <a routerLink="/app/cuenta"><app-icon name="wallet" [size]="23" /><span>Pagos y comprobantes</span></a>
       </div>
     }
