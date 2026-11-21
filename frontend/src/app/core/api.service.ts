@@ -22,6 +22,52 @@ export class Api {
   dashboard(): Observable<any> { return this.http.get('/api/dashboard'); }
 
   // ---------- pacientes (HU-01, HU-02, HU-03)
+  // v2.5: ficha ampliada (captación, etiquetas, N° HC, datos fiscales, familiares)
+  patientProfileOptions(): Observable<{ sources: { code: string; label: string }[]; relationships: string[]; tags: { tag: string; patients: number }[] }> {
+    return this.http.get<any>('/api/patients/profile-options');
+  }
+  patientProfile(id: number): Observable<PatientProfile> { return this.http.get<PatientProfile>(`/api/patients/${id}/profile`); }
+  updatePatientProfile(id: number, body: any): Observable<PatientProfile> { return this.http.put<PatientProfile>(`/api/patients/${id}/profile`, body); }
+  patientRuc(ruc: string): Observable<RucInfo> { return this.http.get<RucInfo>(`/api/patients/ruc/${ruc}`); }
+  addRelation(id: number, body: any): Observable<PatientProfile> { return this.http.post<PatientProfile>(`/api/patients/${id}/relations`, body); }
+  updateRelation(id: number, relId: number, body: any): Observable<PatientProfile> { return this.http.put<PatientProfile>(`/api/patients/${id}/relations/${relId}`, body); }
+  deleteRelation(id: number, relId: number): Observable<PatientProfile> { return this.http.delete<PatientProfile>(`/api/patients/${id}/relations/${relId}`); }
+
+  // v2.5: anamnesis y signos vitales
+  anamnesisTemplates(all = false): Observable<any[]> { return this.http.get<any[]>('/api/anamnesis/templates', { params: params({ all: all || undefined }) }); }
+  createAnamnesisTemplate(body: any): Observable<any> { return this.http.post('/api/anamnesis/templates', body); }
+  updateAnamnesisTemplate(id: number, body: any): Observable<any> { return this.http.put(`/api/anamnesis/templates/${id}`, body); }
+  patientAnamnesis(id: number): Observable<{ records: any[]; alerts: string[] }> { return this.http.get<any>(`/api/patients/${id}/anamnesis`); }
+  addAnamnesis(id: number, body: any): Observable<{ records: any[]; alerts: string[] }> { return this.http.post<any>(`/api/patients/${id}/anamnesis`, body); }
+  updateAnamnesis(id: number, recordId: number, body: any): Observable<{ records: any[]; alerts: string[] }> { return this.http.put<any>(`/api/patients/${id}/anamnesis/${recordId}`, body); }
+  vitals(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${id}/vitals`); }
+  addVitals(id: number, body: any): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${id}/vitals`, body); }
+  deleteVitals(id: number, vitalId: number): Observable<any[]> { return this.http.delete<any[]>(`/api/patients/${id}/vitals/${vitalId}`); }
+
+  // v2.5: periodontograma
+  periodontograms(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${id}/periodontograms`); }
+  periodontogram(id: number, examId: number): Observable<any> { return this.http.get(`/api/patients/${id}/periodontograms/${examId}`); }
+  createPeriodontogram(id: number, body: any): Observable<any> { return this.http.post(`/api/patients/${id}/periodontograms`, body); }
+  updatePeriodontogram(id: number, examId: number, body: any): Observable<any> { return this.http.put(`/api/patients/${id}/periodontograms/${examId}`, body); }
+
+  // v2.5: laboratorio dental
+  labOptions(): Observable<any> { return this.http.get('/api/lab-options'); }
+  laboratories(all = false): Observable<any[]> { return this.http.get<any[]>('/api/laboratories', { params: params({ all: all || undefined }) }); }
+  createLaboratory(body: any): Observable<any> { return this.http.post('/api/laboratories', body); }
+  updateLaboratory(id: number, body: any): Observable<any> { return this.http.put(`/api/laboratories/${id}`, body); }
+  labOrders(f: { status?: string; laboratoryId?: number | null; patientId?: number; overdue?: boolean; unpaid?: boolean; q?: string }): Observable<{ items: any[]; summary: any }> {
+    return this.http.get<any>('/api/lab-orders', { params: params({ status: f.status, laboratoryId: f.laboratoryId, patientId: f.patientId, overdue: f.overdue || undefined, unpaid: f.unpaid || undefined, q: f.q }) });
+  }
+  labOrder(id: number): Observable<any> { return this.http.get(`/api/lab-orders/${id}`); }
+  createLabOrder(body: any): Observable<any> { return this.http.post('/api/lab-orders', body); }
+  updateLabOrder(id: number, body: any): Observable<any> { return this.http.put(`/api/lab-orders/${id}`, body); }
+  labOrderStatus(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/status`, body); }
+  payLabOrder(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/payments`, body); }
+
+  searchPatientsFiltered(q: string, page: number, size: number, filters: { tag?: string; source?: string; mine?: boolean }): Observable<Page<Patient>> {
+    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: filters.mine || undefined, tag: filters.tag, source: filters.source }) });
+  }
+
   searchPatients(q: string, page = 0, size = 20, mine = false): Observable<Page<Patient>> {
     return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: mine ? 'true' : undefined }) });
   }
@@ -360,6 +406,15 @@ export interface NotificationItem {
   id: number; patientId?: number; appointmentId?: number; type: string; operation: string; channel: string; destination: string;
   subject?: string; body: string; idempotencyKey: string; scheduledFor?: string; status: string; attempts: number;
   lastError?: string; providerId?: string; sentAt?: string; createdAt: string;
+}
+
+export interface PatientRelation {
+  id: number; relatedPatientId?: number | null; fullName: string; docType?: string; docNumber?: string; relationship: string;
+  phone?: string; email?: string; isGuardian: boolean | number; pays: boolean | number; notes?: string; relatedHc?: string; inverse: boolean | number;
+}
+export interface PatientProfile {
+  source?: string; sourceLabel?: string; sourceDetail?: string; hcNumber?: string; fiscalRuc?: string; fiscalName?: string;
+  fiscalAddress?: string; tags: string[]; relations: PatientRelation[];
 }
 
 export interface PortalAppointment {

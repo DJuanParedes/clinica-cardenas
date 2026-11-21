@@ -12,13 +12,19 @@ import { HistoryTabComponent } from './clinical/history-tab.component';
 import { OdontogramTabComponent } from './clinical/odontogram-tab.component';
 import { PlanTabComponent } from './clinical/plan-tab.component';
 import { FilesTabComponent } from './clinical/files-tab.component';
+import { PatientProfilePanelsComponent } from './patient-profile-panels.component';
+import { AnamnesisTabComponent } from './clinical/anamnesis-tab.component';
+import { VitalsTabComponent } from './clinical/vitals-tab.component';
+import { PeriodontogramTabComponent } from './clinical/periodontogram-tab.component';
+import { LabOrdersComponent } from './lab-orders.component';
+import { PatientProfile } from '../core/api.service';
 
-type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuenta';
+type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' | 'laboratorio' | 'archivos' | 'cuenta';
 
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent],
+  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -32,10 +38,14 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
             <h1>{{ p.fullName }}</h1>
             <div class="facts">
               <span class="tabular">{{ p.docType }} {{ p.docNumber }}</span>
+              @if (profile?.hcNumber || p.hcNumber) { <span class="tabular">HC {{ profile?.hcNumber || p.hcNumber }}</span> }
               <span>{{ p.age }} años · {{ p.sex === 'F' ? 'Femenino' : 'Masculino' }}</span>
               <span class="tabular"><app-icon name="phone" [size]="14" /> {{ p.phone }}</span>
               @if (p.email) { <span><app-icon name="mail" [size]="14" /> {{ p.email }}</span> }
             </div>
+            @if (profile?.tags?.length) {
+              <div class="hero-tags">@for (t of profile!.tags; track t) { <a class="tag teal plain" [routerLink]="['/pacientes']" [queryParams]="{ etiqueta: t }">{{ t }}</a> }</div>
+            }
           </div>
           <div class="next">
             @if (next) {
@@ -63,6 +73,9 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
           </div>
         </header>
 
+        @if (clinical && anamAlerts.length) {
+          <div class="notice gum anam" role="alert"><app-icon name="alert" /><div>@for (a of anamAlerts; track a) { <div class="strong">{{ a }}</div> }</div></div>
+        }
         @if (clinical && (alerts || pending.length)) {
           <section class="clin panel">
             <div class="alerts">
@@ -85,16 +98,31 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
           @if (clinical) {
             <a [class.on]="tab === 'historia'" (click)="go('historia')">Historia clínica</a>
             <a [class.on]="tab === 'odontograma'" (click)="go('odontograma')">Odontograma</a>
+            <a [class.on]="tab === 'periodontograma'" (click)="go('periodontograma')">Periodontograma</a>
           }
           @if (canPlan) { <a [class.on]="tab === 'plan'" (click)="go('plan')">Plan de tratamiento</a> }
+          @if (auth.can('LABORATORIO')) { <a [class.on]="tab === 'laboratorio'" (click)="go('laboratorio')">Laboratorio</a> }
           <a [class.on]="tab === 'archivos'" (click)="go('archivos')">Fotos y documentos</a>
           @if (canAccount) { <a [class.on]="tab === 'cuenta'" (click)="go('cuenta')">Cuenta y pagos</a> }
         </nav>
 
         @switch (tab) {
-          @case ('historia') { <app-history-tab [patientId]="p.id" /> }
+          @case ('historia') {
+            <div class="seg sub">
+              <button type="button" [class.on]="sub === 'antecedentes'" (click)="sub = 'antecedentes'">Antecedentes y diagnósticos</button>
+              <button type="button" [class.on]="sub === 'anamnesis'" (click)="sub = 'anamnesis'">Anamnesis</button>
+              <button type="button" [class.on]="sub === 'signos'" (click)="sub = 'signos'">Signos vitales</button>
+            </div>
+            @switch (sub) {
+              @case ('anamnesis') { <app-anamnesis-tab [patientId]="p.id" /> }
+              @case ('signos') { <app-vitals-tab [patientId]="p.id" /> }
+              @default { <app-history-tab [patientId]="p.id" /> }
+            }
+          }
           @case ('odontograma') { <app-odontogram-tab [patientId]="p.id" /> }
+          @case ('periodontograma') { <app-periodontogram-tab [patientId]="p.id" /> }
           @case ('plan') { <app-plan-tab [patientId]="p.id" /> }
+          @case ('laboratorio') { <app-lab-orders [patientId]="p.id" /> }
           @case ('cuenta') { <app-account-tab [patientId]="p.id" /> }
           @case ('archivos') { <app-files-tab [patientId]="p.id" [patientName]="p.fullName" /> }
           @default {
@@ -142,6 +170,8 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
                   </div>
                 }
               </section>
+
+              <app-patient-profile-panels [patientId]="p.id" (changed)="profile = $event" />
 
               <section class="panel">
                 <div class="panel-head"><h3>Archivos solicitados al paciente</h3>
@@ -248,6 +278,11 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'plan' | 'archivos' | 'cuent
     .facts span { display: inline-flex; align-items: center; gap: 5px; }
     .next { display: flex; flex-direction: column; padding: 0 20px; border-left: 1px solid var(--line); min-width: 180px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .seg.sub { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin-bottom: 14px; background: var(--surface); flex-wrap: wrap; }
+    .seg.sub button { border: 0; background: none; padding: 6px 14px; border-radius: 999px; font: inherit; cursor: pointer; }
+    .seg.sub button.on { background: var(--teal-soft); color: var(--teal-strong); font-weight: 700; }
+    .anam { margin-bottom: 14px; }
+    .hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
     .audit { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 6px; }
     .nowrap { white-space: nowrap; }
@@ -265,6 +300,9 @@ export class PatientDetailComponent implements OnChanges {
   @Input() tab: Tab = 'resumen';
 
   p: Patient | null = null;
+  profile: PatientProfile | null = null;
+  anamAlerts: string[] = [];
+  sub: 'antecedentes' | 'anamnesis' | 'signos' = 'antecedentes';
   next: Appointment | null = null;
   nextIsMine = false;
   alerts: any = null;
@@ -297,13 +335,13 @@ export class PatientDetailComponent implements OnChanges {
   get canAccount(): boolean { return this.auth.can('CAJA_COBRAR'); }
 
   ngOnChanges() {
-    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, plan: this.canPlan, archivos: true, cuenta: this.canAccount };
+    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, periodontograma: this.clinical, laboratorio: this.auth.can('LABORATORIO'), plan: this.canPlan, archivos: true, cuenta: this.canAccount };
     if (!this.tab || !allowed[this.tab]) this.tab = 'resumen';
     const id = +this.id;
     if (this.p?.id === id) return;
     this.api.patient(id).subscribe((r: any) => {
       this.p = r.patient; this.next = r.nextAppointment || null; this.nextIsMine = !!r.nextIsMine;
-      this.alerts = r.clinicalAlerts || null; this.pending = r.pendingProcedures || [];
+      this.alerts = r.clinicalAlerts || null; this.pending = r.pendingProcedures || []; this.anamAlerts = (r as any).anamnesisAlerts || [];
       if (this.alerts && !this.alerts.allergies && !this.alerts.medication && !this.alerts.background) this.alerts = { ...this.alerts, empty: true };
     });
     this.loadReqs(id);
