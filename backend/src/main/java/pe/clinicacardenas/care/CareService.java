@@ -372,6 +372,17 @@ public class CareService {
         List<Long> ids = jdbc.queryForList("select id from patients where replace(replace(phone, ' ', ''), '-', '') = ? and active = true",
                 Long.class, phone);
         if (ids.isEmpty()) return Map.of("accion", "DESCONOCIDO");
+        // v2.7: "BAJA" retira el consentimiento de publicidad (Ley 29733; Código de Protección al Consumidor, art. 58)
+        if (text.matches("^(baja|stop|dar de baja|no (quiero|deseo) (recibir )?(m[aá]s )?(promociones|publicidad|mensajes)).*")) {
+            for (Long id : ids) {
+                if (Boolean.FALSE.equals(jdbc.queryForObject("select marketing_consent from patients where id = ?", Boolean.class, id))) continue;
+                jdbc.update("update patients set marketing_consent = false, marketing_consent_at = ? where id = ?", Dates.now(), id);
+                audit.record("PACIENTE", id, "PUBLICIDAD_BAJA", "Pidió la baja de promociones por WhatsApp");
+            }
+            out.put("accion", "BAJA_PUBLICIDAD");
+            out.put("respuesta", "Listo, ya no te enviaremos promociones. Seguirás recibiendo los avisos de tus citas. Si cambias de opinión, avísanos en recepción.");
+            return out;
+        }
         Appointment next = null;
         for (Long id : ids) {
             for (Appointment a : appointments.findByPatientIdOrderByStartAtDesc(id)) {
