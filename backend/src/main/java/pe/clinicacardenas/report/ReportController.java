@@ -40,4 +40,24 @@ public class ReportController {
                                           @RequestParam(required = false) Long dentistId) {
         return service.treatments(from, to, dentistId);
     }
+
+    // ---------- v2.8: reporte anual descargable
+    @org.springframework.beans.factory.annotation.Autowired
+    private AnnualReportService annual;
+
+    @GetMapping("/annual")
+    public Map<String, Object> annual(@RequestParam int year) { return annual.report(year); }
+
+    @GetMapping("/annual/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> annualPdf(@RequestParam int year) {
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header("Content-Disposition", "attachment; filename=\"reporte-anual-" + year + ".pdf\"").body(annual.pdf(year));
+    }
+
+    @GetMapping("/annual/csv")
+    public org.springframework.http.ResponseEntity<byte[]> annualCsv(@RequestParam int year) {
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header("Content-Disposition", "attachment; filename=\"reporte-anual-" + year + ".csv\"")
+                .body(annual.csv(year).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 }

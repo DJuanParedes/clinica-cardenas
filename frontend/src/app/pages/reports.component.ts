@@ -35,6 +35,7 @@ type Tab = 'ingresos' | 'citas' | 'tratamientos';
         <a [class.on]="tab === 'ingresos'" (click)="go('ingresos')">Ingresos</a>
         <a [class.on]="tab === 'citas'" (click)="go('citas')">Citas</a>
         <a [class.on]="tab === 'tratamientos'" (click)="go('tratamientos')">Tratamientos</a>
+        <a routerLink="/reportes/anual">Reporte anual</a>
       </nav>
 
       <section class="panel filters no-print">
