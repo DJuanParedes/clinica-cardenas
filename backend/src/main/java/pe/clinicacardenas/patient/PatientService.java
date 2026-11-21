@@ -74,8 +74,19 @@ public class PatientService {
     /** mine = solo los pacientes que tienen o tuvieron cita con el odontólogo que consulta ("Mis pacientes").
      *  tag / source (v2.5) filtran por etiqueta y por fuente de captación. */
     public Map<String, Object> search(String q, int page, int size, boolean mine, String tag, String source) {
+        return search(q, page, size, mine, tag, source, null);
+    }
+
+    /** v2.7: además, filtros de seguimiento (tarea pendiente, próxima cita, presupuesto, saldo…) de la lista de pacientes. */
+    public Map<String, Object> search(String q, int page, int size, boolean mine, String tag, String source, pe.clinicacardenas.crm.SegmentFilter extra) {
+        final List<Long> extraIds;
+        if (extra != null && !extra.isEmpty()) {
+            var w = extra.where(Dates.now());
+            extraIds = jdbc.queryForList("select p.id from patients p where " + w.sql(), Long.class, w.args().toArray());
+        } else extraIds = null;
         Specification<Patient> filter = (root, cq, cb) -> {
             List<Predicate> ps = new ArrayList<>();
+            if (extraIds != null) ps.add(extraIds.isEmpty() ? cb.disjunction() : root.get("id").in(extraIds));
             if (source != null && !source.isBlank()) ps.add(cb.equal(root.get("source"), source.trim().toUpperCase()));
             if (tag != null && !tag.isBlank()) {
                 List<Long> ids = jdbc.queryForList("select patient_id from patient_tags where tag = ?", Long.class, tag.trim());
