@@ -59,6 +59,20 @@ public class Patient {
     @Column(name = "emergency_contact_phone")
     public String emergencyContactPhone;
     public String notes;
+    /** v2.5: de dónde llegó el paciente (RECOMENDACION, FACEBOOK…) y detalle (quién lo recomendó, qué campaña). */
+    public String source;
+    @Column(name = "source_detail")
+    public String sourceDetail;
+    /** N° de historia clínica: se asigna solo (000123) y se puede cambiar por el número de la ficha en papel. */
+    @Column(name = "hc_number")
+    public String hcNumber;
+    /** Datos para factura: RUC, razón social y dirección fiscal (persona con negocio o empresa que paga). */
+    @Column(name = "fiscal_ruc")
+    public String fiscalRuc;
+    @Column(name = "fiscal_name")
+    public String fiscalName;
+    @Column(name = "fiscal_address")
+    public String fiscalAddress;
     public boolean active = true;
     /** HU-23: canal preferido para avisos (WHATSAPP, EMAIL, AMBOS, NINGUNO). */
     @Column(name = "notify_channel")

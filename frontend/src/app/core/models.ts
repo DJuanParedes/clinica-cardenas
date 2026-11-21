@@ -19,6 +19,7 @@ export interface Patient {
   ubigeo?: string; department?: string; province?: string; emergencyContactRelationship?: string; minor?: boolean;
   guardianName?: string; guardianDocType?: string; guardianDocNumber?: string; guardianRelationship?: string; guardianPhone?: string;
   dataConsent?: boolean; consentVersion?: string; consentChannel?: string; consentFileId?: number;
+  source?: string; sourceDetail?: string; hcNumber?: string; fiscalRuc?: string; fiscalName?: string; fiscalAddress?: string;
 }
 
 export interface UserLite { id: number; username: string; fullName: string; role: Role; active: boolean; }
