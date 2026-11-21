@@ -26,44 +26,94 @@ public class PatientController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> search(@RequestParam(defaultValue = "") String q,
                                       @RequestParam(defaultValue = "0") int page,
-                                      @RequestParam(defaultValue = "20") int size) {
-        return service.search(q, page, size);
+                                      @RequestParam(defaultValue = "20") int size,
+                                      @RequestParam(defaultValue = "false") boolean mine,
+                                      @RequestParam(required = false) String tag,
+                                      @RequestParam(required = false) String source) {
+        Map<String, Object> r = service.search(q, page, size, mine, tag, source);
+        if (!fullAccess()) {
+            r.put("content", ((List<?>) r.get("content")).stream().map(x -> reduced((Patient) x)).toList());
+            r.put("restricted", true);
+        }
+        return r;
+    }
+
+    /**
+     * Minimización de datos (Ley 29733, art. 8 y Reglamento): quien solo cobra (caja) ve lo necesario para cobrar y
+     * emitir el comprobante: nombre, documento, correo y un teléfono enmascarado; no la dirección, fecha de nacimiento,
+     * contactos ni datos clínicos.
+     */
+    static boolean fullAccess() {
+        return pe.clinicacardenas.security.PermissionService.has("PACIENTES_EDITAR") || pe.clinicacardenas.security.PermissionService.has("HISTORIA_CLINICA");
+    }
+
+    static Map<String, Object> reduced(Patient p) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", p.id);
+        m.put("firstName", p.firstName);
+        m.put("lastName", p.lastName);
+        m.put("fullName", p.getFullName());
+        m.put("docType", p.docType);
+        m.put("docNumber", p.docNumber);
+        m.put("email", p.email);
+        m.put("phone", p.phone == null || p.phone.length() < 4 ? null : "*****" + p.phone.substring(p.phone.length() - 4));
+        m.put("minor", p.isMinor());
+        if (p.isMinor()) m.put("guardianName", p.guardianName);
+        // Caja emite la factura: necesita el RUC y la razón social, no el resto de la ficha.
+        m.put("fiscalRuc", p.fiscalRuc);
+        m.put("fiscalName", p.fiscalName);
+        m.put("fiscalAddress", p.fiscalAddress);
+        m.put("hcNumber", p.hcNumber);
+        m.put("restricted", true);
+        return m;
     }
 
     @GetMapping("/check-document")
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public Map<String, Object> check(@RequestParam String type, @RequestParam String number,
                                      @RequestParam(required = false) Long excludeId) {
         return service.checkDocument(type, number, excludeId);
     }
 
     @GetMapping("/{id}")
-    public Map<String, Object> get(@PathVariable Long id) {
-        return service.summary(id);
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
+    public Map<String, Object> get(@PathVariable Long id, org.springframework.security.core.Authentication auth) {
+        Map<String, Object> m = service.summary(id);
+        boolean clinical = auth != null && auth.getAuthorities().stream().anyMatch(a -> "HISTORIA_CLINICA".equals(a.getAuthority()));
+        if (!clinical) {
+            m.remove("clinicalAlerts");      // datos de salud: solo el personal asistencial (Ley 29733, datos sensibles)
+            m.remove("anamnesisAlerts");
+            m.remove("pendingProcedures");
+        }
+        if (!fullAccess()) m.put("patient", reduced((Patient) m.get("patient")));
+        return m;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public Patient create(@RequestBody PatientValidator.Input in) {
         return service.create(in);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public Patient update(@PathVariable Long id, @RequestBody PatientValidator.Input in) {
         return service.update(id, in);
     }
 
     @GetMapping("/{id}/appointments")
+    @PreAuthorize("hasAuthority('PACIENTES_VER')")
     public List<Appointment> appointments(@PathVariable Long id) {
         service.get(id);
         return appointments.findByPatientIdOrderByStartAtDesc(id);
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAnyRole('ADMIN','RECEPCION')")
+    @PreAuthorize("hasAuthority('PACIENTES_EDITAR')")
     public List<AuditLog> audit(@PathVariable Long id) {
         return audit.forEntity("PACIENTE", id);
     }

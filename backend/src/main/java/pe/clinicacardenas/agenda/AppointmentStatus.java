@@ -10,6 +10,9 @@ public enum AppointmentStatus {
     public static final Set<AppointmentStatus> BLOCKING =
             EnumSet.of(PROGRAMADA, CONFIRMADA, EN_ESPERA, EN_ATENCION, ATENDIDA);
 
+    /** Citas que todavía deben atenderse (ocupan horario y no se han cerrado). */
+    public static final Set<AppointmentStatus> PENDING = EnumSet.of(PROGRAMADA, CONFIRMADA, EN_ESPERA, EN_ATENCION);
+
     public boolean isFinal() {
         return this == ATENDIDA || this == CANCELADA || this == NO_ASISTIO;
     }

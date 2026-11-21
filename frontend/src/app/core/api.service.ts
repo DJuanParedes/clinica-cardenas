@@ -22,8 +22,76 @@ export class Api {
   dashboard(): Observable<any> { return this.http.get('/api/dashboard'); }
 
   // ---------- pacientes (HU-01, HU-02, HU-03)
-  searchPatients(q: string, page = 0, size = 20): Observable<Page<Patient>> {
-    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size }) });
+  // v2.5: ficha ampliada (captación, etiquetas, N° HC, datos fiscales, familiares)
+  patientProfileOptions(): Observable<{ sources: { code: string; label: string }[]; relationships: string[]; tags: { tag: string; patients: number }[] }> {
+    return this.http.get<any>('/api/patients/profile-options');
+  }
+  patientProfile(id: number): Observable<PatientProfile> { return this.http.get<PatientProfile>(`/api/patients/${id}/profile`); }
+  updatePatientProfile(id: number, body: any): Observable<PatientProfile> { return this.http.put<PatientProfile>(`/api/patients/${id}/profile`, body); }
+  patientRuc(ruc: string): Observable<RucInfo> { return this.http.get<RucInfo>(`/api/patients/ruc/${ruc}`); }
+  addRelation(id: number, body: any): Observable<PatientProfile> { return this.http.post<PatientProfile>(`/api/patients/${id}/relations`, body); }
+  updateRelation(id: number, relId: number, body: any): Observable<PatientProfile> { return this.http.put<PatientProfile>(`/api/patients/${id}/relations/${relId}`, body); }
+  deleteRelation(id: number, relId: number): Observable<PatientProfile> { return this.http.delete<PatientProfile>(`/api/patients/${id}/relations/${relId}`); }
+
+  // v2.5: anamnesis y signos vitales
+  anamnesisTemplates(all = false): Observable<any[]> { return this.http.get<any[]>('/api/anamnesis/templates', { params: params({ all: all || undefined }) }); }
+  createAnamnesisTemplate(body: any): Observable<any> { return this.http.post('/api/anamnesis/templates', body); }
+  updateAnamnesisTemplate(id: number, body: any): Observable<any> { return this.http.put(`/api/anamnesis/templates/${id}`, body); }
+  patientAnamnesis(id: number): Observable<{ records: any[]; alerts: string[] }> { return this.http.get<any>(`/api/patients/${id}/anamnesis`); }
+  addAnamnesis(id: number, body: any): Observable<{ records: any[]; alerts: string[] }> { return this.http.post<any>(`/api/patients/${id}/anamnesis`, body); }
+  updateAnamnesis(id: number, recordId: number, body: any): Observable<{ records: any[]; alerts: string[] }> { return this.http.put<any>(`/api/patients/${id}/anamnesis/${recordId}`, body); }
+  vitals(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${id}/vitals`); }
+  addVitals(id: number, body: any): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${id}/vitals`, body); }
+  deleteVitals(id: number, vitalId: number): Observable<any[]> { return this.http.delete<any[]>(`/api/patients/${id}/vitals/${vitalId}`); }
+
+  // v2.5: periodontograma
+  periodontograms(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${id}/periodontograms`); }
+  periodontogram(id: number, examId: number): Observable<any> { return this.http.get(`/api/patients/${id}/periodontograms/${examId}`); }
+  createPeriodontogram(id: number, body: any): Observable<any> { return this.http.post(`/api/patients/${id}/periodontograms`, body); }
+  updatePeriodontogram(id: number, examId: number, body: any): Observable<any> { return this.http.put(`/api/patients/${id}/periodontograms/${examId}`, body); }
+
+  // v2.5: laboratorio dental
+  labOptions(): Observable<any> { return this.http.get('/api/lab-options'); }
+  laboratories(all = false): Observable<any[]> { return this.http.get<any[]>('/api/laboratories', { params: params({ all: all || undefined }) }); }
+  createLaboratory(body: any): Observable<any> { return this.http.post('/api/laboratories', body); }
+  updateLaboratory(id: number, body: any): Observable<any> { return this.http.put(`/api/laboratories/${id}`, body); }
+  labOrders(f: { status?: string; laboratoryId?: number | null; patientId?: number; overdue?: boolean; unpaid?: boolean; q?: string }): Observable<{ items: any[]; summary: any }> {
+    return this.http.get<any>('/api/lab-orders', { params: params({ status: f.status, laboratoryId: f.laboratoryId, patientId: f.patientId, overdue: f.overdue || undefined, unpaid: f.unpaid || undefined, q: f.q }) });
+  }
+  labOrder(id: number): Observable<any> { return this.http.get(`/api/lab-orders/${id}`); }
+  createLabOrder(body: any): Observable<any> { return this.http.post('/api/lab-orders', body); }
+  updateLabOrder(id: number, body: any): Observable<any> { return this.http.put(`/api/lab-orders/${id}`, body); }
+  labOrderStatus(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/status`, body); }
+  payLabOrder(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/payments`, body); }
+
+  // v2.6: comunicación con el paciente
+  messageTemplates(): Observable<{ templates: any[]; variables: string[] }> { return this.http.get<any>('/api/messaging/templates'); }
+  updateTemplate(code: string, body: any): Observable<any> { return this.http.put(`/api/messaging/templates/${code}`, body); }
+  restoreTemplate(code: string): Observable<any> { return this.http.post(`/api/messaging/templates/${code}/restore`, {}); }
+  previewTemplate(code: string, body: any): Observable<any> { return this.http.post(`/api/messaging/templates/${code}/preview`, body); }
+  automations(): Observable<any[]> { return this.http.get<any[]>('/api/messaging/automations'); }
+  updateAutomation(code: string, body: any): Observable<any> { return this.http.put(`/api/messaging/automations/${code}`, body); }
+  messagingHistory(f: { template?: string; status?: string; q?: string }): Observable<any[]> {
+    return this.http.get<any[]>('/api/messaging/history', { params: params({ template: f.template, status: f.status, q: f.q }) });
+  }
+  publicLinks(): Observable<any> { return this.http.get('/api/messaging/public-links'); }
+  updatePublicLinks(body: any): Observable<any> { return this.http.put('/api/messaging/public-links', body); }
+  publicBookingOptions(): Observable<any> { return this.http.get('/api/public/booking/options'); }
+  publicSlots(dentistId: number, date: string, reasonCode: string): Observable<{ slots: string[] }> {
+    return this.http.get<any>('/api/public/booking/slots', { params: params({ dentistId, date, reasonCode }) });
+  }
+  publicBook(body: any): Observable<any> { return this.http.post('/api/public/booking', body); }
+  publicPreregisterForm(): Observable<any> { return this.http.get('/api/public/preregistro'); }
+  publicPreregister(body: any): Observable<any> { return this.http.post('/api/public/preregistro', body); }
+  publicSurvey(token: string): Observable<any> { return this.http.get(`/api/public/survey/${token}`); }
+  publicRate(token: string, body: any): Observable<any> { return this.http.post(`/api/public/survey/${token}`, body); }
+
+  searchPatientsFiltered(q: string, page: number, size: number, filters: { tag?: string; source?: string; mine?: boolean }): Observable<Page<Patient>> {
+    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: filters.mine || undefined, tag: filters.tag, source: filters.source }) });
+  }
+
+  searchPatients(q: string, page = 0, size = 20, mine = false): Observable<Page<Patient>> {
+    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: mine ? 'true' : undefined }) });
   }
   patient(id: number): Observable<{ patient: Patient; nextAppointment?: Appointment; lastVisit?: Appointment; appointmentsCount: number }> {
     return this.http.get<any>(`/api/patients/${id}`);
@@ -31,6 +99,40 @@ export class Api {
   checkDocument(type: string, number: string, excludeId?: number): Observable<{ exists: boolean; patient?: { id: number; fullName: string } }> {
     return this.http.get<any>('/api/patients/check-document', { params: params({ type, number, excludeId }) });
   }
+  emailInvoice(id: number, email: string): Observable<any> { return this.http.post<any>(`/api/billing/invoices/${id}/email`, { email: email || null }); }
+  cashDay(date: string): Observable<any> { return this.http.get<any>('/api/cash/day', { params: params({ date }) }); }
+  // inventario: lotes, compras, solicitudes
+  inventoryLots(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/lots`); }
+  purchases(from?: string, to?: string): Observable<any[]> { return this.http.get<any[]>('/api/inventory/purchases', { params: params({ from, to }) }); }
+  purchase(id: number): Observable<any> { return this.http.get<any>(`/api/inventory/purchases/${id}`); }
+  createPurchase(body: any): Observable<any> { return this.http.post<any>('/api/inventory/purchases', body); }
+  payPurchase(id: number, body: any): Observable<any> { return this.http.post<any>(`/api/inventory/purchases/${id}/pay`, body); }
+  supplyCatalog(): Observable<any[]> { return this.http.get<any[]>('/api/supply-requests/catalog'); }
+  supplyRequests(status?: string, mine = false): Observable<any[]> { return this.http.get<any[]>('/api/supply-requests', { params: params({ status, mine: mine ? 'true' : undefined }) }); }
+  createSupplyRequest(body: any): Observable<any> { return this.http.post<any>('/api/supply-requests', body); }
+  answerSupplyRequest(id: number, body: any): Observable<any> { return this.http.post<any>(`/api/supply-requests/${id}/answer`, body); }
+  cancelSupplyRequest(id: number): Observable<any> { return this.http.post<any>(`/api/supply-requests/${id}/cancel`, {}); }
+  // catálogo y promociones
+  catalogProcedures(all = false): Observable<any[]> { return this.http.get<any[]>('/api/catalog/procedures', { params: params({ all: all ? 'true' : undefined }) }); }
+  saveProcedure(id: number | null, body: any): Observable<any> { return id ? this.http.put<any>(`/api/catalog/procedures/${id}`, body) : this.http.post<any>('/api/catalog/procedures', body); }
+  promotions(): Observable<any[]> { return this.http.get<any[]>('/api/catalog/promotions'); }
+  savePromotion(id: number | null, body: any): Observable<any[]> { return id ? this.http.put<any[]>(`/api/catalog/promotions/${id}`, body) : this.http.post<any[]>('/api/catalog/promotions', body); }
+  // mi perfil y roles personalizados
+  myProfile(): Observable<any> { return this.http.get<any>('/api/me/profile'); }
+  updateMyProfile(body: any): Observable<any> { return this.http.put<any>('/api/me/profile', body); }
+  changeMyPassword(body: any): Observable<any> { return this.http.post<any>('/api/me/password', body); }
+  createRole(body: any): Observable<any> { return this.http.post<any>('/api/permissions/roles', body); }
+  deleteRole(code: string): Observable<any> { return this.http.delete<any>(`/api/permissions/roles/${code}`); }
+  start2faEmail(): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/start', {}); }
+  enable2faEmail(code: string): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/enable', { code }); }
+  publicPromotions(): Observable<any[]> { return this.http.get<any[]>('/api/public/promotions'); }
+  myEarnings(from: string, to: string): Observable<any> { return this.http.get<any>('/api/me/earnings', { params: params({ from, to }) }); }
+  legal(code: string): Observable<{ code: string; version: string; title: string; body: string; publishedAt: string }> { return this.http.get<any>(`/api/public/legal/${code}`); }
+  patientConsents(id: number): Observable<any> { return this.http.get<any>(`/api/patients/${id}/consents`); }
+  uploadSignedConsent(id: number, file: File): Observable<any> { const fd = new FormData(); fd.append('file', file); return this.http.post<any>(`/api/patients/${id}/consents/signed`, fd); }
+  dniConfig(): Observable<{ enabled: boolean }> { return this.http.get<{ enabled: boolean }>('/api/lookup/dni-config'); }
+  lookupDni(dni: string): Observable<{ firstName: string; lastName: string; source: string; birthDate?: string; sex?: string; address?: string; ubigeo?: string; district?: string }> { return this.http.get<any>(`/api/lookup/dni/${dni}`); }
+  ubigeo(): Observable<UbigeoDep[]> { return this.http.get<UbigeoDep[]>('/ubigeo.json'); }
   createPatient(body: any): Observable<Patient> { return this.http.post<Patient>('/api/patients', body); }
   updatePatient(id: number, body: any): Observable<Patient> { return this.http.put<Patient>(`/api/patients/${id}`, body); }
   patientAppointments(id: number): Observable<Appointment[]> { return this.http.get<Appointment[]>(`/api/patients/${id}/appointments`); }
@@ -38,12 +140,15 @@ export class Api {
 
   // ---------- agenda (HU-07, HU-08, HU-09)
   dentists(): Observable<Dentist[]> { return this.http.get<Dentist[]>('/api/dentists'); }
-  slots(dentistId: number, date: string, duration: number, excludeId?: number):
+  slots(dentistId: number, date: string, duration: number, excludeId?: number, patientId?: number):
       Observable<{ works: boolean; blocks: Block[]; slots: Slot[]; freeCount: number; dentist: Dentist }> {
-    return this.http.get<any>('/api/agenda/slots', { params: params({ dentistId, date, duration, excludeId }) });
+    return this.http.get<any>('/api/agenda/slots', { params: params({ dentistId, date, duration, excludeId, patientId }) });
   }
   day(date: string, dentistId?: number): Observable<{ columns: { dentist: Dentist; blocks: Block[] }[]; appointments: Appointment[]; counts: Record<string, number> }> {
     return this.http.get<any>('/api/agenda/day', { params: params({ date, dentistId }) });
+  }
+  appointmentsRange(from: string, to: string, dentistId?: number): Observable<Appointment[]> {
+    return this.http.get<Appointment[]>('/api/appointments', { params: params({ from, to, dentistId }) });
   }
   appointment(id: number): Observable<Appointment> { return this.http.get<Appointment>(`/api/appointments/${id}`); }
   createAppointment(body: any): Observable<Appointment> { return this.http.post<Appointment>('/api/appointments', body); }
@@ -99,6 +204,245 @@ export class Api {
   saveSchedules(dentistId: number, blocks: { weekday: number; start: string; end: string }[]): Observable<any[]> {
     return this.http.put<any[]>(`/api/dentists/${dentistId}/schedules`, blocks);
   }
+
+  // ---------- roles y permisos (HU-26)
+  permissions(): Observable<PermissionMatrix> { return this.http.get<PermissionMatrix>('/api/permissions'); }
+  savePermissions(role: string, permissions: string[]): Observable<PermissionMatrix> {
+    return this.http.put<PermissionMatrix>(`/api/permissions/${role}`, { permissions });
+  }
+
+  // ---------- caja (HU-13, HU-14, HU-15)
+  cashMeta(): Observable<{ methods: string[]; methodLabels: Record<string, string>; expenseCategories: string[] }> { return this.http.get<any>('/api/cash/meta'); }
+  account(pid: number): Observable<Account> { return this.http.get<Account>(`/api/cash/patients/${pid}/account`); }
+  pay(body: any): Observable<{ payment: Payment; concept: string; account: Account }> { return this.http.post<any>('/api/cash/payments', body); }
+  // Cobros en línea con Mercado Pago (tarjeta, Yape)
+  portalOnlineConfig(): Observable<OnlineConfig> { return this.http.get<OnlineConfig>('/api/portal/payments/online/config'); }
+  portalOnlineCreate(amount: number): Observable<OnlineCharge> { return this.http.post<OnlineCharge>('/api/portal/payments/online', { amount }); }
+  portalOnlineStatus(id: number): Observable<OnlineCharge> { return this.http.get<OnlineCharge>(`/api/portal/payments/online/${id}`); }
+  onlineConfig(): Observable<OnlineConfig> { return this.http.get<OnlineConfig>('/api/cash/online/config'); }
+  onlineCreate(body: { patientId: number; treatmentItemId: number | null; amount: number; description?: string }): Observable<OnlineCharge> { return this.http.post<OnlineCharge>('/api/cash/online', body); }
+  onlineStatus(id: number): Observable<OnlineCharge> { return this.http.get<OnlineCharge>(`/api/cash/online/${id}`); }
+  onlineCancel(id: number): Observable<OnlineCharge> { return this.http.post<OnlineCharge>(`/api/cash/online/${id}/cancel`, {}); }
+  onlineWhatsapp(id: number): Observable<{ sent: boolean; phone: string }> { return this.http.post<any>(`/api/cash/online/${id}/whatsapp`, {}); }
+  voidPayment(id: number, reason: string): Observable<Payment> { return this.http.post<Payment>(`/api/cash/payments/${id}/void`, { reason }); }
+  addExpense(body: any): Observable<any> { return this.http.post('/api/cash/expenses', body); }
+  voidExpense(id: number, reason: string): Observable<any> { return this.http.post(`/api/cash/expenses/${id}/void`, { reason }); }
+  cashToday(): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/today'); }
+  cashReport(from: string, to: string): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/report', { params: params({ from, to }) }); }
+
+  // ---------- comisiones (HU-16, HU-17, HU-18)
+  commissionSummary(): Observable<any[]> { return this.http.get<any[]>('/api/commissions/summary'); }
+  commissionRules(dentistId?: number): Observable<CommissionRule[]> { return this.http.get<CommissionRule[]>('/api/commissions/rules', { params: params({ dentistId }) }); }
+  saveCommissionRule(id: number | null, body: any): Observable<CommissionRule> {
+    return id ? this.http.put<CommissionRule>(`/api/commissions/rules/${id}`, body) : this.http.post<CommissionRule>('/api/commissions/rules', body);
+  }
+  calculateCommissions(dentistId: number, from: string, to: string): Observable<any> {
+    return this.http.get('/api/commissions/calculate', { params: params({ dentistId, from, to }) });
+  }
+  settlements(dentistId?: number, status?: string): Observable<any[]> { return this.http.get<any[]>('/api/commissions/settlements', { params: params({ dentistId, status }) }); }
+  settle(body: any): Observable<any> { return this.http.post('/api/commissions/settlements', body); }
+  settlement(id: number): Observable<any> { return this.http.get(`/api/commissions/settlements/${id}`); }
+  paySettlement(id: number, body: any): Observable<any> { return this.http.post(`/api/commissions/settlements/${id}/payouts`, body); }
+  annulSettlement(id: number, reason: string): Observable<any> { return this.http.post(`/api/commissions/settlements/${id}/annul`, { reason }); }
+
+  // ---------- indicadores (HU-19, HU-20, HU-21)
+  incomeReport(from: string, to: string, group?: string): Observable<any> { return this.http.get('/api/reports/income', { params: params({ from, to, group }) }); }
+  appointmentsReport(from: string, to: string, dentistId?: number | null, group?: string): Observable<any> {
+    return this.http.get('/api/reports/appointments', { params: params({ from, to, dentistId, group }) });
+  }
+  treatmentsReport(from: string, to: string, dentistId?: number | null): Observable<any> {
+    return this.http.get('/api/reports/treatments', { params: params({ from, to, dentistId }) });
+  }
+
+  // ---------- notificaciones (HU-23, HU-24)
+  notifications(status?: string, type?: string): Observable<{ counters: Record<string, number>; items: NotificationItem[]; panelUrl: string }> {
+    return this.http.get<any>('/api/notifications', { params: params({ status, type }) });
+  }
+  retryNotification(id: number): Observable<NotificationItem> { return this.http.post<NotificationItem>(`/api/notifications/${id}/retry`, {}); }
+  patientNotifications(pid: number): Observable<NotificationItem[]> { return this.http.get<NotificationItem[]>(`/api/patients/${pid}/notifications`); }
+  setNotificationChannel(pid: number, channel: string): Observable<Patient> {
+    return this.http.patch<Patient>(`/api/patients/${pid}/notification-channel`, { channel });
+  }
+  remind(appointmentId: number): Observable<{ queued: number; duplicated: number; message: string }> {
+    return this.http.post<any>(`/api/appointments/${appointmentId}/remind`, {});
+  }
+
+  // ---------- archivos clínicos y documentos firmados
+  patientFiles(pid: number): Observable<PatientFile[]> { return this.http.get<PatientFile[]>(`/api/patients/${pid}/files`); }
+  uploadFile(pid: number, file: Blob, name: string, meta: { kind: string; title?: string; note?: string; tooth?: number | null; share?: boolean }): Observable<PatientFile> {
+    const fd = new FormData();
+    fd.append('file', file, name);
+    for (const [k, v] of Object.entries(meta)) if (v !== null && v !== undefined && v !== '') fd.append(k, String(v));
+    return this.http.post<PatientFile>(`/api/patients/${pid}/files`, fd);
+  }
+  createDocument(pid: number, body: { kind: string; title: string; body: string; signerName: string; signatureJpeg: string; shareWithPatient: boolean }): Observable<PatientFile> {
+    return this.http.post<PatientFile>(`/api/patients/${pid}/documents`, body);
+  }
+  fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
+  shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
+  deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }
+
+  // ---------- inventario
+  inventory(): Observable<{ items: InventoryItem[]; lowCount: number; recent: any[] }> { return this.http.get<any>('/api/inventory'); }
+  createInventoryItem(body: any): Observable<InventoryItem> { return this.http.post<InventoryItem>('/api/inventory', body); }
+  updateInventoryItem(id: number, body: any): Observable<InventoryItem> { return this.http.put<InventoryItem>(`/api/inventory/${id}`, body); }
+  inventoryImage(id: number, file: File): Observable<InventoryItem> { const fd = new FormData(); fd.append('file', file); return this.http.post<InventoryItem>(`/api/inventory/${id}/image`, fd); }
+  removeInventoryImage(id: number): Observable<InventoryItem> { return this.http.delete<InventoryItem>(`/api/inventory/${id}/image`); }
+  dentistPhoto(id: number, file: File): Observable<Dentist> { const fd = new FormData(); fd.append('file', file); return this.http.post<Dentist>(`/api/dentists/${id}/photo`, fd); }
+  removeDentistPhoto(id: number): Observable<Dentist> { return this.http.delete<Dentist>(`/api/dentists/${id}/photo`); }
+  inventoryMove(id: number, body: any): Observable<any> { return this.http.post(`/api/inventory/${id}/moves`, body); }
+  inventoryMoves(id: number): Observable<any[]> { return this.http.get<any[]>(`/api/inventory/${id}/moves`); }
+  supplies(): Observable<any[]> { return this.http.get<any[]>('/api/inventory/supplies'); }
+  saveSupplies(procedureId: number, list: { itemId: number; quantity: number }[]): Observable<any> { return this.http.put(`/api/inventory/supplies/${procedureId}`, list); }
+
+  // ---------- seguimiento: lista de espera, cuotas, controles, satisfacción
+  waitlist(): Observable<any[]> { return this.http.get<any[]>('/api/waitlist'); }
+  addWaitlist(body: { patientId: number; dentistId?: number | null; reason: string; preference?: string }): Observable<any> { return this.http.post('/api/waitlist', body); }
+  closeWaitlist(id: number): Observable<any> { return this.http.post(`/api/waitlist/${id}/close`, {}); }
+  installments(planId: number): Observable<Installments> { return this.http.get<Installments>(`/api/plans/${planId}/installments`); }
+  createInstallments(planId: number, count: number, firstDueDate: string): Observable<Installments> {
+    return this.http.post<Installments>(`/api/plans/${planId}/installments`, { count, firstDueDate });
+  }
+  recalls(): Observable<any[]> { return this.http.get<any[]>('/api/recalls'); }
+  sendRecall(patientId: number, kind: string): Observable<{ queued: number; message: string }> { return this.http.post<any>(`/api/recalls/${patientId}/send`, { kind }); }
+  rescheduleRequests(): Observable<any[]> { return this.http.get<any[]>('/api/agenda/reschedule-requests'); }
+  satisfaction(days = 90): Observable<any> { return this.http.get('/api/reports/satisfaction', { params: params({ days }) }); }
+
+  // ---------- verificación en 2 pasos
+  totpSetup(): Observable<{ secret: string; otpauthUrl: string }> { return this.http.post<any>('/api/auth/2fa/setup', {}); }
+  totpEnable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/enable', { code }); }
+  totpDisable(code: string): Observable<any> { return this.http.post('/api/auth/2fa/disable', { code }); }
+
+  // ---------- app del paciente (HU-22)
+  portalMe(): Observable<any> { return this.http.get('/api/portal/me'); }
+  portalAppointments(): Observable<{ next: PortalAppointment | null; upcoming: PortalAppointment[]; past: PortalAppointment[] }> {
+    return this.http.get<any>('/api/portal/appointments');
+  }
+  portalConfirm(id: number): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/confirm`, {}); }
+  portalNotices(): Observable<{ unread: number; items: any[] }> { return this.http.get<any>('/api/portal/notices'); }
+  portalReadNotices(): Observable<any> { return this.http.post('/api/portal/notices/read', {}); }
+  portalBookingOptions(): Observable<any> { return this.http.get('/api/portal/booking/options'); }
+  portalBookingSlots(dentistId: number, date: string, reasonCode: string, excludeId?: number | null): Observable<{ slots: string[]; durationMin: number; works: boolean }> {
+    return this.http.get<any>('/api/portal/booking/slots', { params: params({ dentistId, date, reasonCode, excludeId: excludeId ?? undefined }) });
+  }
+  portalBook(body: { dentistId: number; startAt: string; reasonCode: string; notes?: string }): Observable<any> {
+    return this.http.post('/api/portal/appointments', body);
+  }
+  portalReschedule(id: number, body: { dentistId?: number; startAt: string }): Observable<any> {
+    return this.http.post(`/api/portal/appointments/${id}/reschedule`, body);
+  }
+  portalCancel(id: number, reason?: string): Observable<any> { return this.http.post(`/api/portal/appointments/${id}/cancel`, { reason }); }
+  portalChannel(channel: string): Observable<any> { return this.http.patch('/api/portal/me/notifications', { channel }); }
+  portalAccount(): Observable<any> { return this.http.get('/api/portal/account'); }
+  portalContact(phone: string, email: string): Observable<any> { return this.http.put('/api/portal/me/contact', { phone, email }); }
+  portalTreatments(): Observable<any> { return this.http.get('/api/portal/treatments'); }
+  portalConsents(): Observable<any> { return this.http.get('/api/portal/consents'); }
+  portalConsentPdf(id: number): Observable<Blob> { return this.http.get(`/api/portal/consents/${id}/pdf`, { responseType: 'blob' }); }
+  portalFileLink(id: number): Observable<{ url: string }> { return this.http.get<{ url: string }>(`/api/portal/files/${id}/link`); }
+  portalDocuments(): Observable<any> { return this.http.get('/api/portal/documents'); }
+  portalInvoiceLink(id: number): Observable<{ url: string }> { return this.http.get<{ url: string }>(`/api/portal/documents/invoices/${id}/link`); }
+  portalFileRequests(): Observable<any[]> { return this.http.get<any[]>('/api/portal/file-requests'); }
+  portalUploadRequest(id: number, file: File): Observable<any[]> { const f = new FormData(); f.append('file', file); return this.http.post<any[]>(`/api/portal/file-requests/${id}/upload`, f); }
+  // archivos solicitados y seguimiento de confirmaciones (personal)
+  fileRequests(patientId: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${patientId}/file-requests`); }
+  createFileRequest(patientId: number, body: any): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${patientId}/file-requests`, body); }
+  cancelFileRequest(patientId: number, id: number): Observable<any[]> { return this.http.post<any[]>(`/api/patients/${patientId}/file-requests/${id}/cancel`, {}); }
+  uploadFileRequest(patientId: number, id: number, file: File): Observable<any[]> { const f = new FormData(); f.append('file', file); return this.http.post<any[]>(`/api/patients/${patientId}/file-requests/${id}/upload`, f); }
+  unconfirmed(): Observable<any> { return this.http.get('/api/agenda/unconfirmed'); }
+  callResult(id: number, result: string, note: string): Observable<any> { return this.http.post(`/api/appointments/${id}/call`, { result, note }); }
+
+  // ---------- mensajes de WhatsApp y asistente virtual
+  conversations(q?: string): Observable<{ items: ConversationThread[]; unread: number; attention: number; mode: string }> {
+    return this.http.get<any>('/api/conversations', { params: params({ q }) });
+  }
+  conversationSummary(): Observable<{ unread: number; attention: number; mode: string }> { return this.http.get<any>('/api/conversations/summary'); }
+  conversation(phone: string): Observable<ConversationDetail> { return this.http.get<ConversationDetail>(`/api/conversations/${phone}`); }
+  sendWhatsapp(phone: string, text: string): Observable<any> { return this.http.post(`/api/conversations/${phone}/messages`, { text }); }
+  updateConversation(phone: string, body: { aiEnabled?: boolean; attended?: boolean }): Observable<ConversationDetail> {
+    return this.http.patch<ConversationDetail>(`/api/conversations/${phone}`, body);
+  }
+  assistantSettings(): Observable<AssistantSettings> { return this.http.get<AssistantSettings>('/api/assistant/settings'); }
+  updateAssistantSettings(body: { mode?: string; pauseMinutes?: number }): Observable<AssistantSettings> {
+    return this.http.put<AssistantSettings>('/api/assistant/settings', body);
+  }
+  faq(): Observable<FaqItem[]> { return this.http.get<FaqItem[]>('/api/assistant/faq'); }
+  addFaq(body: Partial<FaqItem>): Observable<FaqItem[]> { return this.http.post<FaqItem[]>('/api/assistant/faq', body); }
+  updateFaq(id: number, body: Partial<FaqItem>): Observable<FaqItem[]> { return this.http.put<FaqItem[]>(`/api/assistant/faq/${id}`, body); }
+  deleteFaq(id: number): Observable<FaqItem[]> { return this.http.delete<FaqItem[]>(`/api/assistant/faq/${id}`); }
+  testAssistant(text: string, patientId?: number): Observable<AssistantTest> {
+    return this.http.post<AssistantTest>('/api/assistant/test', { text, patientId: patientId ?? null });
+  }
+}
+
+export interface PatientFile {
+  id: number; patientId: number; kind: string; title: string; note?: string; tooth?: number; contentType: string; sizeBytes: number;
+  sharedWithPatient: boolean; signedAt?: string; createdAt: string; createdBy: string; image?: boolean;
+}
+
+export interface InventoryItem { id: number; name: string; unit: string; stock: number; minStock: number; active: boolean; low: boolean; updatedAt?: string; imageUrl?: string | null;
+  category?: string; brand?: string | null; supplier?: string | null; unitCost?: number | null; tracksExpiry?: boolean; }
+
+export interface Installments {
+  planId: number; total: number; paid: number;
+  items: { id: number; number: number; dueDate: string; amount: number; status: 'PAGADA' | 'PENDIENTE' | 'VENCIDA' }[];
+}
+
+export interface PermissionMatrix {
+  permissions: { code: string; group: string; label: string }[];
+  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number; custom?: boolean; baseRole?: string; baseRoleLabel?: string; description?: string }[];
+}
+
+export interface Payment {
+  id: number; patientId: number; treatmentItemId?: number; amount: number; method: string; reference?: string; notes?: string;
+  paidAt: string; cashier: string; status: string; voidReason?: string; voidedAt?: string; voidedBy?: string;
+}
+
+export interface Obligation {
+  treatmentItemId: number; procedure: string; category: string; tooth?: number; planId: number; planTitle: string;
+  status: string; doneAt?: string; price: number; paid: number; pending: number;
+}
+
+export interface Account {
+  patient: { id: number; fullName: string; docType: string; docNumber: string };
+  charges: number; credits: number; balance: number; inFavor: number; unapplied: number;
+  obligations: Obligation[];
+  movements: { date: string; type: 'CARGO' | 'ABONO'; concept: string; detail: string; charge: number; credit: number; balance: number; paymentId?: number }[];
+  payments: Payment[];
+}
+
+export interface CashReport {
+  from: string; to: string; income: number; outgo: number; net: number; incomeCount: number; outgoCount: number; voided: number;
+  byMethod: { method: string; label: string; income: number; outgo: number; net: number }[];
+  byDay: { date: string; income: number; outgo: number }[];
+  byCategory: { category: string; amount: number }[];
+  detail: { type: 'INGRESO' | 'EGRESO'; id: number; date: string; concept: string; party?: string; patientId?: number; category?: string;
+    method: string; reference?: string; amount: number; user: string }[];
+}
+
+export interface CommissionRule {
+  id: number; dentist: Dentist; procedure?: Procedure; calcType: string; value: number; base: string;
+  validFrom: string; validTo?: string; active: boolean; notes?: string; label: string; createdBy: string;
+}
+
+export interface NotificationItem {
+  id: number; patientId?: number; appointmentId?: number; type: string; operation: string; channel: string; destination: string;
+  subject?: string; body: string; idempotencyKey: string; scheduledFor?: string; status: string; attempts: number;
+  lastError?: string; providerId?: string; sentAt?: string; createdAt: string;
+}
+
+export interface PatientRelation {
+  id: number; relatedPatientId?: number | null; fullName: string; docType?: string; docNumber?: string; relationship: string;
+  phone?: string; email?: string; isGuardian: boolean | number; pays: boolean | number; notes?: string; relatedHc?: string; inverse: boolean | number;
+}
+export interface PatientProfile {
+  source?: string; sourceLabel?: string; sourceDetail?: string; hcNumber?: string; fiscalRuc?: string; fiscalName?: string;
+  fiscalAddress?: string; tags: string[]; relations: PatientRelation[];
+}
+
+export interface PortalAppointment {
+  id: number; startAt: string; endAt: string; durationMin: number; reason: string; status: string;
+  dentist: { fullName: string; specialty: string; color: string }; canConfirm: boolean;
+  canReschedule?: boolean; canCancel?: boolean; dentistId?: number; confirmDeadline?: string;
 }
 
 export interface InvoiceDetail {
@@ -111,3 +455,41 @@ export interface RucInfo {
   ruc: string; razonSocial: string; estado: string; condicion: string;
   direccion: string; distrito: string; provincia: string; departamento: string; tipo: string;
 }
+
+export interface ConversationThread {
+  phone: string; patientId: number | null; name: string; aiEnabled: boolean; manualUntil: string | null;
+  needsAttention: boolean; unread: number; lastMessageAt: string | null; lastPreview: string | null;
+}
+
+export interface ConversationMessage {
+  id: string; direction: 'IN' | 'OUT'; source: 'PACIENTE' | 'IA' | 'PERSONAL' | 'SISTEMA'; body: string;
+  intent: string | null; engine: string | null; status: string | null; author: string | null; at: string;
+}
+
+export interface ConversationDetail {
+  thread: { phone: string; patientId: number | null; name: string | null; aiEnabled: boolean; manualUntil: string | null; needsAttention: boolean; silence: string | null };
+  messages: ConversationMessage[];
+  upcoming?: { id: number; startAt: string; dentist: string; reason: string; status: string }[];
+}
+
+export interface AssistantSettings {
+  mode: 'AUTOMATICO' | 'FUERA_HORARIO' | 'APAGADO'; pauseMinutes: number; openNow: boolean; schedule: string; knowledgeDocs: number;
+  model: { proveedor: string; modelo: string; externo: boolean; ultimoError: string | null };
+}
+
+export interface FaqItem { id: number; question: string; answer: string; active: boolean; updatedAt?: string; updatedBy?: string; }
+
+export interface AssistantTest { text: string; intent: string; needsHuman: boolean; engine: string; sources: string[]; ms: number; }
+
+export interface OnlineConfig { provider: string; enabled: boolean; testMode: boolean; methods: string[]; message: string; }
+export interface OnlineCharge {
+  id: number; reference: string; patientId: number; treatmentItemId: number | null; amount: number; description: string;
+  status: 'PENDIENTE' | 'APROBADO' | 'CANCELADO' | 'VENCIDO'; statusLabel: string; checkoutUrl: string | null;
+  mpPaymentId: string | null; mpStatus: string | null; mpStatusDetail: string | null; method: string | null;
+  paymentId: number | null; expiresAt: string; createdAt: string; source: string; testMode: boolean;
+}
+
+/** [código, nombre, hijos] — departamentos → provincias → distritos (INEI). */
+export type UbigeoDist = [string, string];
+export type UbigeoProv = [string, string, UbigeoDist[]];
+export type UbigeoDep = [string, string, UbigeoProv[]];

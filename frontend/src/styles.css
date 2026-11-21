@@ -193,6 +193,7 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2);
 }
 .table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table td.right.tabular, .table th.right { white-space: nowrap; }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr.click { cursor: pointer; }
 .table tbody tr.click:hover td { background: #f4f9f8; }
@@ -262,6 +263,26 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   .span-2 { grid-column: auto; }
   .kv { grid-template-columns: 1fr; gap: 2px; }
   .kv dd { margin-bottom: 8px; }
+
+  /* Tablas en celular: cada fila se vuelve una tarjeta (sin desplazamiento horizontal) */
+  .table:not(.keep) thead { display: none; }
+  .table:not(.keep), .table:not(.keep) tbody, .table:not(.keep) tr, .table:not(.keep) td { display: block; width: 100%; }
+  .table:not(.keep) tr { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .table:not(.keep) tr:last-child { border-bottom: 0; }
+  .table:not(.keep) td { border: 0 !important; padding: 2px 0 !important; text-align: left !important; white-space: normal !important; }
+  .table:not(.keep) td:empty { display: none; }
+  .table:not(.keep) td[colspan] { padding: 8px 0 !important; }
+  .table:not(.keep) .row.end, .table:not(.keep) td .actions { justify-content: flex-start; }
+  .table:not(.keep) td .btn { margin: 4px 6px 0 0; }
+  .table:not(.keep) tbody tr.click:hover td { background: none; }
+  .scroll { overflow-x: visible !important; }
+  .panel-head { flex-wrap: wrap; padding: 12px 14px; }
+  .page-head h1 { font-size: 1.6rem; }
+  .page-head .actions, .page-head > .row { width: 100%; }
+  .input.search, .input { max-width: 100%; }
+  .seg { flex-wrap: wrap; }
+  .tabs { overflow-x: auto; }
+  .payform, .grid.two, .grid.three { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -272,3 +293,5 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   body { background: #fff; }
   .no-print { display: none !important; }
 }
+.teal-ink { color: var(--teal-strong); }
+.input.search { max-width: 360px; }

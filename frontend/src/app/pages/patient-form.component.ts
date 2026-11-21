@@ -2,22 +2,24 @@ import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subject, debounceTime, switchMap, of, catchError } from 'rxjs';
-import { Api } from '../core/api.service';
+import { Api, UbigeoDep, UbigeoProv } from '../core/api.service';
+import { LegalModalComponent } from '../shared/legal-modal.component';
 import { ToastService } from '../core/toast.service';
 import { DOC_TYPES, apiError, dateTime, isoDate } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
 interface Form {
   docType: string; docNumber: string; firstName: string; lastName: string; birthDate: string; sex: string;
-  phone: string; email: string; address: string; district: string;
-  emergencyContactName: string; emergencyContactPhone: string; notes: string;
+  phone: string; email: string; address: string; district: string; ubigeo: string;
+  emergencyContactName: string; emergencyContactPhone: string; emergencyContactRelationship: string; notes: string; dataConsent: boolean;
+  guardianName: string; guardianDocType: string; guardianDocNumber: string; guardianRelationship: string; guardianPhone: string;
 }
 
 /** HU-01 registro y HU-03 actualización de datos del paciente. */
 @Component({
   selector: 'app-patient-form',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LegalModalComponent],
   template: `
     <div class="page narrow">
       <a class="back" [routerLink]="id ? ['/pacientes', id] : '/pacientes'"><app-icon name="chevronLeft" [size]="16" /> {{ id ? 'Volver a la ficha' : 'Pacientes' }}</a>
@@ -57,6 +59,16 @@ interface Form {
                      [attr.inputmode]="f.docType === 'DNI' ? 'numeric' : 'text'" autocomplete="off" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }
               @else if (id) { <span class="hint">El documento no se modifica después del registro.</span> }
+              @else if (f.docType === 'DNI') {
+                @if (!dniEnabled) { <span class="hint">Escribe los datos a mano: la consulta a RENIEC no está activada en el servidor.</span> }
+                @else if (looking) { <span class="hint reniec">Consultando RENIEC…</span> }
+                @else if (reniecName) { <span class="hint reniec ok">✓ RENIEC: {{ reniecName }}{{ reniecExtra ? ' · ' + reniecExtra : '' }}</span> }
+                @else if (reniecError) {
+                  <span class="hint reniec bad">{{ reniecError }}
+                    @if (validDni) { <button type="button" class="linkish" (click)="lookup(true)">Reintentar</button> }</span>
+                }
+                @else { <span class="hint">Al completar los 8 dígitos se buscan los nombres en RENIEC.</span> }
+              }
             </div>
             <div class="field">
               <label class="req" for="fn">Nombres</label>
@@ -72,6 +84,7 @@ interface Form {
               <label class="req" for="bd">Fecha de nacimiento</label>
               <input id="bd" name="birthDate" type="date" class="input" [class.invalid]="e['birthDate']" [(ngModel)]="f.birthDate" [max]="today" />
               @if (e['birthDate']) { <span class="err">{{ e['birthDate'] }}</span> }
+              @else if (age !== null) { <span class="hint">{{ age }} años{{ minor ? ' · menor de edad: se registra su representante legal' : '' }}</span> }
             </div>
             <div class="field">
               <span class="label req">Sexo</span>
@@ -102,34 +115,136 @@ interface Form {
               <input id="ad" name="address" class="input" [(ngModel)]="f.address" />
             </div>
             <div class="field">
+              <label for="dep">Departamento</label>
+              <select id="dep" name="dep" class="input" [(ngModel)]="dep" (ngModelChange)="onDep()">
+                <option value="">Seleccionar…</option>
+                @for (d of deps; track d[0]) { <option [value]="d[0]">{{ d[1] }}</option> }
+              </select>
+            </div>
+            <div class="field">
+              <label for="prv">Provincia</label>
+              <select id="prv" name="prv" class="input" [(ngModel)]="prov" (ngModelChange)="onProv()" [disabled]="!dep">
+                <option value="">Seleccionar…</option>
+                @for (p of provinces; track p[0]) { <option [value]="p[0]">{{ p[1] }}</option> }
+              </select>
+            </div>
+            <div class="field">
               <label for="ds">Distrito</label>
-              <input id="ds" name="district" class="input" [(ngModel)]="f.district" list="districts" />
-              <datalist id="districts">
-                <option value="Chaclacayo"></option><option value="Lurigancho-Chosica"></option><option value="Ate"></option>
-                <option value="Santa Eulalia"></option><option value="La Molina"></option><option value="Cieneguilla"></option>
-              </datalist>
+              <select id="ds" name="ubigeo" class="input" [class.invalid]="e['ubigeo']" [(ngModel)]="f.ubigeo" [disabled]="!prov">
+                <option value="">Seleccionar…</option>
+                @for (d of districts; track d[0]) { <option [value]="d[0]">{{ d[1] }}</option> }
+              </select>
+              @if (e['ubigeo']) { <span class="err">{{ e['ubigeo'] }}</span> }
+              @else if (f.ubigeo) { <span class="hint">UBIGEO {{ f.ubigeo }}</span> }
             </div>
           </div>
         </section>
 
+        @if (minor) {
+          <section class="panel guardian">
+            <div class="panel-head"><h3>Representante legal del menor</h3><span class="tag amber">Obligatorio · menor de 18 años</span></div>
+            <div class="panel-body grid cols-3">
+              <p class="span-all muted small">Por ser menor de edad, quien decide sobre su atención y firma el consentimiento es su padre, madre o tutor legal
+                (Código Civil, patria potestad y tutela). No se usa "contacto de emergencia".</p>
+              <div class="field">
+                <label class="req" for="grel">Vínculo</label>
+                <select id="grel" name="grel" class="input" [class.invalid]="e['guardianRelationship']" [(ngModel)]="f.guardianRelationship">
+                  <option value="">Seleccionar…</option><option value="MADRE">Madre</option><option value="PADRE">Padre</option><option value="TUTOR_LEGAL">Tutor legal</option>
+                </select>
+                @if (e['guardianRelationship']) { <span class="err">{{ e['guardianRelationship'] }}</span> }
+              </div>
+              <div class="field span-2">
+                <label class="req" for="gname">Nombres y apellidos</label>
+                <input id="gname" name="gname" class="input" [class.invalid]="e['guardianName']" [(ngModel)]="f.guardianName" />
+                @if (e['guardianName']) { <span class="err">{{ e['guardianName'] }}</span> }
+              </div>
+              <div class="field">
+                <label class="req" for="gdt">Documento</label>
+                <select id="gdt" name="gdt" class="input" [(ngModel)]="f.guardianDocType">
+                  @for (d of docTypes; track d.code) { <option [value]="d.code">{{ d.label }}</option> }
+                </select>
+              </div>
+              <div class="field">
+                <label class="req" for="gdn">Número</label>
+                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" />
+                @if (guardianInfo && !e['guardianDocNumber']) { <span class="hint reniec" [class.ok]="guardianInfo.startsWith('✓')">{{ guardianInfo }}</span> }
+                @if (e['guardianDocNumber']) { <span class="err">{{ e['guardianDocNumber'] }}</span> }
+              </div>
+              <div class="field">
+                <label class="req" for="gph">Celular</label>
+                <input id="gph" name="gph" class="input tabular" [class.invalid]="e['guardianPhone']" [(ngModel)]="f.guardianPhone" inputmode="tel" />
+                @if (e['guardianPhone']) { <span class="err">{{ e['guardianPhone'] }}</span> }
+              </div>
+            </div>
+          </section>
+        }
+
         <section class="panel">
-          <div class="panel-head"><h3>Contacto de emergencia y notas</h3></div>
+          <div class="panel-head"><h3>{{ minor ? 'Notas y consentimiento' : 'Contacto de emergencia, notas y consentimiento' }}</h3></div>
           <div class="panel-body grid cols-3">
-            <div class="field span-2">
-              <label for="ecn">Nombre del contacto</label>
-              <input id="ecn" name="ecn" class="input" [(ngModel)]="f.emergencyContactName" />
-            </div>
-            <div class="field">
-              <label for="ecp">Teléfono del contacto</label>
-              <input id="ecp" name="ecp" class="input tabular" [class.invalid]="e['emergencyContactPhone']" [(ngModel)]="f.emergencyContactPhone" inputmode="tel" />
-              @if (e['emergencyContactPhone']) { <span class="err">{{ e['emergencyContactPhone'] }}</span> }
-            </div>
+            @if (!minor) {
+              <div class="field">
+                <label for="ecn">Contacto de emergencia</label>
+                <input id="ecn" name="ecn" class="input" [(ngModel)]="f.emergencyContactName" placeholder="Nombre completo" />
+              </div>
+              <div class="field">
+                <label for="ecr">Parentesco o relación</label>
+                <select id="ecr" name="ecr" class="input" [(ngModel)]="f.emergencyContactRelationship">
+                  <option value="">Seleccionar…</option>
+                  @for (r of relations; track r) { <option [value]="r">{{ r }}</option> }
+                </select>
+              </div>
+              <div class="field">
+                <label for="ecp">Teléfono del contacto</label>
+                <input id="ecp" name="ecp" class="input tabular" [class.invalid]="e['emergencyContactPhone']" [(ngModel)]="f.emergencyContactPhone" inputmode="tel" />
+                @if (e['emergencyContactPhone']) { <span class="err">{{ e['emergencyContactPhone'] }}</span> }
+              </div>
+              <p class="span-all muted small">Persona a quien avisar si el paciente sufre una complicación durante la atención. Es opcional para adultos.</p>
+            }
+            @if (!id) {
+              <div class="field">
+                <label for="src">¿Cómo nos conoció?</label>
+                <select id="src" name="source" class="input" [(ngModel)]="source">
+                  <option value="">Sin registrar</option>
+                  @for (o of sources; track o.code) { <option [value]="o.code">{{ o.label }}</option> }
+                </select>
+              </div>
+              <div class="field">
+                @if (source) {
+                  <label for="srcd">{{ source === 'RECOMENDACION' ? '¿Quién lo recomendó?' : 'Detalle (opcional)' }}</label>
+                  <input id="srcd" name="sourceDetail" class="input" [(ngModel)]="sourceDetail" maxlength="120" />
+                }
+              </div>
+            }
             <div class="field span-all">
               <label for="nt">Notas administrativas</label>
               <textarea id="nt" name="notes" class="input" [(ngModel)]="f.notes" maxlength="500" placeholder="Preferencias de horario, seguro, referido por…"></textarea>
             </div>
+            <div class="field span-all">
+              <div class="consent" [class.ok]="f.dataConsent" [class.invalid]="e['dataConsent']">
+                <app-icon [name]="f.dataConsent ? 'check' : 'shield'" />
+                <div class="grow">
+                  @if (f.dataConsent) {
+                    <strong>Política de privacidad aceptada{{ consentVersion ? ' (v' + consentVersion + ')' : '' }}</strong>
+                    <div class="muted small">{{ minor ? 'Aceptó el representante legal.' : 'Aceptó el paciente.' }} Al guardar queda el registro con fecha, versión y usuario.
+                      Imprime la política para su firma y luego adjunta la copia firmada en la ficha del paciente.</div>
+                  } @else {
+                    <strong>Consentimiento para el tratamiento de datos personales y de salud</strong>
+                    <div class="muted small">Obligatorio (Ley N.° 29733): los datos de salud son sensibles y requieren consentimiento expreso
+                      {{ minor ? 'del padre, madre o tutor legal' : 'del paciente' }}. Lean juntos la política completa.</div>
+                  }
+                  @if (e['dataConsent']) { <span class="err">{{ e['dataConsent'] }}</span> }
+                </div>
+                @if (!consentLocked) {
+                  <button type="button" class="btn sm" [class.primary]="!f.dataConsent" (click)="legalOpen = true">{{ f.dataConsent ? 'Ver política' : 'Leer y aceptar' }}</button>
+                }
+              </div>
+            </div>
           </div>
         </section>
+
+        <app-legal-modal [open]="legalOpen" code="PRIVACIDAD" [who]="minor ? (f.guardianName || 'representante legal') : (f.firstName + ' ' + f.lastName).trim()"
+          (accepted)="onAccepted($event)" (closed)="legalOpen = false" />
 
         <div class="formbar">
           <a class="btn" [routerLink]="id ? ['/pacientes', id] : '/pacientes'">Cancelar</a>
@@ -141,6 +256,15 @@ interface Form {
     </div>
   `,
   styles: [`
+    .consent { display: flex; align-items: center; gap: 12px; line-height: 1.45; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+    .consent.ok { background: var(--green-soft); border-color: var(--green); }
+    .consent.invalid { border-color: var(--red, #c0392b); }
+    .guardian { border: 1px solid var(--amber, #d4a017); }
+    .guardian .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .reniec { color: var(--azul, #2563eb); }
+    .reniec.ok { color: var(--verde, #15803d); font-weight: 500; }
+    .reniec.bad { color: var(--rojo, #b91c1c); }
+    .linkish { background: none; border: 0; padding: 0 0 0 6px; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
     .narrow { max-width: 980px; }
     form { display: flex; flex-direction: column; gap: 16px; }
     .dup { margin-bottom: 16px; align-items: center; }
@@ -159,11 +283,28 @@ export class PatientFormComponent implements OnInit {
   today = isoDate();
   f: Form = {
     docType: 'DNI', docNumber: '', firstName: '', lastName: '', birthDate: '', sex: '',
-    phone: '', email: '', address: '', district: '', emergencyContactName: '', emergencyContactPhone: '', notes: '',
+    phone: '', email: '', address: '', district: '', ubigeo: '', emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelationship: '',
+    notes: '', dataConsent: false, guardianName: '', guardianDocType: 'DNI', guardianDocNumber: '', guardianRelationship: '', guardianPhone: '',
   };
+  relations = ['Cónyuge o pareja', 'Madre', 'Padre', 'Hijo(a)', 'Hermano(a)', 'Otro familiar', 'Amigo(a)'];
+  deps: UbigeoDep[] = [];
+  dep = '';
+  prov = '';
+  dniEnabled = false;
+  looking = false;
+  reniecName = '';
+  reniecExtra = '';
+  reniecError = '';
+  guardianInfo = '';
+  private lastLooked = '';
+  private autoFill: Partial<Record<'firstName' | 'lastName' | 'birthDate' | 'sex' | 'address', string>> = {};
+  private lastGuardian = '';
+  legalOpen = false;
+  consentVersion = '';
   e: Record<string, string> = {};
   duplicate: { id: number; fullName: string } | null = null;
   saving = false;
+  consentLocked = false;
   meta = '';
   private check$ = new Subject<void>();
 
@@ -176,17 +317,107 @@ export class PatientFormComponent implements OnInit {
         if (!ok || this.id) return of(null);
         return this.api.checkDocument(this.f.docType, n).pipe(catchError(() => of(null)));
       }),
-    ).subscribe((r) => (this.duplicate = r && r.exists ? r.patient! : null));
+    ).subscribe((r) => {
+      this.duplicate = r && r.exists ? r.patient! : null;
+      if (!this.duplicate) this.lookup(); // documento nuevo: buscar en RENIEC
+    });
+  }
+
+  get age(): number | null {
+    if (!this.f.birthDate) return null;
+    const b = new Date(this.f.birthDate + 'T00:00:00'); const t = new Date();
+    let a = t.getFullYear() - b.getFullYear();
+    if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) a--;
+    return a >= 0 ? a : null;
+  }
+  get minor() { const a = this.age; return a !== null && a < 18; }
+  get provinces(): UbigeoProv[] { return this.deps.find((d) => d[0] === this.dep)?.[2] || []; }
+  get districts() { return this.provinces.find((p) => p[0] === this.prov)?.[2] || []; }
+  onDep() { this.prov = ''; this.f.ubigeo = ''; }
+  onProv() { this.f.ubigeo = ''; }
+  private setUbigeo(code?: string) {
+    if (!code || code.length !== 6) return;
+    this.dep = code.slice(0, 2); this.prov = code.slice(0, 4); this.f.ubigeo = code;
+  }
+
+  get validDni() { return /^\d{8}$/.test(this.f.docNumber.trim()); }
+
+  /** Al completar el DNI se consulta RENIEC y se llenan los campos vacíos (lo ya escrito no se pisa). */
+  lookup(force = false) {
+    const dni = this.f.docNumber.trim();
+    if (!this.dniEnabled || this.id || this.f.docType !== 'DNI' || !/^\d{8}$/.test(dni)) return;
+    if (!force && dni === this.lastLooked) return;
+    this.lastLooked = dni;
+    this.looking = true; this.reniecError = ''; this.reniecName = ''; this.reniecExtra = '';
+    this.api.lookupDni(dni).subscribe({
+      next: (r) => {
+        if (this.f.docNumber.trim() !== dni) return;
+        this.looking = false;
+        const replace = force || !this.f.firstName.trim() || !this.f.lastName.trim();
+        const fill: typeof this.autoFill = {};
+        if (replace) { this.f.firstName = fill.firstName = r.firstName; this.f.lastName = fill.lastName = r.lastName; }
+        const extra: string[] = [];
+        if (r.birthDate && !this.f.birthDate) { this.f.birthDate = fill.birthDate = r.birthDate; extra.push('fecha de nacimiento'); }
+        if (r.sex && !this.f.sex) { this.f.sex = fill.sex = r.sex; extra.push('sexo'); }
+        if (r.address && !this.f.address) { this.f.address = fill.address = r.address; extra.push('dirección'); }
+        this.autoFill = fill;
+        if (r.ubigeo) { this.setUbigeo(r.ubigeo); extra.push('distrito'); }
+        this.reniecName = `${r.firstName} ${r.lastName}`;
+        this.reniecExtra = extra.length ? 'también se completó ' + extra.join(', ') : '';
+        this.e['firstName'] = ''; this.e['lastName'] = '';
+      },
+      error: (err) => {
+        if (this.f.docNumber.trim() !== dni) return;
+        this.looking = false;
+        this.reniecError = apiError(err).message;
+      },
+    });
+  }
+
+  lookupGuardian() {
+    const dni = this.f.guardianDocNumber.trim();
+    if (this.f.guardianDocType !== 'DNI' || !/^\d{8}$/.test(dni)) { this.guardianInfo = ''; return; }
+    if (!this.dniEnabled || dni === this.lastGuardian) return;
+    this.lastGuardian = dni;
+    this.guardianInfo = 'Consultando RENIEC…';
+    this.api.lookupDni(dni).subscribe({
+      next: (r) => {
+        if (this.f.guardianDocNumber.trim() !== dni) return;
+        if (!this.f.guardianName.trim()) this.f.guardianName = `${r.firstName} ${r.lastName}`;
+        this.guardianInfo = `✓ RENIEC: ${r.firstName} ${r.lastName}`;
+        this.e['guardianName'] = '';
+      },
+      error: (err) => { if (this.f.guardianDocNumber.trim() === dni) this.guardianInfo = apiError(err).message; },
+    });
+  }
+
+  onAccepted(version: string) {
+    this.f.dataConsent = true;
+    this.consentVersion = version;
+    this.legalOpen = false;
+    this.e['dataConsent'] = '';
   }
 
   ngOnInit() {
+    this.api.ubigeo().subscribe((d) => {
+      this.deps = d;
+      if (!this.id && !this.f.ubigeo) this.setUbigeo('150107'); // Chaclacayo (sede de la clínica) como sugerencia
+    });
+    this.api.dniConfig().subscribe({ next: (c) => (this.dniEnabled = c.enabled), error: () => {} });
+    if (!this.id) this.api.patientProfileOptions().subscribe({ next: (o) => (this.sources = o.sources), error: () => {} });
     if (this.id) {
       this.api.patient(+this.id).subscribe(({ patient: p }) => {
         this.f = {
           docType: p.docType, docNumber: p.docNumber, firstName: p.firstName, lastName: p.lastName, birthDate: p.birthDate,
-          sex: p.sex, phone: p.phone, email: p.email || '', address: p.address || '', district: p.district || '',
-          emergencyContactName: p.emergencyContactName || '', emergencyContactPhone: p.emergencyContactPhone || '', notes: p.notes || '',
+          sex: p.sex, phone: p.phone, email: p.email || '', address: p.address || '', district: p.district || '', ubigeo: p.ubigeo || '',
+          emergencyContactName: p.emergencyContactName || '', emergencyContactPhone: p.emergencyContactPhone || '',
+          emergencyContactRelationship: p.emergencyContactRelationship || '', notes: p.notes || '',
+          dataConsent: !!p.dataConsent, guardianName: p.guardianName || '', guardianDocType: p.guardianDocType || 'DNI',
+          guardianDocNumber: p.guardianDocNumber || '', guardianRelationship: p.guardianRelationship || '', guardianPhone: p.guardianPhone || '',
         };
+        this.consentVersion = p.consentVersion || '';
+        this.setUbigeo(p.ubigeo);
+        this.consentLocked = !!(p as any).dataConsent;
         this.meta = p.updatedAt ? `${dateTime(p.updatedAt)} por ${p.updatedBy}` : `registrado el ${dateTime(p.createdAt)} por ${p.createdBy}`;
       });
     } else if (this.doc) {
@@ -200,6 +431,13 @@ export class PatientFormComponent implements OnInit {
   checkDoc() {
     this.e['docNumber'] = '';
     this.duplicate = null;
+    if (this.f.docNumber.trim() !== this.lastLooked) {
+      this.reniecName = ''; this.reniecExtra = ''; this.reniecError = '';
+      // quita lo que RENIEC completó para el número anterior (si no se editó a mano)
+      for (const [k, v] of Object.entries(this.autoFill)) if ((this.f as any)[k] === v) (this.f as any)[k] = '';
+      this.autoFill = {};
+      this.lastLooked = '';
+    }
     this.check$.next();
   }
 
@@ -216,9 +454,21 @@ export class PatientFormComponent implements OnInit {
     if (!this.f.sex) e['sex'] = 'Selecciona el sexo.';
     if (!/^\+?\d{6,12}$/.test(this.f.phone.replace(/[\s()-]/g, ''))) e['phone'] = 'Ingresa un teléfono válido (6 a 12 dígitos).';
     if (this.f.email.trim() && !/^[^\s]+[@][^\s]+\.[^\s]+$/.test(this.f.email.trim())) e['email'] = 'Ingresa un correo válido.';
+    if (this.minor) {
+      if (this.f.guardianName.trim().length < 5) e['guardianName'] = 'Ingresa el nombre completo del padre, madre o tutor legal.';
+      if (!this.f.guardianRelationship) e['guardianRelationship'] = 'Selecciona el vínculo.';
+      const g = this.f.guardianDocNumber.replace(/\s/g, '');
+      if (this.f.guardianDocType === 'DNI' ? !/^\d{8}$/.test(g) : g.length < 6) e['guardianDocNumber'] = 'Ingresa un documento válido.';
+      if (!/^\+?\d{6,12}$/.test(this.f.guardianPhone.replace(/[\s()-]/g, ''))) e['guardianPhone'] = 'Ingresa un celular válido.';
+    }
+    if (!this.f.dataConsent) e['dataConsent'] = 'Falta aceptar la política de privacidad.';
     this.e = e;
     return Object.keys(e).length === 0;
   }
+
+  source = '';
+  sourceDetail = '';
+  sources: { code: string; label: string }[] = [];
 
   save() {
     if (!this.validate()) {
@@ -231,6 +481,10 @@ export class PatientFormComponent implements OnInit {
     req.subscribe({
       next: (p) => {
         this.toast.ok(this.id ? 'Datos del paciente actualizados.' : `Paciente registrado: ${p.fullName}.`);
+        // v2.5: la fuente de captación se guarda en la ficha ampliada (no bloquea el registro si falla)
+        if (!this.id && this.source) {
+          this.api.updatePatientProfile(p.id, { source: this.source, sourceDetail: this.sourceDetail }).subscribe({ error: () => {} });
+        }
         this.router.navigate(['/pacientes', p.id]);
       },
       error: (err) => {

@@ -1,20 +1,46 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../core/auth.service';
-import { Role } from '../core/models';
+import { Api } from '../core/api.service';
 import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
 import { initials } from '../core/format';
 
-interface NavItem { path: string; label: string; icon: string; roles: Role[]; }
+interface NavItem { path: string; label: string; icon: string; perms: string[]; roles?: string[]; }
+interface NavGroup { title: string; items: NavItem[]; }
 
-const NAV: NavItem[] = [
-  { path: '/inicio', label: 'Inicio', icon: 'home', roles: ['ADMIN', 'RECEPCION', 'ODONTOLOGO', 'CAJA', 'DIRECTOR'] },
-  { path: '/agenda', label: 'Agenda del día', icon: 'calendar', roles: ['ADMIN', 'RECEPCION', 'ODONTOLOGO', 'DIRECTOR'] },
-  { path: '/pacientes', label: 'Pacientes', icon: 'patient', roles: ['ADMIN', 'RECEPCION', 'ODONTOLOGO', 'CAJA', 'DIRECTOR'] },
-  { path: '/comprobantes', label: 'Comprobantes', icon: 'receipt', roles: ['ADMIN', 'CAJA'] },
-  { path: '/usuarios', label: 'Usuarios y accesos', icon: 'shield', roles: ['ADMIN'] },
+/** Menú según los permisos del rol (HU-26). */
+const NAV: NavGroup[] = [
+  { title: '', items: [
+    { path: '/inicio', label: 'Inicio', icon: 'home', perms: [] },
+    { path: '/agenda', label: 'Agenda del día', icon: 'calendar', perms: ['AGENDA_VER'] },
+    { path: '/pacientes', label: 'Pacientes', icon: 'patient', perms: ['PACIENTES_VER'] },
+    { path: '/mensajes', label: 'Mensajes WhatsApp', icon: 'message', perms: ['MENSAJES'] },
+    { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
+    { path: '/mis-ganancias', label: 'Mis ganancias', icon: 'coins', perms: [], roles: ['ODONTOLOGO'] },
+    { path: '/laboratorio', label: 'Laboratorio', icon: 'tooth', perms: ['LABORATORIO', 'CAJA_EGRESOS'] },
+    { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
+    { path: '/insumos', label: 'Solicitar insumos', icon: 'box', perms: ['SOLICITAR_INSUMOS'] },
+    { path: '/catalogo', label: 'Procedimientos y promociones', icon: 'tag', perms: ['PROMOCIONES', 'PLAN_TRATAMIENTO'] },
+  ] },
+  { title: 'Caja', items: [
+    { path: '/caja', label: 'Caja del día', icon: 'wallet', perms: ['CAJA_COBRAR', 'CAJA_EGRESOS'] },
+    { path: '/comprobantes', label: 'Comprobantes', icon: 'receipt', perms: ['COMPROBANTES'] },
+    { path: '/caja/reporte', label: 'Flujo de caja', icon: 'coins', perms: ['CAJA_REPORTE'] },
+  ] },
+  { title: 'Gestión', items: [
+    { path: '/reportes', label: 'Indicadores', icon: 'chart', perms: ['REPORTES'] },
+    { path: '/comisiones', label: 'Comisiones', icon: 'percent', perms: ['COMISIONES'] },
+    { path: '/comunicacion', label: 'Comunicación con pacientes', icon: 'send', perms: ['AUTOMATIZACIONES'] },
+    { path: '/notificaciones', label: 'Notificaciones', icon: 'bell', perms: ['NOTIFICACIONES'] },
+  ] },
+  { title: 'Seguridad', items: [
+    { path: '/usuarios', label: 'Personal', icon: 'shield', perms: ['USUARIOS'] },
+    { path: '/roles', label: 'Roles y permisos', icon: 'key', perms: ['ROLES'] },
+    { path: '/perfil', label: 'Mi perfil', icon: 'user', perms: [] },
+    { path: '/seguridad', label: 'Mi seguridad (2 pasos)', icon: 'lock', perms: [] },
+  ] },
 ];
 
 @Component({
@@ -37,11 +63,15 @@ const NAV: NavItem[] = [
         }
 
         <nav aria-label="Navegación principal">
-          @for (item of nav(); track item.path) {
-            <a [routerLink]="item.path" routerLinkActive="on" class="nav">
-              <app-icon [name]="item.icon" />
-              <span>{{ item.label }}</span>
-            </a>
+          @for (g of nav(); track g.title) {
+            @if (g.title) { <div class="gt">{{ g.title }}</div> }
+            @for (item of g.items; track item.path) {
+              <a [routerLink]="item.path" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: item.path === '/caja' }" class="nav">
+                <app-icon [name]="item.icon" />
+                <span>{{ item.label }}</span>
+                @if (item.path === '/mensajes' && unread() > 0) { <span class="badge" [attr.aria-label]="unread() + ' mensajes sin leer'">{{ unread() > 99 ? '99+' : unread() }}</span> }
+              </a>
+            }
           }
         </nav>
 
@@ -84,9 +114,12 @@ const NAV: NavItem[] = [
     .w2 { font-size: 22px; font-weight: 900; color: var(--ink); letter-spacing: -.01em; }
     .quick { height: 42px; margin: 0 0 16px; font-size: 14px; width: 100%; }
     nav { display: flex; flex-direction: column; gap: 2px; }
-    .nav { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+    .gt { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: .04em; padding: 14px 12px 4px; }
+    .nav { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px;
       color: var(--ink-2); font-size: 14px; font-weight: 600; }
     .nav:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+    .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #25d366; color: #fff;
+      font-size: 11.5px; font-weight: 800; display: grid; place-items: center; }
     .nav.on { background: var(--brand-soft); color: var(--teal-strong); font-weight: 700; }
     .nav.on::before { content: ""; position: absolute; left: -14px; top: 8px; bottom: 8px; width: 4px; border-radius: 0 4px 4px 0; background: var(--orange); }
     .place { display: flex; align-items: center; gap: 6px; margin: auto 8px 10px; font-size: 12px; color: var(--muted); }
@@ -110,19 +143,35 @@ const NAV: NavItem[] = [
     @media print { .side, .topbar { display: none !important; } .shell { display: block; } }
   `],
 })
-export class ShellComponent {
+export class ShellComponent implements OnDestroy {
   auth = inject(AuthService);
   private router = inject(Router);
+  private api = inject(Api);
   navOpen = false;
+  /** Mensajes de WhatsApp sin leer (insignia del menú, se actualiza cada 15 s). */
+  unread = signal(0);
+  private timer: ReturnType<typeof setInterval> | undefined;
 
   nav = computed(() => {
     const u = this.auth.user();
-    return u ? NAV.filter((n) => n.roles.includes(u.role)) : [];
+    if (!u) return [];
+    const ok = (n: NavItem) => (!n.roles || n.roles.includes(u.role)) && (!n.perms.length || n.perms.some((p) => (u.permissions || []).includes(p)));
+    return NAV.map((g) => ({ title: g.title, items: g.items.filter(ok) })).filter((g) => g.items.length);
   });
-  canCreateAppointment = computed(() => this.auth.hasRole('ADMIN', 'RECEPCION'));
+  canCreateAppointment = computed(() => !!this.auth.user() && this.auth.can('CITAS_GESTIONAR'));
   ini = computed(() => initials(this.auth.user()?.fullName));
 
   constructor() {
+    this.auth.refresh(); // permisos al día (HU-26)
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => (this.navOpen = false));
+    this.pollUnread();
+    this.timer = setInterval(() => this.pollUnread(), 15000);
+  }
+
+  ngOnDestroy() { clearInterval(this.timer); }
+
+  private pollUnread() {
+    if (!this.auth.can('MENSAJES')) return;
+    this.api.conversationSummary().subscribe({ next: (s) => this.unread.set(s.unread), error: () => {} });
   }
 }

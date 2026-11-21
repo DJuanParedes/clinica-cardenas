@@ -3,10 +3,14 @@ package pe.clinicacardenas.user;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.clinicacardenas.agenda.Appointment;
+import pe.clinicacardenas.agenda.AppointmentRepository;
+import pe.clinicacardenas.agenda.AppointmentStatus;
 import pe.clinicacardenas.agenda.Dentist;
 import pe.clinicacardenas.agenda.DentistRepository;
 import pe.clinicacardenas.agenda.DentistSchedule;
 import pe.clinicacardenas.agenda.DentistScheduleRepository;
+import pe.clinicacardenas.agenda.SlotCalculator;
 import pe.clinicacardenas.auth.PasswordPolicy;
 import pe.clinicacardenas.common.ApiException;
 import pe.clinicacardenas.common.AuditService;
@@ -14,6 +18,7 @@ import pe.clinicacardenas.common.Dates;
 import pe.clinicacardenas.security.CurrentUser;
 
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -29,9 +34,13 @@ public class UserService {
     private final DentistScheduleRepository schedules;
     private final PasswordEncoder encoder;
     private final AuditService audit;
+    private final AppointmentRepository appointments;
+
+    private static final DateTimeFormatter DMY_HM = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     public UserService(UserRepository users, DentistRepository dentists, DentistScheduleRepository schedules,
-                       PasswordEncoder encoder, AuditService audit) {
+                       PasswordEncoder encoder, AuditService audit, AppointmentRepository appointments) {
+        this.appointments = appointments;
         this.users = users;
         this.dentists = dentists;
         this.schedules = schedules;
@@ -40,7 +49,24 @@ public class UserService {
     }
 
     public record UserRequest(String username, String email, String fullName, Role role, String password,
-                              String specialty, String cop) {}
+                              String specialty, String cop, String phone, String accessRole) {
+        public UserRequest(String username, String email, String fullName, Role role, String password, String specialty, String cop) {
+            this(username, email, fullName, role, password, specialty, cop, null, null);
+        }
+    }
+
+    public record ProfileRequest(String fullName, String email, String phone) {}
+
+    public record PasswordChange(String currentPassword, String newPassword) {}
+
+    private pe.clinicacardenas.security.PermissionService permissions;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setPermissions(pe.clinicacardenas.security.PermissionService permissions) {
+        this.permissions = permissions;
+    }
+
+    private static final Pattern PHONE = Pattern.compile("^9\\d{8}$");
 
     public record ScheduleBlock(int weekday, String start, String end) {}
 
@@ -63,6 +89,10 @@ public class UserService {
         m.put("fullName", u.fullName);
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
+        m.put("phone", u.phone);
+        m.put("accessRole", u.accessRole);
+        m.put("accessRoleLabel", u.accessRole == null ? u.role.label : permissions.label(u.accessRole));
+        m.put("twoFactorMethod", u.twoFactorMethod);
         m.put("active", u.active);
         m.put("locked", u.lockedUntil != null && u.lockedUntil.isAfter(Dates.now()));
         m.put("lastLoginAt", u.lastLoginAt);
@@ -75,6 +105,7 @@ public class UserService {
             dm.put("specialty", d.specialty);
             dm.put("cop", d.cop);
             dm.put("color", d.color);
+            dm.put("photoUrl", d.getPhotoUrl());
             m.put("dentist", dm);
         });
         return m;
@@ -110,6 +141,13 @@ public class UserService {
         if (r.role() == Role.ODONTOLOGO && (r.specialty() == null || r.specialty().isBlank())) {
             errors.put("specialty", "Indica la especialidad del odontólogo.");
         }
+        if (r.phone() != null && !r.phone().isBlank() && !PHONE.matcher(r.phone().replaceAll("\\s", "")).matches()) {
+            errors.put("phone", "Celular de 9 dígitos que empiece con 9.");
+        }
+        if (r.accessRole() != null && !r.accessRole().isBlank() && r.role() != null
+                && !r.accessRole().equals(r.role().name()) && !permissions.isCustomFor(r.accessRole(), r.role())) {
+            errors.put("accessRole", "Ese rol no corresponde al puesto elegido.");
+        }
         if (!errors.isEmpty()) {
             throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION",
                     "Revisa los campos marcados.", errors);
@@ -124,6 +162,8 @@ public class UserService {
         u.email = r.email().trim().toLowerCase();
         u.fullName = r.fullName().trim();
         u.role = r.role();
+        u.phone = phone(r.phone());
+        u.accessRole = access(r);
         u.passwordHash = encoder.encode(r.password());
         u.active = true;
         u.createdAt = Dates.now();
@@ -150,10 +190,15 @@ public class UserService {
         u.fullName = r.fullName().trim();
         u.email = r.email().trim().toLowerCase();
         u.role = r.role();
+        if (r.phone() != null) u.phone = phone(r.phone());
+        String acc = access(r);
+        if (!Objects.equals(acc, u.accessRole)) changes.add("rol de acceso → " + (acc == null ? u.role.label : permissions.label(acc)));
+        u.accessRole = acc;
         u.updatedAt = Dates.now();
         u.updatedBy = CurrentUser.usernameOrSystem();
         users.save(u);
         Optional<Dentist> dentist = dentists.findByUserId(u.id);
+        if (u.role != Role.ODONTOLOGO) dentist.filter(d -> d.active).ifPresent(d -> ensureNoPendingAppointments(d, "cambiarle el rol"));
         if (u.role == Role.ODONTOLOGO) {
             ensureDentist(u, r.specialty(), r.cop());
         } else {
@@ -161,6 +206,51 @@ public class UserService {
         }
         audit.record("USUARIO", u.id, "EDITAR", changes.isEmpty() ? "Datos revisados sin cambios" : String.join(", ", changes));
         return view(u);
+    }
+
+    private static String phone(String p) {
+        return p == null || p.isBlank() ? null : p.replaceAll("\\s", "");
+    }
+
+    private static String access(UserRequest r) {
+        return r.accessRole() == null || r.accessRole().isBlank() || r.accessRole().equals(r.role().name()) ? null : r.accessRole();
+    }
+
+    // ------------------------------------------------------------------ mi perfil (cada usuario)
+
+    @Transactional
+    public Map<String, Object> updateOwnProfile(ProfileRequest r) {
+        User u = users.findByUsernameIgnoreCase(CurrentUser.usernameOrSystem()).orElseThrow(() -> ApiException.notFound("El usuario"));
+        Map<String, String> errors = new LinkedHashMap<>();
+        if (r.fullName() == null || r.fullName().trim().length() < 3) errors.put("fullName", "Ingresa nombres y apellidos.");
+        if (r.email() == null || !EMAIL.matcher(r.email().trim()).matches()) errors.put("email", "Ingresa un correo válido.");
+        else users.findByEmailIgnoreCase(r.email().trim()).ifPresent(o -> { if (!o.id.equals(u.id)) errors.put("email", "Ese correo ya pertenece a otra cuenta."); });
+        if (r.phone() != null && !r.phone().isBlank() && !PHONE.matcher(r.phone().replaceAll("\\s", "")).matches()) errors.put("phone", "Celular de 9 dígitos que empiece con 9.");
+        if (!errors.isEmpty()) throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
+        u.fullName = r.fullName().trim();
+        u.email = r.email().trim().toLowerCase();
+        u.phone = phone(r.phone());
+        u.updatedAt = Dates.now();
+        u.updatedBy = u.username;
+        users.save(u);
+        audit.record("USUARIO", u.id, "PERFIL", "Actualizó sus datos personales");
+        return view(u);
+    }
+
+    /** Cambio de contraseña por el propio usuario: exige la actual. */
+    @Transactional
+    public void changeOwnPassword(PasswordChange r) {
+        User u = users.findByUsernameIgnoreCase(CurrentUser.usernameOrSystem()).orElseThrow(() -> ApiException.notFound("El usuario"));
+        if (r.currentPassword() == null || !encoder.matches(r.currentPassword(), u.passwordHash)) {
+            throw ApiException.field("currentPassword", "La contraseña actual no es correcta.");
+        }
+        PasswordPolicy.check("newPassword", r.newPassword());
+        if (encoder.matches(r.newPassword(), u.passwordHash)) throw ApiException.field("newPassword", "La nueva contraseña debe ser distinta a la actual.");
+        u.passwordHash = encoder.encode(r.newPassword());
+        u.updatedAt = Dates.now();
+        u.updatedBy = u.username;
+        users.save(u);
+        audit.record("USUARIO", u.id, "CAMBIO_CLAVE", "Cambió su contraseña");
     }
 
     private void ensureDentist(User u, String specialty, String cop) {
@@ -195,6 +285,7 @@ public class UserService {
         if (!active && u.username.equals(CurrentUser.usernameOrSystem())) {
             throw ApiException.badRequest("OPERACION_NO_PERMITIDA", "No puedes desactivar tu propia cuenta.");
         }
+        if (!active) dentists.findByUserId(u.id).filter(d -> d.active).ifPresent(d -> ensureNoPendingAppointments(d, "desactivarlo"));
         u.active = active;
         u.updatedAt = Dates.now();
         u.updatedBy = CurrentUser.usernameOrSystem();
@@ -227,6 +318,16 @@ public class UserService {
         return view(u);
     }
 
+    /** Un odontólogo con citas por atender no se desactiva: esas citas quedarían sin profesional. */
+    private void ensureNoPendingAppointments(Dentist d, String action) {
+        List<Appointment> pending = appointments.findPendingForDentist(d.id, Dates.now(), AppointmentStatus.PENDING);
+        if (!pending.isEmpty()) {
+            throw ApiException.conflict("CITAS_PENDIENTES", d.getFullName() + " tiene " + pending.size()
+                    + " cita(s) pendiente(s) (la próxima: " + pending.get(0).startAt.format(DMY_HM)
+                    + "). Reprográmalas con otro odontólogo o cancélalas antes de " + action + ".");
+        }
+    }
+
     // ------------------------------------------------------------------ horarios
 
     @Transactional(readOnly = true)
@@ -249,12 +350,29 @@ public class UserService {
                 throw ApiException.badRequest("HORARIO_INVALIDO", "Usa el formato HH:mm en los horarios.");
             }
             if (!e.isAfter(s)) throw ApiException.badRequest("HORARIO_INVALIDO", "La hora de fin debe ser posterior al inicio.");
+            // Las citas empiezan en bloques de 15 minutos: un horario de 9:10 ofrecería horas que luego se rechazan.
+            if (s.getMinute() % 15 != 0 || e.getMinute() % 15 != 0 || s.getSecond() != 0 || e.getSecond() != 0) {
+                throw ApiException.badRequest("HORARIO_INVALIDO", "Usa horas en bloques de 15 minutos (por ejemplo 09:00, 09:15, 13:30).");
+            }
             for (DentistSchedule p : parsed) {
                 if (p.weekday == b.weekday() && p.startTime.isBefore(e) && p.endTime.isAfter(s)) {
                     throw ApiException.badRequest("HORARIO_INVALIDO", "Hay bloques que se superponen el mismo día.");
                 }
             }
             parsed.add(new DentistSchedule(dentistId, b.weekday(), s, e));
+        }
+        // Las citas futuras no pueden quedar fuera del nuevo horario.
+        List<Appointment> outside = new ArrayList<>();
+        for (Appointment a : appointments.findPendingForDentist(dentistId, Dates.now(), AppointmentStatus.PENDING)) {
+            int wd = a.startAt.getDayOfWeek().getValue();
+            List<SlotCalculator.Block> day = new ArrayList<>();
+            for (DentistSchedule p : parsed) if (p.weekday == wd) day.add(new SlotCalculator.Block(p.startTime, p.endTime));
+            if (!SlotCalculator.fitsInBlocks(day, a.startAt.toLocalTime(), a.endAt.toLocalTime())) outside.add(a);
+        }
+        if (!outside.isEmpty()) {
+            Appointment f = outside.get(0);
+            throw ApiException.conflict("CITAS_FUERA_DE_HORARIO", outside.size() + " cita(s) pendiente(s) quedarían fuera del nuevo horario"
+                    + " (la primera: " + f.startAt.format(DMY_HM) + " con " + f.patient.getFullName() + "). Reprográmalas antes de cambiar el horario.");
         }
         schedules.deleteByDentistId(dentistId);
         schedules.flush();

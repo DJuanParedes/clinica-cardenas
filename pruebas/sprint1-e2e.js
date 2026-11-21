@@ -6,7 +6,7 @@
  * (el segundo parámetro es la API simulada de SUNAT; por defecto el mismo host en el puerto 8082)
  * También se puede pegar en la consola del navegador estando en http://localhost:8081
  */
-async function sprint1E2E(BASE, SUNAT = BASE.replace(/:\d+$/, ':8082')) {
+async function sprint1E2E(BASE, SUNAT = BASE.replace(/:(\d+)$/, (m, p) => ':' + (Number(p) + 1))) {
   const PWD = 'Clinica2026';
   const results = [];
   const uid = Date.now().toString().slice(-6);
@@ -135,7 +135,7 @@ async function sprint1E2E(BASE, SUNAT = BASE.replace(/:\d+$/, ':8082')) {
   // ---------------------------------------------------------------- HU-01 / HU-02 / HU-03 pacientes
   const dni = randDni();
   let patient;
-  const patientBody = { docType: 'DNI', docNumber: dni, firstName: 'lucía fernanda', lastName: 'ñahui céspedes', birthDate: '1990-04-12', sex: 'F', phone: '987 111 222', email: 'lucia' + uid + '@correo.pe', district: 'Chaclacayo' };
+  const patientBody = { dataConsent: true, docType: 'DNI', docNumber: dni, firstName: 'lucía fernanda', lastName: 'ñahui céspedes', birthDate: '1990-04-12', sex: 'F', phone: '987 111 222', email: 'lucia' + uid + '@correo.pe', district: 'Chaclacayo' };
   await check('HU-01', 'Registrar paciente con DNI válido', async () => {
     const r = await api('POST', '/api/patients', patientBody, recep);
     expectStatus(r, 201, 'registrar'); patient = r.body;
@@ -230,13 +230,13 @@ async function sprint1E2E(BASE, SUNAT = BASE.replace(/:\d+$/, ':8082')) {
     expect(codes[0] === 201 && codes[1] === 409, 'resultado ' + codes.join('/'));
     return 'una aceptada y una rechazada (' + codes.join(' / ') + ')';
   });
-  await check('HU-09', 'Flujo de estados: confirmar → llegada → atención → atendida', async () => {
-    for (const s of ['CONFIRMADA', 'EN_ESPERA', 'EN_ATENCION', 'ATENDIDA']) {
-      const r = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: s }, s === 'EN_ATENCION' || s === 'ATENDIDA' ? odo : recep);
-      expectStatus(r, 200, 'pasar a ' + s);
-    }
-    const bad = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'CANCELADA', reason: 'x' }, recep);
-    expectStatus(bad, 409, 'cancelar una atendida');
+  await check('HU-09', 'Flujo de estados: confirmar; la llegada de otro día y la inasistencia anticipada se rechazan', async () => {
+    expectStatus(await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'CONFIRMADA' }, recep), 200, 'confirmar');
+    const early = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'EN_ESPERA' }, recep);
+    expect(early.status === 409 && early.body.code === 'FUERA_DE_FECHA', 'registró la llegada días antes: ' + early.status);
+    const ns = await api('PATCH', `/api/appointments/${appt.id}/status`, { status: 'NO_ASISTIO' }, recep);
+    expect(ns.status === 409 && ns.body.code === 'CITA_NO_INICIADA', 'marcó inasistencia antes de la hora: ' + ns.status);
+    return early.body.message;
   });
   let appt2;
   await check('HU-08', 'Reprogramar exige motivo y revalida disponibilidad', async () => {

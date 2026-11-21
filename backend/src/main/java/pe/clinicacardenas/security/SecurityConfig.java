@@ -46,14 +46,18 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/auth/login", "/api/auth/recover", "/api/auth/reset").permitAll()
+                .requestMatchers("/api/portal/auth/**").permitAll()
+                .requestMatchers("/api/public/**").permitAll()   // enlaces temporales firmados
+                .requestMatchers("/api/internal/**").permitAll()   // webhooks entre servicios: validan su propio token
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                .requestMatchers("/api/**").authenticated()
+                .requestMatchers("/api/portal/**").hasRole("PACIENTE")
+                .requestMatchers("/api/**").hasRole("PERSONAL")
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) ->
                     write(res, mapper, 401, "NO_AUTENTICADO", "Tu sesión expiró o no es válida. Inicia sesión nuevamente.", req.getRequestURI()))
                 .accessDeniedHandler((req, res, ex) ->
-                    write(res, mapper, 403, "SIN_PERMISO", "Tu rol no tiene permiso para esta operación.", req.getRequestURI())))
+                    write(res, mapper, 403, "SIN_PERMISO", "Tu rol no tiene permiso para esta operación. Pide al administrador que te asigne el permiso.", req.getRequestURI())))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

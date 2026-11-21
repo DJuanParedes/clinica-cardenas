@@ -28,27 +28,33 @@ const PERMISSIONS: { role: string; can: string }[] = [
     <div class="page">
       <div class="page-head">
         <div>
-          <h1>Usuarios y accesos</h1>
-          <p class="sub">Cada persona entra con su propia cuenta y ve solo las funciones de su rol.</p>
+          <h1>Personal</h1>
+          <p class="sub">Cada persona entra con su propia cuenta. El <strong>puesto</strong> define su función en la clínica; el <strong>rol</strong> define qué puede ver y hacer (se configura en Roles y permisos).</p>
         </div>
         <div class="actions"><button class="btn primary" type="button" (click)="openNew()"><app-icon name="plus" [size]="16" /> Crear cuenta</button></div>
       </div>
 
       <div class="layout">
         <section class="panel">
+          <div class="panel-head spread">
+            <input class="input search" type="search" [(ngModel)]="q" placeholder="Buscar por nombre, usuario, correo o puesto" aria-label="Buscar personal" />
+            <span class="muted small">{{ shown.length }} de {{ users.length }}</span>
+          </div>
           <table class="table">
-            <thead><tr><th>Persona</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+            <thead><tr><th>Persona</th><th>Puesto / rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
             <tbody>
-              @for (u of users; track u.id) {
+              @for (u of shown; track u.id) {
                 <tr [class.off]="!u.active">
                   <td>
                     <div class="row">
-                      <span class="avatar">{{ ini(u.fullName) }}</span>
+                      @if (u.dentist?.photoUrl) { <img class="avatar ph" [src]="u.dentist.photoUrl" [alt]="u.fullName" /> }
+                      @else { <span class="avatar">{{ ini(u.fullName) }}</span> }
                       <div><div class="strong">{{ u.fullName }}</div><div class="muted small">{{ u.username }} · {{ u.email }}</div></div>
                     </div>
                   </td>
                   <td>
                     <span class="tag plain" [class]="'tag plain ' + roleTone(u.role)">{{ u.roleLabel }}</span>
+                    @if (u.accessRole) { <div class="small"><span class="tag teal">{{ u.accessRoleLabel }}</span></div> }
                     @if (u.dentist) { <div class="muted small">{{ u.dentist.specialty }}</div> }
                   </td>
                   <td>
@@ -60,11 +66,13 @@ const PERMISSIONS: { role: string; can: string }[] = [
                   <td class="right">
                     <div class="row end">
                       @if (u.locked && u.active) { <button class="btn sm" type="button" (click)="unlock(u)"><app-icon name="unlock" [size]="14" /> Desbloquear</button> }
-                      <button class="btn sm" type="button" (click)="openEdit(u)">Editar</button>
+                      <button class="btn sm ghost" type="button" (click)="viewing = u"><app-icon name="eye" [size]="14" /> Ver</button>
+                      <button class="btn sm" type="button" (click)="openEdit(u)"><app-icon name="edit" [size]="14" /> Editar</button>
                     </div>
                   </td>
                 </tr>
               }
+              @empty { <tr><td colspan="5" class="muted" style="text-align:center;padding:24px">Nadie coincide con la búsqueda.</td></tr> }
             </tbody>
           </table>
         </section>
@@ -78,6 +86,27 @@ const PERMISSIONS: { role: string; can: string }[] = [
         </aside>
       </div>
     </div>
+
+    <app-modal [open]="!!viewing" [title]="viewing?.fullName || ''" [subtitle]="viewing ? viewing.username : ''" (close)="viewing = null">
+      @if (viewing) {
+        <dl class="kv small">
+          <dt>Puesto</dt><dd>{{ viewing.roleLabel }}</dd>
+          <dt>Rol de acceso</dt><dd>{{ viewing.accessRoleLabel }}</dd>
+          <dt>Correo</dt><dd>{{ viewing.email }}</dd>
+          <dt>Celular</dt><dd>{{ viewing.phone || '—' }}</dd>
+          @if (viewing.dentist) { <dt>Especialidad</dt><dd>{{ viewing.dentist.specialty }}{{ viewing.dentist.cop ? ' · ' + viewing.dentist.cop : '' }}</dd> }
+          <dt>Verificación en 2 pasos</dt><dd>{{ viewing.twoFactorMethod === 'CORREO' ? 'Por correo' : viewing.twoFactorMethod === 'APP' ? 'App de autenticación' : 'No activada' }}</dd>
+          <dt>Estado</dt><dd>{{ !viewing.active ? 'Desactivada' : viewing.locked ? 'Bloqueada' : 'Activa' }}</dd>
+          <dt>Último acceso</dt><dd>{{ viewing.lastLoginAt ? dt(viewing.lastLoginAt) : 'Nunca' }}</dd>
+          <dt>Creada</dt><dd>{{ viewing.createdAt ? dt(viewing.createdAt) : '—' }}</dd>
+          @if (viewing.updatedBy) { <dt>Último cambio</dt><dd>{{ dt(viewing.updatedAt) }} · {{ viewing.updatedBy }}</dd> }
+        </dl>
+      }
+      <ng-container modal-actions>
+        <button class="btn" type="button" (click)="viewing = null">Cerrar</button>
+        <button class="btn primary" type="button" (click)="openEdit(viewing); viewing = null">Editar</button>
+      </ng-container>
+    </app-modal>
 
     <app-modal [open]="modal" [title]="editing ? 'Editar cuenta' : 'Crear cuenta'" [subtitle]="editing ? editing.username : ''" [width]="620" (close)="modal = false">
       <form class="grid cols-2" (ngSubmit)="save()" autocomplete="off">
@@ -97,11 +126,25 @@ const PERMISSIONS: { role: string; can: string }[] = [
           @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
         </div>
         <div class="field">
-          <label class="req" for="rl">Rol</label>
-          <select id="rl" name="rl" class="input" [class.invalid]="e['role']" [(ngModel)]="f.role">
+          <label class="req" for="rl">Puesto</label>
+          <select id="rl" name="rl" class="input" [class.invalid]="e['role']" [(ngModel)]="f.role" (ngModelChange)="f.accessRole = ''">
+            <option value="">Seleccionar…</option>
             @for (r of roles; track r.code) { <option [value]="r.code">{{ r.label }}</option> }
           </select>
           @if (e['role']) { <span class="err">{{ e['role'] }}</span> }
+        </div>
+        <div class="field">
+          <label for="ar">Rol de acceso</label>
+          <select id="ar" name="ar" class="input" [class.invalid]="e['accessRole']" [(ngModel)]="f.accessRole" [disabled]="!f.role">
+            <option value="">Permisos del puesto</option>
+            @for (r of customFor(f.role); track r.code) { <option [value]="r.code">{{ r.label }}</option> }
+          </select>
+          @if (e['accessRole']) { <span class="err">{{ e['accessRole'] }}</span> } @else { <span class="hint">Opcional: un rol personalizado basado en este puesto.</span> }
+        </div>
+        <div class="field">
+          <label for="ph">Celular</label>
+          <input id="ph" name="ph" class="input" [class.invalid]="e['phone']" [(ngModel)]="f.phone" maxlength="9" inputmode="numeric" placeholder="9XXXXXXXX" />
+          @if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }
         </div>
         @if (!editing) {
           <div class="field">
@@ -127,6 +170,18 @@ const PERMISSIONS: { role: string; can: string }[] = [
       @if (editing) {
         <div class="danger-zone">
           @if (editing.dentist) {
+            <div class="dz-row">
+              <div class="row">
+                @if (editing.dentist.photoUrl) { <img class="avatar ph lg" [src]="editing.dentist.photoUrl" alt="Foto del odontólogo" /> }
+                @else { <span class="avatar lg">{{ ini(editing.fullName) }}</span> }
+                <div><div class="strong small">Foto del odontólogo</div><div class="muted small">Se ve en la agenda y en la app del paciente al reservar. JPG, PNG o WEBP hasta 4 MB.</div></div>
+              </div>
+              <div class="row">
+                <label class="btn sm"><app-icon name="upload" [size]="14" /> {{ photoBusy ? 'Subiendo…' : (editing.dentist.photoUrl ? 'Cambiar' : 'Subir foto') }}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden (change)="uploadPhoto($event)" [disabled]="photoBusy" /></label>
+                @if (editing.dentist.photoUrl) { <button class="btn sm ghost" type="button" (click)="removePhoto()">Quitar</button> }
+              </div>
+            </div>
             <div class="dz-row">
               <div><div class="strong small">Horario de atención</div><div class="muted small">Define los bloques en los que se pueden programar citas.</div></div>
               <button class="btn sm" type="button" (click)="openSchedule()"><app-icon name="calendar" [size]="14" /> Editar horario</button>
@@ -187,6 +242,8 @@ const PERMISSIONS: { role: string; can: string }[] = [
     </app-modal>
   `,
   styles: [`
+    .avatar.ph { object-fit: cover; padding: 0; }
+    .avatar.lg { width: 52px; height: 52px; font-size: 16px; flex: none; }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
     tr.off td { opacity: .6; }
     .nowrap { white-space: nowrap; }
@@ -220,6 +277,7 @@ export class UsersComponent implements OnInit {
 
   modal = false;
   editing: any = null;
+  photoBusy = false;
   f: any = {};
   e: Record<string, string> = {};
   saving = false;
@@ -229,23 +287,33 @@ export class UsersComponent implements OnInit {
   scheduleOpen = false;
   blocks: { weekday: number; start: string; end: string }[] = [];
 
+  q = '';
+  viewing: any = null;
+  customRoles: any[] = [];
+  get shown() {
+    const q = this.q.trim().toLowerCase();
+    return this.users.filter((u) => !q || [u.fullName, u.username, u.email, u.roleLabel, u.accessRoleLabel, u.dentist?.specialty].some((x) => (x || '').toLowerCase().includes(q)));
+  }
+  customFor(role: string) { return this.customRoles.filter((r) => r.baseRole === role); }
+
   ngOnInit() {
     this.load();
     this.api.roles().subscribe((r) => (this.roles = r));
+    if (this.auth.can('ROLES')) this.api.permissions().subscribe((m) => (this.customRoles = m.roles.filter((r: any) => r.custom)));
   }
 
   load() { this.api.users().subscribe((u) => (this.users = u)); }
 
   openNew() {
     this.editing = null;
-    this.f = { fullName: '', username: '', email: '', role: 'RECEPCION', password: '', specialty: '', cop: '' };
+    this.f = { fullName: '', username: '', email: '', role: '', accessRole: '', phone: '', password: '', specialty: '', cop: '' };
     this.e = {};
     this.modal = true;
   }
 
   openEdit(u: any) {
     this.editing = u;
-    this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, specialty: u.dentist?.specialty || '', cop: u.dentist?.cop || '' };
+    this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, accessRole: u.accessRole || '', phone: u.phone || '', specialty: u.dentist?.specialty || '', cop: u.dentist?.cop || '' };
     this.e = {};
     this.tempPassword = '';
     this.audit = [];
@@ -256,7 +324,8 @@ export class UsersComponent implements OnInit {
   save() {
     this.saving = true;
     this.e = {};
-    const req = this.editing ? this.api.updateUser(this.editing.id, this.f) : this.api.createUser(this.f);
+    const body = { ...this.f, role: this.f.role || null, accessRole: this.f.accessRole || null, phone: this.f.phone || '' };
+    const req = this.editing ? this.api.updateUser(this.editing.id, body) : this.api.createUser(body);
     req.subscribe({
       next: (u) => {
         this.saving = false;
@@ -317,4 +386,30 @@ export class UsersComponent implements OnInit {
   roleTone(r: string) { return ROLE_TONE[r] || 'grey'; }
   ini = initials;
   dt = dateTime;
+
+  uploadPhoto(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.editing?.dentist) return;
+    this.photoBusy = true;
+    this.api.dentistPhoto(this.editing.dentist.id, file).subscribe({
+      next: (d) => { this.photoBusy = false; this.setPhoto(d.photoUrl || null); this.toast.ok('Foto actualizada.'); },
+      error: (err) => { this.photoBusy = false; this.toast.error(apiError(err).message); },
+    });
+  }
+
+  removePhoto() {
+    if (!this.editing?.dentist) return;
+    this.api.removeDentistPhoto(this.editing.dentist.id).subscribe({
+      next: () => { this.setPhoto(null); this.toast.ok('Foto quitada.'); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  private setPhoto(url: string | null) {
+    this.editing.dentist.photoUrl = url;
+    const u = this.users.find((x: any) => x.id === this.editing.id);
+    if (u?.dentist) u.dentist.photoUrl = url;
+  }
 }

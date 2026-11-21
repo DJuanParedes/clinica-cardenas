@@ -1,0 +1,110 @@
+# Integración continua: en cada push y pull request se prueban el backend, la web y los microservicios,
+# y se compila el APK de la app móvil (queda como artefacto descargable en la pestaña Actions).
+name: CI
+
+on:
+  push:
+    branches: [main, sprint-final-todas-las-hu]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Spring Boot) · pruebas JUnit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: mvn -B -q test
+        working-directory: backend
+
+  web:
+    name: Web (Angular) · compilación
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - run: npx ng build --configuration production
+        working-directory: frontend
+
+  servicios:
+    name: Microservicios (Node) · sintaxis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: |
+          for f in notificaciones/*.js sunat-sim/*.js; do node --check "$f"; done
+
+  android:
+    name: App móvil (Kotlin Multiplatform) · APK
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compilar APK de prueba
+        working-directory: movil
+        run: gradle --no-daemon --console=plain :composeApp:assembleDebug
+      - name: APK firmado para Play Store (solo si hay llave configurada)
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        working-directory: movil
+        env:
+          CLINICA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          CLINICA_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CLINICA_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/clinica.jks"
+          export CLINICA_KEYSTORE="$RUNNER_TEMP/clinica.jks"
+          gradle --no-daemon --console=plain :composeApp:bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClinicaCardenas-apk
+          path: |
+            movil/composeApp/build/outputs/apk/debug/*.apk
+            movil/composeApp/build/outputs/bundle/release/*.aab
+          if-no-files-found: ignore
+
+  ios:
+    name: App móvil · iOS (compilación en Mac)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compilar el código compartido para iPhone (Kotlin/Native)
+        working-directory: movil
+        run: gradle --no-daemon --console=plain :composeApp:linkDebugFrameworkIosSimulatorArm64 :composeApp:linkReleaseFrameworkIosArm64
+      - name: Generar y compilar el proyecto Xcode (simulador, sin firma)
+        working-directory: movil/iosApp
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40

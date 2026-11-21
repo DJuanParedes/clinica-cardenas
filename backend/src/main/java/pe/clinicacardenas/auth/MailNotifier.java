@@ -45,4 +45,37 @@ public class MailNotifier {
             log.warn("No se pudo enviar el correo a {}: {}", to, e.getMessage());
         }
     }
+
+    /** Correo HTML con un adjunto opcional (p. ej. el XML del comprobante). Devuelve false si quedó simulado o falló. */
+    public boolean sendHtml(String to, String subject, String html, String attachmentName, byte[] attachment, String attachmentType) {
+        java.util.Map<String, byte[]> m = new java.util.LinkedHashMap<>();
+        if (attachmentName != null && attachment != null) m.put(attachmentName, attachment);
+        return sendHtml(to, subject, html, m);
+    }
+
+    /** Correo HTML con varios adjuntos (nombre → contenido; el tipo se deduce de la extensión). */
+    public boolean sendHtml(String to, String subject, String html, java.util.Map<String, byte[]> attachments) {
+        if (!isConfigured()) {
+            log.info("[correo simulado] Para: {} | Asunto: {} | HTML {} caracteres | adjuntos {}", to, subject, html.length(), attachments.keySet());
+            return false;
+        }
+        try {
+            JavaMailSender s = sender.getObject();
+            jakarta.mail.internet.MimeMessage msg = s.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper h = new org.springframework.mail.javamail.MimeMessageHelper(msg, true, "UTF-8");
+            h.setTo(to);
+            h.setSubject(subject);
+            h.setText(html.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim(), html);
+            for (java.util.Map.Entry<String, byte[]> a : attachments.entrySet()) {
+                String type = a.getKey().endsWith(".pdf") ? "application/pdf" : a.getKey().endsWith(".xml") ? "application/xml" : "application/octet-stream";
+                h.addAttachment(a.getKey(), new org.springframework.core.io.ByteArrayResource(a.getValue()), type);
+            }
+            s.send(msg);
+            return true;
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo a {}: {}", to, e.getMessage());
+            throw new pe.clinicacardenas.common.ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "CORREO_NO_ENVIADO",
+                    "No se pudo enviar el correo: " + e.getMessage());
+        }
+    }
 }

@@ -15,4 +15,13 @@ public class Procedure {
     public String category;
     public BigDecimal price;
     public boolean active = true;
+    /** Agrupa variantes del mismo servicio (p. ej. "Limpieza dental": simple, profunda, con ultrasonido). */
+    public String family;
+    public String description;
+    @Column(name = "duration_min")
+    public Integer durationMin;
+
+    /** Promoción vigente hoy (la calcula PromotionService al listar el catálogo). */
+    @Transient
+    public java.util.Map<String, Object> promotion;
 }

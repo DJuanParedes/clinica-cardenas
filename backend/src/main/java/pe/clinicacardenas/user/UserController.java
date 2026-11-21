@@ -25,7 +25,7 @@ public class UserController {
     public record PasswordRequest(String newPassword) {}
 
     @GetMapping("/roles")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public List<Map<String, String>> roles() {
         List<Map<String, String>> out = new ArrayList<>();
         for (Role r : Role.values()) out.add(Map.of("code", r.name(), "label", r.label));
@@ -33,51 +33,51 @@ public class UserController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public List<Map<String, Object>> list() {
         return service.list();
     }
 
     @PostMapping("/users")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public Map<String, Object> create(@RequestBody UserService.UserRequest req) {
         return service.create(req);
     }
 
     @PutMapping("/users/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public Map<String, Object> update(@PathVariable Long id, @RequestBody UserService.UserRequest req) {
         return service.update(id, req);
     }
 
     @PatchMapping("/users/{id}/active")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public Map<String, Object> setActive(@PathVariable Long id, @RequestBody ActiveRequest req) {
         return service.setActive(id, req.active());
     }
 
     @PostMapping("/users/{id}/password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public Map<String, String> resetPassword(@PathVariable Long id, @RequestBody PasswordRequest req) {
         service.adminResetPassword(id, req.newPassword());
         return Map.of("message", "Contraseña temporal asignada.");
     }
 
     @PostMapping("/users/{id}/unlock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public Map<String, Object> unlock(@PathVariable Long id) {
         return service.unlock(id);
     }
 
     @GetMapping("/users/{id}/audit")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public List<AuditLog> userAudit(@PathVariable Long id) {
         return audit.forEntity("USUARIO", id);
     }
 
     @GetMapping("/audit")
-    @PreAuthorize("hasAnyRole('ADMIN','DIRECTOR')")
+    @PreAuthorize("hasAuthority('AUDITORIA')")
     public List<AuditLog> latestAudit() {
         return audit.latest(50);
     }
@@ -88,7 +88,7 @@ public class UserController {
     }
 
     @PutMapping("/dentists/{id}/schedules")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USUARIOS')")
     public List<DentistSchedule> replaceSchedules(@PathVariable Long id, @RequestBody List<UserService.ScheduleBlock> blocks) {
         return service.replaceSchedules(id, blocks);
     }

@@ -17,7 +17,7 @@ import java.util.Map;
 /** HU-10, HU-11 y HU-12. */
 @RestController
 @RequestMapping("/api/billing")
-@PreAuthorize("hasAnyRole('CAJA','ADMIN')")
+@PreAuthorize("hasAuthority('COMPROBANTES')")
 public class BillingController {
 
     private final BillingService service;
@@ -67,9 +67,31 @@ public class BillingController {
         return service.detail(id);
     }
 
+    private InvoiceMailer mailer;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMailer(InvoiceMailer mailer) {
+        this.mailer = mailer;
+    }
+
     @PostMapping("/invoices/{id}/send")
     public Map<String, Object> send(@PathVariable Long id) {
         return service.send(id);
+    }
+
+    public record EmailRequest(String email) {}
+
+    @PostMapping("/invoices/{id}/email")
+    public Map<String, Object> email(@PathVariable Long id, @RequestBody(required = false) EmailRequest r) {
+        return mailer.send(id, r == null ? null : r.email());
+    }
+
+    @GetMapping("/invoices/{id}/pdf")
+    public ResponseEntity<byte[]> pdf(@PathVariable Long id) {
+        Invoice inv = service.get(id);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+                .header("Content-Disposition", "inline; filename=\"" + inv.series + "-" + inv.number + ".pdf\"")
+                .body(mailer.pdf(id));
     }
 
     @PostMapping("/invoices/{id}/status")

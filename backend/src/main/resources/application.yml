@@ -7,6 +7,10 @@ server:
 spring:
   application:
     name: clinica-cardenas
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 13MB
   main:
     banner-mode: off
   datasource:
@@ -51,9 +55,17 @@ management:
 
 app:
   timezone: America/Lima
+  # consulta de nombres por DNI (RENIEC vía Decolecta/apis.net.pe): https://decolecta.com
+  reniec:
+    url: ${RENIEC_API_URL:https://api.decolecta.com/v1/reniec/dni?numero={dni}}
+    token: ${RENIEC_API_TOKEN:}
+  # dirección pública HTTPS del sistema (avisos de Mercado Pago y regreso después de pagar)
+  public-url: ${APP_PUBLIC_URL:}
   # true: el código de recuperación de contraseña también se devuelve en la respuesta (solo demo)
   demo-mode: ${APP_DEMO_MODE:true}
   seed-demo-data: ${APP_SEED_DEMO:true}
+  # contraseña inicial de los usuarios del personal (en la nube se genera una aleatoria)
+  seed-password: ${APP_SEED_PASSWORD:Clinica2026}
   jwt:
     secret: ${JWT_SECRET:cambia-este-secreto-en-produccion-clinica-cardenas-2026}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
@@ -80,8 +92,39 @@ app:
     certificado-clave: ${SUNAT_CERTIFICADO_CLAVE:clinica-demo}
     igv-rate: 0.18
     boleta-max-sin-documento: 700.00
+  notifications:
+    # Microservicio de notificaciones (WhatsApp y correo). En docker-compose: servicio "notificaciones".
+    url: ${NOTIF_URL:http://localhost:9083}
+    enabled: ${NOTIF_ENABLED:true}
+    webhook-token: ${NOTIF_WEBHOOK_TOKEN:token-webhook-clinica-cardenas}
+    panel-url: ${NOTIF_PANEL_URL:http://localhost:9083}
+    clinic-phone: ${CLINICA_TELEFONO:987 654 000}
+
+  assistant:
+    # Asistente virtual de WhatsApp (RAG + modelo de lenguaje). Sin configurar usa el modelo local (siempre disponible).
+    # claude: ANTHROPIC_API_KEY · openai: API compatible (OpenAI, Groq, Ollama/LM Studio local) con ASISTENTE_URL
+    provider: ${ASISTENTE_PROVEEDOR:}
+    model: ${ASISTENTE_MODELO:}
+    api-key: ${ASISTENTE_API_KEY:}
+    anthropic-key: ${ANTHROPIC_API_KEY:}
+    url: ${ASISTENTE_URL:}
+    # el microservicio espera la respuesta 8 s: si el modelo tarda más, se envía la respuesta local
+    timeout-ms: ${ASISTENTE_TIMEOUT_MS:6000}
+
+  files:
+    # Fotos, radiografías y documentos de los pacientes (volumen de Docker en producción)
+    dir: ${FILES_DIR:./archivos}
+    max-mb: 10
+  payments:
+    # simulado: pasarela de prueba (Yape, Plin, tarjeta). Real: Culqi/Izipay con sus llaves en el .env
+    mode: ${PAGOS_MODO:simulado}
+    # mercadopago: Checkout Pro (tarjeta, Yape, saldo de Mercado Pago). Llaves en https://www.mercadopago.com.pe/developers/panel
+    mercadopago:
+      access-token: ${MP_ACCESS_TOKEN:}
+      webhook-secret: ${MP_WEBHOOK_SECRET:}
 
 logging:
   level:
     root: INFO
     org.hibernate.SQL: WARN
+    pe.clinicacardenas.notification: INFO

@@ -1,0 +1,150 @@
+package pe.clinicacardenas.pacientes.ui.login
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import pe.clinicacardenas.pacientes.data.remote.ApiException
+import pe.clinicacardenas.pacientes.data.repository.ClinicRepository
+import pe.clinicacardenas.pacientes.data.repository.SessionRepository
+import pe.clinicacardenas.pacientes.data.repository.StaffRepository
+
+enum class LoginMode { INGRESAR, ACTIVAR }
+
+data class LoginState(
+    val mode: LoginMode = LoginMode.INGRESAR,
+    val docType: String = "DNI",
+    val docNumber: String = "",
+    val password: String = "",
+    val birthDate: String = "",
+    val code: String = "",
+    val newPassword: String = "",
+    val codeSent: Boolean = false,
+    val codeInfo: String? = null,
+    val staff: Boolean = false,
+    val username: String = "",
+    val staffPassword: String = "",
+    val staffCode: String = "",
+    val needCode: Boolean = false,
+    val consent: Boolean = false,
+    val terms: pe.clinicacardenas.pacientes.data.remote.LegalDto? = null,
+    val termsOpen: Boolean = false,
+    val loading: Boolean = false,
+    val error: String? = null,
+    val fieldErrors: Map<String, String> = emptyMap(),
+)
+
+/** HU del portal: ingreso con documento y contraseña, y activación de cuenta con código. */
+class LoginViewModel(
+    private val repo: ClinicRepository,
+    private val session: SessionRepository,
+    private val staffRepo: StaffRepository,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(LoginState())
+    val state: StateFlow<LoginState> = _state.asStateFlow()
+
+    /** Abre los términos y la política vigentes: se aceptan después de leerlos (Ley 29733). */
+    fun openTerms() {
+        _state.update { it.copy(termsOpen = true) }
+        if (_state.value.terms != null) return
+        viewModelScope.launch {
+            val t = runCatching { repo.legal("TERMINOS") }.getOrNull()
+            _state.update { it.copy(terms = t ?: pe.clinicacardenas.pacientes.data.remote.LegalDto("TERMINOS", "-", "Términos y política de privacidad",
+                "No se pudo cargar el texto. Puedes leerlo en la clínica o en el portal web antes de aceptar.")) }
+        }
+    }
+
+    /** Regresa al paso anterior: de "código" a "documento y fecha". */
+    fun back() = _state.update { it.copy(codeSent = false, code = "", newPassword = "", error = null, fieldErrors = emptyMap()) }
+
+    fun edit(f: LoginState.() -> LoginState) = _state.update { it.f().copy(error = null) }
+
+    fun mode(m: LoginMode) = _state.update { it.copy(mode = m, error = null, fieldErrors = emptyMap()) }
+
+    private fun validDoc(s: LoginState): String? = when {
+        s.docType == "DNI" && !Regex("\\d{8}").matches(s.docNumber.trim()) -> "El DNI tiene 8 dígitos."
+        s.docNumber.isBlank() -> "Ingresa tu número de documento."
+        else -> null
+    }
+
+    fun login() {
+        val s = _state.value
+        val errors = buildMap {
+            validDoc(s)?.let { put("docNumber", it) }
+            if (s.password.isBlank()) put("password", "Ingresa tu contraseña.")
+        }
+        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
+        run { repo.login(s.docType, s.docNumber, s.password) }
+    }
+
+    fun requestCode() {
+        val s = _state.value
+        val errors = buildMap {
+            validDoc(s)?.let { put("docNumber", it) }
+            if (!Regex("\\d{2}/\\d{2}/\\d{4}").matches(s.birthDate.trim())) put("birthDate", "Usa el formato dd/mm/aaaa.")
+        }
+        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
+        val (d, m, y) = s.birthDate.trim().split("/")
+        run {
+            val r = repo.requestCode(s.docType, s.docNumber, "$y-$m-$d")
+            val demo = r.demoCode?.let { "\nCódigo de demostración: $it" } ?: ""
+            _state.update { it.copy(codeSent = true, codeInfo = r.message + demo, code = r.demoCode ?: it.code) }
+        }
+    }
+
+    fun activate() {
+        val s = _state.value
+        val errors = buildMap {
+            if (s.code.trim().length != 6) put("code", "El código tiene 6 dígitos.")
+            if (s.newPassword.length < 8 || !s.newPassword.any { it.isDigit() } || !s.newPassword.any { it.isLetter() })
+                put("newPassword", "Mínimo 8 caracteres, con letras y números.")
+            if (!s.consent) put("consent", "Para usar la app necesitamos tu autorización.")
+        }
+        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
+        run { repo.activate(s.docType, s.docNumber, s.code, s.newPassword, s.consent) }
+    }
+
+    fun setStaff(on: Boolean) = _state.update { it.copy(staff = on, error = null, fieldErrors = emptyMap(), mode = if (on) LoginMode.INGRESAR else it.mode) }
+
+    /** Ingreso del personal: usuario y contraseña, y el código de 6 dígitos si activó la verificación en 2 pasos. */
+    fun staffLogin() {
+        val s = _state.value
+        val errors = buildMap {
+            if (s.username.isBlank()) put("username", "Ingresa tu usuario.")
+            if (s.staffPassword.isBlank()) put("staffPassword", "Ingresa tu contraseña.")
+            if (s.needCode && s.staffCode.trim().length != 6) put("staffCode", "El código tiene 6 dígitos.")
+        }
+        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors) }
+        _state.update { it.copy(loading = true, error = null, fieldErrors = emptyMap()) }
+        viewModelScope.launch {
+            try {
+                staffRepo.login(s.username, s.staffPassword, if (s.needCode) s.staffCode else null)
+            } catch (e: ApiException) {
+                when (e.code) {
+                    "REQUIERE_2FA" -> _state.update { it.copy(needCode = true, error = null) }
+                    "CODIGO_2FA_INVALIDO" -> _state.update { it.copy(staffCode = "", error = e.message) }
+                    else -> _state.update { it.copy(error = e.message, staffPassword = "", needCode = false, staffCode = "") }
+                }
+            } finally {
+                _state.update { it.copy(loading = false) }
+            }
+        }
+    }
+
+    private fun run(block: suspend () -> Unit) {
+        _state.update { it.copy(loading = true, error = null, fieldErrors = emptyMap()) }
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: ApiException) {
+                _state.update { it.copy(error = e.message, fieldErrors = e.fields) }
+            } finally {
+                _state.update { it.copy(loading = false) }
+            }
+        }
+    }
+}

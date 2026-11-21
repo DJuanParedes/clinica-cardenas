@@ -12,7 +12,8 @@ import java.util.Map;
 @RequestMapping("/api")
 public class ClinicalController {
 
-    private static final String CLINICAL = "hasAnyRole('ODONTOLOGO','ADMIN')";
+    private static final String CLINICAL = "hasAuthority('HISTORIA_CLINICA')";
+    private static final String PLAN = "hasAuthority('PLAN_TRATAMIENTO')";
 
     private final ClinicalService service;
 
@@ -57,38 +58,38 @@ public class ClinicalController {
     }
 
     @GetMapping("/patients/{id}/plans")
-    @PreAuthorize("hasAnyRole('ODONTOLOGO','ADMIN','CAJA')")
+    @PreAuthorize("hasAnyAuthority('PLAN_TRATAMIENTO','HISTORIA_CLINICA','CAJA_COBRAR')")
     public List<Map<String, Object>> plans(@PathVariable Long id) {
         return service.plans(id);
     }
 
     @PostMapping("/patients/{id}/plans")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize(CLINICAL)
+    @PreAuthorize(PLAN)
     public Map<String, Object> createPlan(@PathVariable Long id, @RequestBody ClinicalService.PlanRequest r) {
         return service.createPlan(id, r);
     }
 
     @PostMapping("/plans/{planId}/items")
-    @PreAuthorize(CLINICAL)
+    @PreAuthorize(PLAN)
     public Map<String, Object> addItem(@PathVariable Long planId, @RequestBody ClinicalService.PlanItemRequest r) {
         return service.addItem(planId, r);
     }
 
     @PatchMapping("/plan-items/{itemId}")
-    @PreAuthorize(CLINICAL)
+    @PreAuthorize(PLAN)
     public Map<String, Object> itemStatus(@PathVariable Long itemId, @RequestBody ClinicalService.ItemStatusRequest r) {
         return service.setItemStatus(itemId, r.status());
     }
 
     @PostMapping("/plans/{planId}/evolutions")
-    @PreAuthorize(CLINICAL)
+    @PreAuthorize(PLAN)
     public Map<String, Object> evolution(@PathVariable Long planId, @RequestBody ClinicalService.EvolutionRequest r) {
         return service.addEvolution(planId, r);
     }
 
     @PostMapping("/plans/{planId}/cancel")
-    @PreAuthorize(CLINICAL)
+    @PreAuthorize(PLAN)
     public Map<String, Object> cancel(@PathVariable Long planId) {
         return service.cancelPlan(planId);
     }

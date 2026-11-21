@@ -45,4 +45,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                   @Param("dentistId") Long dentistId);
 
     List<Appointment> findByPatientIdOrderByStartAtDesc(Long patientId);
+
+    /** Citas pendientes (no cerradas) de un odontólogo desde una fecha: para no dejarlas huérfanas. */
+    @Query("""
+           select a from Appointment a
+           where a.dentist.id = :dentistId and a.startAt >= :from
+             and a.status in :statuses
+           order by a.startAt asc
+           """)
+    List<Appointment> findPendingForDentist(@Param("dentistId") Long dentistId,
+                                            @Param("from") LocalDateTime from,
+                                            @Param("statuses") Collection<AppointmentStatus> statuses);
 }

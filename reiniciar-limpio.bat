@@ -1,5 +1,5 @@
 @echo off
-title Clinica Cardenas - reinicio limpio
+title Clinica Cardenas COMPLETO - reinicio limpio
 cd /d "%~dp0"
 echo Reconstruyendo con base de datos limpia (se borran los datos)...
 (docker compose down -v && docker compose up -d --build) > arranque.log 2>&1

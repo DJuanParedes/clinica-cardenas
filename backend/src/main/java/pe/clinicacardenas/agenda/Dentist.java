@@ -1,7 +1,9 @@
 package pe.clinicacardenas.agenda;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import pe.clinicacardenas.files.ImageService;
 import pe.clinicacardenas.user.User;
 
 @Entity
@@ -20,6 +22,14 @@ public class Dentist {
     public String cop;
     public String color;
     public boolean active = true;
+
+    @JsonIgnore
+    @Column(name = "photo_path")
+    public String photoPath;
+
+    public String getPhotoUrl() {
+        return ImageService.url(photoPath);
+    }
 
     public String getFullName() {
         return user == null ? null : user.fullName;
