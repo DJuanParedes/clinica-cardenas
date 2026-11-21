@@ -206,6 +206,15 @@ public class PatientService {
         return create(in, true);
     }
 
+    /** v2.6: el paciente se registra solo desde el enlace público: consentimiento por canal WEB con su IP. */
+    @Transactional
+    public Patient createFromWeb(PatientValidator.Input in, String ip) {
+        WEB_IP.set(ip == null ? "" : ip);
+        try { return create(in, false); } finally { WEB_IP.remove(); }
+    }
+
+    private static final ThreadLocal<String> WEB_IP = new ThreadLocal<>();
+
     private Patient create(PatientValidator.Input in, boolean demo) {
         Map<String, String> errors = PatientValidator.validate(in, Dates.today());
         if (!errors.isEmpty()) {
@@ -232,8 +241,11 @@ public class PatientService {
         p.demo = demo;
         repo.save(p);
         if (p.hcNumber == null) { p.hcNumber = String.format("%06d", p.id); repo.save(p); }
-        if (p.dataConsent && consents != null) consents.recordInitial(p);
-        audit.record("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc);
+        if (p.dataConsent && consents != null) {
+            if (WEB_IP.get() != null) consents.record(p, "PRIVACIDAD", "WEB", "paciente (enlace web)", WEB_IP.get().isBlank() ? null : WEB_IP.get());
+            else consents.recordInitial(p);
+        }
+        audit.record("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc + (WEB_IP.get() != null ? " · registrado desde la web" : ""));
         events.publishEvent(new ContactSync.PatientSaved(p.id));
         return p;
     }
