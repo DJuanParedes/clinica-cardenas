@@ -96,6 +96,7 @@ import { PUBLIC_STYLES } from './public-styles';
               <label for="cs">He leído y acepto la <a (click)="legalOpen = true">política de tratamiento de datos personales</a> (Ley N.° 29733).</label>
             </div>
             @if (e['dataConsent']) { <span class="err">{{ e['dataConsent'] }}</span> }
+            <label class="consent opt"><input type="checkbox" name="mk" [(ngModel)]="p.marketingConsent" /> <span>Quiero recibir promociones y novedades de la clínica por WhatsApp o correo (opcional; puedo darme de baja respondiendo BAJA).</span></label>
             @if (error) { <div class="err">{{ error }}</div> }
             <button class="btn primary block" type="submit" [disabled]="busy">{{ busy ? 'Reservando…' : 'Reservar cita' }}</button>
           </form>
@@ -118,7 +119,7 @@ export class PublicBookingComponent implements OnInit {
   startAt = '';
   loading = false;
   notes = '';
-  p: any = { docType: 'DNI', docNumber: '', birthDate: '', firstName: '', lastName: '', sex: '', phone: '', email: '', dataConsent: false, source: 'WEB' };
+  p: any = { docType: 'DNI', docNumber: '', birthDate: '', firstName: '', lastName: '', sex: '', phone: '', email: '', dataConsent: false, marketingConsent: false, source: 'WEB' };
   e: Record<string, string> = {};
   error = '';
   busy = false;

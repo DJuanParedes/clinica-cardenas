@@ -67,6 +67,7 @@ import { PUBLIC_STYLES } from './public-styles';
             <label for="cs">He leído y acepto la <a (click)="legalOpen = true">política de tratamiento de datos personales</a> (Ley N.° 29733), incluidos mis datos de salud.</label>
           </div>
           @if (e['dataConsent']) { <span class="err">{{ e['dataConsent'] }}</span> }
+          <label class="consent opt"><input type="checkbox" name="mk" [(ngModel)]="p.marketingConsent" /> <span>Quiero recibir promociones y novedades de la clínica por WhatsApp o correo (opcional; puedo darme de baja respondiendo BAJA).</span></label>
           @if (error) { <div class="err">{{ error }}</div> }
           <button class="btn primary block" type="submit" [disabled]="busy">{{ busy ? 'Enviando…' : 'Enviar mi ficha' }}</button>
         </form>
@@ -79,7 +80,7 @@ import { PUBLIC_STYLES } from './public-styles';
 export class PublicRegisterComponent implements OnInit {
   private api = inject(Api);
   f: any = null;
-  p: any = { docType: 'DNI', docNumber: '', birthDate: '', firstName: '', lastName: '', sex: '', phone: '', email: '', address: '', source: '', dataConsent: false };
+  p: any = { docType: 'DNI', docNumber: '', birthDate: '', firstName: '', lastName: '', sex: '', phone: '', email: '', address: '', source: '', dataConsent: false, marketingConsent: false };
   ans: Record<string, { value?: string; note?: string }> = {};
   allergies = '';
   medication = '';

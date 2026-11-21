@@ -338,7 +338,7 @@ export class CommunicationComponent implements OnInit {
   }
 
   kindLabel(k: string) { return k === 'ANTES' ? 'Antes' : k === 'DIA' ? 'El día' : 'Después'; }
-  catLabel(c: string) { return c === 'CITA' ? 'Avisos de cita' : c === 'RESERVA' ? 'Reserva web' : 'Automatización'; }
+  catLabel(c: string) { return c === 'CITA' ? 'Avisos de cita' : c === 'RESERVA' ? 'Reserva web' : c === 'MARKETING' ? 'Marketing' : 'Automatización'; }
   varHelp(v: string) { return VAR_HELP[v] || v; }
   st(s: string) { return STATUS[s] || { label: s, tone: 'grey' }; }
   dt = dateTime;
