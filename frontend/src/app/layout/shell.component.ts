@@ -17,7 +17,9 @@ const NAV: NavGroup[] = [
     { path: '/agenda', label: 'Agenda del día', icon: 'calendar', perms: ['AGENDA_VER'] },
     { path: '/pacientes', label: 'Pacientes', icon: 'patient', perms: ['PACIENTES_VER'] },
     { path: '/mensajes', label: 'Mensajes WhatsApp', icon: 'message', perms: ['MENSAJES'] },
+    { path: '/tareas', label: 'Tareas', icon: 'checks', perms: ['TAREAS'] },
     { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
+    { path: '/embudo', label: 'Embudo de ventas', icon: 'funnel', perms: ['LEADS'] },
     { path: '/mis-ganancias', label: 'Mis ganancias', icon: 'coins', perms: [], roles: ['ODONTOLOGO'] },
     { path: '/laboratorio', label: 'Laboratorio', icon: 'tooth', perms: ['LABORATORIO', 'CAJA_EGRESOS'] },
     { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
@@ -32,6 +34,7 @@ const NAV: NavGroup[] = [
   { title: 'Gestión', items: [
     { path: '/reportes', label: 'Indicadores', icon: 'chart', perms: ['REPORTES'] },
     { path: '/comisiones', label: 'Comisiones', icon: 'percent', perms: ['COMISIONES'] },
+    { path: '/marketing', label: 'Marketing y campañas', icon: 'megaphone', perms: ['MARKETING'] },
     { path: '/comunicacion', label: 'Comunicación con pacientes', icon: 'send', perms: ['AUTOMATIZACIONES'] },
     { path: '/notificaciones', label: 'Notificaciones', icon: 'bell', perms: ['NOTIFICACIONES'] },
   ] },
@@ -69,6 +72,7 @@ const NAV: NavGroup[] = [
               <a [routerLink]="item.path" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: item.path === '/caja' }" class="nav">
                 <app-icon [name]="item.icon" />
                 <span>{{ item.label }}</span>
+                @if (item.path === '/tareas' && dueTasks() > 0) { <span class="badge tasks" [attr.aria-label]="dueTasks() + ' tareas vencidas o para hoy'">{{ dueTasks() > 99 ? '99+' : dueTasks() }}</span> }
                 @if (item.path === '/mensajes' && unread() > 0) { <span class="badge" [attr.aria-label]="unread() + ' mensajes sin leer'">{{ unread() > 99 ? '99+' : unread() }}</span> }
               </a>
             }
@@ -118,6 +122,7 @@ const NAV: NavGroup[] = [
     .nav { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px;
       color: var(--ink-2); font-size: 14px; font-weight: 600; }
     .nav:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+    .badge.tasks { background: var(--gum); }
     .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #25d366; color: #fff;
       font-size: 11.5px; font-weight: 800; display: grid; place-items: center; }
     .nav.on { background: var(--brand-soft); color: var(--teal-strong); font-weight: 700; }
@@ -150,6 +155,8 @@ export class ShellComponent implements OnDestroy {
   navOpen = false;
   /** Mensajes de WhatsApp sin leer (insignia del menú, se actualiza cada 15 s). */
   unread = signal(0);
+  dueTasks = signal(0);
+  private polls = 0;
   private timer: ReturnType<typeof setInterval> | undefined;
 
   nav = computed(() => {
@@ -171,6 +178,8 @@ export class ShellComponent implements OnDestroy {
   ngOnDestroy() { clearInterval(this.timer); }
 
   private pollUnread() {
+    if (this.auth.can('TAREAS') && this.polls++ % 4 === 0)
+      this.api.taskSummary().subscribe({ next: (s) => this.dueTasks.set((s.mineOverdue || 0) + (s.mineToday || 0)), error: () => {} });
     if (!this.auth.can('MENSAJES')) return;
     this.api.conversationSummary().subscribe({ next: (s) => this.unread.set(s.unread), error: () => {} });
   }

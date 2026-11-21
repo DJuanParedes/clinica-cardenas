@@ -1,3 +1,5 @@
+import { TaskListComponent } from '../shared/task-list.component';
+import { MarketingConsentComponent } from '../shared/marketing-consent.component';
 import { Component, Input, OnChanges, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -24,7 +26,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent],
+  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -172,6 +174,8 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
               </section>
 
               <app-patient-profile-panels [patientId]="p.id" (changed)="profile = $event" />
+              @if (auth.can('TAREAS')) { <app-task-list [patientId]="p.id" [subtitle]="p.fullName" /> }
+              <app-marketing-consent [patient]="p" />
 
               <section class="panel">
                 <div class="panel-head"><h3>Archivos solicitados al paciente</h3>

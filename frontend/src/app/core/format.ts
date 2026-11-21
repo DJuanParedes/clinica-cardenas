@@ -111,7 +111,8 @@ export const CATEGORY_LABEL: Record<string, string> = {
   MANTENIMIENTO: 'Mantenimiento', MARKETING: 'Publicidad', IMPUESTOS: 'Impuestos', OTROS: 'Otros',
 };
 export const NOTIF_TYPE: Record<string, string> = { RECORDATORIO: 'Recordatorio', CAMBIO_CITA: 'Cambio de cita', CANCELACION: 'Cancelación', CODIGO_ACCESO: 'Código de acceso',
-  MENSAJE: 'Mensaje', CONTROL: 'Control preventivo', LISTA_ESPERA: 'Lista de espera', CUOTA: 'Cuota por vencer', CITA_REGISTRADA: 'Cita registrada' };
+  MENSAJE: 'Mensaje', CONTROL: 'Control preventivo', LISTA_ESPERA: 'Lista de espera', CUOTA: 'Cuota por vencer', CITA_REGISTRADA: 'Cita registrada',
+  CAMPANA: 'Campaña', CUMPLEANOS: 'Cumpleaños', AVISO_PREVIO: 'Aviso previo', RECORDATORIO_DIA: 'Recordatorio del día', AGRADECIMIENTO: 'Agradecimiento', ENCUESTA: 'Encuesta' };
 export const NOTIF_STATUS: Record<string, string> = {
   PENDIENTE: 'En cola', PROGRAMADO: 'Programado', ENVIADO: 'Enviado', ENTREGADO: 'Entregado', LEIDO: 'Leído', FALLIDO: 'Fallido', ANULADO: 'Anulado', DUPLICADO: 'Duplicado evitado',
 };

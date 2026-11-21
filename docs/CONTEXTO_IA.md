@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.6.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.7.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -49,8 +49,8 @@ N° de historia clínica, datos fiscales y familiares) ·
 `payment` (Mercado Pago, modo simulado) · `portal` (API del paciente: citas, historia, documentos, archivos
 solicitados, contacto) · `report` · `security` (JWT, roles y 17+ permisos editables) · `user` (usuarios y perfil).
 
-Base de datos: migraciones Flyway `V1`…`V17` en `backend/src/main/resources/db/migration/`. **Nunca edites una
-migración ya publicada**: crea la siguiente (`V18__descripcion.sql`). Errores de negocio con `ApiException`
+Base de datos: migraciones Flyway `V1`…`V18` en `backend/src/main/resources/db/migration/`. **Nunca edites una
+migración ya publicada**: crea la siguiente (`V19__descripcion.sql`). Errores de negocio con `ApiException`
 (`ApiException.field("campo", "mensaje")` para errores de formulario; el frontend los muestra bajo el campo).
 
 ### Frontend (`frontend/src/app/`)
@@ -101,7 +101,23 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.6.0)
+## Estado actual (noviembre 2026, versión 2.7.0)
+
+Versión 2.7.0: seguimiento y marketing (paquete `crm` del backend, migración V18).
+- Tareas (`tasks`, permiso `TAREAS`, todos los roles): llamar, cobrar, recordar…, de un paciente, de un lead o generales,
+  con responsable, fecha y prioridad. Bandeja `/tareas`, panel en la ficha del paciente y contador en el menú e Inicio.
+- Lista de pacientes: última y próxima cita, tarea pendiente, % de avance del presupuesto (planes ACTIVO) y saldo
+  (`PatientInsightsService`), con filtros de seguimiento (`SegmentFilter`, el mismo motor de los segmentos).
+- Marketing (`/marketing`, permiso `MARKETING`: administración y dirección): segmentos guardados (`segments`), tareas
+  en lote desde un segmento, campañas (`campaigns`, `campaign_recipients`) y saludo de cumpleaños (apagado por
+  defecto; `app_settings.cumpleanos_*`). Consentimiento de publicidad aparte del de datos: `patients.marketing_consent`
+  (NULL sin preguntar, TRUE, FALSE) y documento legal `PUBLICIDAD`. Las campañas solo van a TRUE; cumpleaños a quien
+  no es FALSE. Responder "BAJA" por WhatsApp lo pone en FALSE (`CareService.whatsappReply`). Envío 08:00–20:00.
+- Embudo de ventas (`/embudo`, permiso `LEADS`): `leads` y `lead_events`, etapas NUEVO → CONTACTADO → CITA_AGENDADA →
+  ASISTIO → GANADO / PERDIDO. Avanza solo con los eventos de la agenda (`LeadService.onAppointment`). Quien escribe por
+  WhatsApp sin ser paciente entra como lead (`leads_whatsapp_auto`). No se vincula al paciente solo por el celular:
+  se sugiere y recepción confirma.
+- Prueba: `pruebas/version-2-7-e2e.js`. Siguiente en la hoja de ruta: 2.8.0.
 
 Versión 2.6.0: comunicación con el paciente (`/comunicacion`, permiso `AUTOMATIZACIONES`, solo administración).
 - Plantillas de mensajes editables (`message_templates`) con variables `{paciente}`, `{fecha_hora}`, `{odontologo}`,

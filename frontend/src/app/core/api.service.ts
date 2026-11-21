@@ -86,9 +86,51 @@ export class Api {
   publicSurvey(token: string): Observable<any> { return this.http.get(`/api/public/survey/${token}`); }
   publicRate(token: string, body: any): Observable<any> { return this.http.post(`/api/public/survey/${token}`, body); }
 
-  searchPatientsFiltered(q: string, page: number, size: number, filters: { tag?: string; source?: string; mine?: boolean }): Observable<Page<Patient>> {
-    return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: filters.mine || undefined, tag: filters.tag, source: filters.source }) });
+  searchPatientsFiltered(q: string, page: number, size: number, filters: { tag?: string; source?: string; mine?: boolean; task?: string; next?: string; budget?: string; debt?: boolean; visit?: string }): Observable<Page<Patient> & { insights?: Record<string, any> }> {
+    return this.http.get<any>('/api/patients', { params: params({ q, page, size, mine: filters.mine || undefined, tag: filters.tag, source: filters.source,
+      task: filters.task, next: filters.next, budget: filters.budget, debt: filters.debt || undefined, visit: filters.visit }) });
   }
+
+  // v2.7: tareas
+  tasks(f: { scope?: string; status?: string; kind?: string; assigneeId?: number; patientId?: number; leadId?: number; q?: string }): Observable<{ items: any[]; counts: any }> {
+    return this.http.get<any>('/api/tasks', { params: params(f) });
+  }
+  taskSummary(): Observable<any> { return this.http.get('/api/tasks/summary'); }
+  taskOptions(): Observable<{ kinds: Record<string, string>; assignees: any[]; me: number }> { return this.http.get<any>('/api/tasks/options'); }
+  createTask(body: any): Observable<any> { return this.http.post('/api/tasks', body); }
+  updateTask(id: number, body: any): Observable<any> { return this.http.put(`/api/tasks/${id}`, body); }
+  completeTask(id: number, result?: string): Observable<any> { return this.http.post(`/api/tasks/${id}/complete`, { result }); }
+  cancelTask(id: number, result: string): Observable<any> { return this.http.post(`/api/tasks/${id}/cancel`, { result }); }
+  reopenTask(id: number): Observable<any> { return this.http.post(`/api/tasks/${id}/reopen`, {}); }
+
+  // v2.7: segmentos, campañas y cumpleaños
+  segmentPreview(f: any): Observable<any> { return this.http.post('/api/marketing/segments/preview', f); }
+  segments(): Observable<any[]> { return this.http.get<any[]>('/api/marketing/segments'); }
+  saveSegment(id: number | null, body: any): Observable<any> { return id ? this.http.put(`/api/marketing/segments/${id}`, body) : this.http.post('/api/marketing/segments', body); }
+  deleteSegment(id: number): Observable<any> { return this.http.delete(`/api/marketing/segments/${id}`); }
+  segmentTasks(body: any): Observable<{ created: number; skipped: number }> { return this.http.post<any>('/api/marketing/segments/tasks', body); }
+  birthdays(month?: number): Observable<any> { return this.http.get('/api/marketing/birthdays', { params: params({ month }) }); }
+  updateBirthdaySettings(body: any): Observable<any> { return this.http.put('/api/marketing/birthdays/settings', body); }
+  runBirthdays(): Observable<any> { return this.http.post('/api/marketing/birthdays/run', {}); }
+  campaigns(): Observable<any[]> { return this.http.get<any[]>('/api/marketing/campaigns'); }
+  campaign(id: number): Observable<any> { return this.http.get(`/api/marketing/campaigns/${id}`); }
+  saveCampaign(id: number | null, body: any): Observable<any> { return id ? this.http.put(`/api/marketing/campaigns/${id}`, body) : this.http.post('/api/marketing/campaigns', body); }
+  scheduleCampaign(id: number, scheduledAt: string | null): Observable<any> { return this.http.post(`/api/marketing/campaigns/${id}/schedule`, { scheduledAt }); }
+  cancelCampaign(id: number): Observable<any> { return this.http.post(`/api/marketing/campaigns/${id}/cancel`, {}); }
+  previewCampaign(body: any): Observable<any> { return this.http.post('/api/marketing/campaigns/preview', body); }
+  setMarketingConsent(patientId: number, accepted: boolean, channel: string): Observable<any> {
+    return this.http.put(`/api/patients/${patientId}/marketing-consent`, { accepted, channel });
+  }
+
+  // v2.7: embudo de ventas
+  leads(f: { q?: string; source?: string; assigneeId?: number; closedDays?: number }): Observable<any> { return this.http.get('/api/leads', { params: params(f) }); }
+  leadMetrics(days = 90): Observable<any> { return this.http.get('/api/leads/metrics', { params: params({ days }) }); }
+  lead(id: number): Observable<any> { return this.http.get(`/api/leads/${id}`); }
+  saveLead(id: number | null, body: any): Observable<any> { return id ? this.http.put(`/api/leads/${id}`, body) : this.http.post('/api/leads', body); }
+  moveLead(id: number, stage: string, lostReason?: string): Observable<any> { return this.http.post(`/api/leads/${id}/stage`, { stage, lostReason }); }
+  leadNote(id: number, text: string): Observable<any> { return this.http.post(`/api/leads/${id}/notes`, { text }); }
+  linkLeadPatient(id: number, patientId: number): Observable<any> { return this.http.post(`/api/leads/${id}/patient`, { patientId }); }
+  setLeadWhatsappAuto(enabled: boolean): Observable<any> { return this.http.put('/api/leads/settings/whatsapp-auto', { enabled }); }
 
   searchPatients(q: string, page = 0, size = 20, mine = false): Observable<Page<Patient>> {
     return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: mine ? 'true' : undefined }) });
