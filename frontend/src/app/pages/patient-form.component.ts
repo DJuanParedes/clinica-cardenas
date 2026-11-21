@@ -201,6 +201,21 @@ interface Form {
               </div>
               <p class="span-all muted small">Persona a quien avisar si el paciente sufre una complicación durante la atención. Es opcional para adultos.</p>
             }
+            @if (!id) {
+              <div class="field">
+                <label for="src">¿Cómo nos conoció?</label>
+                <select id="src" name="source" class="input" [(ngModel)]="source">
+                  <option value="">Sin registrar</option>
+                  @for (o of sources; track o.code) { <option [value]="o.code">{{ o.label }}</option> }
+                </select>
+              </div>
+              <div class="field">
+                @if (source) {
+                  <label for="srcd">{{ source === 'RECOMENDACION' ? '¿Quién lo recomendó?' : 'Detalle (opcional)' }}</label>
+                  <input id="srcd" name="sourceDetail" class="input" [(ngModel)]="sourceDetail" maxlength="120" />
+                }
+              </div>
+            }
             <div class="field span-all">
               <label for="nt">Notas administrativas</label>
               <textarea id="nt" name="notes" class="input" [(ngModel)]="f.notes" maxlength="500" placeholder="Preferencias de horario, seguro, referido por…"></textarea>
@@ -389,6 +404,7 @@ export class PatientFormComponent implements OnInit {
       if (!this.id && !this.f.ubigeo) this.setUbigeo('150107'); // Chaclacayo (sede de la clínica) como sugerencia
     });
     this.api.dniConfig().subscribe({ next: (c) => (this.dniEnabled = c.enabled), error: () => {} });
+    if (!this.id) this.api.patientProfileOptions().subscribe({ next: (o) => (this.sources = o.sources), error: () => {} });
     if (this.id) {
       this.api.patient(+this.id).subscribe(({ patient: p }) => {
         this.f = {
@@ -450,6 +466,10 @@ export class PatientFormComponent implements OnInit {
     return Object.keys(e).length === 0;
   }
 
+  source = '';
+  sourceDetail = '';
+  sources: { code: string; label: string }[] = [];
+
   save() {
     if (!this.validate()) {
       this.toast.warn('Revisa los campos marcados.');
@@ -461,6 +481,10 @@ export class PatientFormComponent implements OnInit {
     req.subscribe({
       next: (p) => {
         this.toast.ok(this.id ? 'Datos del paciente actualizados.' : `Paciente registrado: ${p.fullName}.`);
+        // v2.5: la fuente de captación se guarda en la ficha ampliada (no bloquea el registro si falla)
+        if (!this.id && this.source) {
+          this.api.updatePatientProfile(p.id, { source: this.source, sourceDetail: this.sourceDetail }).subscribe({ error: () => {} });
+        }
         this.router.navigate(['/pacientes', p.id]);
       },
       error: (err) => {
