@@ -241,6 +241,22 @@ public class NotificationService {
         return out;
     }
 
+    /**
+     * v2.8: mensaje directo a un paciente por un canal concreto (p. ej. el enlace para firmar un consentimiento).
+     * No es publicidad: no lleva pie de baja. Devuelve lo que quedó en cola.
+     */
+    @Transactional
+    public List<Sent> direct(Patient p, String type, String channel, String destination, String subject, String body, String key) {
+        List<Sent> out = new ArrayList<>();
+        Target t = new Target(channel, destination);
+        String k = key + ":" + channel;
+        if (repo.existsByIdempotencyKey(k)) return out;
+        String b = "WHATSAPP".equals(channel) ? body : body.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
+        add(p, null, type, "ENVIAR", t, subject, b, k, null);
+        repo.findByIdempotencyKey(k).ifPresent(n -> out.add(new Sent(channel, n.id)));
+        return out;
+    }
+
     /** Variables de la plantilla para una cita. */
     public Map<String, String> vars(Appointment a) {
         Map<String, String> v = new LinkedHashMap<>();
