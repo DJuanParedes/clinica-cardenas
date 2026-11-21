@@ -147,6 +147,17 @@ public class NotificationService {
     /** Plantilla de WhatsApp con formato (saltos de línea, negritas) y sus parámetros, en orden {{1}}, {{2}}… */
     private record Wa(String template, List<String> params) {}
 
+    /** v2.9: plantillas de WhatsApp que la clínica debe tener aprobadas en Meta (ver docs/PLANTILLAS_WHATSAPP.md). */
+    public static final String WA_PROMOCION = "novedad_clinica";
+    public static final String WA_CUMPLEANOS = "cumpleanos_clinica";
+    public static final String WA_DOCUMENTO = "documento_por_firmar";
+
+    /** Texto libre como parámetro de plantilla: una sola línea, sin el pie de baja (ya está en la plantilla), máx. 700. */
+    private static String waText(String s) {
+        String t = s == null ? "" : s.replaceAll("\\s*\\n+\\s*", " · ").replaceAll(" {2,}", " ").trim();
+        return t.length() > 700 ? t.substring(0, 699) + "…" : t;
+    }
+
     private Wa wa(String template, String... params) {
         return new Wa(template, List.of(params));
     }
@@ -231,7 +242,10 @@ public class NotificationService {
                     ? text + "\n\n_Responde *BAJA* si no deseas recibir más promociones._"
                     : text.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone
                       + "\n\nSi no deseas recibir más promociones, respóndenos BAJA por WhatsApp o avísanos en recepción.";
-            add(p, null, type, "ENVIAR", t, subj, b, k, null);
+            // v2.9: fuera de la ventana de 24 h Meta solo acepta plantillas aprobadas de categoría marketing.
+            Wa meta = "CUMPLEANOS".equals(type) ? wa(WA_CUMPLEANOS, clinicName, waText(text))
+                    : wa(WA_PROMOCION, clinicName, waText(text));
+            add(p, null, type, "ENVIAR", t, subj, b, k, null, meta);
             repo.findByIdempotencyKey(k).ifPresent(n -> {
                 n.templateCode = templateCode;
                 repo.save(n);
@@ -247,12 +261,20 @@ public class NotificationService {
      */
     @Transactional
     public List<Sent> direct(Patient p, String type, String channel, String destination, String subject, String body, String key) {
+        return direct(p, type, channel, destination, subject, body, key, null);
+    }
+
+    /** Igual que {@link #direct}, con la plantilla de WhatsApp aprobada y sus parámetros (nombre, p1, p2, ...). */
+    @Transactional
+    public List<Sent> direct(Patient p, String type, String channel, String destination, String subject, String body, String key,
+                             List<String> waTemplate) {
         List<Sent> out = new ArrayList<>();
         Target t = new Target(channel, destination);
         String k = key + ":" + channel;
         if (repo.existsByIdempotencyKey(k)) return out;
         String b = "WHATSAPP".equals(channel) ? body : body.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
-        add(p, null, type, "ENVIAR", t, subject, b, k, null);
+        Wa meta = waTemplate == null || waTemplate.isEmpty() ? null : new Wa(waTemplate.get(0), waTemplate.subList(1, waTemplate.size()));
+        add(p, null, type, "ENVIAR", t, subject, b, k, null, meta);
         repo.findByIdempotencyKey(k).ifPresent(n -> out.add(new Sent(channel, n.id)));
         return out;
     }

@@ -222,7 +222,8 @@ public class InformedConsentService {
             String text = "Hola " + signer.split(" ")[0] + ", " + clinicName + " te envía el *consentimiento informado* para "
                     + (minor ? p.getFullName() + ": " : "tu tratamiento: ") + procedure + ".\n\nLéelo con calma y fírmalo desde tu celular aquí:\n" + url
                     + "\n\nEl enlace vence en " + VALID_DAYS + " días. Si tienes dudas, pregúntanos antes de firmar.";
-            notifications.direct(p, "CONSENTIMIENTO", channel, dest, "Consentimiento informado para firmar · " + clinicName, text, "consentimiento:" + id);
+            notifications.direct(p, "CONSENTIMIENTO", channel, dest, "Consentimiento informado para firmar · " + clinicName, text, "consentimiento:" + id,
+                    List.of(NotificationService.WA_DOCUMENTO, signer.split(" ")[0], clinicName, String.valueOf(t.get("name")).toLowerCase(Locale.ROOT), url, String.valueOf(VALID_DAYS)));
         }
         audit.record("HISTORIA", p.id, "CONSENTIMIENTO", "Envió para firmar: " + t.get("name") + " · " + ("PRESENCIAL".equals(channel) ? "en la clínica" : channel.toLowerCase()));
         Map<String, Object> out = new LinkedHashMap<>(requests("r.id = ?", id).get(0));
