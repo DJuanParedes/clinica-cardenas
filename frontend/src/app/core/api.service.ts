@@ -64,6 +64,28 @@ export class Api {
   labOrderStatus(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/status`, body); }
   payLabOrder(id: number, body: any): Observable<any> { return this.http.post(`/api/lab-orders/${id}/payments`, body); }
 
+  // v2.6: comunicación con el paciente
+  messageTemplates(): Observable<{ templates: any[]; variables: string[] }> { return this.http.get<any>('/api/messaging/templates'); }
+  updateTemplate(code: string, body: any): Observable<any> { return this.http.put(`/api/messaging/templates/${code}`, body); }
+  restoreTemplate(code: string): Observable<any> { return this.http.post(`/api/messaging/templates/${code}/restore`, {}); }
+  previewTemplate(code: string, body: any): Observable<any> { return this.http.post(`/api/messaging/templates/${code}/preview`, body); }
+  automations(): Observable<any[]> { return this.http.get<any[]>('/api/messaging/automations'); }
+  updateAutomation(code: string, body: any): Observable<any> { return this.http.put(`/api/messaging/automations/${code}`, body); }
+  messagingHistory(f: { template?: string; status?: string; q?: string }): Observable<any[]> {
+    return this.http.get<any[]>('/api/messaging/history', { params: params({ template: f.template, status: f.status, q: f.q }) });
+  }
+  publicLinks(): Observable<any> { return this.http.get('/api/messaging/public-links'); }
+  updatePublicLinks(body: any): Observable<any> { return this.http.put('/api/messaging/public-links', body); }
+  publicBookingOptions(): Observable<any> { return this.http.get('/api/public/booking/options'); }
+  publicSlots(dentistId: number, date: string, reasonCode: string): Observable<{ slots: string[] }> {
+    return this.http.get<any>('/api/public/booking/slots', { params: params({ dentistId, date, reasonCode }) });
+  }
+  publicBook(body: any): Observable<any> { return this.http.post('/api/public/booking', body); }
+  publicPreregisterForm(): Observable<any> { return this.http.get('/api/public/preregistro'); }
+  publicPreregister(body: any): Observable<any> { return this.http.post('/api/public/preregistro', body); }
+  publicSurvey(token: string): Observable<any> { return this.http.get(`/api/public/survey/${token}`); }
+  publicRate(token: string, body: any): Observable<any> { return this.http.post(`/api/public/survey/${token}`, body); }
+
   searchPatientsFiltered(q: string, page: number, size: number, filters: { tag?: string; source?: string; mine?: boolean }): Observable<Page<Patient>> {
     return this.http.get<Page<Patient>>('/api/patients', { params: params({ q, page, size, mine: filters.mine || undefined, tag: filters.tag, source: filters.source }) });
   }

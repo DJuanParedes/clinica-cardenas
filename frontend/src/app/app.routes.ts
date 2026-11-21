@@ -6,6 +6,10 @@ const T = (s: string) => `${s} · Clínica Cárdenas`;
 
 export const routes: Routes = [
   { path: 'pago/resultado', loadComponent: () => import('./pages/payment-result.component').then((m) => m.PaymentResultComponent), title: T('Resultado del pago') },
+  // ---------- v2.6: enlaces públicos (sin iniciar sesión)
+  { path: 'reservar', loadComponent: () => import('./public/public-booking.component').then((m) => m.PublicBookingComponent), title: T('Reserva tu cita') },
+  { path: 'registro', loadComponent: () => import('./public/public-register.component').then((m) => m.PublicRegisterComponent), title: T('Llena tu ficha') },
+  { path: 'encuesta/:token', loadComponent: () => import('./public/public-survey.component').then((m) => m.PublicSurveyComponent), title: T('¿Cómo te atendimos?') },
   // ---------- HU-22: aplicación móvil del paciente
   { path: 'app/ingresar', canActivate: [portalGuestGuard], loadComponent: () => import('./portal/portal-login.component').then((m) => m.PortalLoginComponent), title: T('Mi app') },
   {
@@ -38,6 +42,7 @@ export const routes: Routes = [
       { path: 'pacientes', canActivate: [permGuard('PACIENTES_VER')], loadComponent: () => import('./pages/patients.component').then((m) => m.PatientsComponent), title: T('Pacientes') },
       { path: 'pacientes/nuevo', canActivate: [permGuard('PACIENTES_EDITAR')], loadComponent: () => import('./pages/patient-form.component').then((m) => m.PatientFormComponent), title: T('Registrar paciente') },
       { path: 'pacientes/:id/editar', canActivate: [permGuard('PACIENTES_EDITAR')], loadComponent: () => import('./pages/patient-form.component').then((m) => m.PatientFormComponent), title: T('Editar paciente') },
+      { path: 'comunicacion', canActivate: [permGuard('AUTOMATIZACIONES')], loadComponent: () => import('./pages/communication.component').then((m) => m.CommunicationComponent), title: T('Comunicación con pacientes') },
       { path: 'laboratorio', canActivate: [permGuard('LABORATORIO', 'CAJA_EGRESOS')], loadComponent: () => import('./pages/lab-orders.component').then((m) => m.LabOrdersComponent), title: T('Laboratorio') },
       { path: 'configuracion/anamnesis', canActivate: [permGuard('HISTORIA_CLINICA')], loadComponent: () => import('./pages/anamnesis-templates.component').then((m) => m.AnamnesisTemplatesComponent), title: T('Plantillas de anamnesis') },
       { path: 'pacientes/:id', canActivate: [permGuard('PACIENTES_VER')], loadComponent: () => import('./pages/patient-detail.component').then((m) => m.PatientDetailComponent), title: T('Ficha del paciente') },

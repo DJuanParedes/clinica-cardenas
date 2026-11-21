@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.5.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.6.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -49,8 +49,8 @@ N° de historia clínica, datos fiscales y familiares) ·
 `payment` (Mercado Pago, modo simulado) · `portal` (API del paciente: citas, historia, documentos, archivos
 solicitados, contacto) · `report` · `security` (JWT, roles y 17+ permisos editables) · `user` (usuarios y perfil).
 
-Base de datos: migraciones Flyway `V1`…`V16` en `backend/src/main/resources/db/migration/`. **Nunca edites una
-migración ya publicada**: crea la siguiente (`V17__descripcion.sql`). Errores de negocio con `ApiException`
+Base de datos: migraciones Flyway `V1`…`V17` en `backend/src/main/resources/db/migration/`. **Nunca edites una
+migración ya publicada**: crea la siguiente (`V18__descripcion.sql`). Errores de negocio con `ApiException`
 (`ApiException.field("campo", "mensaje")` para errores de formulario; el frontend los muestra bajo el campo).
 
 ### Frontend (`frontend/src/app/`)
@@ -101,12 +101,27 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.5.0)
+## Estado actual (noviembre 2026, versión 2.6.0)
+
+Versión 2.6.0: comunicación con el paciente (`/comunicacion`, permiso `AUTOMATIZACIONES`, solo administración).
+- Plantillas de mensajes editables (`message_templates`) con variables `{paciente}`, `{fecha_hora}`, `{odontologo}`,
+  `{enlace_encuesta}`… y botones de respuesta; `MessageTemplateService.render` arma cada aviso. Historial de envíos.
+- Automatizaciones (`automation_rules`): 5 días antes, 1 día antes con Confirmar / No podré asistir, el día de la
+  cita, agradecimiento y encuesta después de ATENDIDA. Reemplazan el recordatorio fijo; editar una regla o una
+  plantilla reprograma las citas futuras (`NotificationService.rescheduleFuture`). El recordatorio de 1 día conserva
+  la clave `recordatorio:` y el tipo `RECORDATORIO`.
+- WhatsApp con botones interactivos (`botonesWa`); si Meta rechaza fuera de la ventana de 24 h, cae a texto con
+  "Responde 1 / 2". El simulador los muestra y responde como `button_reply`.
+- Páginas públicas sin sesión: `/reservar` (usa los horarios libres reales, valida DNI + fecha de nacimiento si el
+  paciente ya existe, `appointments.booked_via = WEB`), `/registro` (prerregistro con antecedentes de salud) y
+  `/encuesta/{token}` (token HMAC con `app.jwt.secret`). API en `/api/public/*` con límite por IP.
+- El despachador y la anulación de recordatorios bloquean la fila (`PESSIMISTIC_WRITE`) para que una cancelación no
+  se cruce con un envío en curso.
+- Prueba: `pruebas/version-2-6-e2e.js`. Siguiente: 2.7.0 (tareas, listas y campañas, embudo).
 
 Versión 2.5.0: ficha del paciente con fuente de captación, etiquetas, N° de historia clínica, RUC para factura y
 familiares; anamnesis por plantillas editables (`/configuracion/anamnesis`) con alertas en la ficha; signos vitales;
 periodontograma con %IP y %SAS; órdenes de laboratorio (`/laboratorio`) con estados, pruebas y pagos por caja.
-Siguiente en la hoja de ruta: 2.6.0 (plantillas de mensajes, automatizaciones configurables, enlace público de citas).
 
 Versión 2.4.0: portal y app con historia de tratamientos, pagos, ficha y consentimientos; archivos solicitados
 (radiografías) que suben paciente, recepción o administración; confirmación de cita hasta 2 h antes con alerta a
