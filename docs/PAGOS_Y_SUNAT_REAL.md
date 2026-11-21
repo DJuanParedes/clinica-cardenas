@@ -14,14 +14,14 @@ El backend ya genera el XML UBL 2.1, lo firma y lo envía; hoy apunta al simulad
 4. Pasar el proceso de **homologación** en el entorno beta de SUNAT (enviar los casos de prueba de boletas,
    facturas y notas de crédito). Alternativa más rápida: usar un **OSE** (Operador de Servicios Electrónicos).
 
-**Cambios en el sistema** (variables del servicio `backend`; en `docker-compose.yml` hoy `SUNAT_URL`
-apunta al simulador, así que se reemplaza esa línea y se agregan las demás):
+**Cambios en el sistema** (variables en `/opt/clinica/.env`; desde la v2.9.0 `docker-compose.yml` las lee de ahí,
+y sin ellas sigue usando el simulador):
 ```
 SUNAT_AMBIENTE=PRODUCCION
 SUNAT_URL=https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService   # producción
 SUNAT_USUARIO=10102984841USUARIO          # RUC + usuario secundario SOL
 SUNAT_CLAVE=********
-SUNAT_CERTIFICADO=file:/data/certificado.p12   # montar el archivo como volumen de solo lectura
+SUNAT_CERTIFICADO=file:/data/sunat/certificado.p12   # copiar el .p12 a /opt/clinica/deploy/sunat/
 SUNAT_CERTIFICADO_CLAVE=********
 ```
 - Beta (pruebas): `https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService`.

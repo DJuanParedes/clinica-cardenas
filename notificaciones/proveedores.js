@@ -169,7 +169,7 @@ async function enviarWhatsApp(local, cuerpo, plantillaForzada, opciones = {}) {
   if (usarPlantilla && !plantillaForzada && opciones.plantillaWa && Array.isArray(opciones.parametrosWa) && !opciones.chat) {
     try {
       const template = { name: opciones.plantillaWa, language: { code: WA.idioma },
-        components: [{ type: 'body', parameters: opciones.parametrosWa.map((t) => ({ type: 'text', text: flatten(t).slice(0, 300) || '-' })) }] };
+        components: [{ type: 'body', parameters: opciones.parametrosWa.map((t) => ({ type: 'text', text: flatten(t).slice(0, 900) || '-' })) }] };
       return { id: await graph({ messaging_product: 'whatsapp', to, type: 'template', template }), via: `plantilla ${opciones.plantillaWa}` };
     } catch (e) {
       // 132001 plantilla inexistente / no aprobada · 132000 cantidad de parámetros distinta · 132012 formato de parámetro

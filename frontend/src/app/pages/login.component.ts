@@ -99,11 +99,13 @@ import { LogoComponent } from '../shared/logo.component';
             <div><strong>Descarga la app para Android</strong>
               <p class="small muted">Escanea el código con la cámara de tu celular o <a href="/app/ClinicaCardenas.apk" download>descárgala aquí</a>. Al instalar, permite "orígenes desconocidos" si Android lo pide.</p></div>
           </div>
+          <a class="lrb" routerLink="/libro-reclamaciones"><img src="libro-reclamaciones.svg" alt="" width="30" height="30" /> Libro de Reclamaciones</a>
         </form>
       </section>
     </div>
   `,
   styles: [`
+    .lrb { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 13.5px; font-weight: 700; }
     .getapp { display: flex; gap: 14px; align-items: center; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
     .getapp .qr { width: 104px; height: 104px; flex: none; background: #fff; }
     .getapp .qr :is(svg) { width: 100%; height: 100%; display: block; }

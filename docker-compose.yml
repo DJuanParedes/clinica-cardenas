@@ -141,10 +141,16 @@ services:
       EMPRESA_RUC: ${EMPRESA_RUC:-10102984841}
       EMPRESA_RAZON_SOCIAL: ${EMPRESA_RAZON_SOCIAL:-CLÍNICA DENTAL CÁRDENAS}
       SUNAT_MODE: ${SUNAT_MODE:-soap}
-      SUNAT_URL: http://sunat-sim:8090/ol-ti-itcpfegem-beta/billService
-      SUNAT_CONSULTA_URL: http://sunat-sim:8090/v1/ruc
+      # Por defecto, simulador. Para SUNAT real (o un OSE) se definen en .env: SUNAT_AMBIENTE, SUNAT_URL,
+      # SUNAT_USUARIO, SUNAT_CLAVE, SUNAT_CERTIFICADO=file:/data/sunat/certificado.p12 y SUNAT_CERTIFICADO_CLAVE.
+      # El .p12 se copia a deploy/sunat/ (no entra al repositorio). Ver docs/PAGOS_Y_SUNAT_REAL.md.
+      SUNAT_AMBIENTE: ${SUNAT_AMBIENTE:-BETA SIMULADO}
+      SUNAT_URL: ${SUNAT_URL:-http://sunat-sim:8090/ol-ti-itcpfegem-beta/billService}
+      SUNAT_CONSULTA_URL: ${SUNAT_CONSULTA_URL:-http://sunat-sim:8090/v1/ruc}
       SUNAT_USUARIO: ${SUNAT_USUARIO:-MODDATOS}
       SUNAT_CLAVE: ${SUNAT_CLAVE:-MODDATOS}
+      SUNAT_CERTIFICADO: ${SUNAT_CERTIFICADO:-classpath:sunat/certificado-demo.p12}
+      SUNAT_CERTIFICADO_CLAVE: ${SUNAT_CERTIFICADO_CLAVE:-clinica-demo}
       NOTIF_URL: http://notificaciones:8093
       NOTIF_PANEL_URL: http://localhost:9083
       NOTIF_WEBHOOK_TOKEN: ${NOTIF_WEBHOOK_TOKEN:-token-webhook-clinica-cardenas}
@@ -163,6 +169,7 @@ services:
       start_period: 40s
     volumes:
       - files-data:/data/archivos
+      - ./deploy/sunat:/data/sunat:ro
     mem_limit: 384m
 
   frontend:

@@ -39,6 +39,7 @@ const NAV: NavGroup[] = [
     { path: '/marketing', label: 'Marketing y campañas', icon: 'megaphone', perms: ['MARKETING'] },
     { path: '/comunicacion', label: 'Comunicación con pacientes', icon: 'send', perms: ['AUTOMATIZACIONES'] },
     { path: '/notificaciones', label: 'Notificaciones', icon: 'bell', perms: ['NOTIFICACIONES'] },
+    { path: '/reclamos', label: 'Libro de reclamaciones', icon: 'clipboard', perms: ['RECLAMOS'] },
   ] },
   { title: 'Seguridad', items: [
     { path: '/usuarios', label: 'Personal', icon: 'shield', perms: ['USUARIOS'] },
