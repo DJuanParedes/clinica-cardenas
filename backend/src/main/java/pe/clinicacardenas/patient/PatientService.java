@@ -36,6 +36,12 @@ public class PatientService {
     }
 
     private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private pe.clinicacardenas.clinical.AnamnesisService anamnesis;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAnamnesis(@org.springframework.context.annotation.Lazy pe.clinicacardenas.clinical.AnamnesisService anamnesis) {
+        this.anamnesis = anamnesis;
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
     void setJdbc(org.springframework.jdbc.core.JdbcTemplate jdbc) {
@@ -61,8 +67,22 @@ public class PatientService {
         return search(q, page, size, false);
     }
 
-    /** mine = solo los pacientes que tienen o tuvieron cita con el odontólogo que consulta ("Mis pacientes"). */
     public Map<String, Object> search(String q, int page, int size, boolean mine) {
+        return search(q, page, size, mine, null, null);
+    }
+
+    /** mine = solo los pacientes que tienen o tuvieron cita con el odontólogo que consulta ("Mis pacientes").
+     *  tag / source (v2.5) filtran por etiqueta y por fuente de captación. */
+    public Map<String, Object> search(String q, int page, int size, boolean mine, String tag, String source) {
+        Specification<Patient> filter = (root, cq, cb) -> {
+            List<Predicate> ps = new ArrayList<>();
+            if (source != null && !source.isBlank()) ps.add(cb.equal(root.get("source"), source.trim().toUpperCase()));
+            if (tag != null && !tag.isBlank()) {
+                List<Long> ids = jdbc.queryForList("select patient_id from patient_tags where tag = ?", Long.class, tag.trim());
+                ps.add(ids.isEmpty() ? cb.disjunction() : root.get("id").in(ids));
+            }
+            return cb.and(ps.toArray(new Predicate[0]));
+        };
         String query = q == null ? "" : q.trim();
         PageRequest pr = PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 50));
         Page<Patient> result;
@@ -83,15 +103,16 @@ public class PatientService {
                 return cb.and(ps.toArray(new Predicate[0]));
             };
             mode = "mis-pacientes";
-            result = repo.findAll(own.and(text), pr.withSort(Sort.by("lastName", "firstName")));
+            result = repo.findAll(own.and(text).and(filter), pr.withSort(Sort.by("lastName", "firstName")));
         } else if (query.isEmpty()) {
             mode = "recientes";
-            result = repo.findAll(pr.withSort(Sort.by(Sort.Direction.DESC, "createdAt")));
+            result = repo.findAll(filter, pr.withSort(Sort.by(Sort.Direction.DESC, "createdAt")));
         } else if (query.matches("^[0-9A-Za-z]{5,15}$") && query.chars().anyMatch(Character::isDigit)) {
             mode = "documento";
             String doc = PatientValidator.normalizeDoc(query);
-            Specification<Patient> spec = (root, cq, cb) -> cb.like(root.<String>get("docNumber"), doc + "%");
-            result = repo.findAll(spec, pr.withSort(Sort.by("docNumber")));
+            Specification<Patient> spec = (root, cq, cb) -> cb.or(cb.like(root.<String>get("docNumber"), doc + "%"),
+                    cb.equal(root.<String>get("hcNumber"), query));
+            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by("docNumber")));
         } else {
             mode = "nombre";
             String[] tokens = query.toLowerCase().split("\\s+");
@@ -105,7 +126,7 @@ public class PatientService {
                 }
                 return cb.and(ps.toArray(new Predicate[0]));
             };
-            result = repo.findAll(spec, pr.withSort(Sort.by("lastName", "firstName")));
+            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by("lastName", "firstName")));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("mode", mode);
@@ -142,6 +163,7 @@ public class PatientService {
             List<Map<String, Object>> h = jdbc.queryForList(
                     "select allergies, current_medication as medication, medical_background as background, blood_type as bloodType from clinical_histories where patient_id = ?", id);
             m.put("clinicalAlerts", h.isEmpty() ? null : h.get(0));
+            if (anamnesis != null) m.put("anamnesisAlerts", anamnesis.alerts(id));
             m.put("pendingProcedures", jdbc.queryForList(
                     "select ti.id, pr.name as `procedure`, ti.tooth, ti.price, tp.title as plan, u.full_name as dentist"
                     + " from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id"
@@ -209,6 +231,7 @@ public class PatientService {
         p.createdBy = CurrentUser.usernameOrSystem();
         p.demo = demo;
         repo.save(p);
+        if (p.hcNumber == null) { p.hcNumber = String.format("%06d", p.id); repo.save(p); }
         if (p.dataConsent && consents != null) consents.recordInitial(p);
         audit.record("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc);
         events.publishEvent(new ContactSync.PatientSaved(p.id));

@@ -58,6 +58,9 @@ public class ConfirmationFollowupController {
     public record CallResult(String result, String note) {}
 
     /** Resultado de la llamada de recepción: confirmó, no contesta (queda la nota) o pide cambiar. */
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager em;
+
     @PostMapping("/api/appointments/{id}/call")
     @PreAuthorize("hasAnyAuthority('CITAS_GESTIONAR','CITAS_ESTADO')")
     @Transactional
@@ -81,6 +84,8 @@ public class ConfirmationFollowupController {
             jdbc.update("update appointments set reschedule_requested_at = ? where id = ?", Dates.now(), id);
         }
         audit.record("CITA", id, "LLAMADA", text);
+        // changeStatus guarda con JPA: se vuelca a la base antes de releer la lista con SQL en esta misma transacción.
+        em.flush();
         return unconfirmed();
     }
 }

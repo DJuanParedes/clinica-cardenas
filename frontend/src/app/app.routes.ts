@@ -38,6 +38,8 @@ export const routes: Routes = [
       { path: 'pacientes', canActivate: [permGuard('PACIENTES_VER')], loadComponent: () => import('./pages/patients.component').then((m) => m.PatientsComponent), title: T('Pacientes') },
       { path: 'pacientes/nuevo', canActivate: [permGuard('PACIENTES_EDITAR')], loadComponent: () => import('./pages/patient-form.component').then((m) => m.PatientFormComponent), title: T('Registrar paciente') },
       { path: 'pacientes/:id/editar', canActivate: [permGuard('PACIENTES_EDITAR')], loadComponent: () => import('./pages/patient-form.component').then((m) => m.PatientFormComponent), title: T('Editar paciente') },
+      { path: 'laboratorio', canActivate: [permGuard('LABORATORIO', 'CAJA_EGRESOS')], loadComponent: () => import('./pages/lab-orders.component').then((m) => m.LabOrdersComponent), title: T('Laboratorio') },
+      { path: 'configuracion/anamnesis', canActivate: [permGuard('HISTORIA_CLINICA')], loadComponent: () => import('./pages/anamnesis-templates.component').then((m) => m.AnamnesisTemplatesComponent), title: T('Plantillas de anamnesis') },
       { path: 'pacientes/:id', canActivate: [permGuard('PACIENTES_VER')], loadComponent: () => import('./pages/patient-detail.component').then((m) => m.PatientDetailComponent), title: T('Ficha del paciente') },
       { path: 'caja', canActivate: [permGuard('CAJA_COBRAR', 'CAJA_EGRESOS', 'CAJA_REPORTE')], loadComponent: () => import('./pages/cash.component').then((m) => m.CashComponent), title: T('Caja del día') },
       { path: 'caja/cobro', canActivate: [permGuard('CAJA_COBRAR')], loadComponent: () => import('./pages/payment-new.component').then((m) => m.PaymentNewComponent), title: T('Registrar cobro') },

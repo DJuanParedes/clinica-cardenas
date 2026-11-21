@@ -30,8 +30,10 @@ public class PatientController {
     public Map<String, Object> search(@RequestParam(defaultValue = "") String q,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "20") int size,
-                                      @RequestParam(defaultValue = "false") boolean mine) {
-        Map<String, Object> r = service.search(q, page, size, mine);
+                                      @RequestParam(defaultValue = "false") boolean mine,
+                                      @RequestParam(required = false) String tag,
+                                      @RequestParam(required = false) String source) {
+        Map<String, Object> r = service.search(q, page, size, mine, tag, source);
         if (!fullAccess()) {
             r.put("content", ((List<?>) r.get("content")).stream().map(x -> reduced((Patient) x)).toList());
             r.put("restricted", true);
@@ -60,6 +62,11 @@ public class PatientController {
         m.put("phone", p.phone == null || p.phone.length() < 4 ? null : "*****" + p.phone.substring(p.phone.length() - 4));
         m.put("minor", p.isMinor());
         if (p.isMinor()) m.put("guardianName", p.guardianName);
+        // Caja emite la factura: necesita el RUC y la razón social, no el resto de la ficha.
+        m.put("fiscalRuc", p.fiscalRuc);
+        m.put("fiscalName", p.fiscalName);
+        m.put("fiscalAddress", p.fiscalAddress);
+        m.put("hcNumber", p.hcNumber);
         m.put("restricted", true);
         return m;
     }
@@ -78,6 +85,7 @@ public class PatientController {
         boolean clinical = auth != null && auth.getAuthorities().stream().anyMatch(a -> "HISTORIA_CLINICA".equals(a.getAuthority()));
         if (!clinical) {
             m.remove("clinicalAlerts");      // datos de salud: solo el personal asistencial (Ley 29733, datos sensibles)
+            m.remove("anamnesisAlerts");
             m.remove("pendingProcedures");
         }
         if (!fullAccess()) m.put("patient", reduced((Patient) m.get("patient")));

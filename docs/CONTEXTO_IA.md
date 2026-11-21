@@ -11,8 +11,8 @@ publicado en internet:
 
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
-- **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión actual **2.4.0**
-  (código 6). El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+- **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
+  (código 6); el sistema web va en la **2.5.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -41,14 +41,16 @@ negocio, muchas con `JdbcTemplate`) y entidades/repositorios JPA:
 y reserva por pasos) · `auth` (login, 2FA por app o correo, recuperación, `MailNotifier`) · `billing` (boletas y
 facturas UBL 2.1, envío a SUNAT, `InvoicePdf` con formato SUNAT y QR) · `care` (respuestas de WhatsApp,
 seguimiento, lista de espera, controles) · `cash` (caja, cobros, egresos) · `clinical` (historia clínica, odontograma
-FDI, planes, evoluciones, consentimientos firmados) · `commission` · `dashboard` · `files` (archivos, `SimplePdf`
+FDI, periodontograma, anamnesis por plantillas, signos vitales, planes, evoluciones, consentimientos firmados) · `commission` · `dashboard` · `files` (archivos, `SimplePdf`
 generador de PDF propio) · `inventory` (lotes FEFO, compras, solicitudes de insumos) · `notification` (bandeja de
-salida con reintentos) · `patient` (pacientes, menores con representante legal, UBIGEO, consulta RENIEC) ·
+salida con reintentos) · `patient` (pacientes, menores con representante legal, UBIGEO, consulta RENIEC, fuente de captación, etiquetas,
+N° de historia clínica, datos fiscales y familiares) ·
+`lab` (laboratorios y órdenes de laboratorio; el pago al laboratorio es un egreso de caja) ·
 `payment` (Mercado Pago, modo simulado) · `portal` (API del paciente: citas, historia, documentos, archivos
 solicitados, contacto) · `report` · `security` (JWT, roles y 17+ permisos editables) · `user` (usuarios y perfil).
 
-Base de datos: migraciones Flyway `V1`…`V15` en `backend/src/main/resources/db/migration/`. **Nunca edites una
-migración ya publicada**: crea la siguiente (`V16__descripcion.sql`). Errores de negocio con `ApiException`
+Base de datos: migraciones Flyway `V1`…`V16` en `backend/src/main/resources/db/migration/`. **Nunca edites una
+migración ya publicada**: crea la siguiente (`V17__descripcion.sql`). Errores de negocio con `ApiException`
 (`ApiException.field("campo", "mensaje")` para errores de formulario; el frontend los muestra bajo el campo).
 
 ### Frontend (`frontend/src/app/`)
@@ -74,7 +76,7 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Backend suelto: `cd backend && mvn -DskipTests package && java -jar target/app.jar` con las variables `DB_URL`,
   `DB_USER`, `DB_PASSWORD`… (ver `docker-compose.yml` y `application.yml`).
 - Pruebas unitarias: `cd backend && mvn test`.
-- Pruebas e2e (backend local con datos demo): `revision-profesor`, `portal-paciente`, `registro-legal`,
+- Pruebas e2e (backend local con datos demo): `revision-profesor`, `portal-paciente`, `version-2-5`, `registro-legal`,
   `logica-citas`, `asistente`, `completo`, `sprint1`. Algunas dependen de la hora del día (horarios libres).
 - Web: `cd frontend && npx ng build --configuration production` debe compilar sin errores.
 
@@ -99,9 +101,14 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.4.0)
+## Estado actual (noviembre 2026, versión 2.5.0)
 
-Recién agregado: portal y app con historia de tratamientos, pagos, ficha y consentimientos; archivos solicitados
+Versión 2.5.0: ficha del paciente con fuente de captación, etiquetas, N° de historia clínica, RUC para factura y
+familiares; anamnesis por plantillas editables (`/configuracion/anamnesis`) con alertas en la ficha; signos vitales;
+periodontograma con %IP y %SAS; órdenes de laboratorio (`/laboratorio`) con estados, pruebas y pagos por caja.
+Siguiente en la hoja de ruta: 2.6.0 (plantillas de mensajes, automatizaciones configurables, enlace público de citas).
+
+Versión 2.4.0: portal y app con historia de tratamientos, pagos, ficha y consentimientos; archivos solicitados
 (radiografías) que suben paciente, recepción o administración; confirmación de cita hasta 2 h antes con alerta a
 recepción para llamar; boleta/factura PDF con formato SUNAT adjunta al correo con su XML; QR de descarga de la app
 en el login; autocompletado con RENIEC al escribir el DNI (necesita `RENIEC_API_TOKEN`, ver `docs/CONSULTA_RENIEC.md`);
