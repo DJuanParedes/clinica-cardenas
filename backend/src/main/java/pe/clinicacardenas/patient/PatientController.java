@@ -19,7 +19,11 @@ public class PatientController {
     private final AppointmentRepository appointments;
     private final AuditService audit;
 
-    public PatientController(PatientService service, AppointmentRepository appointments, AuditService audit) {
+    private final pe.clinicacardenas.crm.PatientInsightsService insights;
+
+    public PatientController(PatientService service, AppointmentRepository appointments, AuditService audit,
+                             pe.clinicacardenas.crm.PatientInsightsService insights) {
+        this.insights = insights;
         this.service = service;
         this.appointments = appointments;
         this.audit = audit;
@@ -32,8 +36,17 @@ public class PatientController {
                                       @RequestParam(defaultValue = "20") int size,
                                       @RequestParam(defaultValue = "false") boolean mine,
                                       @RequestParam(required = false) String tag,
-                                      @RequestParam(required = false) String source) {
-        Map<String, Object> r = service.search(q, page, size, mine, tag, source);
+                                      @RequestParam(required = false) String source,
+                                      @RequestParam(required = false) String task,
+                                      @RequestParam(required = false) String next,
+                                      @RequestParam(required = false) String budget,
+                                      @RequestParam(required = false) Boolean debt,
+                                      @RequestParam(required = false) String visit) {
+        var extra = new pe.clinicacardenas.crm.SegmentFilter(null, null, null, null, null, null, visit, next, budget, debt, task, null, null, null).clean();
+        Map<String, Object> r = service.search(q, page, size, mine, tag, source, extra);
+        // v2.7: última y próxima cita, tarea pendiente, avance del presupuesto y saldo de cada paciente de la página
+        List<Long> ids = ((List<?>) r.get("content")).stream().map(x -> ((Patient) x).id).toList();
+        r.put("insights", insights.forPatients(ids));
         if (!fullAccess()) {
             r.put("content", ((List<?>) r.get("content")).stream().map(x -> reduced((Patient) x)).toList());
             r.put("restricted", true);
