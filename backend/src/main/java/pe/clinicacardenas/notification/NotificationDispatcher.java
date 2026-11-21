@@ -177,6 +177,7 @@ public class NotificationDispatcher {
                 payload.put("plantillaWa", n.waTemplate);
                 payload.put("parametrosWa", json.readValue(n.waParams, List.class));
             }
+            if (n.waButtons != null) payload.put("botonesWa", json.readValue(n.waButtons, List.class));
             if (n.patientId != null) {
                 // nombre del paciente y si es real o de ejemplo: el microservicio decide si lo envía de verdad
                 patients.findById(n.patientId).ifPresent(p -> {
