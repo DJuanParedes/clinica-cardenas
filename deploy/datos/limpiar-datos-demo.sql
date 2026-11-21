@@ -28,6 +28,14 @@ DELETE FROM surveys WHERE patient_id IN (SELECT id FROM demo_p) OR appointment_i
 DELETE FROM notifications WHERE patient_id IN (SELECT id FROM demo_p) OR appointment_id IN (SELECT id FROM demo_a);
 DELETE FROM assistant_bookings WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM file_requests WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE FROM patient_tags WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE FROM patient_relations WHERE patient_id IN (SELECT id FROM demo_p) OR related_patient_id IN (SELECT id FROM demo_p);
+DELETE FROM anamnesis_records WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE FROM vital_signs WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE FROM periodontograms WHERE patient_id IN (SELECT id FROM demo_p);
+DELETE e FROM lab_order_events e JOIN lab_orders o ON o.id = e.order_id WHERE o.patient_id IN (SELECT id FROM demo_p);
+DELETE pp FROM lab_order_payments pp JOIN lab_orders o ON o.id = pp.order_id WHERE o.patient_id IN (SELECT id FROM demo_p);
+DELETE FROM lab_orders WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM consent_records WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM portal_codes WHERE patient_id IN (SELECT id FROM demo_p);
 DELETE FROM patient_notices WHERE patient_id IN (SELECT id FROM demo_p);
