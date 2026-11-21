@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.8.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.9.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -101,7 +101,24 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.8.0)
+## Estado actual (noviembre 2026, versión 2.9.0)
+
+Versión 2.9.0: cumplimiento legal y operación real (migración V23).
+- Libro de Reclamaciones virtual (paquete `complaint`, permiso `RECLAMOS`: admin, dirección y recepción): página
+  pública `/libro-reclamaciones` (enlazada desde /reservar y el login) con los campos del Anexo I del DS 011-2011-PCM,
+  número correlativo por año (`2026-000001`) y código de consulta de 8 letras. No se condiciona a aceptar la política
+  de privacidad. Plazo en días hábiles (`reclamos_plazo_dias`, 15 por defecto; feriados nacionales + Semana Santa en
+  `ComplaintService.holiday`). Al registrar: copia en PDF al correo del consumidor, tarea ALTA (origen RECLAMO) y aviso
+  a `reclamos_correo_aviso`; recordatorio diario 8:00. Módulo /reclamos para responder (correo, domicilio o en la
+  clínica) y exportar el CSV del año. Consulta pública con código + documento.
+- Plantillas de WhatsApp propias (`NotificationService.WA_PROMOCION/WA_CUMPLEANOS/WA_DOCUMENTO`): campañas →
+  `novedad_clinica`, cumpleaños → `cumpleanos_clinica`, consentimientos → `documento_por_firmar`. Textos en
+  `docs/PLANTILLAS_WHATSAPP.md`; si Meta no las aprobó, se usa `aviso_clinica`.
+- Respaldo (`deploy/respaldo.sh`): base de datos + volumen de archivos, copia a Azure Blob con la identidad
+  administrada de la VM (`/etc/clinica-respaldo.conf` → `RESPALDO_BLOB`) y prueba de restauración los domingos en un
+  MySQL temporal (`/opt/clinica-respaldos/pruebas-restauracion.log`).
+- SUNAT configurable por `.env` (`SUNAT_URL`, certificado en `deploy/sunat/`); sin variables sigue el simulador.
+  Guía ANPD en `docs/PROTECCION_DATOS_ANPD.md`. Prueba: `pruebas/version-2-9-e2e.js`.
 
 Versión 2.8.0: operación y detalles de uso (migraciones V19 a V22).
 - Kardex valorizado (V19, permiso `INVENTARIO_COSTOS`): cada movimiento de `inventory_moves` guarda `unit_cost`,

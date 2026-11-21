@@ -19,3 +19,7 @@ sonar/.clave
 sonar/reporte-sonar.json
 sonar/resumen.txt
 sonar/analisis.log
+
+# Certificado digital de SUNAT (nunca al repositorio)
+deploy/sunat/*.p12
+deploy/sunat/*.pfx
