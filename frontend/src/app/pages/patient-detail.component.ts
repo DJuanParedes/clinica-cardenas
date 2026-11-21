@@ -1,3 +1,6 @@
+import { PatientFlagsComponent } from '../shared/patient-flags.component';
+import { OrthoTabComponent } from './clinical/ortho-tab.component';
+import { InformedConsentsComponent } from '../shared/informed-consents.component';
 import { TaskListComponent } from '../shared/task-list.component';
 import { MarketingConsentComponent } from '../shared/marketing-consent.component';
 import { Component, Input, OnChanges, inject } from '@angular/core';
@@ -21,12 +24,12 @@ import { PeriodontogramTabComponent } from './clinical/periodontogram-tab.compon
 import { LabOrdersComponent } from './lab-orders.component';
 import { PatientProfile } from '../core/api.service';
 
-type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' | 'laboratorio' | 'archivos' | 'cuenta';
+type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' | 'laboratorio' | 'ortodoncia' | 'archivos' | 'cuenta';
 
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent],
+  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent, PatientFlagsComponent, OrthoTabComponent, InformedConsentsComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -75,6 +78,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
           </div>
         </header>
 
+        <app-patient-flags [patientId]="p.id" />
         @if (clinical && anamAlerts.length) {
           <div class="notice gum anam" role="alert"><app-icon name="alert" /><div>@for (a of anamAlerts; track a) { <div class="strong">{{ a }}</div> }</div></div>
         }
@@ -103,6 +107,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
             <a [class.on]="tab === 'periodontograma'" (click)="go('periodontograma')">Periodontograma</a>
           }
           @if (canPlan) { <a [class.on]="tab === 'plan'" (click)="go('plan')">Plan de tratamiento</a> }
+          @if (clinical) { <a [class.on]="tab === 'ortodoncia'" (click)="go('ortodoncia')">Ortodoncia</a> }
           @if (auth.can('LABORATORIO')) { <a [class.on]="tab === 'laboratorio'" (click)="go('laboratorio')">Laboratorio</a> }
           <a [class.on]="tab === 'archivos'" (click)="go('archivos')">Fotos y documentos</a>
           @if (canAccount) { <a [class.on]="tab === 'cuenta'" (click)="go('cuenta')">Cuenta y pagos</a> }
@@ -126,7 +131,11 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
           @case ('plan') { <app-plan-tab [patientId]="p.id" /> }
           @case ('laboratorio') { <app-lab-orders [patientId]="p.id" /> }
           @case ('cuenta') { <app-account-tab [patientId]="p.id" /> }
-          @case ('archivos') { <app-files-tab [patientId]="p.id" [patientName]="p.fullName" /> }
+          @case ('ortodoncia') { <app-ortho-tab [patientId]="p.id" /> }
+          @case ('archivos') {
+            @if (auth.can('HISTORIA_CLINICA', 'PACIENTES_EDITAR')) { <app-informed-consents [patientId]="p.id" [patientName]="p.fullName" /> }
+            <app-files-tab [patientId]="p.id" [patientName]="p.fullName" />
+          }
           @default {
             <div class="grid summary">
               <section class="panel">
@@ -339,7 +348,7 @@ export class PatientDetailComponent implements OnChanges {
   get canAccount(): boolean { return this.auth.can('CAJA_COBRAR'); }
 
   ngOnChanges() {
-    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, periodontograma: this.clinical, laboratorio: this.auth.can('LABORATORIO'), plan: this.canPlan, archivos: true, cuenta: this.canAccount };
+    const allowed: Record<string, boolean> = { resumen: true, historia: this.clinical, odontograma: this.clinical, periodontograma: this.clinical, laboratorio: this.auth.can('LABORATORIO'), ortodoncia: this.clinical, plan: this.canPlan, archivos: true, cuenta: this.canAccount };
     if (!this.tab || !allowed[this.tab]) this.tab = 'resumen';
     const id = +this.id;
     if (this.p?.id === id) return;

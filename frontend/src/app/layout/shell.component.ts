@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { HostListener, Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../core/auth.service';
@@ -21,6 +21,8 @@ const NAV: NavGroup[] = [
     { path: '/seguimiento', label: 'Seguimiento', icon: 'activity', perms: ['AGENDA_VER'] },
     { path: '/embudo', label: 'Embudo de ventas', icon: 'funnel', perms: ['LEADS'] },
     { path: '/mis-ganancias', label: 'Mis ganancias', icon: 'coins', perms: [], roles: ['ODONTOLOGO'] },
+    { path: '/ortodoncia', label: 'Ortodoncia', icon: 'tooth', perms: ['HISTORIA_CLINICA'] },
+    { path: '/consentimientos', label: 'Consentimientos', icon: 'clipboard', perms: ['HISTORIA_CLINICA', 'PACIENTES_EDITAR'] },
     { path: '/laboratorio', label: 'Laboratorio', icon: 'tooth', perms: ['LABORATORIO', 'CAJA_EGRESOS'] },
     { path: '/inventario', label: 'Inventario', icon: 'clipboard', perms: ['INVENTARIO'] },
     { path: '/insumos', label: 'Solicitar insumos', icon: 'box', perms: ['SOLICITAR_INSUMOS'] },
@@ -61,8 +63,18 @@ const NAV: NavGroup[] = [
           </span>
         </a>
 
-        @if (canCreateAppointment()) {
-          <a class="btn accent block quick" routerLink="/citas/nueva"><app-icon name="plus" [size]="16" [stroke]="2.2" /> Nueva cita</a>
+        @if (createItems().length) {
+          <div class="create" (click)="$event.stopPropagation()">
+            <button type="button" class="btn accent block quick" [attr.aria-expanded]="createOpen" aria-haspopup="menu" (click)="createOpen = !createOpen">
+              <app-icon name="plus" [size]="16" [stroke]="2.2" /> Crear</button>
+            @if (createOpen) {
+              <div class="create-menu" role="menu">
+                @for (c of createItems(); track c.path + (c.q || '')) {
+                  <a role="menuitem" [routerLink]="c.path" [queryParams]="c.params" (click)="createOpen = false"><app-icon [name]="c.icon" [size]="16" /> {{ c.label }}</a>
+                }
+              </div>
+            }
+          </div>
         }
 
         <nav aria-label="Navegación principal">
@@ -122,6 +134,11 @@ const NAV: NavGroup[] = [
     .nav { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px;
       color: var(--ink-2); font-size: 14px; font-weight: 600; }
     .nav:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+    .create { position: relative; }
+    .create-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 50; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 14px; box-shadow: 0 16px 40px -18px rgba(11, 40, 60, .45); padding: 6px; display: grid; }
+    .create-menu a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--ink); font-weight: 600; font-size: 14px; text-decoration: none; }
+    .create-menu a:hover { background: var(--teal-soft); color: var(--teal-strong); }
     .badge.tasks { background: var(--gum); }
     .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #25d366; color: #fff;
       font-size: 11.5px; font-weight: 800; display: grid; place-items: center; }
@@ -166,7 +183,25 @@ export class ShellComponent implements OnDestroy {
     return NAV.map((g) => ({ title: g.title, items: g.items.filter(ok) })).filter((g) => g.items.length);
   });
   canCreateAppointment = computed(() => !!this.auth.user() && this.auth.can('CITAS_GESTIONAR'));
+  /** v2.8: botón global "Crear" con lo que cada rol puede registrar. */
+  createOpen = false;
+  createItems = computed(() => {
+    if (!this.auth.user()) return [];
+    const all: { label: string; icon: string; path: string; params?: any; q?: string; perm: string }[] = [
+      { label: 'Nueva cita', icon: 'calendar', path: '/citas/nueva', perm: 'CITAS_GESTIONAR' },
+      { label: 'Registrar paciente', icon: 'patient', path: '/pacientes/nuevo', perm: 'PACIENTES_EDITAR' },
+      { label: 'Nueva tarea', icon: 'checks', path: '/tareas', params: { nueva: 1 }, q: 't', perm: 'TAREAS' },
+      { label: 'Registrar cobro', icon: 'wallet', path: '/caja/cobro', perm: 'CAJA_COBRAR' },
+      { label: 'Emitir comprobante', icon: 'receipt', path: '/comprobantes/nuevo', perm: 'COMPROBANTES' },
+      { label: 'Nuevo lead', icon: 'funnel', path: '/embudo', params: { nuevo: 1 }, q: 'l', perm: 'LEADS' },
+      { label: 'Nueva campaña', icon: 'megaphone', path: '/marketing', params: { vista: 'campanas', nueva: 1 }, q: 'c', perm: 'MARKETING' },
+    ];
+    return all.filter((c) => this.auth.can(c.perm));
+  });
   ini = computed(() => initials(this.auth.user()?.fullName));
+
+  @HostListener('document:click') closeCreate() { this.createOpen = false; }
+  @HostListener('document:keydown.escape') escCreate() { this.createOpen = false; }
 
   constructor() {
     this.auth.refresh(); // permisos al día (HU-26)
