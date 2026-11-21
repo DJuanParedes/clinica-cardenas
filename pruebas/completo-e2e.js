@@ -341,8 +341,9 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
       } finally {
         await fetch(NOTIF + '/admin/modo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"modo":"normal"}' });
       }
-      const n = await waitFor((l) => l.filter((x) => x.appointmentId === a2.id).every((x) => x.status === 'PROGRAMADO'), 70000);
-      expect(n.filter((x) => x.appointmentId === a2.id).every((x) => x.status === 'PROGRAMADO'), 'no se reintentó');
+      const done = (x) => (x.operation === 'PROGRAMAR' ? x.status === 'PROGRAMADO' : ['ENVIADO', 'ENTREGADO', 'LEIDO'].includes(x.status));
+      const n = await waitFor((l) => l.filter((x) => x.appointmentId === a2.id).every(done), 70000);
+      expect(n.filter((x) => x.appointmentId === a2.id).every(done), 'no se reintentó: ' + n.filter((x) => x.appointmentId === a2.id).map((x) => x.type + '/' + x.status));
       return 'PENDIENTE → PROGRAMADO tras el reintento';
     });
   }

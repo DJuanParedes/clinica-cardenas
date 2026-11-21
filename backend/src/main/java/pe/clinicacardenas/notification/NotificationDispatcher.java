@@ -137,8 +137,30 @@ public class NotificationDispatcher {
         final String fStatus = status, fError = error, fProvider = providerId;
         final LocalDateTime fSent = sentAt;
         final boolean fRetry = retry;
-        tx.executeWithoutResult(s -> repo.findById(id).ifPresent(x -> {
-            if (!"PENDIENTE".equals(x.status)) return; // anulada mientras se enviaba
+        tx.executeWithoutResult(s -> repo.lockById(id).ifPresent(x -> {
+            if (!"PENDIENTE".equals(x.status)) {
+                // Anulada mientras se enviaba: si el microservicio alcanzó a programarla, se pide anularla allá también.
+                if ("ANULADO".equals(x.status) && "PROGRAMAR".equals(x.operation) && "PROGRAMADO".equals(fStatus)) {
+                    String key = "anular:" + x.idempotencyKey;
+                    if (!repo.existsByIdempotencyKey(key)) {
+                        Notification c = new Notification();
+                        c.patientId = x.patientId;
+                        c.appointmentId = x.appointmentId;
+                        c.type = "RECORDATORIO";
+                        c.operation = "ANULAR";
+                        c.channel = x.channel;
+                        c.destination = x.destination;
+                        c.subject = "Anular recordatorio";
+                        c.body = "Se anula el recordatorio " + x.idempotencyKey;
+                        c.idempotencyKey = key;
+                        c.status = "PENDIENTE";
+                        c.createdAt = Dates.now();
+                        repo.save(c);
+                        again.set(true);
+                    }
+                }
+                return;
+            }
             x.attempts++;
             x.updatedAt = Dates.now();
             x.lastError = fError;

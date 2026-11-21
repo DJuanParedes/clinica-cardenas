@@ -1,7 +1,9 @@
 package pe.clinicacardenas.notification;
 
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,6 +23,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
            """)
     List<Notification> findDue(@Param("now") LocalDateTime now, Pageable page);
 
+    /** Bloquea las filas: así la anulación no se cruza con un envío en curso del despachador. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Notification> findByAppointmentIdAndOperationAndStatusIn(Long appointmentId, String operation, List<String> statuses);
 
     List<Notification> findByPatientIdOrderByCreatedAtDesc(Long patientId);
@@ -28,4 +32,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findAllByOrderByCreatedAtDesc(Pageable page);
 
     long countByStatus(String status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select n from Notification n where n.id = :id")
+    Optional<Notification> lockById(@Param("id") Long id);
 }
