@@ -40,7 +40,8 @@ export function parseLocal(iso: string): Date {
   // "2026-11-05T09:30:00" o "2026-11-05" interpretados como hora local
   const [d, t] = iso.split('T');
   const [y, m, day] = d.split('-').map(Number);
-  const [hh, mm, ss] = (t || '00:00:00').split(':').map((x) => parseInt(x, 10) || 0);
+  // los segundos pueden faltar ("2026-11-24T10:00", así serializa Java cuando son 0)
+  const [hh = 0, mm = 0, ss = 0] = (t || '00:00:00').split(':').map((x) => parseInt(x, 10) || 0);
   return new Date(y, m - 1, day, hh, mm, ss);
 }
 
