@@ -335,7 +335,7 @@ public class DeletionService {
         }
         int cancelled = cancelPendingMessages(p, x.table(), id);
         for (String[] d : p.deletes) jdbc.update("delete from " + d[0] + WHERE + d[1], params(d[2]));
-        if (cancelled > 0) events.publishEvent(new pe.clinicacardenas.notification.NotificationService.Queued());
+        if (cancelled > 0) events.publishEvent(pe.clinicacardenas.notification.NotificationService.Queued.INSTANCE);
 
         String summary = p.counts.isEmpty() ? "Solo el registro" : "Con él: " + p.counts.entrySet().stream()
                 .map(en -> en.getValue() + " " + en.getKey()).reduce((a, b) -> a + ", " + b).orElse("");

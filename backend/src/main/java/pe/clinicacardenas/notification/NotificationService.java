@@ -82,7 +82,7 @@ public class NotificationService {
     }
 
     /** Evento que dispara el envío inmediato una vez confirmada la transacción. */
-    public record Queued() {}
+    public enum Queued { INSTANCE }
 
     public record Target(String channel, String destination) {}
 
@@ -209,7 +209,7 @@ public class NotificationService {
         n.status = PENDIENTE;
         n.createdAt = Dates.now();
         repo.save(n);
-        events.publishEvent(new Queued());
+        events.publishEvent(Queued.INSTANCE);
     }
 
     // ------------------------------------------------------------------ v2.6: plantillas editables
@@ -448,7 +448,7 @@ public class NotificationService {
                 if (!repo.existsByIdempotencyKey(cancel.idempotencyKey)) repo.save(cancel);
             }
         }
-        events.publishEvent(new Queued());
+        events.publishEvent(Queued.INSTANCE);
     }
 
     // ------------------------------------------------------------------ eventos de la agenda
@@ -564,7 +564,7 @@ public class NotificationService {
         copy.createdAt = Dates.now();
         repo.save(copy);
         audit.register("NOTIFICACION", copy.id, "REENVIAR", n.type + " por " + n.channel + " a " + n.destination);
-        events.publishEvent(new Queued());
+        events.publishEvent(Queued.INSTANCE);
         return copy;
     }
 

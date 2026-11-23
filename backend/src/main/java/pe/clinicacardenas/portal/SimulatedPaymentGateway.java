@@ -20,7 +20,7 @@ public class SimulatedPaymentGateway {
 
     public record Result(String operationId, String reference) {}
 
-    public Result charge(Charge c, java.math.BigDecimal amount) {
+    public Result charge(Charge c) {
         String op = "SIM-" + (100000 + random.nextInt(900000));
         switch (c.method()) {
             case "YAPE", "PLIN" -> {

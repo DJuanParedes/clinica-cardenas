@@ -47,7 +47,7 @@ public class MailNotifier {
     }
 
     /** Correo HTML con un adjunto opcional (p. ej. el XML del comprobante). Devuelve false si quedó simulado o falló. */
-    public boolean sendHtml(String to, String subject, String html, String attachmentName, byte[] attachment, String attachmentType) {
+    public boolean sendHtml(String to, String subject, String html, String attachmentName, byte[] attachment) {
         java.util.Map<String, byte[]> m = new java.util.LinkedHashMap<>();
         if (attachmentName != null && attachment != null) m.put(attachmentName, attachment);
         return sendHtml(to, subject, html, m);

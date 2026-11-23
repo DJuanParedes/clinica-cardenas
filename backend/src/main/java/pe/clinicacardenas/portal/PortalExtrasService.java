@@ -259,7 +259,7 @@ public class PortalExtrasService {
         if (amount.compareTo(balance) > 0) throw ApiException.field(AMOUNT, "El monto supera tu saldo pendiente (S/ " + balance.toPlainString() + ").");
         String method = r.method() == null ? "" : r.method().trim().toUpperCase();
         SimulatedPaymentGateway.Result res = gateway.charge(new SimulatedPaymentGateway.Charge(method, r.approvalCode(),
-                r.cardNumber(), r.cardExpiry(), r.cardCvv()), amount);
+                r.cardNumber(), r.cardExpiry(), r.cardCvv()));
         Map<String, Object> paid = cash.registerPayment(new CashService.PaymentRequest(p.id, null, amount, method,
                 res.operationId(), "Pago en línea desde la app · " + res.reference()));
         Map<String, Object> out = new LinkedHashMap<>();

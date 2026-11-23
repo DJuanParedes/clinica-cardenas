@@ -226,7 +226,7 @@ public class ComplaintService {
                             + " en el Libro de Reclamaciones de " + esc(tradeName) + " con el <b>N.° " + label + "</b> (código de consulta <b>"
                             + code + "</b>). Adjuntamos la copia de tu hoja.</p><p>Te responderemos a más tardar el <b>"
                             + due.format(DMY) + "</b>.</p><p>Atentamente,<br>" + esc(businessName) + " · RUC " + ruc + "</p>",
-                    "hoja-reclamacion-" + label + ".pdf", pdf(c), "application/pdf");
+                    "hoja-reclamacion-" + label + ".pdf", pdf(c));
             if (sent) jdbc.update("update complaints set copy_sent = true where id = ?", id);
         }
         String notice = setting(RECLAMOS_CORREO_AVISO, "");
@@ -349,7 +349,7 @@ public class ComplaintService {
                             + ((String) c.get("kind")).toLowerCase(Locale.ROOT) + N + c.get(NUMBER) + ":</p><blockquote>"
                             + esc(response).replace("\n", "<br>") + "</blockquote><p>Adjuntamos la hoja completa.</p><p>Atentamente,<br>"
                             + esc(businessName) + " · RUC " + ruc + "</p>",
-                    "respuesta-reclamacion-" + c.get(NUMBER) + ".pdf", pdf(done), "application/pdf");
+                    "respuesta-reclamacion-" + c.get(NUMBER) + ".pdf", pdf(done));
             if (ok) jdbc.update("update complaints set response_sent = true where id = ?", id);
         }
         audit.register(RECLAMO, id, "RESPONDER", c.get(NUMBER) + " · " + channel.toLowerCase(Locale.ROOT));

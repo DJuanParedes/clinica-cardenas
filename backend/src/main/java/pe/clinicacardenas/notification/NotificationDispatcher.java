@@ -35,6 +35,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component
 public class NotificationDispatcher {
+    private static final String PATH_MESSAGES = "/v1/mensajes";
+    private static final String PATH_REMINDERS = "/v1/recordatorios";
     private static final String ANULADO = "ANULADO";
     private static final String ANULAR = "ANULAR";
     private static final String ENTREGADO_2 = "ENTREGADO";
@@ -223,9 +225,9 @@ public class NotificationDispatcher {
                     payload.put("paciente", pac);
                 });
             }
-            String path = "/v1/mensajes";
+            String path = PATH_MESSAGES;
             if (PROGRAMAR.equals(n.operation)) {
-                path = "/v1/recordatorios";
+                path = PATH_REMINDERS;
                 payload.put("enviarEn", n.scheduledFor == null ? null : n.scheduledFor.atZone(Dates.ZONE).toOffsetDateTime().toString());
             }
             b = HttpRequest.newBuilder(URI.create(baseUrl + path))
