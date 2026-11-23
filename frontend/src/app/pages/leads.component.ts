@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -13,7 +14,7 @@ import { TaskListComponent } from '../shared/task-list.component';
 @Component({
   selector: 'app-leads',
   standalone: true,
-  imports: [FormsModule, RouterLink, ModalComponent, PatientPickerComponent, TaskListComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, PatientPickerComponent, TaskListComponent],
   template: `
     <div class="page wide">
       <header class="page-head">
@@ -152,7 +153,7 @@ import { TaskListComponent } from '../shared/task-list.component';
               </dd>
               @if (lead.notes) { <dt>Notas</dt><dd>{{ lead.notes }}</dd> }
             </dl>
-            <div class="row"><button class="btn sm ghost" type="button" (click)="editLead()">Editar datos</button></div>
+            <div class="row"><button class="btn sm ghost" type="button" (click)="editLead()">Editar datos</button> <app-delete-button entity="leads" [recordId]="lead.id" what="Oportunidad" (deleted)="lead = null; load()" /></div>
             <form class="note" (ngSubmit)="addNote()"><input class="input" name="nt" [(ngModel)]="note" maxlength="500" placeholder="Anotar algo (llamada, respuesta, precio enviado…)" /><button class="btn sm" type="submit" [disabled]="!note.trim()">Anotar</button></form>
             <ul class="tl">
               @for (e of lead.events; track $index) { <li><span class="muted small">{{ dt(e.createdAt) }} · {{ e.createdBy }}</span><div>{{ e.detail }}</div></li> }

@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -11,7 +12,7 @@ import { TaskFormComponent } from '../shared/task-form.component';
 @Component({
   selector: 'app-tasks',
   standalone: true,
-  imports: [FormsModule, RouterLink, ModalComponent, TaskFormComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -67,6 +68,7 @@ import { TaskFormComponent } from '../shared/task-form.component';
                       @if (!t.assignee || t.assignee.id !== me) { <button class="btn sm ghost" type="button" (click)="take(t)">Tomarla</button> }
                       <button class="btn sm ghost" type="button" (click)="edit = t; formOpen = true">Editar</button>
                     } @else { <button class="btn sm ghost" type="button" (click)="reopen(t)">Reabrir</button> }
+                    <app-delete-button entity="tasks" [recordId]="t.id" what="Tarea" [iconOnly]="true" [ghost]="true" (deleted)="load()" />
                   </div>
                 </div>
               }

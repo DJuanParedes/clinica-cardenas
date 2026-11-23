@@ -114,7 +114,7 @@ const INTENT_LABEL: Record<string, string> = {
                 <div class="fa">
                   <label class="small"><input type="checkbox" [checked]="f.active" (change)="toggleFaq(f)" [disabled]="!canConfigure" /> Activa</label>
                   <button class="btn ghost sm" type="button" (click)="editFaq(f)" [disabled]="!canConfigure"><app-icon name="edit" [size]="14" /> Editar</button>
-                  <button class="btn ghost sm danger" type="button" (click)="removeFaq(f)" [disabled]="!canConfigure"><app-icon name="x" [size]="14" /> Eliminar</button>
+                  @if (auth.can('ELIMINAR_REGISTROS')) { <button class="btn ghost sm danger" type="button" (click)="removeFaq(f)"><app-icon name="trash" [size]="14" /> Eliminar</button> }
                 </div>
               </div>
             } @empty { <p class="muted small">Sin preguntas frecuentes.</p> }
@@ -291,7 +291,7 @@ const INTENT_LABEL: Record<string, string> = {
 export class MessagesComponent implements OnInit, OnDestroy {
   private api = inject(Api);
   private toast = inject(ToastService);
-  private auth = inject(AuthService);
+  auth = inject(AuthService);
   @ViewChild('msgs') msgsRef?: ElementRef<HTMLDivElement>;
 
   threads: ConversationThread[] = [];

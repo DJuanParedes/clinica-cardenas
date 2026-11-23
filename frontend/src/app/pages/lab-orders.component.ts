@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -23,7 +24,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
 @Component({
   selector: 'app-lab-orders',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
   template: `
     <div [class.page]="!patientId">
       @if (!patientId) {
@@ -107,7 +108,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
                   <td>{{ l.contact || '—' }}<div class="muted small">{{ l.phone }}{{ l.email ? ' · ' + l.email : '' }}</div></td>
                   <td class="right tabular">{{ l.inProgress }}</td>
                   <td class="right tabular" [class.red]="l.balance > 0">{{ money(l.balance) }}</td>
-                  <td class="right">@if (canEdit) { <button class="btn ghost sm" type="button" (click)="openLab(l)"><app-icon name="edit" [size]="14" /></button> }</td>
+                  <td class="right">@if (canEdit) { <button class="btn ghost sm" type="button" (click)="openLab(l)"><app-icon name="edit" [size]="14" /></button> } <app-delete-button entity="laboratories" [recordId]="l.id" what="Laboratorio" [iconOnly]="true" [ghost]="true" (deleted)="loadLabs()" /></td>
                 </tr>
               } @empty { <tr><td colspan="5" class="muted center">Agrega los laboratorios con los que trabaja la clínica.</td></tr> }
             </tbody>
@@ -181,7 +182,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
         <div class="det">
           <div class="row wrap gap"><span [class]="'tag ' + st(d.status).tone">{{ st(d.status).label }}</span>
             @if (d.overdue) { <span class="tag gum">Atrasada</span> }
-            @if (!patientId) { <a class="link small" [routerLink]="['/pacientes', d.patientId]" [queryParams]="{ tab: 'laboratorio' }" (click)="d = null">Ver ficha del paciente</a> }</div>
+            @if (!patientId) { <a class="link small" [routerLink]="['/pacientes', d.patientId]" [queryParams]="{ tab: 'laboratorio' }" (click)="d = null">Ver ficha del paciente</a> } <app-delete-button entity="lab_orders" [recordId]="d.id" what="Orden de laboratorio" (deleted)="d = null; load()" /></div>
           <dl class="kv">
             <dt>Trabajo</dt><dd>{{ d.description }}{{ d.teeth ? ' · piezas ' + d.teeth : '' }}</dd>
             @if (d.shade || d.material) { <dt>Color / material</dt><dd>{{ d.shade || '—' }} · {{ d.material || '—' }}</dd> }

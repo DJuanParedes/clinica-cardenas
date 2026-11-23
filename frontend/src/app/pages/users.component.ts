@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -24,7 +25,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, RouterLink],
+  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, RouterLink],
   template: `
     <div class="page">
       <div class="page-head">
@@ -69,6 +70,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
                       @if (u.locked && u.active) { <button class="btn sm" type="button" (click)="unlock(u)"><app-icon name="unlock" [size]="14" /> Desbloquear</button> }
                       <button class="btn sm ghost" type="button" (click)="viewing = u"><app-icon name="eye" [size]="14" /> Ver</button>
                       <button class="btn sm" type="button" (click)="openEdit(u)"><app-icon name="edit" [size]="14" /> Editar</button>
+                      @if (u.username !== myUsername) { <app-delete-button entity="users" [recordId]="u.id" what="Usuario" [iconOnly]="true" [ghost]="true" (deleted)="load()" /> }
                     </div>
                   </td>
                 </tr>
@@ -283,6 +285,7 @@ export class UsersComponent implements OnInit {
   private api = inject(Api);
   private toast = inject(ToastService);
   auth = inject(AuthService);
+  get myUsername() { return this.auth.user()?.username; }
 
   users: any[] = [];
   roles: { code: string; label: string }[] = [];

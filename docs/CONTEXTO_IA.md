@@ -100,8 +100,25 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Comprobantes: formato SUNAT (UBL 2.1, serie B001/F001, QR, importe en letras). SUNAT hoy es simulada.
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
+- Roles y permisos: solo el rol ADMIN (`RoleController` usa `hasRole('ADMIN')`, no un permiso asignable). Eliminar
+  registros: permiso `ELIMINAR_REGISTROS` (solo admin por defecto). Nunca se borran comprobantes, reclamos,
+  consentimientos informados firmados, pagos vigentes ni días de caja cerrados.
 
-## Estado actual (noviembre 2026, versión 2.10.1)
+## Estado actual (noviembre 2026, versión 2.11.0)
+
+Versión 2.11.0 (migración V26): control total del administrador.
+- Roles: renombrar y describir cualquier rol (también los del sistema), ocultar roles sin usuarios (`roles.hidden`,
+  no salen al asignar), crear copiando permisos de cualquier rol o vacío (`copyFrom`), eliminar roles propios pasando
+  antes sus usuarios a otro (`?reassignTo=`). Los roles del sistema no se borran (el código usa su enum). Permisos:
+  editar nombre, grupo y descripción (`PATCH /api/permissions/catalog/{code}`); el código no cambia. `ROLES` es
+  exclusivo del administrador (`PermissionService.ADMIN_ONLY`).
+- Eliminar registros (`admin/DeletionService`, `/api/admin/records/{entidad}/{id}/preview|delete`): arma un plan con las
+  llaves foráneas reales: lo dependiente se borra, las referencias opcionales quedan en blanco y `ALWAYS_KEEP` bloquea
+  lo que debe conservarse. Se confirma escribiendo ELIMINAR; copia completa en `deleted_records` (pantalla /papelera,
+  descarga JSON). En la web: `app-delete-button` (solo visible con el permiso) y un diálogo único en la raíz.
+  Los borrados que ya existían (archivos, notas, signos vitales, preguntas del asistente, segmentos) también exigen
+  `ELIMINAR_REGISTROS`. Prueba: `pruebas/version-2-11-e2e.js`.
+
 
 Versión 2.10.1 (migración V25): cuadre y cierre de caja (`CashClosingService`, `/caja/cierre`, permisos `CAJA_CIERRE`
 para admin y caja, `CAJA_REABRIR` para admin y dirección). Esperado por medio = fondo + cobros − egresos; conteo por

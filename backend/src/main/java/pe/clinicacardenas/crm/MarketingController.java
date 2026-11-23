@@ -38,7 +38,7 @@ public class MarketingController {
     public Map<String, Object> update(@PathVariable Long id, @RequestBody MarketingService.SegmentRequest r) { return marketing.saveSegment(id, r); }
 
     @DeleteMapping("/marketing/segments/{id}")
-    @PreAuthorize("hasAuthority('MARKETING')")
+    @PreAuthorize("hasAuthority('ELIMINAR_REGISTROS')")
     public Map<String, Object> delete(@PathVariable Long id) { marketing.deleteSegment(id); return Map.of("ok", true); }
 
     @PostMapping("/marketing/segments/tasks")

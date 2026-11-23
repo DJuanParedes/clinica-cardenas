@@ -59,6 +59,7 @@ public class AnamnesisController {
     }
 
     @DeleteMapping("/patients/{id}/vitals/{vitalId}")
+    @PreAuthorize("hasAuthority('ELIMINAR_REGISTROS')")
     public List<Map<String, Object>> deleteVitals(@PathVariable Long id, @PathVariable Long vitalId) {
         return service.deleteVitals(id, vitalId);
     }

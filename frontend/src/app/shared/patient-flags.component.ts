@@ -35,7 +35,7 @@ import { ModalComponent } from './modal.component';
           <li [class]="'t-' + n.tone">
             <div class="grow"><div>{{ n.text }}</div><div class="muted small">{{ n.updatedBy || n.createdBy }} · {{ dt(n.updatedAt || n.createdAt) }}</div></div>
             <label class="check small"><input type="checkbox" [checked]="n.pinned" (change)="toggle(n)" /> Fijada</label>
-            <button class="btn sm ghost" type="button" (click)="del(n)" aria-label="Borrar nota">Borrar</button>
+            @if (auth.can('ELIMINAR_REGISTROS')) { <button class="btn sm ghost" type="button" (click)="del(n)" aria-label="Borrar nota">Borrar</button> }
           </li>
         } @empty { <li class="muted small">Sin notas.</li> }
       </ul>

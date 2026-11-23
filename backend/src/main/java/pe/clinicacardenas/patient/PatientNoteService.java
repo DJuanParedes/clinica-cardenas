@@ -80,7 +80,7 @@ public class PatientNoteService {
     }
 
     @DeleteMapping("/notes/{id}")
-    @PreAuthorize("hasAnyAuthority('PACIENTES_EDITAR','HISTORIA_CLINICA')")
+    @PreAuthorize("hasAuthority('ELIMINAR_REGISTROS')")
     @Transactional
     public Map<String, Object> delete(@PathVariable Long patientId, @PathVariable Long id) {
         if (jdbc.update("update patient_notes set deleted_at = ?, deleted_by = ? where id = ? and patient_id = ? and deleted_at is null",

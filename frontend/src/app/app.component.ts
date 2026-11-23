@@ -1,13 +1,15 @@
 import { Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToastService } from './core/toast.service';
+import { DeleteDialogComponent } from './shared/delete-dialog.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, DeleteDialogComponent],
   template: `
     <router-outlet />
+    <app-delete-dialog />
     <div class="toasts" aria-live="polite">
       @for (t of toast.items(); track t.id) {
         <div class="toast" [class]="'toast ' + t.kind" role="status">

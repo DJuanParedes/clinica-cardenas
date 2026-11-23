@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { InventoryCostsComponent } from './inventory-costs.component';
 import { AuthService } from '../core/auth.service';
 import { Component, OnInit, inject } from '@angular/core';
@@ -16,7 +17,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent, InventoryCostsComponent],
+  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent, InventoryCostsComponent],
   template: `
     <div class="page">
       <header class="page-head spread">
@@ -228,6 +229,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
       }
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="lotsFor = null">Cerrar</button>
+        @if (lotsFor) { <app-delete-button entity="inventory_items" [recordId]="lotsFor.id" what="Material" [small]="false" (deleted)="lotsFor = null; load()" /> }
         @if (lotsFor) { <button class="btn primary" type="button" (click)="edit(lotsFor); lotsFor = null">Editar material</button> }
       </ng-container>
     </app-modal>

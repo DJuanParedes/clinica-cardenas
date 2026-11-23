@@ -59,7 +59,7 @@ public class FileController {
     }
 
     @DeleteMapping("/files/{id}")
-    @PreAuthorize("hasAuthority('HISTORIA_CLINICA')")
+    @PreAuthorize("hasAuthority('ELIMINAR_REGISTROS')")
     public Map<String, String> delete(@PathVariable Long id) {
         service.delete(id);
         return Map.of("message", "Archivo eliminado.");

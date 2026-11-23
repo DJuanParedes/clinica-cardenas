@@ -45,6 +45,7 @@ const NAV: NavGroup[] = [
   { title: 'Seguridad', items: [
     { path: '/usuarios', label: 'Personal', icon: 'shield', perms: ['USUARIOS'] },
     { path: '/roles', label: 'Roles y permisos', icon: 'key', perms: ['ROLES'] },
+    { path: '/papelera', label: 'Papelera', icon: 'trash', perms: ['ELIMINAR_REGISTROS'] },
     { path: '/perfil', label: 'Mi perfil', icon: 'user', perms: [] },
     { path: '/seguridad', label: 'Mi seguridad (2 pasos)', icon: 'lock', perms: [] },
   ] },

@@ -70,6 +70,7 @@ export const routes: Routes = [
       { path: 'reportes', canActivate: [permGuard('REPORTES')], loadComponent: () => import('./pages/reports.component').then((m) => m.ReportsComponent), title: T('Indicadores') },
       { path: 'notificaciones', canActivate: [permGuard('NOTIFICACIONES')], loadComponent: () => import('./pages/notifications.component').then((m) => m.NotificationsComponent), title: T('Notificaciones') },
       { path: 'usuarios', canActivate: [permGuard('USUARIOS')], loadComponent: () => import('./pages/users.component').then((m) => m.UsersComponent), title: T('Usuarios') },
+      { path: 'papelera', canActivate: [permGuard('ELIMINAR_REGISTROS')], loadComponent: () => import('./pages/trash.component').then((m) => m.TrashComponent), title: T('Papelera') },
       { path: 'roles', canActivate: [permGuard('ROLES')], loadComponent: () => import('./pages/roles.component').then((m) => m.RolesComponent), title: T('Roles y permisos') },
       { path: 'inventario', canActivate: [permGuard('INVENTARIO')], loadComponent: () => import('./pages/inventory.component').then((m) => m.InventoryComponent), title: T('Inventario') },
       { path: 'mensajes', canActivate: [permGuard('MENSAJES')], loadComponent: () => import('./pages/messages.component').then((m) => m.MessagesComponent), title: T('Mensajes de WhatsApp') },
