@@ -9,11 +9,8 @@ import pe.clinicacardenas.pacientes.data.remote.AccountDto
 import pe.clinicacardenas.pacientes.data.remote.ActivateRequest
 import pe.clinicacardenas.pacientes.data.remote.ApiClient
 import pe.clinicacardenas.pacientes.data.remote.ApiException
-import pe.clinicacardenas.pacientes.data.remote.AppointmentDto
-import pe.clinicacardenas.pacientes.data.remote.AppointmentsDto
 import pe.clinicacardenas.pacientes.data.remote.CodeRequest
 import pe.clinicacardenas.pacientes.data.remote.CodeResponse
-import pe.clinicacardenas.pacientes.data.remote.DentistDto
 import pe.clinicacardenas.pacientes.data.remote.LoginRequest
 import pe.clinicacardenas.pacientes.data.remote.PingDto
 import pe.clinicacardenas.pacientes.platform.PlatformActions

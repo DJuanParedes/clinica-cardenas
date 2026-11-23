@@ -60,7 +60,7 @@ class SyncAppointmentsUseCase(
                     sent++
                 } catch (e: DomainError.SinConexion) {
                     // Sin red la operación ni siquiera llegó al servicio: no gasta intentos ni espera.
-                    // Se corta la pasada; todo queda pendiente para la próxima sincronización.
+                    // Se corta la pasada; lo que falta queda pendiente para la próxima sincronización.
                     offline = true
                     break
                 } catch (e: DomainError) {

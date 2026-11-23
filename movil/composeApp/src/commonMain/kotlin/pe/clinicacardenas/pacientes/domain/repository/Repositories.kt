@@ -4,7 +4,6 @@ import kotlinx.coroutines.flow.Flow
 import pe.clinicacardenas.pacientes.domain.model.Appointment
 import pe.clinicacardenas.pacientes.domain.model.OperationType
 import pe.clinicacardenas.pacientes.domain.model.PendingOperation
-import pe.clinicacardenas.pacientes.domain.model.SyncStatus
 
 /**
  * Citas guardadas en el teléfono: la fuente única de verdad. La implementación (SQLDelight) vive en la capa de datos;
@@ -64,11 +63,11 @@ interface TokenStorage {
 }
 
 /** Reloj y generador de claves inyectables, para poder probar los casos de uso con tiempos controlados. */
-interface Clock {
+fun interface Clock {
     fun now(): Long
 }
 
-interface KeyGenerator {
+fun interface KeyGenerator {
     fun newKey(): String
 }
 

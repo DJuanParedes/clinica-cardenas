@@ -172,7 +172,7 @@ private fun PlanCard(p: PortalPlanDto) {
         Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(8.dp).background(Brand.Fondo, RoundedCornerShape(6.dp))) {
             Box(Modifier.fillMaxWidth(pct).height(8.dp).background(Brand.Azul, RoundedCornerShape(6.dp)))
         }
-        p.items.forEach { it ->
+        p.items.forEach {
             Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
                 Text(if (it.status == "REALIZADO") "✅" else "⏳", fontSize = 15.sp)
                 Column(Modifier.weight(1f).padding(start = 8.dp)) {

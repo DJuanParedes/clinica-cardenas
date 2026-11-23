@@ -4,7 +4,7 @@ import app.cash.sqldelight.db.SqlDriver
 import pe.clinicacardenas.pacientes.db.ClinicaDb
 
 /** Fábrica del driver SQLite de cada plataforma (Android / iOS). */
-interface DriverFactory {
+fun interface DriverFactory {
     fun create(): SqlDriver
 }
 
