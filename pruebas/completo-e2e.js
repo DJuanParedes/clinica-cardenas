@@ -176,6 +176,13 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     expect(bad.status === 400 && bad.body.fields.value, 'porcentaje > 100');
     const over = await api('POST', '/api/commissions/rules', { dentistId: dra, calcType: 'PORCENTAJE', value: 30, base: 'REALIZADO', validFrom: today }, admin);
     expect(over.status === 409 && over.body.code === 'REGLA_SUPERPUESTA', 'regla general superpuesta: ' + over.status);
+    // Repetible: desactiva la regla E2E que haya quedado de una corrida anterior.
+    for (const r of ((await api('GET', '/api/commissions/rules', undefined, admin)).body || [])) {
+      if (r.notes === 'E2E' && r.active && r.procedure?.id === pid('OPE-002') && r.dentist?.id === dra) {
+        await api('PUT', `/api/commissions/rules/${r.id}`, { dentistId: dra, procedureId: r.procedure.id, calcType: r.calcType, value: r.value, base: r.base,
+          validFrom: r.validFrom, validTo: r.validTo, notes: r.notes, active: false }, admin);
+      }
+    }
     const ok = await api('POST', '/api/commissions/rules', { dentistId: dra, procedureId: pid('OPE-002'), calcType: 'MONTO_FIJO', value: 70, base: 'REALIZADO',
       validFrom: daysAgo(1), notes: 'E2E' }, admin);
     expectStatus(ok, 201, 'regla por procedimiento');
