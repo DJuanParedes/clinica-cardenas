@@ -27,6 +27,11 @@ public class NoticeService {
 
     @Transactional(propagation = Propagation.REQUIRED)
     public void add(Long patientId, String kind, String title, String body, Long refId) {
+        save(patientId, kind, title, body, refId);
+    }
+
+    /** Las llamadas internas guardan directo: ya corren dentro de la transacción del evento. */
+    private void save(Long patientId, String kind, String title, String body, Long refId) {
         PatientNotice n = new PatientNotice();
         n.patientId = patientId;
         n.kind = kind;
@@ -51,26 +56,23 @@ public class NoticeService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentCreated(Appointment a) {
-        add(a.patient.id, "CITA_CREADA", "Cita reservada",
+        save(a.patient.id, "CITA_CREADA", "Cita reservada",
                 "Tu cita de " + a.reason.toLowerCase() + " con " + a.dentist.getFullName() + " es el " + when(a) + ".", a.id);
     }
 
-    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentRescheduled(Appointment a) {
-        add(a.patient.id, "CITA_REPROGRAMADA", "Cita reprogramada",
+        save(a.patient.id, "CITA_REPROGRAMADA", "Cita reprogramada",
                 "Tu cita ahora es el " + when(a) + " con " + a.dentist.getFullName() + ".", a.id);
     }
 
-    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentStatus(Appointment a) {
         switch (a.status) {
-            case CONFIRMADA -> add(a.patient.id, "CITA_CONFIRMADA", "Cita confirmada",
+            case CONFIRMADA -> save(a.patient.id, "CITA_CONFIRMADA", "Cita confirmada",
                     "Te esperamos el " + when(a) + ". Llega 10 minutos antes.", a.id);
-            case CANCELADA -> add(a.patient.id, "CITA_CANCELADA", "Cita cancelada",
+            case CANCELADA -> save(a.patient.id, "CITA_CANCELADA", "Cita cancelada",
                     "Se canceló tu cita del " + when(a) + (a.statusReason == null ? "." : ": " + a.statusReason + "."), a.id);
-            case ATENDIDA -> add(a.patient.id, "ENCUESTA", "¿Cómo te atendimos?",
+            case ATENDIDA -> save(a.patient.id, "ENCUESTA", "¿Cómo te atendimos?",
                     "Califica tu cita con " + a.dentist.getFullName() + ". Nos ayuda a mejorar.", a.id);
             default -> { }
         }

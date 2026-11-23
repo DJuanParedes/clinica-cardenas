@@ -28,9 +28,11 @@ import java.util.*;
 public class CampaignService {
 
     /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
-    private CampaignService self;
+    private final org.springframework.beans.factory.ObjectProvider<CampaignService> selfProvider;
+
+    private CampaignService self() {
+        return selfProvider.getObject();
+    }
 
 
     private static final Logger log = LoggerFactory.getLogger(CampaignService.class);
@@ -42,7 +44,9 @@ public class CampaignService {
     private final PatientRepository patients;
     private final NotificationService notifications;
 
-    public CampaignService(JdbcTemplate jdbc, AuditService audit, MarketingService marketing, PatientRepository patients, NotificationService notifications) {
+    public CampaignService(JdbcTemplate jdbc, AuditService audit, MarketingService marketing, PatientRepository patients, NotificationService notifications,
+                           org.springframework.beans.factory.ObjectProvider<CampaignService> selfProvider) {
+        this.selfProvider = selfProvider;
         this.jdbc = jdbc;
         this.audit = audit;
         this.marketing = marketing;
@@ -192,7 +196,7 @@ public class CampaignService {
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     public void tick() {
         for (Long id : jdbc.queryForList("select id from campaigns where status = 'PROGRAMADA' and scheduled_at <= ?", Long.class, Dates.now())) {
-            try { self.send(id); } catch (Exception e) { log.warn("Campaña {}: {}", id, e.getMessage()); }
+            try { self().send(id); } catch (Exception e) { log.warn("Campaña {}: {}", id, e.getMessage()); }
         }
     }
 

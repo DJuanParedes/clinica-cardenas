@@ -34,9 +34,11 @@ import java.util.*;
 public class CareService {
 
     /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
-    private CareService self;
+    private final org.springframework.beans.factory.ObjectProvider<CareService> selfProvider;
+
+    private CareService self() {
+        return selfProvider.getObject();
+    }
 
 
     private static final Logger log = LoggerFactory.getLogger(CareService.class);
@@ -59,7 +61,8 @@ public class CareService {
     public CareService(WaitlistRepository waitlist, InstallmentRepository installments, PatientRepository patients,
                        DentistRepository dentists, AppointmentRepository appointments, TreatmentPlanRepository plans,
                        AgendaService agenda, NotificationService notifications, NoticeService notices,
-                       AuditService audit, JdbcTemplate jdbc) {
+                       AuditService audit, JdbcTemplate jdbc, org.springframework.beans.factory.ObjectProvider<CareService> selfProvider) {
+        this.selfProvider = selfProvider;
         this.waitlist = waitlist;
         this.installments = installments;
         this.patients = patients;
@@ -317,16 +320,19 @@ public class CareService {
         return Map.of("queued", queued, "message", queued > 0 ? "Recordatorio enviado." : "Ya se le envió este recordatorio este mes.");
     }
 
+    private static boolean recentlyRecalled(Object last) {
+        LocalDateTime at = last instanceof java.sql.Timestamp t ? t.toLocalDateTime() : last instanceof LocalDateTime l ? l : null;
+        return at != null && at.isAfter(Dates.now().minusDays(30));
+    }
+
     /** Todos los lunes a las 10:00 a. m. se envían solos los recordatorios de control (máximo uno al mes por paciente). */
     @Scheduled(cron = "0 0 10 * * MON", zone = "America/Lima")
     public void autoRecalls() {
         int n = 0;
-        for (Map<String, Object> r : self.recalls()) {
-            Object last = r.get("lastRecallAt");
-            if (last instanceof java.sql.Timestamp t && t.toLocalDateTime().isAfter(Dates.now().minusDays(30))) continue;
-            if (last instanceof LocalDateTime t && t.isAfter(Dates.now().minusDays(30))) continue;
+        for (Map<String, Object> r : self().recalls()) {
+            if (recentlyRecalled(r.get("lastRecallAt"))) continue;
             try {
-                self.sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
+                self().sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
                 n++;
             } catch (Exception e) {
                 log.warn("Recordatorio de control no enviado: {}", e.getMessage());
