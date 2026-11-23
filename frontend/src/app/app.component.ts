@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToastService } from './core/toast.service';
 
@@ -30,6 +30,37 @@ import { ToastService } from './core/toast.service';
     @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
   `],
 })
-export class AppComponent {
+export class AppComponent implements OnInit, OnDestroy {
   toast = inject(ToastService);
+  private zone = inject(NgZone);
+  private obs?: MutationObserver;
+  private timer: any;
+
+  /**
+   * v2.10: en celular y tablet cada fila de tabla se muestra como tarjeta; para que se entienda, cada celda lleva
+   * el nombre de su columna (data-label), que el CSS muestra delante del valor.
+   */
+  ngOnInit() {
+    this.zone.runOutsideAngular(() => {
+      const label = () => {
+        document.querySelectorAll<HTMLTableElement>('table.table:not(.keep)').forEach((t) => {
+          const heads = Array.from(t.querySelectorAll('thead th')).map((th) => (th.textContent || '').trim());
+          if (!heads.length) return;
+          t.querySelectorAll('tbody tr').forEach((tr) => {
+            let col = 0;
+            Array.from(tr.children).forEach((td, i) => {
+              const span = Number(td.getAttribute('colspan') || 1);
+              const h = span > 1 || i === 0 || td.querySelector('.btn, input, select') ? '' : heads[col] || '';
+              if (td.getAttribute('data-label') !== h) td.setAttribute('data-label', h);
+              col += span;
+            });
+          });
+        });
+      };
+      this.obs = new MutationObserver(() => { clearTimeout(this.timer); this.timer = setTimeout(label, 120); });
+      this.obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+
+  ngOnDestroy() { this.obs?.disconnect(); }
 }
