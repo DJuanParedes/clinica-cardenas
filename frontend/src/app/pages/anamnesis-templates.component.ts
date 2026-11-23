@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api.service';
@@ -10,7 +11,7 @@ import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
 @Component({
   selector: 'app-anamnesis-templates',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [DeleteButtonComponent, FormsModule, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -65,7 +66,8 @@ import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
               <button type="button" class="btn sm" (click)="addQ()"><app-icon name="plus" [size]="14" /> Agregar pregunta</button>
               <div class="row end">
                 @if (d.updatedAt) { <span class="muted small grow">Editada {{ dt(d.updatedAt) }} por {{ d.updatedBy }}</span> }
-                <button type="button" class="btn" (click)="d = null">Cancelar</button>
+
+                @if (d.id) { <app-delete-button entity="anamnesis_templates" [recordId]="d.id" what="Formulario de anamnesis" [small]="false" (deleted)="d = null; ngOnInit()" /> }                <button type="button" class="btn" (click)="d = null">Cancelar</button>
                 <button type="submit" class="btn primary" [disabled]="saving">{{ saving ? 'Guardando…' : 'Guardar plantilla' }}</button>
               </div>
               <p class="muted small">Las fichas ya llenadas conservan las preguntas con las que se respondieron.</p>

@@ -143,7 +143,10 @@ async function v28(BASE) {
     const fk = (await j('GET', `/api/patients/${pid}/flags`, null, cj)).b;
     expect(fk.hasMedicalAlert && fk.allergies === undefined && fk.notes.length === 1, 'caja ve el detalle médico o no ve la alerta');
     expect((await j('POST', `/api/patients/${pid}/notes`, { text: 'Nota de caja' }, cj)).s === 403, 'caja escribió una nota');
+    // v2.11: borrar es exclusivo del administrador
     r = await j('DELETE', `/api/patients/${pid}/notes/${fc.notes[0].id}`, null, rc);
+    expect(r.s === 403, 'recepción no puede borrar');
+    r = await j('DELETE', `/api/patients/${pid}/notes/${fc.notes[0].id}`, null, ad);
     expect(r.s === 200 && r.b.notes.length === 0, 'borrar');
   });
 

@@ -179,7 +179,7 @@ export class FilesTabComponent implements OnInit, OnDestroy {
   viewUrl = '';
 
   get canUpload() { return this.auth.can('HISTORIA_CLINICA', 'PACIENTES_EDITAR'); }
-  get canDelete() { return this.auth.can('HISTORIA_CLINICA'); }
+  get canDelete() { return this.auth.can('ELIMINAR_REGISTROS'); }
   get shown() { return this.filter ? this.files.filter((f) => f.kind === this.filter) : this.files; }
 
   ngOnInit() { this.load(); }

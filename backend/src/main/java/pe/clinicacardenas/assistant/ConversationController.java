@@ -71,6 +71,7 @@ public class ConversationController {
     }
 
     @DeleteMapping("/assistant/faq/{id}")
+    @PreAuthorize("hasAuthority('ELIMINAR_REGISTROS')")
     public List<Map<String, Object>> deleteFaq(@PathVariable Long id) {
         return service.deleteFaq(id);
     }

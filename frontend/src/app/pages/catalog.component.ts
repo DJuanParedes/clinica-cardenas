@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api.service';
@@ -12,7 +13,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent],
+  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head spread">
@@ -45,6 +46,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
                   <td class="right nowrap">
                     <button class="btn sm ghost" type="button" (click)="view = p"><app-icon name="eye" [size]="14" /> Ver</button>
                     @if (canEdit) { <button class="btn sm" type="button" (click)="editProc(p)"><app-icon name="edit" [size]="14" /> Editar</button> }
+                    <app-delete-button entity="procedures" [recordId]="p.id" what="Procedimiento" [iconOnly]="true" [ghost]="true" (deleted)="load()" />
                   </td>
                 </tr>
               } @empty { <tr><td colspan="6" class="muted center">Sin resultados.</td></tr> }
@@ -67,7 +69,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
                   <td class="small tabular">{{ date(p.validFrom) }} – {{ date(p.validTo) }}</td>
                   <td><span class="tag" [class.green]="p.state === 'VIGENTE'" [class.amber]="p.state === 'PROGRAMADA'" [class.grey]="p.state === 'VENCIDA' || p.state === 'INACTIVA'">{{ stateLabel(p.state) }}</span></td>
                   <td class="num tabular">{{ p.uses }}</td>
-                  <td class="right">@if (canEdit) { <button class="btn sm" type="button" (click)="editPromo(p)"><app-icon name="edit" [size]="14" /> Editar</button> }</td>
+                  <td class="right">@if (canEdit) { <button class="btn sm" type="button" (click)="editPromo(p)"><app-icon name="edit" [size]="14" /> Editar</button> } <app-delete-button entity="promotions" [recordId]="p.id" what="Promoción" [iconOnly]="true" [ghost]="true" (deleted)="load()" /></td>
                 </tr>
               } @empty { <tr><td colspan="7" class="muted center">No hay promociones.</td></tr> }
             </tbody>
