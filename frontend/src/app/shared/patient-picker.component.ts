@@ -18,7 +18,7 @@ import { initials } from '../core/format';
         <span class="avatar">{{ ini(value.fullName) }}</span>
         <div class="grow">
           <div class="strong">{{ value.fullName }}</div>
-          <div class="muted small">{{ value.docType }} {{ value.docNumber }} · {{ value.age }} años · {{ value.phone }}</div>
+          <div class="muted small">{{ value.docType }} {{ value.docNumber }}@if (ageOf(value) != null) { · {{ ageOf(value) }} años }@if (value.phone) { · {{ value.phone }} }</div>
         </div>
         @if (!locked) { <button type="button" class="btn sm" (click)="clear()">Cambiar</button> }
       </div>
@@ -36,7 +36,7 @@ import { initials } from '../core/format';
               <span class="avatar">{{ ini(p.fullName) }}</span>
               <span class="grow">
                 <span class="strong">{{ p.fullName }}</span>
-                <span class="muted small block">{{ p.docType }} {{ p.docNumber }} · {{ p.age }} años</span>
+                <span class="muted small block">{{ p.docType }} {{ p.docNumber }}@if (ageOf(p) != null) { · {{ ageOf(p) }} años }</span>
               </span>
             </button>
           }
@@ -61,6 +61,14 @@ import { initials } from '../core/format';
   `],
 })
 export class PatientPickerComponent implements OnDestroy {
+  /** Edad: la que manda el servidor o, si no viene, calculada con la fecha de nacimiento. */
+  ageOf(p: any): number | null {
+    if (p?.age != null) return p.age;
+    if (!p?.birthDate) return null;
+    const b = new Date(p.birthDate + 'T00:00:00'), t = new Date();
+    return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0);
+  }
+
   private api = inject(Api);
 
   @Input() value: Patient | null = null;

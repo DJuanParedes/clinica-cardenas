@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.10.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.10.1**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -101,7 +101,14 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.10.0)
+## Estado actual (noviembre 2026, versión 2.10.1)
+
+Versión 2.10.1 (migración V25): cuadre y cierre de caja (`CashClosingService`, `/caja/cierre`, permisos `CAJA_CIERRE`
+para admin y caja, `CAJA_REABRIR` para admin y dirección). Esperado por medio = fondo + cobros − egresos; conteo por
+billetes/monedas; diferencia exige observación; una caja cerrada rechaza cobros, egresos y anulaciones manuales de ese
+día (los cobros en línea no se bloquean y se avisan); PDF para firmar. Horario de silencio en notificaciones
+(21:00–08:00, `NotificationService.quietHours`). La categoría de la cita se deduce también por palabras ("limpieza",
+"brackets"…). Prueba: `pruebas/version-2-10-e2e.js`.
 
 Versión 2.10.0: correcciones de uso (migración V24).
 - Categorías únicas (`core/categories.ts`, mismo orden y color): la cita guarda `appointments.category` (se elige en

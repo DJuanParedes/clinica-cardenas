@@ -225,7 +225,20 @@ public class AgendaService {
         if (reason == null || reason.isBlank()) return null;
         List<String> l = jdbc.queryForList("select category from procedures where active = true and category is not null"
                 + " and (? like concat('%', name, '%') or ? = category) order by length(name) desc limit 1", String.class, reason, reason);
-        return l.isEmpty() ? null : l.get(0);
+        if (!l.isEmpty()) return l.get(0);
+        // Palabras de uso diario (las mismas que se usaron para clasificar las citas antiguas en V24).
+        String r = java.text.Normalizer.normalize(reason.toLowerCase(java.util.Locale.ROOT), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        String[][] words = {
+                {"Ortodoncia", "ortodon", "bracket", "brackets", "alineador"}, {"Endodoncia", "endodon", "conducto", "nervio"},
+                {"Prevención", "profila", "limpieza", "fluor", "sellante", "destartraje"}, {"Cirugía", "exodon", "extrac", "cordal", "muela del juicio"},
+                {"Operatoria", "restaura", "resina", "curacion", "caries", "obturac"}, {"Estética", "blanquea", "carilla"},
+                {"Implantología", "implant"}, {"Prótesis", "protesis", "corona", "puente", "placa"},
+                {"Periodoncia", "encia", "periodon", "sangrado"}, {"Diagnóstico", "evaluaci", "control", "dolor", "consulta", "diagnost", "radiograf", "revision"}};
+        for (String[] w : words) for (int i = 1; i < w.length; i++) if (r.contains(w[i])) {
+            List<String> ok = jdbc.queryForList("select category from procedures where category = ? limit 1", String.class, w[0]);
+            if (!ok.isEmpty()) return ok.get(0);
+        }
+        return null;
     }
 
     /*

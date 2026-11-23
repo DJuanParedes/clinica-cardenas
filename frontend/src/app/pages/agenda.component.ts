@@ -415,6 +415,14 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
   weekBoxes: Record<string, { a: Appointment; top: number; height: number; lane: number; lanes: number }[]> = {};
   catColor = categoryColor;
   showCancelled = false;
+  private scrolledFor = '';
+
+  /** v2.10: al abrir el día se muestra la hora actual (hoy) o la primera cita, no siempre las 8:00. */
+  private scrollToFocus() {
+    const target = document.querySelector<HTMLElement>('.grid-body .now') || document.querySelector<HTMLElement>('.grid-body .appt');
+    if (!target) return;
+    if (target.getBoundingClientRect().top > window.innerHeight - 120) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
   /** "Ortodoncia · control mensual", sin repetir si el motivo es la misma categoría. */
   motive(a: Appointment): string {
     if (!a.category || a.reason === a.category) return a.reason;
@@ -538,6 +546,7 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
         this.loading = false;
         this.placeNow();
         if (this.sel) this.sel = r.appointments.find((a) => a.id === this.sel!.id) || null;
+        if (!this.scrolledFor || this.scrolledFor !== this.date) { this.scrolledFor = this.date; setTimeout(() => this.scrollToFocus(), 50); }
       },
       error: () => (this.loading = false),
     });

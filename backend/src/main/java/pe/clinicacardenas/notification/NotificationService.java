@@ -162,6 +162,27 @@ public class NotificationService {
         return new Wa(template, List.of(params));
     }
 
+    /**
+     * v2.10: horario de silencio (21:00 a 08:00). Lo programado de noche se corre a las 08:00; si es un aviso previo a
+     * una cita y a las 08:00 ya sería tarde, se adelanta a las 20:00 de la noche anterior.
+     */
+    static final java.time.LocalTime QUIET_FROM = java.time.LocalTime.of(21, 0), QUIET_TO = java.time.LocalTime.of(8, 0);
+
+    LocalDateTime quietHours(LocalDateTime at, Long appointmentId) {
+        if (at == null) return null;
+        java.time.LocalTime t = at.toLocalTime();
+        if (!t.isBefore(QUIET_TO) && t.isBefore(QUIET_FROM)) return at;
+        LocalDateTime morning = (t.isBefore(QUIET_TO) ? at.toLocalDate() : at.toLocalDate().plusDays(1)).atTime(QUIET_TO);
+        if (appointmentId != null) {
+            java.util.List<LocalDateTime> start = jdbc.queryForList("select start_at from appointments where id = ?", LocalDateTime.class, appointmentId);
+            if (!start.isEmpty() && at.isBefore(start.get(0)) && !morning.isBefore(start.get(0).minusMinutes(60))) {
+                LocalDateTime evening = (t.isBefore(QUIET_TO) ? at.toLocalDate().minusDays(1) : at.toLocalDate()).atTime(20, 0);
+                return evening.isAfter(Dates.now()) ? evening : at;
+            }
+        }
+        return morning;
+    }
+
     private void add(Patient p, Long appointmentId, String type, String operation, Target t, String subject, String body,
                      String key, LocalDateTime scheduledFor, Wa wa) {
         if (repo.existsByIdempotencyKey(key)) return; // ya encolado: no se duplica
@@ -175,7 +196,7 @@ public class NotificationService {
         n.subject = subject;
         n.body = body;
         n.idempotencyKey = key;
-        n.scheduledFor = scheduledFor;
+        n.scheduledFor = quietHours(scheduledFor, appointmentId);
         if (wa != null && "WHATSAPP".equals(t.channel())) {
             n.waTemplate = wa.template();
             try {

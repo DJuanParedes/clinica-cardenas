@@ -16,8 +16,10 @@ import java.util.Map;
 public class CashController {
 
     private final CashService service;
+    private final CashClosingService closings;
 
-    public CashController(CashService service) {
+    public CashController(CashService service, CashClosingService closings) {
+        this.closings = closings;
         this.service = service;
     }
 
@@ -37,12 +39,14 @@ public class CashController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CAJA_COBRAR')")
     public Map<String, Object> pay(@RequestBody CashService.PaymentRequest req) {
+        closings.ensureOpen(Dates.today());
         return service.registerPayment(req);
     }
 
     @PostMapping("/payments/{id}/void")
     @PreAuthorize("hasAuthority('CAJA_COBRAR')")
     public Payment voidPayment(@PathVariable Long id, @RequestBody CashService.VoidRequest req) {
+        closings.ensurePaymentDayOpen(id);
         return service.voidPayment(id, req.reason());
     }
 
@@ -50,13 +54,50 @@ public class CashController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CAJA_EGRESOS')")
     public Expense expense(@RequestBody CashService.ExpenseRequest req) {
+        closings.ensureOpen(req.expenseDate() == null ? Dates.today() : req.expenseDate());
         return service.registerExpense(req);
     }
 
     @PostMapping("/expenses/{id}/void")
     @PreAuthorize("hasAuthority('CAJA_EGRESOS')")
     public Expense voidExpense(@PathVariable Long id, @RequestBody CashService.VoidRequest req) {
+        closings.ensureExpenseDayOpen(id);
         return service.voidExpense(id, req.reason());
+    }
+
+    // ---------- v2.10: cuadre y cierre de caja
+
+    @GetMapping("/closing")
+    @PreAuthorize("hasAnyAuthority('CAJA_CIERRE','CAJA_REPORTE')")
+    public Map<String, Object> closing(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return closings.summary(date);
+    }
+
+    @PostMapping("/closing")
+    @PreAuthorize("hasAuthority('CAJA_CIERRE')")
+    public Map<String, Object> close(@RequestBody CashClosingService.CloseRequest req) {
+        return closings.close(req);
+    }
+
+    @PostMapping("/closing/{date}/reopen")
+    @PreAuthorize("hasAuthority('CAJA_REABRIR')")
+    public Map<String, Object> reopen(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                      @RequestBody CashClosingService.ReopenRequest req) {
+        return closings.reopen(date, req);
+    }
+
+    @GetMapping("/closings")
+    @PreAuthorize("hasAnyAuthority('CAJA_CIERRE','CAJA_REPORTE')")
+    public java.util.List<Map<String, Object>> closings(@RequestParam(defaultValue = "30") int limit) {
+        return closings.history(limit);
+    }
+
+    @GetMapping("/closing/{date}/pdf")
+    @PreAuthorize("hasAnyAuthority('CAJA_CIERRE','CAJA_REPORTE')")
+    public org.springframework.http.ResponseEntity<byte[]> closingPdf(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"cierre-caja-" + date + ".pdf\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF).body(closings.pdf(date));
     }
 
     /** Caja del día: lo que cobró y pagó el turno. */
