@@ -227,7 +227,7 @@ public class PatientProfileService {
         if (rel == null || !RELATIONSHIPS.contains(rel)) e.put("relationship", "Elige el parentesco.");
         if ("DNI".equals(docType) && docNumber != null && !docNumber.matches("^\\d{8}$")) e.put("docNumber", "El DNI tiene 8 dígitos.");
         if (phone != null && !phone.matches("^9\\d{8}$")) e.put("phone", "Celular de 9 dígitos que empiece con 9.");
-        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) e.put("email", "Correo no válido.");
+        if (email != null && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del familiar.", e);
         return new Values(relatedId, name, docType, docNumber, rel, phone, email, Boolean.TRUE.equals(r.isGuardian()),
                 Boolean.TRUE.equals(r.pays()), trim(r.notes(), 200));

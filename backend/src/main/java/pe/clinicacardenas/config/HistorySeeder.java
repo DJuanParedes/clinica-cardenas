@@ -38,7 +38,9 @@ import java.util.*;
 public class HistorySeeder {
 
     private static final Logger log = LoggerFactory.getLogger(HistorySeeder.class);
-    public static final String PATIENT_APP_PASSWORD = "Paciente2026";
+    /** Contraseña de la cuenta de prueba del portal: viene de la configuración (APP_SEED_PATIENT_PASSWORD), no del código. */
+    @org.springframework.beans.factory.annotation.Value("${app.seed-patient-password}")
+    private String patientAppPassword;
 
     private final PatientService patientService;
     private final PatientRepository patients;
@@ -220,7 +222,7 @@ public class HistorySeeder {
             patients.save(p);
             PatientAccount acc = new PatientAccount();
             acc.patientId = p.id;
-            acc.passwordHash = encoder.encode(PATIENT_APP_PASSWORD);
+            acc.passwordHash = encoder.encode(patientAppPassword);
             acc.active = true;
             acc.createdAt = Dates.now();
             acc.activatedAt = Dates.now();

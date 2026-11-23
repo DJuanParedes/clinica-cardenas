@@ -66,6 +66,8 @@ app:
   seed-demo-data: ${APP_SEED_DEMO:true}
   # contraseña inicial de los usuarios del personal (en la nube se genera una aleatoria)
   seed-password: ${APP_SEED_PASSWORD:Clinica2026}
+  # Cuenta de prueba del portal del paciente (DNI 45872196). Solo datos de demostración.
+  seed-patient-password: ${APP_SEED_PATIENT_PASSWORD:Paciente2026}
   jwt:
     secret: ${JWT_SECRET:cambia-este-secreto-en-produccion-clinica-cardenas-2026}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}

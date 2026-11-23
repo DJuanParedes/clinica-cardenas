@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 public class UserService {
 
     private static final Pattern USERNAME = Pattern.compile("^[a-zA-Z0-9._-]{3,40}$");
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
     private static final String[] COLORS = {"#00A3D4", "#F08A00", "#1E5FAE", "#7A4FC9", "#217A4A", "#C2410C"};
 
     private final UserRepository users;

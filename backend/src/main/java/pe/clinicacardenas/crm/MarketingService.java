@@ -30,6 +30,14 @@ import java.util.*;
 @Service
 public class MarketingService {
 
+    /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
+    private final org.springframework.beans.factory.ObjectProvider<MarketingService> selfProvider;
+
+    private MarketingService self() {
+        return selfProvider.getObject();
+    }
+
+
     private static final Logger log = LoggerFactory.getLogger(MarketingService.class);
     public static final int MAX_BULK_TASKS = 500;
 
@@ -44,7 +52,9 @@ public class MarketingService {
     private final ConsentService consents;
 
     public MarketingService(JdbcTemplate jdbc, ObjectMapper json, AuditService audit, TaskService tasks, PatientInsightsService insights,
-                            PatientRepository patients, NotificationService notifications, MessageTemplateService templates, ConsentService consents) {
+                            PatientRepository patients, NotificationService notifications, MessageTemplateService templates, ConsentService consents,
+                            org.springframework.beans.factory.ObjectProvider<MarketingService> selfProvider) {
+        this.selfProvider = selfProvider;
         this.jdbc = jdbc;
         this.json = json;
         this.audit = audit;
@@ -299,7 +309,7 @@ public class MarketingService {
         try {
             LocalTime at = LocalTime.parse(Optional.ofNullable(setting("cumpleanos_hora")).orElse("09:00"));
             if (Dates.now().toLocalTime().isBefore(at)) return;
-            runBirthdays(false);
+            self().runBirthdays(false);
         } catch (Exception e) {
             log.warn("Saludos de cumpleaños: {}", e.getMessage());
         }

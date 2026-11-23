@@ -131,6 +131,7 @@ public class AnnualReportService {
     // ------------------------------------------------------------------ descargas
 
     @SuppressWarnings("unchecked")
+    @Transactional(readOnly = true)
     public byte[] pdf(int year) {
         Map<String, Object> r = report(year);
         Map<String, Object> s = (Map<String, Object>) r.get("summary"), p = (Map<String, Object>) r.get("previous");
@@ -183,6 +184,7 @@ public class AnnualReportService {
     }
 
     @SuppressWarnings("unchecked")
+    @Transactional(readOnly = true)
     public String csv(int year) {
         Map<String, Object> r = report(year);
         StringBuilder b = new StringBuilder("﻿");

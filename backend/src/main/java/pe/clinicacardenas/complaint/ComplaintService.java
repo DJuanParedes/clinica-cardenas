@@ -46,7 +46,7 @@ public class ComplaintService {
     public static final List<String> CHANNELS = List.of("EMAIL", "DOMICILIO", "PRESENCIAL");
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DMYH = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom RND = new SecureRandom();
 
