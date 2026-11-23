@@ -30,6 +30,7 @@ import { ModalComponent } from '../shared/modal.component';
         </div>
         <div class="actions">
           @if (auth.can('CAJA_REPORTE')) { <a class="btn" routerLink="/caja/reporte"><app-icon name="chart" [size]="16" /> Flujo por período</a> }
+          @if (auth.can('CAJA_CIERRE')) { <a class="btn" routerLink="/caja/cierre" [queryParams]="{ fecha: day }"><app-icon name="check" [size]="16" /> Cuadre y cierre</a> }
           @if (auth.can('CAJA_EGRESOS')) { <button class="btn" type="button" (click)="openExpense()"><app-icon name="arrowDown" [size]="16" /> Registrar egreso</button> }
           @if (auth.can('CAJA_COBRAR')) { <a class="btn primary" routerLink="/caja/cobro"><app-icon name="wallet" [size]="16" /> Registrar cobro</a> }
         </div>

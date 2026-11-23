@@ -125,6 +125,12 @@ export class Api {
   deletePatientNote(pid: number, id: number): Observable<any> { return this.http.delete(`/api/patients/${pid}/notes/${id}`); }
   annualReport(year: number): Observable<any> { return this.http.get('/api/reports/annual', { params: params({ year }) }); }
   annualReportFile(year: number, kind: 'pdf' | 'csv'): Observable<Blob> { return this.http.get(`/api/reports/annual/${kind}`, { params: params({ year }), responseType: 'blob' }); }
+  // v2.10: cuadre y cierre de caja
+  cashClosing(date: string): Observable<any> { return this.http.get('/api/cash/closing', { params: params({ date }) }); }
+  closeCash(body: any): Observable<any> { return this.http.post('/api/cash/closing', body); }
+  reopenCash(date: string, reason: string): Observable<any> { return this.http.post(`/api/cash/closing/${date}/reopen`, { reason }); }
+  cashClosings(): Observable<any[]> { return this.http.get<any[]>('/api/cash/closings'); }
+  cashClosingPdf(date: string): Observable<Blob> { return this.http.get(`/api/cash/closing/${date}/pdf`, { responseType: 'blob' }); }
   // v2.9: libro de reclamaciones
   complaintInfo(): Observable<any> { return this.http.get('/api/public/complaints/info'); }
   fileComplaint(body: any): Observable<any> { return this.http.post('/api/public/complaints', body); }

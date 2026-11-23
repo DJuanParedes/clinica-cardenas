@@ -31,6 +31,7 @@ const NAV: NavGroup[] = [
   { title: 'Caja', items: [
     { path: '/caja', label: 'Caja del día', icon: 'wallet', perms: ['CAJA_COBRAR', 'CAJA_EGRESOS'] },
     { path: '/comprobantes', label: 'Comprobantes', icon: 'receipt', perms: ['COMPROBANTES'] },
+    { path: '/caja/cierre', label: 'Cuadre de caja', icon: 'check', perms: ['CAJA_CIERRE'] },
     { path: '/caja/reporte', label: 'Flujo de caja', icon: 'coins', perms: ['CAJA_REPORTE'] },
   ] },
   { title: 'Gestión', items: [
