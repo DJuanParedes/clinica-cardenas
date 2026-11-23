@@ -17,6 +17,7 @@ fun MainViewController(): UIViewController {
             single<DriverFactory> { NativeDriverFactory() }
             single<PlatformActions> { IosPlatformActions() }
             single { Darwin.create() }
+            single<pe.clinicacardenas.pacientes.domain.repository.TokenStorage> { pe.clinicacardenas.pacientes.data.local.IosTokenStorage() }
         },
     )
     return ComposeUIViewController { App() }

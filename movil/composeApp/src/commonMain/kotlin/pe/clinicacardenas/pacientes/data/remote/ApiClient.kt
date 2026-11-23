@@ -23,6 +23,9 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
+/** Antepone la versión del API a las rutas /api/... */
+fun versioned(path: String): String = if (path.startsWith("/api/") && !path.startsWith("/api/v1/")) "/api/v1/" + path.removePrefix("/api/") else path
+
 /** Error del API con el mensaje del servidor (en español) y, si aplica, los campos a corregir. */
 class ApiException(
     override val message: String,
@@ -79,7 +82,8 @@ class ApiClient(
     private val server: () -> String,
     private val token: () -> String?,
 ) {
-    private fun url(path: String) = server().trimEnd('/') + path
+    /** Rutas versionadas: la app consume /api/v1 (el servicio mantiene /api sin versión solo para la web). */
+    private fun url(path: String) = server().trimEnd('/') + versioned(path)
 
     private fun HttpRequestBuilder.auth() {
         token()?.let { header(HttpHeaders.Authorization, "Bearer $it") }
@@ -88,7 +92,7 @@ class ApiClient(
     private suspend inline fun <reified T> call(block: () -> HttpResponse): T = apiCall(block)
 
     suspend fun ping(serverUrl: String): PingDto = call {
-        http.get(serverUrl.trimEnd('/') + "/api/portal/auth/ping")
+        http.get(serverUrl.trimEnd('/') + versioned("/api/portal/auth/ping"))
     }
 
     suspend fun login(body: LoginRequest): SessionDto = call {
@@ -143,7 +147,15 @@ class ApiClient(
         }
     }
 
-    suspend fun book(body: BookRequest): MessageDto = postJson("/api/portal/appointments", body)
+    /** Reserva idempotente: la clave hace que un reintento de la sincronización no duplique la cita. */
+    suspend fun book(body: BookRequest, idempotencyKey: String? = null): MessageDto = call {
+        http.post(url("/api/portal/appointments")) {
+            auth()
+            idempotencyKey?.let { header("Idempotency-Key", it) }
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+    }
 
     suspend fun reschedule(id: Long, body: RescheduleRequest): MessageDto = postJson("/api/portal/appointments/$id/reschedule", body)
 

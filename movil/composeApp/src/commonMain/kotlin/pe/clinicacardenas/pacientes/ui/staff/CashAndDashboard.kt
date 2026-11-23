@@ -78,7 +78,7 @@ class CashViewModel(private val repo: StaffRepository) : ViewModel() {
 }
 
 @Composable
-fun CashScreen(user: StaffUserDto, open: (StaffNav) -> Unit, vm: CashViewModel = koinViewModel(), search: PatientSearchViewModel = koinViewModel(key = "caja-buscar")) {
+fun CashScreen(open: (StaffNav) -> Unit, vm: CashViewModel = koinViewModel(), search: PatientSearchViewModel = koinViewModel(key = "caja-buscar")) {
     val s by vm.state.collectAsState()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -163,7 +163,7 @@ class DashboardViewModel(private val repo: StaffRepository) : ViewModel() {
 }
 
 @Composable
-fun DashboardScreen(user: StaffUserDto, open: (StaffNav) -> Unit, vm: DashboardViewModel = koinViewModel()) {
+fun DashboardScreen(user: StaffUserDto, vm: DashboardViewModel = koinViewModel()) {
     val s by vm.state.collectAsState()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -183,8 +183,8 @@ fun DashboardScreen(user: StaffUserDto, open: (StaffNav) -> Unit, vm: DashboardV
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Stat(d.appointmentsToday.toString(), "citas hoy", Modifier.weight(1f))
-                        Stat(d.statusCounts.ATENDIDA.toString(), "atendidas", Modifier.weight(1f), Brand.Verde)
-                        Stat((d.statusCounts.CANCELADA + d.statusCounts.NO_ASISTIO).toString(), "canceladas", Modifier.weight(1f), Brand.Rojo)
+                        Stat(d.statusCounts.atendida.toString(), "atendidas", Modifier.weight(1f), Brand.Verde)
+                        Stat((d.statusCounts.cancelada + d.statusCounts.noAsistio).toString(), "canceladas", Modifier.weight(1f), Brand.Rojo)
                     }
                 }
                 item {

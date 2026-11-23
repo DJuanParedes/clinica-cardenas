@@ -17,6 +17,7 @@ class ClinicaApp : Application() {
                 single<DriverFactory> { AndroidDriverFactory(this@ClinicaApp) }
                 single<PlatformActions> { AndroidPlatformActions(this@ClinicaApp) }
                 single { OkHttp.create() }
+                single<pe.clinicacardenas.pacientes.domain.repository.TokenStorage> { pe.clinicacardenas.pacientes.data.local.AndroidTokenStorage(this@ClinicaApp) }
             },
         )
     }

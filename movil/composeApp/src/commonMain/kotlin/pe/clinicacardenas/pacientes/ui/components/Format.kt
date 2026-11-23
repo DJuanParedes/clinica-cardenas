@@ -71,6 +71,7 @@ object Fmt {
         "REPROGRAMADA" to "Reprogramada",
         "EN_ESPERA" to "En sala",
         "EN_ATENCION" to "En atención",
+        "POR_ENVIAR" to "Por enviar",
     )
 
     fun statusColors(status: String): Pair<Color, Color> = when (status) {

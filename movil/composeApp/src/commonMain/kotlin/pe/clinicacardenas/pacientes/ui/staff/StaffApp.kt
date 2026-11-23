@@ -134,10 +134,10 @@ fun StaffApp(user: StaffUserDto) {
                 StaffNav.NewAppointment -> NewAppointmentScreen(onClose = { nav = null })
                 is StaffNav.Web -> WebModuleScreen(n.title, n.path, onBack = { nav = null })
                 null -> when (tab) {
-                    STab.RESUMEN -> DashboardScreen(user, open)
+                    STab.RESUMEN -> DashboardScreen(user)
                     STab.AGENDA -> AgendaScreen(user, open)
                     STab.PACIENTES -> PatientsScreen(open)
-                    STab.CAJA -> CashScreen(user, open)
+                    STab.CAJA -> CashScreen(open)
                     STab.MAS -> MoreScreen(user, open)
                     STab.CUENTA -> StaffAccountScreen(user)
                 }

@@ -1,5 +1,6 @@
 package pe.clinicacardenas.pacientes.data.remote
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /* Modelos del API del personal (/api). Solo los campos que usa la app; el resto se ignora. */
@@ -173,13 +174,13 @@ data class InvoiceCreatedDto(val invoice: InvoiceHeadDto, val statusMessage: Str
 
 @Serializable
 data class StatusCountsDto(
-    val PROGRAMADA: Int = 0,
-    val CONFIRMADA: Int = 0,
-    val EN_ESPERA: Int = 0,
-    val EN_ATENCION: Int = 0,
-    val ATENDIDA: Int = 0,
-    val CANCELADA: Int = 0,
-    val NO_ASISTIO: Int = 0,
+    @SerialName("PROGRAMADA") val programada: Int = 0,
+    @SerialName("CONFIRMADA") val confirmada: Int = 0,
+    @SerialName("EN_ESPERA") val enEspera: Int = 0,
+    @SerialName("EN_ATENCION") val enAtencion: Int = 0,
+    @SerialName("ATENDIDA") val atendida: Int = 0,
+    @SerialName("CANCELADA") val cancelada: Int = 0,
+    @SerialName("NO_ASISTIO") val noAsistio: Int = 0,
 )
 
 @Serializable

@@ -42,4 +42,17 @@ interface PlatformActions {
 
     /** Pide la huella / rostro (o el PIN del teléfono). */
     fun authenticate(reason: String, onResult: (Boolean) -> Unit)
+
+    /**
+     * Estado del permiso de notificaciones: "NO_PREGUNTADO", "CONCEDIDO", "DENEGADO" o "DENEGADO_PARA_SIEMPRE"
+     * (en Android, cuando el usuario marcó "no volver a preguntar"; en iOS, cualquier rechazo, porque el sistema
+     * no vuelve a mostrar el diálogo).
+     */
+    fun notificationPermission(): String
+
+    /** Muestra el diálogo del sistema (si todavía se puede) y devuelve el estado resultante. */
+    fun requestNotificationPermission(onResult: (String) -> Unit)
+
+    /** Abre los ajustes de la app en el sistema, para cuando el permiso se negó para siempre. */
+    fun openAppSettings()
 }

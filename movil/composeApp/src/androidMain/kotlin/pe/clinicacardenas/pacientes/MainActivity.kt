@@ -27,7 +27,35 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
 
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // Permiso de notificaciones (capacidad nativa de recordatorios): se resuelve en sus tres estados.
+    private var pendingPermission: ((String) -> Unit)? = null
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        getSharedPreferences(PERMISOS, MODE_PRIVATE).edit().putBoolean(PREGUNTADO, true).apply()
+        val cb = pendingPermission
+        pendingPermission = null
+        cb?.invoke(if (granted) "CONCEDIDO" else notificationState())
+    }
+
+    /** Estado actual del permiso: CONCEDIDO, NO_PREGUNTADO, DENEGADO o DENEGADO_PARA_SIEMPRE. */
+    fun notificationState(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return if (androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) "CONCEDIDO" else "DENEGADO_PARA_SIEMPRE"
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return "CONCEDIDO"
+        if (!getSharedPreferences(PERMISOS, MODE_PRIVATE).getBoolean(PREGUNTADO, false)) return "NO_PREGUNTADO"
+        // Android deja de mostrar el diálogo cuando el usuario lo negó dos veces o marcó "no volver a preguntar".
+        return if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) "DENEGADO" else "DENEGADO_PARA_SIEMPRE"
+    }
+
+    fun requestNotifications(onResult: (String) -> Unit) {
+        val state = notificationState()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || state == "CONCEDIDO" || state == "DENEGADO_PARA_SIEMPRE") {
+            onResult(state)
+            return
+        }
+        pendingPermission = onResult
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     private var pendingPick: ((PickedFile?) -> Unit)? = null
     private var cameraUri: Uri? = null
@@ -95,13 +123,9 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** En Android 13+ los recordatorios necesitan permiso explícito del usuario. */
+    /** En Android 13+ los recordatorios necesitan permiso explícito: se pregunta una vez al abrir la app. */
     private fun askNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        if (notificationState() == "NO_PREGUNTADO") requestNotifications { }
     }
 
     // ------------------------------------------------------------- cámara, galería y documentos
@@ -205,5 +229,8 @@ class MainActivity : ComponentActivity() {
         /** Actividad visible (para lanzar la cámara o la huella desde el código compartido). */
         @Volatile
         var current: MainActivity? = null
+
+        private const val PERMISOS = "permisos"
+        private const val PREGUNTADO = "notificaciones.preguntado"
     }
 }

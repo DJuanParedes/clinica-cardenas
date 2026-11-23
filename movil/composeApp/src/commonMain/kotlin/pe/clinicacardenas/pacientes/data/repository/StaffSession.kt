@@ -11,14 +11,21 @@ import pe.clinicacardenas.pacientes.data.remote.StaffLoginRequest
 import pe.clinicacardenas.pacientes.data.remote.StaffUserDto
 
 /**
- * Sesión del personal de la clínica. Guarda el token y el usuario en SQLDelight y la preferencia de
+ * Sesión del personal de la clínica. Guarda el token en el almacén seguro (TokenStorage) y el usuario en SQLDelight y la preferencia de
  * desbloqueo con huella. Si el servidor responde 401 (token vencido), se cierra la sesión.
  */
-class StaffSession(private val store: LocalStore) {
+class StaffSession(private val store: LocalStore, private val tokens: pe.clinicacardenas.pacientes.domain.repository.TokenStorage) {
+    init {
+        store.get(KEY_TOKEN)?.let { old ->
+            if (tokens.read(KEY_TOKEN) == null) tokens.write(KEY_TOKEN, old)
+            store.put(KEY_TOKEN, null)
+        }
+    }
+
     private val _user = MutableStateFlow(read())
     val user: StateFlow<StaffUserDto?> = _user.asStateFlow()
 
-    val token: String? get() = store.get(KEY_TOKEN)
+    val token: String? get() = tokens.read(KEY_TOKEN)
 
     var biometric: Boolean
         get() = store.get(KEY_BIO) == "1"
@@ -27,7 +34,7 @@ class StaffSession(private val store: LocalStore) {
     fun can(vararg perms: String): Boolean = _user.value?.permissions?.any { it in perms } == true
 
     fun start(token: String, user: StaffUserDto) {
-        store.put(KEY_TOKEN, token)
+        tokens.write(KEY_TOKEN, token)
         update(user)
     }
 
@@ -37,13 +44,13 @@ class StaffSession(private val store: LocalStore) {
     }
 
     fun clear() {
-        store.put(KEY_TOKEN, null)
+        tokens.write(KEY_TOKEN, null)
         store.put(KEY_USER, null)
         _user.value = null
     }
 
     private fun read(): StaffUserDto? {
-        if (store.get(KEY_TOKEN) == null) return null
+        if (tokens.read(KEY_TOKEN) == null) return null
         return store.get(KEY_USER)?.let { runCatching { ApiJson.decodeFromString(StaffUserDto.serializer(), it) }.getOrNull() }
     }
 
