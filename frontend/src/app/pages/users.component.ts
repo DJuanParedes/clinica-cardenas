@@ -262,7 +262,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
     .blocks { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .blk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
     .t { width: 104px; height: 30px; font-size: 13px; }
-    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+    @media (max-width: 1360px) { .layout { grid-template-columns: minmax(0, 1fr); } }
   `],
 })
 export class UsersComponent implements OnInit {

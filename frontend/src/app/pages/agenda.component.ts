@@ -7,6 +7,7 @@ import { ToastService } from '../core/toast.service';
 import { Appointment, AuditEntry, Block, Dentist } from '../core/models';
 import { STATUS_LABEL, STATUS_TONE, apiError, dateTime, hhmm, isoDate, longDay, parseLocal } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { categoryColor } from '../core/categories';
 import { ModalComponent } from '../shared/modal.component';
 
 const SLOT_PX = 30;     // alto de 15 minutos
@@ -102,7 +103,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
                           [style.border-left-color]="c.dentist.color" (click)="open(a)">
                     <span class="t tabular">{{ hhmm(a.startAt) }}–{{ hhmm(a.endAt) }}</span>
                     <span class="n">{{ a.patient.fullName }}@if (a.bookedVia === 'WEB') { <span class="webtag" title="Reservada por el enlace público">Web</span> }</span>
-                    <span class="r">{{ a.reason }}</span>
+                    <span class="r"><i class="cdot" [style.background]="catColor(a.category)"></i>{{ motive(a) }}</span>
                     <span class="st">{{ label(a.status) }}@if ($any(a).rescheduleRequestedAt) { · pide reprogramar }</span>
                   </button>
                 }
@@ -115,6 +116,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
       } @else {
         <div class="counts">
           <span class="muted small">{{ rangeAppts.length }} citas · {{ activeCount }} sin cancelar</span>
+          @if (view === 'semana') { <label class="check small"><input type="checkbox" [(ngModel)]="showCancelled" (ngModelChange)="layoutWeek()" /> Ver canceladas</label> }
           <span class="grow"></span>
           @if (dentists.length > 1 && !auth.hasRole('ODONTOLOGO')) {
             <select class="input dsel" [ngModel]="filter" (ngModelChange)="filter = $event; reload()" aria-label="Filtrar por odontólogo">
@@ -126,19 +128,33 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
         @if (loading) { <div class="skeleton" style="height: 420px"></div> }
         @else if (view === 'semana') {
           <section class="panel week">
-            @for (d of weekDays; track d.iso) {
-              <div class="wday" [class.today]="d.iso === todayIso">
-                <button type="button" class="wh" (click)="goDay(d.iso)"><span class="muted small">{{ d.dow }}</span><strong>{{ d.num }}</strong><span class="muted small">{{ d.list.length }} citas</span></button>
-                <div class="wl">
-                  @for (a of d.list; track a.id) {
-                    <button type="button" class="chip" [class]="'chip s-' + a.status" [style.border-left-color]="a.dentist.color" (click)="open(a)">
-                      <span class="tabular strong">{{ hhmm(a.startAt) }}</span> {{ a.patient.fullName }}@if (a.bookedVia === 'WEB') { <span class="webtag" title="Reservada por el enlace público">Web</span> }
-                      <span class="muted small">{{ a.reason }}{{ filter ? '' : ' · ' + a.dentist.fullName }}</span>
-                    </button>
-                  } @empty { <span class="muted small pad">Libre</span> }
-                </div>
+            <div class="wgrid" [style.--wh.px]="weekHeight">
+              <div class="wcorner"></div>
+              @for (d of weekDays; track d.iso) {
+                <button type="button" class="wh" [class.today]="d.iso === todayIso" (click)="goDay(d.iso)">
+                  <span class="muted small">{{ d.dow }}</span><strong>{{ d.num }}</strong><span class="muted small">{{ (weekBoxes[d.iso] || []).length }} cita{{ (weekBoxes[d.iso] || []).length === 1 ? '' : 's' }}</span>
+                </button>
+              }
+              <div class="wtimes">
+                @for (t of weekHours; track t) { <span class="tl tabular" [style.top.px]="wy(t)">{{ t }}</span> }
               </div>
-            }
+              @for (d of weekDays; track d.iso) {
+                <div class="wcol" [class.today]="d.iso === todayIso">
+                  @for (t of weekHours; track t) { <span class="hline" [style.top.px]="wy(t)"></span> }
+                  @for (b of weekBoxes[d.iso] || []; track b.a.id) {
+                    <button type="button" class="wappt" [class]="'wappt s-' + b.a.status" [style.top.px]="b.top" [style.height.px]="b.height"
+                            [style.left]="'calc(' + (100 / b.lanes) * b.lane + '% + 2px)'" [style.width]="'calc(' + (100 / b.lanes) + '% - 4px)'"
+                            [style.border-left-color]="b.a.dentist.color" (click)="open(b.a)"
+                            [attr.title]="hhmm(b.a.startAt) + '–' + hhmm(b.a.endAt) + ' · ' + b.a.patient.fullName + ' · ' + (b.a.category || b.a.reason) + ' · ' + b.a.dentist.fullName">
+                      <span class="n"><b class="t tabular">{{ hhmm(b.a.startAt) }}</b> {{ b.a.patient.fullName }}</span>
+                      @if (b.height > 30) { <span class="r"><i class="cdot" [style.background]="catColor(b.a.category)"></i>{{ b.a.category || b.a.reason }}</span> }
+                    </button>
+                  }
+                  @if (d.iso === todayIso && weekNowY !== null) { <div class="now" [style.top.px]="weekNowY"></div> }
+                  @if (!(weekBoxes[d.iso] || []).length) { <span class="free muted small">Libre</span> }
+                </div>
+              }
+            </div>
           </section>
         } @else {
           <section class="panel month">
@@ -163,7 +179,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
         <div class="stack">
           <div class="row wrap">
             <span class="tag" [class]="'tag ' + tone(sel.status)">{{ label(sel.status) }}</span>
-            <span class="muted small">{{ sel.reason }} · {{ sel.durationMin }} min</span>
+            <span class="muted small"><i class="cdot" [style.background]="catColor(sel.category)"></i>{{ motive(sel) }} · {{ sel.durationMin }} min</span>
           </div>
           @if (sel.notes) { <p class="small">{{ sel.notes }}</p> }
           @if (sel.statusReason) { <p class="small muted">{{ sel.statusReason }}</p> }
@@ -232,13 +248,32 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
   styles: [`
     .webtag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; background: #efe7ff; color: #5b3fb0; font-size: 10.5px; font-weight: 800; vertical-align: middle; }
     .vsel { margin-right: 6px; }
-    .week { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); overflow-x: auto; }
-    .wday { border-right: 1px solid var(--line); min-height: 360px; display: flex; flex-direction: column; }
-    .wday:last-child { border-right: 0; }
-    .wday.today { background: var(--teal-soft); }
-    .wh { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer; font: inherit; }
-    .wh strong { font-size: 20px; }
-    .wl { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+    .week { overflow: auto; max-height: calc(100vh - 230px); min-height: 380px; }
+    .wgrid { display: grid; grid-template-columns: 56px repeat(7, minmax(120px, 1fr)); grid-template-rows: auto var(--wh); min-width: 900px; }
+    .wcorner, .wh { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); border-bottom: 1px solid var(--line); }
+    .wcorner { left: 0; z-index: 4; }
+    .wh { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-top: 0; border-left: 1px solid var(--line); border-right: 0; cursor: pointer; font: inherit; }
+    .wh strong { font-size: 19px; }
+    .wh.today { background: var(--teal-soft); }
+    .wtimes { position: sticky; left: 0; z-index: 2; background: var(--surface, #fff); }
+    .wtimes .tl { position: absolute; right: 8px; transform: translateY(-50%); font-size: 11.5px; color: var(--muted); }
+    .wcol { position: relative; border-left: 1px solid var(--line); }
+    .wcol.today { background: color-mix(in srgb, var(--teal-soft) 55%, transparent); }
+    .wcol .hline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+    .wcol .free { position: absolute; top: 10px; left: 10px; }
+    .wappt { position: absolute; display: flex; flex-direction: column; gap: 0; overflow: hidden; text-align: left; padding: 3px 6px;
+      border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 8px; background: #fff; font: inherit; font-size: 11.5px;
+      line-height: 1.35; justify-content: center; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); z-index: 1; }
+    .wappt:hover { z-index: 2; box-shadow: 0 4px 12px rgba(15, 23, 42, .15); }
+    .wappt .t { font-weight: 800; margin-right: 2px; }
+    .wappt .n { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wappt .r { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+    .wappt .cdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+    .wappt.s-CANCELADA { opacity: .5; text-decoration: line-through; }
+    .wappt.s-ATENDIDA { background: #eef8f1; }
+    .wappt.s-NO_ASISTIO { background: #fdf0f2; }
+    .wcol .now { position: absolute; left: 0; right: 0; height: 2px; border-top: 0; background: var(--gum, #c0264d); z-index: 2; }
     .chip { display: flex; flex-direction: column; text-align: left; gap: 2px; padding: 6px 8px; border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 8px; background: var(--surface); cursor: pointer; font: inherit; font-size: 12.5px; }
     .chip.s-CANCELADA { opacity: .5; text-decoration: line-through; }
     .chip.s-ATENDIDA { background: #eef8f1; }
@@ -371,6 +406,20 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
   view: 'dia' | 'semana' | 'mes' = 'dia';
   rangeAppts: Appointment[] = [];
   weekDays: { iso: string; dow: string; num: number; list: Appointment[] }[] = [];
+  /** v2.10: semana con eje de horas. */
+  weekHours: string[] = [];
+  weekStart = 8 * 60;
+  weekEnd = 20 * 60;
+  weekHeight = 0;
+  weekNowY: number | null = null;
+  weekBoxes: Record<string, { a: Appointment; top: number; height: number; lane: number; lanes: number }[]> = {};
+  catColor = categoryColor;
+  showCancelled = false;
+  /** "Ortodoncia · control mensual", sin repetir si el motivo es la misma categoría. */
+  motive(a: Appointment): string {
+    if (!a.category || a.reason === a.category) return a.reason;
+    return a.category + ' · ' + a.reason;
+  }
   monthDays: { iso: string; num: number; inMonth: boolean; list: Appointment[] }[] = [];
   get activeCount() { return this.rangeAppts.filter((a) => a.status !== 'CANCELADA').length; }
   get rangeLabel() {
@@ -412,11 +461,53 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
         const dows = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         const month = parseLocal(this.date).getMonth();
         this.weekDays = days.map((iso) => { const d = parseLocal(iso); return { iso, dow: dows[d.getDay()], num: d.getDate(), list: by(iso) }; });
+        this.layoutWeek();
         this.monthDays = days.map((iso) => { const d = parseLocal(iso); return { iso, num: d.getDate(), inMonth: d.getMonth() === month, list: by(iso).filter((a) => a.status !== 'CANCELADA') }; });
         this.loading = false;
       },
       error: () => (this.loading = false),
     });
+  }
+
+  private static readonly WPX = 1.5; // píxeles por minuto en la vista semanal (1 h = 90 px, 30 min = 45 px)
+
+  wy(t: string): number { return (this.toMin(t) - this.weekStart) * AgendaComponent.WPX + 4; }
+
+  layoutWeek() {
+    const all = this.weekDays.flatMap((d) => d.list).filter((a) => this.showCancelled || a.status !== 'CANCELADA');
+    let lo = 8 * 60, hi = 20 * 60;
+    for (const a of all) { lo = Math.min(lo, this.toMin(this.time(a.startAt))); hi = Math.max(hi, this.toMin(this.time(a.endAt))); }
+    this.weekStart = Math.floor(lo / 60) * 60;
+    this.weekEnd = Math.ceil(hi / 60) * 60;
+    this.weekHours = [];
+    for (let m = this.weekStart; m <= this.weekEnd; m += 60) this.weekHours.push(String(Math.floor(m / 60)).padStart(2, '0') + ':00');
+    this.weekHeight = (this.weekEnd - this.weekStart) * AgendaComponent.WPX + 10;
+    this.weekBoxes = {};
+    for (const d of this.weekDays) {
+      // Citas que se cruzan (distintos odontólogos a la misma hora) se reparten en carriles lado a lado.
+      const items = d.list.filter((a) => this.showCancelled || a.status !== 'CANCELADA').map((a) => ({ a, s: this.toMin(this.time(a.startAt)), e: this.toMin(this.time(a.endAt)) }));
+      const out: { a: Appointment; top: number; height: number; lane: number; lanes: number }[] = [];
+      let group: typeof items = [], groupEnd = -1;
+      const flush = () => {
+        const laneEnds: number[] = [];
+        const placed = group.map((it) => {
+          let lane = laneEnds.findIndex((end) => end <= it.s);
+          if (lane < 0) { lane = laneEnds.length; laneEnds.push(it.e); } else laneEnds[lane] = it.e;
+          return { it, lane };
+        });
+        for (const p of placed) out.push({ a: p.it.a, lane: p.lane, lanes: laneEnds.length,
+          top: (p.it.s - this.weekStart) * AgendaComponent.WPX + 5, height: Math.max(20, (p.it.e - p.it.s) * AgendaComponent.WPX - 2) });
+        group = []; groupEnd = -1;
+      };
+      for (const it of items.sort((x, y) => x.s - y.s)) {
+        if (group.length && it.s >= groupEnd) flush();
+        group.push(it); groupEnd = Math.max(groupEnd, it.e);
+      }
+      if (group.length) flush();
+      this.weekBoxes[d.iso] = out;
+    }
+    const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+    this.weekNowY = m >= this.weekStart && m <= this.weekEnd ? (m - this.weekStart) * AgendaComponent.WPX + 4 : null;
   }
 
   get dayLabel() { return longDay(this.date) + (this.date === this.todayIso ? ' · hoy' : ''); }

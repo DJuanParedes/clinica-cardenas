@@ -7,6 +7,7 @@ import { Dentist, Procedure } from '../core/models';
 import {
   METHOD_LABEL, SETTLEMENT_LABEL, SETTLEMENT_TONE, apiError, dateTime, isoDate, periodPreset, shortDate, soles,
 } from '../core/format';
+import { categoryColor, sortCategories } from '../core/categories';
 import { IconComponent } from '../shared/icon.component';
 import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
 import { TableSearchComponent } from '../shared/table-search.component';
@@ -65,7 +66,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                   <tr [class.off]="!r.active">
                     <td><div class="row"><span class="dot" [style.background]="r.dentist.color"></span><span class="strong">{{ r.dentist.fullName }}</span></div></td>
                     <td><div class="strong">{{ r.calcType === 'PORCENTAJE' ? r.value + ' %' : money(r.value) + ' fijo' }}</div>
-                      <div class="muted small">{{ r.procedure ? r.procedure.name : 'Todos los procedimientos' }}</div>
+                      <div class="small scope"><i class="cdot" [style.background]="catColor(r.procedure?.category || r.category)"></i>{{ scope(r) }}</div>
                       @if (r.calcType === 'PORCENTAJE') { <div class="small teal-ink">{{ ruleSoles(r) }}</div> }</td>
                     <td>{{ r.base === 'COBRADO' ? 'Lo cobrado' : 'Precio del procedimiento' }}</td>
                     <td class="tabular">{{ date(r.validFrom) }} – {{ r.validTo ? date(r.validTo) : 'sin fin' }}</td>
@@ -202,11 +203,22 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
           @if (e['dentistId']) { <span class="err">{{ e['dentistId'] }}</span> }
         </div>
         <div class="field span-2">
-          <label for="rp">Aplica a</label>
+          <span class="label">Categoría</span>
+          <div class="cats">
+            <button type="button" class="cat" [class.on]="!rf.category" (click)="pickRuleCategory(null)" [disabled]="ruleLocked">Todas las categorías</button>
+            @for (c of categories; track c) {
+              <button type="button" class="cat" [class.on]="rf.category === c" [style.--c]="catColor(c)" (click)="pickRuleCategory(c)" [disabled]="ruleLocked"><i class="cdot"></i>{{ c }}</button>
+            }
+          </div>
+          @if (e['category']) { <span class="err">{{ e['category'] }}</span> }
+        </div>
+        <div class="field span-2">
+          <label for="rp">Procedimiento puntual <span class="muted">(opcional: solo si este procedimiento tiene un acuerdo distinto al de su categoría)</span></label>
           <select id="rp" name="rp" class="input" [class.invalid]="e['procedureId']" [(ngModel)]="rf.procedureId" [disabled]="ruleLocked">
-            <option [ngValue]="null">Todos los procedimientos (regla general)</option>
-            @for (p of procedures; track p.id) { <option [ngValue]="p.id">{{ p.name }} · {{ money(p.price) }}</option> }
+            <option [ngValue]="null">{{ rf.category ? 'Todos los de ' + rf.category : 'Todos los procedimientos' }}</option>
+            @for (p of ruleProcedures; track p.id) { <option [ngValue]="p.id">{{ p.name }} · {{ money(p.price) }}</option> }
           </select>
+          <span class="muted small">Si hay varias reglas, manda la del procedimiento, luego la de su categoría y al final la general.</span>
         </div>
         <div class="field">
           <span class="label req">Tipo</span>
@@ -323,6 +335,12 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
     </app-modal>
   `,
   styles: [`
+    .cats { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cat { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+      font: inherit; font-size: 13px; cursor: pointer; }
+    .cat.on { border-color: var(--c, var(--teal)); box-shadow: inset 0 0 0 1px var(--c, var(--teal)); background: color-mix(in srgb, var(--c, var(--teal)) 9%, #fff); font-weight: 700; }
+    .cat .cdot, .cdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: none; }
+    .scope { display: flex; align-items: center; gap: 6px; color: var(--muted); }
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 18px; }
     .dcard { display: flex; align-items: center; gap: 14px; padding: 16px 18px; position: relative; overflow: hidden; }
     .dcard .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
@@ -400,7 +418,7 @@ export class CommissionsComponent implements OnInit {
   ngOnInit() {
     if (!['reglas', 'calcular', 'liquidaciones'].includes(this.tab)) this.tab = 'reglas';
     this.api.dentists().subscribe((d) => { this.dentists = d; if (!this.calcDentist && d.length) this.calcDentist = d[0].id; });
-    this.api.procedures().subscribe((p) => (this.procedures = p));
+    this.api.procedures().subscribe((p) => { this.procedures = p; this.categories = sortCategories(p.map((x) => x.category)); });
     this.refresh();
   }
 
@@ -423,10 +441,25 @@ export class CommissionsComponent implements OnInit {
   }
 
   // ---------- reglas
+  categories: string[] = [];
+  catColor = categoryColor;
+
+  get ruleProcedures() { return this.procedures.filter((p) => !this.rf?.category || p.category === this.rf.category); }
+
+  pickRuleCategory(c: string | null) {
+    this.rf.category = c;
+    const p = this.procedures.find((x) => x.id === this.rf.procedureId);
+    if (p && c && p.category !== c) this.rf.procedureId = null;
+  }
+
+  scope(r: any): string {
+    if (r.procedure) return r.procedure.name + (r.procedure.category ? ' · ' + r.procedure.category : '');
+    return r.category ? 'Categoría ' + r.category : 'Todas las categorías';
+  }
   newRule() {
     this.ruleEditing = null;
     this.ruleLocked = false;
-    this.rf = { dentistId: null, procedureId: null, calcType: 'PORCENTAJE', value: null, base: 'REALIZADO',
+    this.rf = { dentistId: null, procedureId: null, category: null, calcType: 'PORCENTAJE', value: null, base: 'REALIZADO',
       validFrom: isoDate(), validTo: null, active: true, notes: '' };
     this.e = {};
     this.ruleOpen = true;
@@ -435,7 +468,7 @@ export class CommissionsComponent implements OnInit {
   editRule(r: CommissionRule) {
     this.ruleEditing = r;
     this.ruleLocked = false;
-    this.rf = { dentistId: r.dentist.id, procedureId: r.procedure?.id ?? null, calcType: r.calcType, value: r.value, base: r.base,
+    this.rf = { dentistId: r.dentist.id, procedureId: r.procedure?.id ?? null, category: r.procedure?.category ?? r.category ?? null, calcType: r.calcType, value: r.value, base: r.base,
       validFrom: r.validFrom, validTo: r.validTo || null, active: r.active, notes: r.notes || '' };
     this.e = {};
     this.ruleOpen = true;

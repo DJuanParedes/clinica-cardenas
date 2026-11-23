@@ -54,8 +54,13 @@ public class CommissionService {
         this.audit = audit;
     }
 
-    public record RuleRequest(Long dentistId, Long procedureId, String calcType, BigDecimal value, String base,
-                              LocalDate validFrom, LocalDate validTo, Boolean active, String notes) {}
+    public record RuleRequest(Long dentistId, Long procedureId, String category, String calcType, BigDecimal value, String base,
+                              LocalDate validFrom, LocalDate validTo, Boolean active, String notes) {
+        public RuleRequest(Long dentistId, Long procedureId, String calcType, BigDecimal value, String base,
+                           LocalDate validFrom, LocalDate validTo, Boolean active, String notes) {
+            this(dentistId, procedureId, null, calcType, value, base, validFrom, validTo, active, notes);
+        }
+    }
 
     public record SettleRequest(Long dentistId, LocalDate from, LocalDate to, List<Long> itemIds, String notes) {}
 
@@ -106,8 +111,15 @@ public class CommissionService {
             String base = r.base() == null ? "REALIZADO" : r.base().trim().toUpperCase();
             if (!List.of("REALIZADO", "COBRADO").contains(base)) e.put("base", "Elige la base de cálculo.");
             if (r.validFrom() == null) e.put("validFrom", "Indica desde cuándo rige la regla.");
+            String cat = r.category() == null || r.category().isBlank() ? null : r.category().trim();
+            if (p != null) cat = p.category;
+            else if (cat != null) {
+                Integer n = jdbc.queryForObject("select count(*) from procedures where category = ?", Integer.class, cat);
+                if (n == null || n == 0) e.put("category", "La categoría no existe.");
+            }
             rule.dentist = d;
             rule.procedure = p;
+            rule.category = cat;
             rule.calcType = type;
             rule.value = v;
             rule.base = base;
@@ -127,12 +139,13 @@ public class CommissionService {
         if (rule.active) {
             for (CommissionRule o : rules.findByDentistIdOrderByValidFromDesc(rule.dentist.id)) {
                 if (!o.active || o.id.equals(rule.id)) continue;
-                boolean sameScope = Objects.equals(o.procedure == null ? null : o.procedure.id, rule.procedure == null ? null : rule.procedure.id);
+                boolean sameScope = Objects.equals(o.procedure == null ? null : o.procedure.id, rule.procedure == null ? null : rule.procedure.id)
+                        && (rule.procedure != null || Objects.equals(o.category, rule.category));
                 LocalDate oEnd = o.validTo == null ? LocalDate.MAX : o.validTo;
                 LocalDate rEnd = rule.validTo == null ? LocalDate.MAX : rule.validTo;
                 if (sameScope && !o.validFrom.isAfter(rEnd) && !rule.validFrom.isAfter(oEnd)) {
                     throw ApiException.conflict("REGLA_SUPERPUESTA", "Ya existe una regla vigente para "
-                            + (rule.procedure == null ? "todos los procedimientos" : rule.procedure.name) + " de "
+                            + rule.getScope() + " de "
                             + rule.dentist.getFullName() + " en esas fechas (" + o.getLabel() + ", desde " + o.validFrom
                             + "). Cierra su vigencia antes de crear otra.",
                             Map.of("validFrom", "Se cruza con otra regla vigente."));
@@ -161,14 +174,16 @@ public class CommissionService {
         if (ChronoUnit.DAYS.between(from, to) > 366) throw ApiException.field("to", "El período no puede superar un año.");
     }
 
-    private Optional<CommissionRule> ruleFor(List<CommissionRule> rs, long procedureId, LocalDate day) {
-        CommissionRule general = null;
+    /** Prioridad: regla del procedimiento puntual, luego la de su categoría, luego la general. */
+    private Optional<CommissionRule> ruleFor(List<CommissionRule> rs, long procedureId, String category, LocalDate day) {
+        CommissionRule byCategory = null, general = null;
         for (CommissionRule r : rs) {
             if (!r.appliesOn(day)) continue;
             if (r.procedure != null && r.procedure.id == procedureId) return Optional.of(r);
-            if (r.procedure == null && general == null) general = r;
+            if (r.procedure == null && r.category != null && r.category.equals(category) && byCategory == null) byCategory = r;
+            if (r.procedure == null && r.category == null && general == null) general = r;
         }
-        return Optional.ofNullable(general);
+        return Optional.ofNullable(byCategory != null ? byCategory : general);
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +195,7 @@ public class CommissionService {
         BigDecimal baseTotal = BigDecimal.ZERO, total = BigDecimal.ZERO, settledTotal = BigDecimal.ZERO;
 
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                select ti.id, ti.price, ti.done_at, ti.procedure_id, ti.tooth, pr.name as procedure_name,
+                select ti.id, ti.price, ti.done_at, ti.procedure_id, ti.tooth, pr.name as procedure_name, pr.category as procedure_category,
                        concat(p.first_name, ' ', p.last_name) as patient_name, p.id as patient_id,
                        coalesce((select sum(py.amount) from payments py where py.treatment_item_id = ti.id and py.status = 'VALIDO'), 0) as paid,
                        (select cl.settlement_id from commission_lines cl where cl.treatment_item_id = ti.id) as settlement_id,
@@ -213,7 +228,7 @@ public class CommissionService {
                 settled.add(m);
                 continue;
             }
-            Optional<CommissionRule> rule = ruleFor(rs, ((Number) row.get("procedure_id")).longValue(), doneAt.toLocalDate());
+            Optional<CommissionRule> rule = ruleFor(rs, ((Number) row.get("procedure_id")).longValue(), (String) row.get("procedure_category"), doneAt.toLocalDate());
             if (rule.isEmpty()) {
                 noRule.add(m);
                 continue;

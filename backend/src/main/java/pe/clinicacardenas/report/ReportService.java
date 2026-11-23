@@ -69,7 +69,7 @@ public class ReportService {
         String[] months = {"ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"};
         return switch (g) {
             case "month" -> months[d.getMonthValue() - 1] + " " + String.valueOf(d.getYear()).substring(2);
-            case "week" -> "sem " + d.getDayOfMonth() + " " + months[d.getMonthValue() - 1];
+            case "week" -> d.getDayOfMonth() + " " + months[d.getMonthValue() - 1];
             default -> d.getDayOfMonth() + " " + months[d.getMonthValue() - 1];
         };
     }
