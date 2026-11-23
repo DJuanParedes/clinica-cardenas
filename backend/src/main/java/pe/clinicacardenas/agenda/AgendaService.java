@@ -53,8 +53,16 @@ public class AgendaService {
         this.audit = audit;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     public record AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
-                                     String reason, String notes, String changeReason) {}
+                                     String reason, String notes, String changeReason, String category) {
+        public AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
+                                  String reason, String notes, String changeReason) {
+            this(patientId, dentistId, startAt, durationMin, reason, notes, changeReason, null);
+        }
+    }
 
     public record StatusRequest(AppointmentStatus status, String reason) {}
 
@@ -203,7 +211,21 @@ public class AgendaService {
         a.durationMin = duration;
         a.reason = r.reason().trim();
         a.notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().trim();
+        // v2.10: la categoría es la misma de los procedimientos y de las reglas de comisión. Si no llega, se deduce del motivo.
+        a.category = categoryFor(r.category(), a.reason);
         return a;
+    }
+
+    private String categoryFor(String category, String reason) {
+        if (category != null && !category.isBlank()) {
+            List<String> l = jdbc.queryForList("select category from procedures where category = ? limit 1", String.class, category.trim());
+            if (l.isEmpty()) throw ApiException.field("category", "La categoría no existe.");
+            return l.get(0);
+        }
+        if (reason == null || reason.isBlank()) return null;
+        List<String> l = jdbc.queryForList("select category from procedures where active = true and category is not null"
+                + " and (? like concat('%', name, '%') or ? = category) order by length(name) desc limit 1", String.class, reason, reason);
+        return l.isEmpty() ? null : l.get(0);
     }
 
     /*
@@ -239,7 +261,7 @@ public class AgendaService {
         java.time.LocalDateTime previousStart = a.startAt;
         String previousDentist = a.dentist.getFullName();
         AppointmentRequest merged = new AppointmentRequest(a.patient.id, r.dentistId(), r.startAt(), r.durationMin(),
-                r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason());
+                r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason(), r.category() == null ? a.category : r.category());
         validateAndFill(a, merged);
         a.status = AppointmentStatus.PROGRAMADA;
         a.statusReason = "Reprogramada: " + r.changeReason().trim();

@@ -30,7 +30,7 @@ export type AppointmentStatus = 'PROGRAMADA' | 'CONFIRMADA' | 'EN_ESPERA' | 'EN_
 
 export interface Appointment {
   id: number; patient: Patient; dentist: Dentist; startAt: string; endAt: string; durationMin: number;
-  reason: string; notes?: string; status: AppointmentStatus; statusReason?: string; arrivedAt?: string;
+  reason: string; category?: string | null; notes?: string; status: AppointmentStatus; statusReason?: string; arrivedAt?: string;
   createdAt: string; createdBy: string;
 }
 

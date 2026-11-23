@@ -22,6 +22,8 @@ public class CommissionRule {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "procedure_id")
     public Procedure procedure;
+    /** v2.10: categoría de procedimientos (la misma del motivo de la cita). Null = todas. Si hay procedimiento, manda él. */
+    public String category;
     /** PORCENTAJE o MONTO_FIJO */
     @Column(name = "calc_type")
     public String calcType;
@@ -50,6 +52,12 @@ public class CommissionRule {
     public String getLabel() {
         String v = "PORCENTAJE".equals(calcType) ? value.stripTrailingZeros().toPlainString() + " %" : "S/ " + value.toPlainString() + " fijo";
         String b = "COBRADO".equals(base) ? "de lo cobrado" : "del precio";
-        return v + ("PORCENTAJE".equals(calcType) ? " " + b : "") + (procedure == null ? " · todos los procedimientos" : " · " + procedure.name);
+        return v + ("PORCENTAJE".equals(calcType) ? " " + b : "") + " · " + getScope();
+    }
+
+    /** A qué se aplica: procedimiento puntual, una categoría o todos. */
+    public String getScope() {
+        if (procedure != null) return procedure.name + (procedure.category == null ? "" : " (" + procedure.category + ")");
+        return category == null ? "todas las categorías" : "categoría " + category;
     }
 }
