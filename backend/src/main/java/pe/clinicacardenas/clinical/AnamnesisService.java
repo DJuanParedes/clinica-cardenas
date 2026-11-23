@@ -190,7 +190,8 @@ public class AnamnesisService {
                   from vital_signs where patient_id = ? order by taken_at desc, id desc limit 50""", patientId);
         for (Map<String, Object> v : rows) {
             v.put("flags", flags(v));
-            Object w = v.get("weight"), h = v.get("height");
+            Object w = v.get("weight");
+            Object h = v.get("height");
             if (w != null && h != null && ((Number) h).intValue() > 0) {
                 double m = ((Number) h).doubleValue() / 100.0;
                 v.put("bmi", Math.round(((Number) w).doubleValue() / (m * m) * 10) / 10.0);
@@ -246,7 +247,8 @@ public class AnamnesisService {
     /** Valores fuera de rango para un adulto (referencia: OMS / guías de manejo odontológico del paciente médicamente comprometido). */
     static List<String> flags(Map<String, Object> v) {
         List<String> f = new ArrayList<>();
-        Integer s = num(v.get(SYSTOLIC)), d = num(v.get(DIASTOLIC));
+        Integer s = num(v.get(SYSTOLIC));
+        Integer d = num(v.get(DIASTOLIC));
         if (s != null && d != null) {
             if (s >= 180 || d >= 110) f.add("Presión muy alta: postergar tratamiento electivo y derivar");
             else if (s >= 140 || d >= 90) f.add("Presión alta");

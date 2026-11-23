@@ -187,7 +187,8 @@ public class CommissionService {
 
     /** Prioridad: regla del procedimiento puntual, luego la de su categoría, luego la general. */
     private Optional<CommissionRule> ruleFor(List<CommissionRule> rs, long procedureId, String category, LocalDate day) {
-        CommissionRule byCategory = null, general = null;
+        CommissionRule byCategory = null;
+        CommissionRule general = null;
         for (CommissionRule r : rs) {
             if (!r.appliesOn(day)) continue;
             if (r.procedure != null && r.procedure.id == procedureId) return Optional.of(r);
@@ -202,8 +203,13 @@ public class CommissionService {
         Dentist d = dentist(dentistId);
         checkPeriod(from, to);
         List<CommissionRule> rs = rules.findByDentistIdOrderByValidFromDesc(d.id);
-        List<Map<String, Object>> eligible = new ArrayList<>(), noRule = new ArrayList<>(), unpaid = new ArrayList<>(), settled = new ArrayList<>();
-        BigDecimal baseTotal = BigDecimal.ZERO, total = BigDecimal.ZERO, settledTotal = BigDecimal.ZERO;
+        List<Map<String, Object>> eligible = new ArrayList<>();
+        List<Map<String, Object>> noRule = new ArrayList<>();
+        List<Map<String, Object>> unpaid = new ArrayList<>();
+        List<Map<String, Object>> settled = new ArrayList<>();
+        BigDecimal baseTotal = BigDecimal.ZERO;
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal settledTotal = BigDecimal.ZERO;
 
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select ti.id, ti.price, ti.done_at, ti.procedure_id, ti.tooth, pr.name as procedure_name, pr.category as procedure_category,
@@ -404,7 +410,8 @@ public class CommissionService {
     public List<Map<String, Object>> summary() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Dentist d : dentists.findAvailable()) {
-            BigDecimal pending = BigDecimal.ZERO, paid = BigDecimal.ZERO;
+            BigDecimal pending = BigDecimal.ZERO;
+            BigDecimal paid = BigDecimal.ZERO;
             for (CommissionSettlement s : listSettlements(d.id, null)) {
                 if (ANULADA.equals(s.status)) continue;
                 pending = pending.add(s.getPendingAmount());

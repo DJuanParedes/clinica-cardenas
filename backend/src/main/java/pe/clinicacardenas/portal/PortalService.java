@@ -306,7 +306,8 @@ public class PortalService {
     public Map<String, Object> appointments(String subject) {
         Patient p = me(subject);
         LocalDateTime now = Dates.now();
-        List<Map<String, Object>> upcoming = new ArrayList<>(), past = new ArrayList<>();
+        List<Map<String, Object>> upcoming = new ArrayList<>();
+        List<Map<String, Object>> past = new ArrayList<>();
         List<Appointment> all = appointments.findByPatientIdOrderByStartAtDesc(p.id);
         for (Appointment a : all) {
             boolean open = !a.status.isFinal() && a.endAt.isAfter(now);

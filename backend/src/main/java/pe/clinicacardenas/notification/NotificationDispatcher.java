@@ -143,7 +143,9 @@ public class NotificationDispatcher {
             retry = true;
             error = "Sin conexión con el microservicio de notificaciones";
         }
-        final String fStatus = status, fError = error, fProvider = providerId;
+        final String fStatus = status;
+        final String fError = error;
+        final String fProvider = providerId;
         final LocalDateTime fSent = sentAt;
         final boolean fRetry = retry;
         tx.executeWithoutResult(s -> repo.lockById(id).ifPresent(x -> {

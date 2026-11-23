@@ -94,7 +94,8 @@ public class PortalRecordsService {
                 select tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt, concat(u.full_name) as dentist
                   from treatment_plans tp left join dentists d on d.id = tp.dentist_id left join users u on u.id = d.user_id
                  where tp.patient_id = ? and tp.status <> 'ANULADO' order by tp.created_at desc""", p.id);
-        BigDecimal totalAll = BigDecimal.ZERO, paidAll = BigDecimal.ZERO;
+        BigDecimal totalAll = BigDecimal.ZERO;
+        BigDecimal paidAll = BigDecimal.ZERO;
         for (Map<String, Object> plan : plans) {
             Long planId = ((Number) plan.get("id")).longValue();
             List<Map<String, Object>> items = jdbc.queryForList("""
@@ -104,7 +105,8 @@ public class PortalRecordsService {
                       from treatment_items ti join procedures pr on pr.id = ti.procedure_id
                       left join dentists d on d.id = ti.done_by_dentist_id left join users u on u.id = d.user_id
                      where ti.plan_id = ? and ti.status <> 'ANULADO' order by ti.sort_order, ti.id""", planId);
-            BigDecimal total = BigDecimal.ZERO, paid = BigDecimal.ZERO;
+            BigDecimal total = BigDecimal.ZERO;
+            BigDecimal paid = BigDecimal.ZERO;
             int done = 0;
             for (Map<String, Object> it : items) {
                 BigDecimal price = (BigDecimal) it.get("price");

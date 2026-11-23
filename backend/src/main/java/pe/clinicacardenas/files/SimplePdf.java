@@ -12,7 +12,9 @@ import java.util.List;
 public final class SimplePdf {
 
     private static final Charset WIN = Charset.forName("windows-1252");
-    private static final float W = 595, H = 842, MARGIN = 56;
+    private static final float W = 595;
+    private static final float H = 842;
+    private static final float MARGIN = 56;
 
     private final List<StringBuilder> pages = new ArrayList<>();
     private final List<byte[]> images = new ArrayList<>();
@@ -153,7 +155,8 @@ public final class SimplePdf {
 
     /** v2.8: gráfico de barras verticales simple (una serie). */
     public SimplePdf bars(String[] labels, double[] values, String rgb, String unitPrefix) {
-        float h = 120, top;
+        float h = 120;
+        float top;
         ensure(h + 40);
         top = y - 10;
         double max = 0;
@@ -274,7 +277,8 @@ public final class SimplePdf {
             write(out, "\nendstream\nendobj\n");
         }
         for (int p = 0; p < pages.size(); p++) {
-            int pageObj = firstPage + p * 2, contentObj = pageObj + 1;
+            int pageObj = firstPage + p * 2;
+            int contentObj = pageObj + 1;
             obj(out, offsets, pageObj, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + (int) W + " " + (int) H + "] "
                     + "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << " + xobjects + ">> >> /Contents "
                     + contentObj + " 0 R >>");

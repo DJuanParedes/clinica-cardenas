@@ -46,7 +46,8 @@ public final class Totp {
 
     static String base32(byte[] data) {
         StringBuilder sb = new StringBuilder();
-        int buffer = 0, bits = 0;
+        int buffer = 0;
+        int bits = 0;
         for (byte b : data) {
             buffer = (buffer << 8) | (b & 0xFF);
             bits += 8;
@@ -62,7 +63,8 @@ public final class Totp {
     static byte[] unbase32(String s) {
         String in = s.replace("=", "").replace(" ", "").toUpperCase();
         ByteBuffer out = ByteBuffer.allocate(in.length() * 5 / 8);
-        int buffer = 0, bits = 0;
+        int buffer = 0;
+        int bits = 0;
         for (char c : in.toCharArray()) {
             int v = B32.indexOf(c);
             if (v < 0) throw new IllegalArgumentException("base32");

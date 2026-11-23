@@ -351,7 +351,8 @@ public class UserService {
         List<DentistSchedule> parsed = new ArrayList<>();
         for (ScheduleBlock b : blocks) {
             if (b.weekday() < 1 || b.weekday() > 7) throw ApiException.badRequest(HORARIO_INVALIDO, "Día inválido.");
-            LocalTime s, e;
+            LocalTime s;
+            LocalTime e;
             try {
                 s = LocalTime.parse(b.start());
                 e = LocalTime.parse(b.end());

@@ -40,7 +40,8 @@ public final class AmountInWords {
             return HUNDREDS[(int) (n / 100)] + " " + convert(n % 100);
         }
         if (n >= 30) {
-            int t = (int) (n / 10), u = (int) (n % 10);
+            int t = (int) (n / 10);
+            int u = (int) (n % 10);
             return TENS[t] + (u > 0 ? " Y " + UNITS[u] : "");
         }
         return UNITS[(int) n];

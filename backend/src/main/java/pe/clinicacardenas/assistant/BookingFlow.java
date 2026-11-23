@@ -205,7 +205,8 @@ public class BookingFlow {
         if (n.matches(".*\\bhoy\\b.*")) return today;
         Matcher m = DMY.matcher(n);
         if (m.find()) {
-            int d = Integer.parseInt(m.group(1)), mo = Integer.parseInt(m.group(2));
+            int d = Integer.parseInt(m.group(1));
+            int mo = Integer.parseInt(m.group(2));
             int y = m.group(3) == null ? today.getYear() : Integer.parseInt(m.group(3)) % 100 + 2000;
             try {
                 LocalDate r = LocalDate.of(y, mo, d);

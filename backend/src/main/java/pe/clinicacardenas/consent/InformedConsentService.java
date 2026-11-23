@@ -69,7 +69,8 @@ public class InformedConsentService {
     private final SurveyLinks links;
     private final AuditService audit;
     private final byte[] key;
-    private final String clinicName, clinicAddress;
+    private final String clinicName;
+    private final String clinicAddress;
 
     public InformedConsentService(JdbcTemplate jdbc, PatientRepository patients, FileService files, NotificationService notifications, SurveyLinks links,
                           AuditService audit, @Value("${app.jwt.secret}") String secret,

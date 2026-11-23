@@ -48,7 +48,9 @@ public class AnnualReportService {
     private static final Map<String, String> METHOD = Map.of("EFECTIVO", "Efectivo", "TARJETA", "Tarjeta", "YAPE", "Yape", "PLIN", "Plin", "TRANSFERENCIA", "Transferencia");
 
     private final JdbcTemplate jdbc;
-    private final String clinic, address, ruc;
+    private final String clinic;
+    private final String address;
+    private final String ruc;
 
     public AnnualReportService(JdbcTemplate jdbc, @Value("${app.company.trade-name}") String clinic,
                                @Value("${app.company.address:}") String address, @Value("${app.company.ruc:}") String ruc) {
@@ -66,11 +68,13 @@ public class AnnualReportService {
         r.put("year", year);
         r.put("generatedAt", Dates.now());
         r.put("partial", year == now);
-        Map<String, Object> cur = summary(year), prev = summary(year - 1);
+        Map<String, Object> cur = summary(year);
+        Map<String, Object> prev = summary(year - 1);
         r.put("summary", cur);
         r.put("previous", prev);
         r.put(MONTHS, months(year));
-        LocalDateTime a = LocalDate.of(year, 1, 1).atStartOfDay(), b = a.plusYears(1);
+        LocalDateTime a = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime b = a.plusYears(1);
         r.put(PROCEDURES, jdbc.queryForList("""
                 select pr.name, count(*) as times, sum(ti.price) as amount from treatment_items ti join procedures pr on pr.id = ti.procedure_id
                  where ti.status = 'REALIZADO' and ti.done_at >= ? and ti.done_at < ? group by pr.name order by times desc, amount desc limit 15
@@ -102,7 +106,8 @@ public class AnnualReportService {
     }
 
     private Map<String, Object> summary(int year) {
-        LocalDateTime a = LocalDate.of(year, 1, 1).atStartOfDay(), b = a.plusYears(1);
+        LocalDateTime a = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime b = a.plusYears(1);
         Map<String, Object> s = new LinkedHashMap<>();
         BigDecimal income = num("select coalesce(sum(amount), 0) from payments where status = 'VALIDO' and paid_at >= ? and paid_at < ?", a, b);
         BigDecimal expenses = num("select coalesce(sum(amount), 0) from expenses where status = 'VALIDO' and expense_date >= ? and expense_date < ?", a.toLocalDate(), b.toLocalDate());
@@ -134,7 +139,8 @@ public class AnnualReportService {
     private List<Map<String, Object>> months(int year) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (int m = 1; m <= 12; m++) {
-            LocalDateTime a = LocalDate.of(year, m, 1).atStartOfDay(), b = a.plusMonths(1);
+            LocalDateTime a = LocalDate.of(year, m, 1).atStartOfDay();
+            LocalDateTime b = a.plusMonths(1);
             BigDecimal inc = num("select coalesce(sum(amount), 0) from payments where status = 'VALIDO' and paid_at >= ? and paid_at < ?", a, b);
             BigDecimal exp = num("select coalesce(sum(amount), 0) from expenses where status = 'VALIDO' and expense_date >= ? and expense_date < ?", a.toLocalDate(), b.toLocalDate());
             Map<String, Object> r = new LinkedHashMap<>();
@@ -156,7 +162,8 @@ public class AnnualReportService {
     @Transactional(readOnly = true)
     public byte[] pdf(int year) {
         Map<String, Object> r = report(year);
-        Map<String, Object> s = (Map<String, Object>) r.get("summary"), p = (Map<String, Object>) r.get("previous");
+        Map<String, Object> s = (Map<String, Object>) r.get("summary");
+        Map<String, Object> p = (Map<String, Object>) r.get("previous");
         SimplePdf pdf = new SimplePdf().header(clinic, address + (ruc.isBlank() ? "" : " · RUC " + ruc))
                 .title("Reporte anual " + year + (Boolean.TRUE.equals(r.get("partial")) ? " (al " + Dates.today().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ")" : ""))
                 .paragraph("Comparado con " + (year - 1) + ". Ingresos = cobros válidos; egresos = gastos registrados en caja.", 9, false).space(6);
@@ -244,7 +251,8 @@ public class AnnualReportService {
     }
 
     private static String delta(Object cur, Object prev) {
-        double c = cur == null ? 0 : Double.parseDouble(cur.toString()), p = prev == null ? 0 : Double.parseDouble(prev.toString());
+        double c = cur == null ? 0 : Double.parseDouble(cur.toString());
+        double p = prev == null ? 0 : Double.parseDouble(prev.toString());
         if (p == 0) return c == 0 ? "—" : "nuevo";
         double d = (c - p) * 100 / Math.abs(p);
         return (d >= 0 ? "+" : "") + String.format(Locale.US, "%.0f", d) + " %";

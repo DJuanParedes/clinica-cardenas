@@ -155,7 +155,12 @@ public class PeriodontogramService {
     record Indices(int teeth, int sites, BigDecimal plaque, BigDecimal bleeding, BigDecimal meanDepth, int deepSites) {}
 
     static Indices indices(Map<String, Tooth> data) {
-        int teeth = 0, sites = 0, plaque = 0, bleed = 0, deep = 0, depthSum = 0;
+        int teeth = 0;
+        int sites = 0;
+        int plaque = 0;
+        int bleed = 0;
+        int deep = 0;
+        int depthSum = 0;
         for (Tooth t : data.values()) {
             if (t.missing) continue;
             teeth++;

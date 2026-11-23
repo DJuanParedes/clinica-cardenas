@@ -46,7 +46,8 @@ public class FileService {
     private final Path dir;
     private final long maxBytes;
     private final byte[] linkKey;
-    private final String clinicName, clinicAddress;
+    private final String clinicName;
+    private final String clinicAddress;
 
     public FileService(PatientFileRepository files, PatientRepository patients, AuditService audit,
                        @Value("${app.files.dir}") String dir, @Value("${app.files.max-mb:10}") long maxMb,
@@ -273,7 +274,8 @@ public class FileService {
     }
 
     static boolean validTooth(int t) {
-        int q = t / 10, n = t % 10;
+        int q = t / 10;
+        int n = t % 10;
         return (q >= 1 && q <= 4 && n >= 1 && n <= 8) || (q >= 5 && q <= 8 && n >= 1 && n <= 5);
     }
 

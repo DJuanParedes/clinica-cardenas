@@ -272,7 +272,8 @@ public class ClinicalService {
 
     private Map<String, Object> planView(TreatmentPlan p) {
         List<TreatmentItem> its = items.findByPlanIdOrderBySortOrderAscIdAsc(p.id);
-        BigDecimal total = BigDecimal.ZERO, done = BigDecimal.ZERO;
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal done = BigDecimal.ZERO;
         int doneCount = 0;
         for (TreatmentItem i : its) {
             total = total.add(i.price);

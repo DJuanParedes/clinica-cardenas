@@ -334,7 +334,8 @@ public class LabService {
             dentist = jdbc.queryForList("select d.id from dentists d join users u on u.id = d.user_id where lower(u.username) = lower(?)", Long.class,
                     CurrentUser.usernameOrSystem()).stream().findFirst().orElse(null);
         }
-        Long plan = r.planId(), item = r.treatmentItemId();
+        Long plan = r.planId();
+        Long item = r.treatmentItemId();
         if (item != null && r.patientId() != null) {
             List<Long> p = jdbc.queryForList("select tp.id from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id where ti.id = ? and tp.patient_id = ?",
                     Long.class, item, r.patientId());

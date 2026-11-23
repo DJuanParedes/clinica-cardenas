@@ -361,7 +361,8 @@ public class DeletionService {
      */
     /** Condición y parámetros de los avisos pendientes de las citas/pacientes que se eliminarían; null si no hay. */
     private Object[] pendingMessages(Plan p, String rootTable, Object rootId) {
-        List<Object> appts = new ArrayList<>(), patients = new ArrayList<>();
+        List<Object> appts = new ArrayList<>();
+        List<Object> patients = new ArrayList<>();
         for (String[] d : p.deletes) {
             if (d[0].equals(APPOINTMENTS)) appts.addAll(jdbc.queryForList("select id from appointments where " + d[1], Long.class, params(d[2])));
         }

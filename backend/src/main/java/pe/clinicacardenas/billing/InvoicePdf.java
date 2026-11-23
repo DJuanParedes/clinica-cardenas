@@ -20,8 +20,11 @@ public final class InvoicePdf {
     private static final String V_1_1_1 = "1 1 1";
 
 
-    private static final String INK = "0.11 0.17 0.2", MUTED = "0.42 0.48 0.52", BRAND = "0.02 0.37 0.53",
-            LINE = "0.75 0.8 0.83", SOFT = "0.93 0.96 0.97";
+    private static final String INK = "0.11 0.17 0.2";
+    private static final String MUTED = "0.42 0.48 0.52";
+    private static final String BRAND = "0.02 0.37 0.53";
+    private static final String LINE = "0.75 0.8 0.83";
+    private static final String SOFT = "0.93 0.96 0.97";
 
     private InvoicePdf() {}
 
@@ -59,7 +62,10 @@ public final class InvoicePdf {
 
     public static byte[] render(Invoice i, List<InvoiceItem> items, UblBuilder.Company c, String words, String phone) {
         SimplePdf pdf = new SimplePdf();
-        float W = SimplePdf.pageWidth(), H = SimplePdf.pageHeight(), L = 40, R = W - 40;
+        float W = SimplePdf.pageWidth();
+        float H = SimplePdf.pageHeight();
+        float L = 40;
+        float R = W - 40;
         boolean factura = "01".equals(i.docType);
 
         // Emisor
@@ -70,7 +76,10 @@ public final class InvoicePdf {
         pdf.text("Teléfono / WhatsApp: " + phone, L, y - 42, 9, false, MUTED, 'L');
 
         // Recuadro del comprobante
-        float bx = R - 200, bw = 200, bh = 74, by = H - 104;
+        float bx = R - 200;
+        float bw = 200;
+        float bh = 74;
+        float by = H - 104;
         pdf.rect(bx, by, bw, bh, null, BRAND, 1.4f);
         pdf.text("R.U.C. N.° " + c.ruc(), bx + bw / 2, by + bh - 20, 11, true, INK, 'C');
         pdf.rect(bx, by + 24, bw, 22, BRAND, null, 0);
@@ -98,7 +107,11 @@ public final class InvoicePdf {
 
         // Detalle
         float ty = cy - 30;
-        float cQty = L + 8, cUnit = L + 52, cDesc = L + 110, cPu = R - 92, cTot = R - 8;
+        float cQty = L + 8;
+        float cUnit = L + 52;
+        float cDesc = L + 110;
+        float cPu = R - 92;
+        float cTot = R - 8;
         pdf.rect(L, ty, R - L, 20, BRAND, null, 0);
         pdf.text("CANT.", cQty, ty + 6.5f, 8.5f, true, V_1_1_1, 'L');
         pdf.text("UNIDAD", cUnit, ty + 6.5f, 8.5f, true, V_1_1_1, 'L');

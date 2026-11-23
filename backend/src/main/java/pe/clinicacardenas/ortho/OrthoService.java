@@ -265,7 +265,8 @@ public class OrthoService {
     @Transactional
     public Map<String, Object> upload(Long id, MultipartFile file, String stage, String view, LocalDate takenOn) {
         Map<String, Object> cur = get(id);
-        String st = code(stage, STAGES, STAGE, ETAPA_NO_VALIDA), vw = code(view, VIEWS, "view", VISTA_NO_VALIDA);
+        String st = code(stage, STAGES, STAGE, ETAPA_NO_VALIDA);
+        String vw = code(view, VIEWS, "view", VISTA_NO_VALIDA);
         String kind = Set.of("PANORAMICA", "CEFALOMETRIA").contains(vw) ? "RADIOGRAFIA" : "FOTO";
         Long patientId = ((Number) cur.get(PATIENTID)).longValue();
         String contentType = file == null ? null : file.getContentType();
@@ -280,7 +281,8 @@ public class OrthoService {
     @Transactional
     public Map<String, Object> linkExisting(Long id, LinkRequest r) {
         Map<String, Object> cur = get(id);
-        String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA), vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
+        String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA);
+        String vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
         if (r.fileId() == null) throw ApiException.field(FILEID, "Elige la foto.");
         PatientFile f = files.get(r.fileId());
         if (!f.patientId.equals(((Number) cur.get(PATIENTID)).longValue())) throw ApiException.field(FILEID, "La foto no es de este paciente.");
@@ -294,7 +296,8 @@ public class OrthoService {
     @Transactional
     public Map<String, Object> movePhoto(Long id, Long photoId, LinkRequest r) {
         get(id);
-        String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA), vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
+        String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA);
+        String vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
         if (jdbc.update("update ortho_photos set stage = ?, view_code = ?, taken_on = coalesce(?, taken_on) where id = ? and case_id = ?", st, vw, r.takenOn(), photoId, id) == 0)
             throw ApiException.notFound("La foto");
         return get(id);

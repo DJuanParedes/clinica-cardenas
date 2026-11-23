@@ -111,7 +111,9 @@ public class ReportService {
         Map<Long, String> dentistNames = dentistNames();
         BigDecimal total = BigDecimal.ZERO;
         LinkedHashMap<LocalDate, long[]> series = emptyCounts(from, to, g, 1); // céntimos
-        Map<String, BigDecimal> byMethod = new LinkedHashMap<>(), byDentist = new LinkedHashMap<>(), byCategory = new LinkedHashMap<>();
+        Map<String, BigDecimal> byMethod = new LinkedHashMap<>();
+        Map<String, BigDecimal> byDentist = new LinkedHashMap<>();
+        Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
         for (Map<String, Object> r : rows) {
             BigDecimal a = money(r.get(AMOUNT));
             total = total.add(a);
@@ -123,7 +125,8 @@ public class ReportService {
             byCategory.merge(r.get(CATEGORY) == null ? "A cuenta" : (String) r.get(CATEGORY), a, BigDecimal::add);
         }
         long days = ChronoUnit.DAYS.between(from, to) + 1;
-        LocalDate pFrom = from.minusDays(days), pTo = from.minusDays(1);
+        LocalDate pFrom = from.minusDays(days);
+        LocalDate pTo = from.minusDays(1);
         BigDecimal previous = money(jdbc.queryForObject("select coalesce(sum(amount), 0) from payments where status = 'VALIDO' and paid_at >= ? and paid_at < ?",
                 BigDecimal.class, pFrom.atStartOfDay(), pTo.plusDays(1).atStartOfDay()));
         BigDecimal invoiced = money(jdbc.queryForObject("""
@@ -289,8 +292,10 @@ public class ReportService {
 
         Map<String, Object[]> byProc = new TreeMap<>(); // nombre -> [categoría, realizados, monto realizado, pendientes, monto pendiente]
         Map<String, long[]> byDentist = new LinkedHashMap<>(); // realizados, pendientes
-        BigDecimal doneAmount = BigDecimal.ZERO, pendingAmount = BigDecimal.ZERO;
-        List<Map<String, Object>> doneDetail = new ArrayList<>(), pendingDetail = new ArrayList<>();
+        BigDecimal doneAmount = BigDecimal.ZERO;
+        BigDecimal pendingAmount = BigDecimal.ZERO;
+        List<Map<String, Object>> doneDetail = new ArrayList<>();
+        List<Map<String, Object>> pendingDetail = new ArrayList<>();
         for (Map<String, Object> r : done) {
             BigDecimal price = money(r.get(PRICE));
             doneAmount = doneAmount.add(price);

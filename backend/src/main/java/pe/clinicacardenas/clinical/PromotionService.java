@@ -112,7 +112,8 @@ public class PromotionService {
                  order by pr.active desc, pr.valid_to desc""");
         LocalDate today = Dates.today();
         for (Map<String, Object> r : rows) {
-            LocalDate f = ((java.sql.Date) r.get("validFrom")).toLocalDate(), t = ((java.sql.Date) r.get(VALIDTO)).toLocalDate();
+            LocalDate f = ((java.sql.Date) r.get("validFrom")).toLocalDate();
+            LocalDate t = ((java.sql.Date) r.get(VALIDTO)).toLocalDate();
             boolean on = Boolean.TRUE.equals(r.get("active")) || Integer.valueOf(1).equals(r.get("active"));
             r.put("state", !on ? "INACTIVA" : today.isBefore(f) ? "PROGRAMADA" : today.isAfter(t) ? "VENCIDA" : "VIGENTE");
             if (r.get(LISTPRICE) != null) r.put("finalPrice", apply((BigDecimal) r.get(LISTPRICE), (String) r.get(DISCOUNTTYPE), (BigDecimal) r.get(VALUE)));

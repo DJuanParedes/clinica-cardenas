@@ -44,7 +44,11 @@ public record SegmentFilter(List<String> sources, List<String> tags, String sex,
         if (birthdayMonth != null && (birthdayMonth < 1 || birthdayMonth > 12)) e.put("birthdayMonth", "Mes no válido.");
         String v = code(visit);
         if (v != null && !VISITS.contains(v)) e.put("visit", OPCION_NO_VALIDA);
-        String na = code(nextAppointment), tk = code(task), bu = code(budget), mk = code(marketing), rg = code(registered);
+        String na = code(nextAppointment);
+        String tk = code(task);
+        String bu = code(budget);
+        String mk = code(marketing);
+        String rg = code(registered);
         if (na != null && !Set.of("CON", "SIN").contains(na)) e.put("nextAppointment", OPCION_NO_VALIDA);
         if (tk != null && !Set.of("CON", "SIN").contains(tk)) e.put("task", OPCION_NO_VALIDA);
         if (bu != null && !"PENDIENTE".equals(bu)) e.put("budget", OPCION_NO_VALIDA);

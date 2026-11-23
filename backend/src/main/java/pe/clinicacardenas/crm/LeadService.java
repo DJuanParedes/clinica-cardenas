@@ -214,8 +214,11 @@ public class LeadService {
         List<Map<String, Object>> rows = jdbc.queryForList("select stage, lost_from_stage, source, lost_reason, estimated_value, created_at, closed_at from leads where created_at >= ?", since);
         List<String> order = List.of(NUEVO_2, CONTACTADO_2, CITA_AGENDADA_2, ASISTIO_2, GANADO_2);
         long[] reached = new long[order.size()];
-        long won = 0, lost = 0, open = 0;
-        BigDecimal pipeline = BigDecimal.ZERO, wonValue = BigDecimal.ZERO;
+        long won = 0;
+        long lost = 0;
+        long open = 0;
+        BigDecimal pipeline = BigDecimal.ZERO;
+        BigDecimal wonValue = BigDecimal.ZERO;
         long winDays = 0;
         Map<String, long[]> bySource = new LinkedHashMap<>();
         Map<String, Long> reasons = new LinkedHashMap<>();
@@ -229,7 +232,8 @@ public class LeadService {
             s[0]++;
             if (GANADO_2.equals(st)) {
                 won++; s[1]++; wonValue = wonValue.add(v);
-                LocalDateTime cl = Dates.toLocalDateTime(r.get(CLOSED_AT)), cr = Dates.toLocalDateTime(r.get("created_at"));
+                LocalDateTime cl = Dates.toLocalDateTime(r.get(CLOSED_AT));
+                LocalDateTime cr = Dates.toLocalDateTime(r.get("created_at"));
                 if (cl != null && cr != null) winDays += ChronoUnit.DAYS.between(cr, cl);
             } else if (PERDIDO_2.equals(st)) {
                 lost++;

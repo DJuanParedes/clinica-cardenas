@@ -41,7 +41,8 @@ public class KardexService {
         // saldo inicial: el último movimiento antes del período
         List<Map<String, Object>> open = jdbc.queryForList(
                 "select stock_after, value_after from inventory_moves where item_id = ? and created_at < ? order by id desc limit 1", itemId, f.atStartOfDay());
-        BigDecimal qty0, val0;
+        BigDecimal qty0;
+        BigDecimal val0;
         if (!open.isEmpty()) {
             qty0 = (BigDecimal) open.get(0).get("stock_after");
             val0 = open.get(0).get(VALUE_AFTER) == null ? BigDecimal.ZERO : (BigDecimal) open.get(0).get(VALUE_AFTER);
@@ -54,7 +55,10 @@ public class KardexService {
                     : ((BigDecimal) first.get(0).get("v")).max(BigDecimal.ZERO);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
-        BigDecimal inQ = BigDecimal.ZERO, inV = BigDecimal.ZERO, outQ = BigDecimal.ZERO, outV = BigDecimal.ZERO;
+        BigDecimal inQ = BigDecimal.ZERO;
+        BigDecimal inV = BigDecimal.ZERO;
+        BigDecimal outQ = BigDecimal.ZERO;
+        BigDecimal outV = BigDecimal.ZERO;
         for (Map<String, Object> m : jdbc.queryForList("""
                 select m.id, m.created_at, m.kind, m.quantity, m.unit_cost, m.total_cost, m.stock_after, m.value_after, m.reason, m.created_by,
                        m.patient_id, concat(p.first_name, ' ', p.last_name) as patient, pr.name as procedure_name,
@@ -143,7 +147,8 @@ public class KardexService {
                 """.formatted(patientId == null ? "" : "and m2.patient_id = " + patientId.longValue(), where),
                 concat(new Object[]{f.atStartOfDay(), t.plusDays(1).atStartOfDay()}, a));
         for (Map<String, Object> r : byProcedure) {
-            BigDecimal mat = (BigDecimal) r.get("materials"), rev = (BigDecimal) r.get("revenue");
+            BigDecimal mat = (BigDecimal) r.get("materials");
+            BigDecimal rev = (BigDecimal) r.get("revenue");
             long times = ((Number) r.get("times")).longValue();
             r.put("perService", times == 0 ? BigDecimal.ZERO : mat.divide(BigDecimal.valueOf(times), 2, RoundingMode.HALF_UP));
             r.put("materialShare", rev.signum() > 0 ? mat.multiply(BigDecimal.valueOf(100)).divide(rev, 1, RoundingMode.HALF_UP) : null);

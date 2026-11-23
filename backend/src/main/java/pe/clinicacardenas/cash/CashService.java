@@ -348,7 +348,8 @@ public class CashService {
                     rs -> { items.put(rs.getLong(1), rs.getString(2)); }, itemIds.toArray());
         }
 
-        BigDecimal income = BigDecimal.ZERO, outgo = BigDecimal.ZERO;
+        BigDecimal income = BigDecimal.ZERO;
+        BigDecimal outgo = BigDecimal.ZERO;
         Map<String, BigDecimal[]> byMethod = new LinkedHashMap<>();
         for (String mt : METHODS) byMethod.put(mt, new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
         TreeMap<LocalDate, BigDecimal[]> byDay = new TreeMap<>();

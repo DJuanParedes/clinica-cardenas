@@ -40,7 +40,11 @@ public class PublicPatientService {
     private static final String TEMPLATEID = "templateId";
 
 
-    static final int MIN_HOURS = 2, MAX_DAYS = 60, MAX_OPEN = 2, IP_PER_HOUR = 8, PHONE_PER_DAY = 2;
+    static final int MIN_HOURS = 2;
+    static final int MAX_DAYS = 60;
+    static final int MAX_OPEN = 2;
+    static final int IP_PER_HOUR = 8;
+    static final int PHONE_PER_DAY = 2;
 
     private final JdbcTemplate jdbc;
     private final AgendaService agenda;
@@ -53,7 +57,9 @@ public class PublicPatientService {
     private final AuditService audit;
     @org.springframework.beans.factory.annotation.Autowired @org.springframework.context.annotation.Lazy
     private pe.clinicacardenas.crm.MarketingService marketing;
-    private final String clinicName, clinicAddress, clinicPhone;
+    private final String clinicName;
+    private final String clinicAddress;
+    private final String clinicPhone;
     private final Map<String, Deque<Long>> hits = new ConcurrentHashMap<>();
 
     public PublicPatientService(JdbcTemplate jdbc, AgendaService agenda, AppointmentRepository appointments, PatientService patients,
@@ -226,7 +232,8 @@ public class PublicPatientService {
                 jdbc.update("update anamnesis_records set created_by = 'paciente (web)' where patient_id = ?", p.id);
             } catch (ApiException ignored) { /* sin respuestas válidas: no se guarda la anamnesis */ }
         }
-        String allergies = clean(r.allergies(), 500), medication = clean(r.medication(), 500);
+        String allergies = clean(r.allergies(), 500);
+        String medication = clean(r.medication(), 500);
         if (allergies != null || medication != null) {
             jdbc.update("insert into clinical_histories (patient_id, allergies, current_medication, created_at, updated_at, updated_by) values (?,?,?,?,?,?)",
                     p.id, allergies, medication, Dates.now(), Dates.now(), "paciente (web)");

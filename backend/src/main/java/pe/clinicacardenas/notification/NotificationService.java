@@ -183,7 +183,8 @@ public class NotificationService {
      * v2.10: horario de silencio (21:00 a 08:00). Lo programado de noche se corre a las 08:00; si es un aviso previo a
      * una cita y a las 08:00 ya sería tarde, se adelanta a las 20:00 de la noche anterior.
      */
-    static final java.time.LocalTime QUIET_FROM = java.time.LocalTime.of(21, 0), QUIET_TO = java.time.LocalTime.of(8, 0);
+    static final java.time.LocalTime QUIET_FROM = java.time.LocalTime.of(21, 0);
+    static final java.time.LocalTime QUIET_TO = java.time.LocalTime.of(8, 0);
 
     LocalDateTime quietHours(LocalDateTime at, Long appointmentId) {
         if (at == null) return null;
@@ -501,7 +502,8 @@ public class NotificationService {
         if (ts.isEmpty()) {
             throw ApiException.badRequest("SIN_CANAL", "El paciente no tiene un canal de notificación activo (preferencia o datos de contacto).");
         }
-        int queued = 0, duplicated = 0;
+        int queued = 0;
+        int duplicated = 0;
         for (Target t : ts) {
             String key = "recordatorio-manual:" + a.id + ":" + a.startAt.format(KEY) + ":" + t.channel();
             if (repo.existsByIdempotencyKey(key)) { duplicated++; continue; }

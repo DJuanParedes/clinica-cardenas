@@ -58,7 +58,8 @@ public class CashClosingService {
     private final CashService cash;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
-    private final String businessName, ruc;
+    private final String businessName;
+    private final String ruc;
 
     public CashClosingService(CashService cash, JdbcTemplate jdbc, AuditService audit,
                               @Value("${app.company.business-name}") String businessName, @Value("${app.company.ruc}") String ruc) {
@@ -195,7 +196,8 @@ public class CashClosingService {
         String notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().trim();
         if (diff.signum() != 0 && (notes == null || notes.length() < 5))
             throw ApiException.field(NOTES, "Hay una diferencia de S/ " + money(diff) + ": explica el motivo (sobrante, faltante, vuelto…).");
-        String json, denJson;
+        String json;
+        String denJson;
         try {
             json = JSON.writeValueAsString(lines);
             denJson = denoms.isEmpty() ? null : JSON.writeValueAsString(denoms);

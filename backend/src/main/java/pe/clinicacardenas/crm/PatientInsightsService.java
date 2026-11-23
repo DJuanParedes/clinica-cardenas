@@ -76,8 +76,10 @@ public class PatientInsightsService {
                 """, params, rs -> {
             Map<String, Object> m = out.get(rs.getLong(1));
             if (m == null) return;
-            BigDecimal total = rs.getBigDecimal(2), done = rs.getBigDecimal(3);
-            long items = rs.getLong(4), doneItems = rs.getLong(5);
+            BigDecimal total = rs.getBigDecimal(2);
+            BigDecimal done = rs.getBigDecimal(3);
+            long items = rs.getLong(4);
+            long doneItems = rs.getLong(5);
             int pct = total.signum() > 0 ? done.multiply(BigDecimal.valueOf(100)).divide(total, 0, RoundingMode.DOWN).intValue()
                     : items > 0 ? (int) (doneItems * 100 / items) : 0;
             m.put("budget", Map.of("total", total, "done", done, "percent", pct, "items", items, "doneItems", doneItems));

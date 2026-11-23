@@ -220,7 +220,8 @@ public class MarketingService {
         if (ids.isEmpty()) throw ApiException.badRequest("SEGMENTO_VACIO", "El segmento no tiene pacientes.");
         if (ids.size() > MAX_BULK_TASKS)
             throw ApiException.badRequest("SEGMENTO_GRANDE", "Son " + ids.size() + " pacientes: afina el filtro (máximo " + MAX_BULK_TASKS + " tareas a la vez).");
-        int created = 0, skipped = 0;
+        int created = 0;
+        int skipped = 0;
         String by = CurrentUser.usernameOrSystem();
         for (Long pid : ids) {
             if (jdbc.queryForObject("select count(*) from tasks where patient_id = ? and status = 'PENDIENTE' and title = ?", Long.class, pid, base.title()) > 0) {
@@ -330,7 +331,8 @@ public class MarketingService {
     public Map<String, Object> runBirthdays(boolean manual) {
         boolean send = "true".equals(setting(CUMPLEANOS_ACTIVO));
         boolean task = "true".equals(setting(CUMPLEANOS_TAREA));
-        int sent = 0, created = 0;
+        int sent = 0;
+        int created = 0;
         if (!send && !task) return Map.of("sent", 0, "tasks", 0, ACTIVE, false);
         LocalDate today = Dates.today();
         int year = today.getYear();

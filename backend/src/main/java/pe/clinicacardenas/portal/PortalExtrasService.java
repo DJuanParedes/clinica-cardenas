@@ -52,7 +52,10 @@ public class PortalExtrasService {
             Map.of("code", "BLANQUEAMIENTO", LABEL, "Blanqueamiento", DURATIONMIN, 60),
             Map.of("code", "CONTROL", LABEL, "Control de tratamiento", DURATIONMIN, 30));
 
-    static final int MIN_HOURS_TO_BOOK = 2, MIN_HOURS_TO_CHANGE = 12, MAX_DAYS_AHEAD = 60, MAX_OPEN = 2;
+    static final int MIN_HOURS_TO_BOOK = 2;
+    static final int MIN_HOURS_TO_CHANGE = 12;
+    static final int MAX_DAYS_AHEAD = 60;
+    static final int MAX_OPEN = 2;
 
     private final PatientRepository patients;
     private final AppointmentRepository appointments;
@@ -65,7 +68,8 @@ public class PortalExtrasService {
     private final InvoiceItemRepository invoiceItems;
     private final FileService files;
     private final AuditService audit;
-    private final String clinicName, clinicAddress;
+    private final String clinicName;
+    private final String clinicAddress;
 
     public PortalExtrasService(PatientRepository patients, AppointmentRepository appointments, AgendaService agenda,
                                PatientNoticeRepository notices, SurveyRepository surveys, SimulatedPaymentGateway gateway,
