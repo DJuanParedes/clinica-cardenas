@@ -19,7 +19,10 @@ public class PortalExtrasController {
     private final PortalExtrasService service;
     private final FileService files;
 
-    public PortalExtrasController(PortalExtrasService service, FileService files) {
+    private final pe.clinicacardenas.common.IdempotencyService idempotency;
+
+    public PortalExtrasController(PortalExtrasService service, FileService files, pe.clinicacardenas.common.IdempotencyService idempotency) {
+        this.idempotency = idempotency;
         this.service = service;
         this.files = files;
     }
@@ -39,8 +42,10 @@ public class PortalExtrasController {
 
     @PostMapping("/api/portal/appointments")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Object> book(Authentication auth, @RequestBody PortalExtrasService.BookRequest req) {
-        return service.book(auth.getName(), req);
+    public Map<String, Object> book(Authentication auth, @RequestBody PortalExtrasService.BookRequest req,
+                                    @RequestHeader(value = "Idempotency-Key", required = false) String key) {
+        // v2.12: la app reintenta las reservas hechas sin conexión; con la misma clave no se duplican.
+        return idempotency.run(key, "portal.book", auth.getName(), () -> service.book(auth.getName(), req));
     }
 
     @PostMapping("/api/portal/appointments/{id}/reschedule")
