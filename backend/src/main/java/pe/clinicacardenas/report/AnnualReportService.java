@@ -184,6 +184,7 @@ public class AnnualReportService {
     }
 
     @SuppressWarnings("unchecked")
+    @Transactional(readOnly = true)
     public String csv(int year) {
         Map<String, Object> r = report(year);
         StringBuilder b = new StringBuilder("﻿");
