@@ -52,6 +52,21 @@ public class ImageService {
         }
     }
 
+    /** v2.10: guarda una imagen que ya está en memoria (fotos de ejemplo descargadas por el servidor). */
+    public String saveBytes(String kind, byte[] data) {
+        checkKind(kind);
+        if (data == null || data.length == 0 || data.length > MAX) return null;
+        String ext = extension(data, Math.min(12, data.length));
+        if (ext == null) return null;
+        String name = UUID.randomUUID() + "." + ext;
+        try {
+            Files.write(root.resolve(kind).resolve(name), data);
+            return kind + "/" + name;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     public void delete(String path) {
         if (path == null || !path.contains("/")) return;
         String[] parts = path.split("/", 2);

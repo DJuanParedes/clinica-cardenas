@@ -394,6 +394,21 @@ public class InventoryService {
                 """);
     }
 
+    /** v2.10: kit del procedimiento de un ítem del plan y catálogo de materiales, para marcar lo usado en la atención. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> usageForm(Long treatmentItemId) {
+        List<Long> proc = jdbc.queryForList("select procedure_id from treatment_items where id = ?", Long.class, treatmentItemId);
+        if (proc.isEmpty()) throw ApiException.notFound("El procedimiento del plan");
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("kit", jdbc.queryForList("""
+                select i.id as itemId, i.name, i.unit, i.stock, s.quantity
+                  from procedure_supplies s join inventory_items i on i.id = s.item_id
+                 where s.procedure_id = ? order by i.name
+                """, proc.get(0)));
+        m.put("catalog", jdbc.queryForList("select id as itemId, name, unit, stock from inventory_items where active = true order by name"));
+        return m;
+    }
+
     @Transactional
     public List<Map<String, Object>> saveSupplies(Long procedureId, List<SupplyRequest> list) {
         Integer exists = jdbc.queryForObject("select count(*) from procedures where id = ?", Integer.class, procedureId);
@@ -414,8 +429,11 @@ public class InventoryService {
     @EventListener
     public void onTreatmentDone(TreatmentItemDone e) {
         if (moves.existsByTreatmentItemIdAndKind(e.treatmentItemId(), "CONSUMO")) return;
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "select item_id, quantity from procedure_supplies where procedure_id = ?", e.procedureId());
+        // v2.10: lo que el odontólogo marcó como usado en esta atención; si no indicó nada, el kit estándar.
+        List<Map<String, Object>> rows = e.used() != null
+                ? e.used().stream().filter(u -> u.itemId() != null && u.quantity() != null && u.quantity().signum() > 0)
+                    .map(u -> Map.<String, Object>of("item_id", u.itemId(), "quantity", u.quantity())).toList()
+                : jdbc.queryForList("select item_id, quantity from procedure_supplies where procedure_id = ?", e.procedureId());
         List<Long> pat = jdbc.queryForList("select tp.patient_id from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id where ti.id = ?",
                 Long.class, e.treatmentItemId());
         Long patientId = pat.isEmpty() ? null : pat.get(0);
