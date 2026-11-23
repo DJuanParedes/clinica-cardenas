@@ -15,8 +15,10 @@ public class UserController {
 
     private final UserService service;
     private final AuditService audit;
+    private final pe.clinicacardenas.security.PermissionService permissions;
 
-    public UserController(UserService service, AuditService audit) {
+    public UserController(UserService service, AuditService audit, pe.clinicacardenas.security.PermissionService permissions) {
+        this.permissions = permissions;
         this.service = service;
         this.audit = audit;
     }
@@ -30,6 +32,13 @@ public class UserController {
         List<Map<String, String>> out = new ArrayList<>();
         for (Role r : Role.values()) out.add(Map.of("code", r.name(), "label", r.label));
         return out;
+    }
+
+    /** v2.10: todos los roles asignables (sistema + creados) con su resumen de permisos. */
+    @GetMapping("/roles/assignable")
+    @PreAuthorize("hasAuthority('USUARIOS')")
+    public List<Map<String, Object>> assignableRoles() {
+        return permissions.assignable();
     }
 
     @GetMapping("/users")
