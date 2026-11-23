@@ -57,6 +57,7 @@ export const routes: Routes = [
       { path: 'pacientes/:id', canActivate: [permGuard('PACIENTES_VER')], loadComponent: () => import('./pages/patient-detail.component').then((m) => m.PatientDetailComponent), title: T('Ficha del paciente') },
       { path: 'caja', canActivate: [permGuard('CAJA_COBRAR', 'CAJA_EGRESOS', 'CAJA_REPORTE')], loadComponent: () => import('./pages/cash.component').then((m) => m.CashComponent), title: T('Caja del día') },
       { path: 'caja/cobro', canActivate: [permGuard('CAJA_COBRAR')], loadComponent: () => import('./pages/payment-new.component').then((m) => m.PaymentNewComponent), title: T('Registrar cobro') },
+      { path: 'caja/cierre', canActivate: [permGuard('CAJA_CIERRE', 'CAJA_REPORTE')], loadComponent: () => import('./pages/cash-closing.component').then((m) => m.CashClosingComponent), title: T('Cuadre de caja') },
       { path: 'caja/reporte', canActivate: [permGuard('CAJA_REPORTE')], loadComponent: () => import('./pages/cash-report.component').then((m) => m.CashReportComponent), title: T('Flujo de caja') },
       { path: 'comprobantes', canActivate: [permGuard('COMPROBANTES')], loadComponent: () => import('./pages/invoices.component').then((m) => m.InvoicesComponent), title: T('Comprobantes') },
       { path: 'comprobantes/nuevo', canActivate: [permGuard('COMPROBANTES')], loadComponent: () => import('./pages/invoice-new.component').then((m) => m.InvoiceNewComponent), title: T('Nuevo comprobante') },
