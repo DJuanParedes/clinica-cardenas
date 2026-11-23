@@ -217,7 +217,24 @@ export class Api {
   updateMyProfile(body: any): Observable<any> { return this.http.put<any>('/api/me/profile', body); }
   changeMyPassword(body: any): Observable<any> { return this.http.post<any>('/api/me/password', body); }
   createRole(body: any): Observable<any> { return this.http.post<any>('/api/permissions/roles', body); }
-  deleteRole(code: string): Observable<any> { return this.http.delete<any>(`/api/permissions/roles/${code}`); }
+  deleteRole(code: string, reassignTo?: string): Observable<any> {
+    return this.http.delete<any>(`/api/permissions/roles/${code}`, { params: reassignTo ? { reassignTo } : {} });
+  }
+  editRole(code: string, body: { name?: string; description?: string; hidden?: boolean }): Observable<PermissionMatrix> {
+    return this.http.patch<PermissionMatrix>(`/api/permissions/roles/${code}`, body);
+  }
+  editPermission(code: string, body: { label?: string; group?: string; description?: string }): Observable<PermissionMatrix> {
+    return this.http.patch<PermissionMatrix>(`/api/permissions/catalog/${code}`, body);
+  }
+  // v2.11: eliminar registros (solo administrador) y papelera
+  deletePreview(entity: string, id: string | number): Observable<DeletePreview> {
+    return this.http.get<DeletePreview>(`/api/admin/records/${entity}/${id}/preview`);
+  }
+  deleteRecord(entity: string, id: string | number, confirm: string, reason: string): Observable<any> {
+    return this.http.post<any>(`/api/admin/records/${entity}/${id}/delete`, { confirm, reason });
+  }
+  trash(): Observable<any[]> { return this.http.get<any[]>('/api/admin/records/trash'); }
+  trashData(id: number): Observable<Blob> { return this.http.get(`/api/admin/records/trash/${id}`, { responseType: 'blob' }); }
   start2faEmail(): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/start', {}); }
   enable2faEmail(code: string): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/enable', { code }); }
   publicPromotions(): Observable<any[]> { return this.http.get<any[]>('/api/public/promotions'); }
@@ -487,8 +504,15 @@ export interface Installments {
 }
 
 export interface PermissionMatrix {
-  permissions: { code: string; group: string; label: string }[];
-  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number; custom?: boolean; baseRole?: string; baseRoleLabel?: string; description?: string }[];
+  permissions: { code: string; group: string; label: string; description?: string }[];
+  roles: { code: string; label: string; locked: boolean; permissions: string[]; users: number; custom?: boolean; baseRole?: string; baseRoleLabel?: string; description?: string; hidden?: boolean }[];
+  adminOnly?: string[];
+}
+
+export interface DeletePreview {
+  entity: string; title: string; id: string; label: string;
+  alsoDeleted: Record<string, number>; unlinked: Record<string, number>;
+  blockers: string[]; warnings: string[]; canDelete: boolean;
 }
 
 export interface Payment {
