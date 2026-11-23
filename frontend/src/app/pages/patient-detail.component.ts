@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { PatientFlagsComponent } from '../shared/patient-flags.component';
 import { OrthoTabComponent } from './clinical/ortho-tab.component';
 import { InformedConsentsComponent } from '../shared/informed-consents.component';
@@ -29,7 +30,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent, PatientFlagsComponent, OrthoTabComponent, InformedConsentsComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent, PatientFlagsComponent, OrthoTabComponent, InformedConsentsComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -66,6 +67,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
             @if (auth.can('PACIENTES_EDITAR')) {
               <a class="btn" [routerLink]="['/pacientes', p.id, 'editar']"><app-icon name="edit" [size]="16" /> Editar datos</a>
             }
+            <app-delete-button entity="patients" [recordId]="p.id" what="Paciente" [small]="false" (deleted)="goPatients()" />
             @if (auth.can('CITAS_GESTIONAR')) {
               <a class="btn primary" routerLink="/citas/nueva" [queryParams]="{ paciente: p.id }"><app-icon name="calendar" [size]="16" /> Programar cita</a>
             }
@@ -307,6 +309,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
 export class PatientDetailComponent implements OnChanges {
   private api = inject(Api);
   private router = inject(Router);
+  goPatients() { this.router.navigate(['/pacientes']); }
   auth = inject(AuthService);
 
   @Input() id!: string;

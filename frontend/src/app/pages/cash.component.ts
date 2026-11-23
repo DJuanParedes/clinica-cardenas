@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -14,7 +15,7 @@ import { ModalComponent } from '../shared/modal.component';
 @Component({
   selector: 'app-cash',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -80,6 +81,7 @@ import { ModalComponent } from '../shared/modal.component';
                         @if ((d.type === 'INGRESO' && auth.can('CAJA_COBRAR')) || (d.type === 'EGRESO' && auth.can('CAJA_EGRESOS'))) {
                           <button class="btn sm ghost" type="button" (click)="askVoid(d)" title="Anular"><app-icon name="x" [size]="14" /></button>
                         }
+                        @if (d.type === 'EGRESO') { <app-delete-button entity="expenses" [recordId]="d.id" what="Egreso" [iconOnly]="true" [ghost]="true" (deleted)="load()" /> }
                       </td>
                     </tr>
                   }

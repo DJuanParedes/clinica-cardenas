@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../../shared/delete-button.component';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../core/api.service';
@@ -15,7 +16,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
 @Component({
   selector: 'app-plan-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
+  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
   template: `
     <div class="spread head">
       <p class="muted small">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }} · los procedimientos realizados quedan disponibles para facturar en caja.</p>
@@ -34,7 +35,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
       <section class="panel plan">
         <div class="panel-head">
           <div>
-            <div class="row"><h3>{{ v.plan.title }}</h3><span class="tag" [class]="'tag ' + planTone(v.plan.status)">{{ planLabel(v.plan.status) }}</span></div>
+            <div class="row"><h3>{{ v.plan.title }}</h3><span class="tag" [class]="'tag ' + planTone(v.plan.status)">{{ planLabel(v.plan.status) }}</span> <app-delete-button entity="treatment_plans" [recordId]="v.plan.id" what="Plan de tratamiento" [iconOnly]="true" [ghost]="true" (deleted)="load()" /></div>
             <p class="muted small">{{ v.plan.dentist?.fullName || v.plan.createdBy }} · creado {{ date(v.plan.createdAt) }}@if (v.plan.notes) { · {{ v.plan.notes }} }</p>
           </div>
           <div class="progress" [attr.aria-label]="'Avance ' + v.doneCount + ' de ' + v.itemCount">

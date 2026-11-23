@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -15,7 +16,7 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
 @Component({
   selector: 'app-marketing',
   standalone: true,
-  imports: [FormsModule, RouterLink, ModalComponent, TaskFormComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -88,7 +89,7 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
               <button class="btn sm" type="button" (click)="openSave()">{{ current ? 'Guardar cambios' : 'Guardar segmento' }}</button>
               @if (auth.can('TAREAS')) { <button class="btn sm" type="button" [disabled]="!pv?.count" (click)="bulkOpen = true; bulk = newBulk()">Crear tareas</button> }
               <button class="btn sm primary" type="button" [disabled]="!pv?.reachable" (click)="newCampaign(true)">Crear campaña</button>
-              @if (current) { <button class="btn sm ghost danger" type="button" (click)="delSegment()">Eliminar segmento</button> }
+              @if (current && auth.can('ELIMINAR_REGISTROS')) { <button class="btn sm ghost danger" type="button" (click)="delSegment()">Eliminar segmento</button> }
             </div>
             <table class="table">
               <thead><tr><th>Paciente</th><th>Última visita</th><th>Próxima cita</th><th>Publicidad</th></tr></thead>
@@ -125,7 +126,7 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
                   <td class="right tabular">{{ c.stats ? c.stats.read : '—' }}</td>
                   <td class="right tabular">{{ c.stats ? c.stats.booked : '—' }}{{ c.stats?.optOuts ? ' · ' + c.stats.optOuts + ' bajas' : '' }}</td>
                   <td class="right">@if (c.status === 'BORRADOR' || c.status === 'PROGRAMADA') { <button class="btn sm ghost" type="button" (click)="editCampaign(c)">Abrir</button> }
-                    @else { <button class="btn sm ghost" type="button" (click)="detail = c">Ver</button> }</td>
+                    @else { <button class="btn sm ghost" type="button" (click)="detail = c">Ver</button> } <app-delete-button entity="campaigns" [recordId]="c.id" what="Campaña" [iconOnly]="true" [ghost]="true" (deleted)="loadCampaigns()" /></td>
                 </tr>
               } @empty { <tr><td colspan="7" class="empty">Aún no hay campañas. Arma un segmento y crea la primera.</td></tr> }
             </tbody>

@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -19,7 +20,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
 @Component({
   selector: 'app-commissions',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -75,7 +76,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
                       @else if (isCurrent(r)) { <span class="tag green">Vigente</span> }
                       @else { <span class="tag amber">Fuera de vigencia</span> }
                     </td>
-                    <td class="right"><button class="btn sm" type="button" (click)="editRule(r)">Editar</button></td>
+                    <td class="right"><button class="btn sm" type="button" (click)="editRule(r)">Editar</button> <app-delete-button entity="commission_rules" [recordId]="r.id" what="Regla de comisión" [iconOnly]="true" [ghost]="true" (deleted)="refresh()" /></td>
                   </tr>
                 } @empty { <tr><td colspan="6"><div class="empty small"><p>Aún no hay reglas. Crea la primera para poder calcular comisiones.</p></div></td></tr> }
               </tbody>

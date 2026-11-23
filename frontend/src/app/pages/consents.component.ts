@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -10,7 +11,7 @@ import { ToastService } from '../core/toast.service';
 @Component({
   selector: 'app-consents',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink],
   template: `
     <div class="page">
       <header class="page-head"><div><h1>Consentimientos informados</h1>
@@ -61,7 +62,7 @@ import { ToastService } from '../core/toast.service';
                   <span class="muted small">Los consentimientos ya enviados conservan el texto con el que se enviaron. Guardar un cambio crea una nueva versión.</span>
                 </div>
                 @if (cur.id) { <label class="check"><input type="checkbox" [(ngModel)]="cur.active" /> Disponible para enviar</label> }
-                <div class="row"><button class="btn primary" type="button" (click)="save()">Guardar</button></div>
+                <div class="row"><button class="btn primary" type="button" (click)="save()">Guardar</button>@if (cur.id) { <app-delete-button entity="consent_templates" [recordId]="cur.id" what="Plantilla de consentimiento" [small]="false" (deleted)="cur = null; loadTemplates()" /> }</div>
               </div>
             } @else { <p class="empty">Elige una plantilla para editarla.</p> }
           </section>

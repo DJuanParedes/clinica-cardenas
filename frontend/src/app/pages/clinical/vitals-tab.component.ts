@@ -123,7 +123,7 @@ export class VitalsTabComponent implements OnChanges {
     });
   }
 
-  canDelete(v: Vital) { return v.createdBy?.toLowerCase() === this.auth.user()?.username?.toLowerCase() && v.takenAt.slice(0, 10) === new Date().toLocaleDateString('en-CA'); }
+  canDelete(v: Vital) { return this.auth.can('ELIMINAR_REGISTROS'); }
   del(v: Vital) {
     if (!confirm('¿Borrar este registro de signos vitales?')) return;
     this.api.deleteVitals(this.patientId, v.id).subscribe({ next: (r) => (this.rows = r), error: (err) => this.toast.error(apiError(err).message) });

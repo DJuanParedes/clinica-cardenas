@@ -1,3 +1,4 @@
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -19,7 +20,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
 @Component({
   selector: 'app-agenda',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent],
+  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent],
   template: `
     <div class="page wide">
       <div class="page-head">
@@ -213,6 +214,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
               @if (canReschedule(sel)) {
                 <a class="btn sm" routerLink="/citas/nueva" [queryParams]="{ reprogramar: sel.id }">Reprogramar</a>
               }
+              <app-delete-button entity="appointments" [recordId]="sel.id" what="Cita" (deleted)="sel = null; reload()" />
             </div>
             @if (cancelling) {
               <div class="field">
