@@ -94,7 +94,7 @@ public class AuthService {
                 u.failedAttempts = 0;
                 u.lockedUntil = now.plusMinutes(lockMinutes);
                 users.save(u);
-                audit.record(USUARIO, u.id, "BLOQUEO", "Bloqueo por " + maxAttempts + " intentos fallidos");
+                audit.register(USUARIO, u.id, "BLOQUEO", "Bloqueo por " + maxAttempts + " intentos fallidos");
                 throw new ApiException(HttpStatus.LOCKED, "CUENTA_BLOQUEADA",
                         "Superaste " + maxAttempts + " intentos. La cuenta quedó bloqueada " + lockMinutes + " minutos.");
             }
@@ -133,7 +133,7 @@ public class AuthService {
         u.lockedUntil = null;
         u.lastLoginAt = now;
         users.save(u);
-        audit.record(USUARIO, u.id, "LOGIN", "Inicio de sesión");
+        audit.register(USUARIO, u.id, "LOGIN", "Inicio de sesión");
         return new LoginResult(jwt.generate(u.username, u.role.name()), jwt.getExpirationMinutes(), profile(u));
     }
 
@@ -186,7 +186,7 @@ public class AuthService {
         if (code == null || !checkEmailCode(u, code)) throw ApiException.field("code", "El código no coincide o venció. Pide uno nuevo.");
         u.twoFactorMethod = CORREO_2;
         users.save(u);
-        audit.record(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos por correo");
+        audit.register(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos por correo");
         return Map.of(ENABLED, true, METHOD, CORREO_2, MESSAGE, "Listo: cada vez que ingreses te enviaremos un código al correo.");
     }
 
@@ -213,7 +213,7 @@ public class AuthService {
         u.totpEnabled = true;
         u.twoFactorMethod = "APP";
         users.save(u);
-        audit.record(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
+        audit.register(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
         return Map.of(ENABLED, true, MESSAGE, "Verificación en 2 pasos activada.");
     }
 
@@ -230,7 +230,7 @@ public class AuthService {
         u.totpSecret = null;
         u.twoFactorMethod = null;
         users.save(u);
-        audit.record(USUARIO, u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
+        audit.register(USUARIO, u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
         return Map.of(ENABLED, false, MESSAGE, "Verificación en 2 pasos desactivada.");
     }
 
@@ -259,7 +259,7 @@ public class AuthService {
 
     public void logout(String token, String username) {
         jwt.revoke(token);
-        users.findByUsernameIgnoreCase(username).ifPresent(u -> audit.record(USUARIO, u.id, "LOGOUT", "Cierre de sesión"));
+        users.findByUsernameIgnoreCase(username).ifPresent(u -> audit.register(USUARIO, u.id, "LOGOUT", "Cierre de sesión"));
     }
 
     private Optional<User> findByLogin(String login) {
@@ -289,7 +289,7 @@ public class AuthService {
         codes.save(prc);
         mail.send(u.email, "Código para restablecer tu contraseña",
                 "Hola " + u.fullName + ",\n\nTu código es: " + code + "\nVence en 15 minutos.\n\nClínica Dental Cárdenas");
-        audit.record(USUARIO, u.id, "RECUPERACION_SOLICITADA", "Código de recuperación emitido");
+        audit.register(USUARIO, u.id, "RECUPERACION_SOLICITADA", "Código de recuperación emitido");
         res.put("maskedEmail", mask(u.email));
         if (demoMode) {
             res.put("demoCode", code);
@@ -323,7 +323,7 @@ public class AuthService {
         u.updatedAt = now;
         u.updatedBy = u.username;
         users.save(u);
-        audit.record(USUARIO, u.id, "CONTRASENA_RESTABLECIDA", "Contraseña restablecida con código");
+        audit.register(USUARIO, u.id, "CONTRASENA_RESTABLECIDA", "Contraseña restablecida con código");
     }
 
     static String mask(String email) {

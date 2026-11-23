@@ -158,7 +158,7 @@ public class SunatSoapGateway implements SunatGateway {
 
     // ------------------------------------------------------------------ utilidades
 
-    private HttpResponse<String> post(String operation, Duration timeout) throws Exception {
+    private HttpResponse<String> post(String operation, Duration timeout) throws java.io.IOException, InterruptedException {
         String envelope = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
                 + "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ser=\"http://service.sunat.gob.pe\""
                 + " xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\">"
@@ -224,7 +224,7 @@ public class SunatSoapGateway implements SunatGateway {
         }
     }
 
-    static byte[] unzipFirstXml(byte[] zip) throws Exception {
+    static byte[] unzipFirstXml(byte[] zip) throws java.io.IOException {
         try (ZipInputStream z = new ZipInputStream(new ByteArrayInputStream(zip))) {
             ZipEntry e;
             while ((e = z.getNextEntry()) != null) {

@@ -96,7 +96,7 @@ public class PeriodontogramService {
                       teeth_present, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?)""",
                     patientId, date, dentist, payload, ix.plaque, ix.bleeding, ix.meanDepth, ix.deepSites, ix.teeth, notes, Dates.now(), user);
             id = jdbc.queryForObject("select max(id) from periodontograms where patient_id = ?", Long.class, patientId);
-            audit.record("HISTORIA", patientId, "PERIODONTOGRAMA", "Examen del " + date + " · IP " + ix.plaque + "% · SAS " + ix.bleeding + "%");
+            audit.register("HISTORIA", patientId, "PERIODONTOGRAMA", "Examen del " + date + " · IP " + ix.plaque + "% · SAS " + ix.bleeding + "%");
         } else {
             List<Map<String, Object>> old = jdbc.queryForList("select created_at from periodontograms where id = ? and patient_id = ?", id, patientId);
             if (old.isEmpty()) throw ApiException.notFound("El periodontograma");
@@ -107,7 +107,7 @@ public class PeriodontogramService {
                     update periodontograms set exam_date=?, data=?, plaque_index=?, bleeding_index=?, mean_depth=?, deep_sites=?, teeth_present=?,
                       notes=?, updated_at=? where id=?""",
                     date, payload, ix.plaque, ix.bleeding, ix.meanDepth, ix.deepSites, ix.teeth, notes, Dates.now(), id);
-            audit.record("HISTORIA", patientId, "PERIODONTOGRAMA", "Corrigió el examen del " + date);
+            audit.register("HISTORIA", patientId, "PERIODONTOGRAMA", "Corrigió el examen del " + date);
         }
         return get(patientId, id);
     }

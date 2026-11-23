@@ -34,7 +34,7 @@ public class DataSeeder implements ApplicationRunner {
 
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
-    private final String DEMO_PASSWORD;
+    private final String demoPassword;
 
     private final UserRepository users;
     private final UserService userService;
@@ -62,19 +62,19 @@ public class DataSeeder implements ApplicationRunner {
         this.clinical = clinical;
         this.procedures = procedures;
         this.seedDemo = seedDemo;
-        this.DEMO_PASSWORD = seedPassword;
+        this.demoPassword = seedPassword;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         if (users.count() > 0) return;
         log.info("Base de datos vacía: creando cuentas iniciales");
-        userService.create(new UserService.UserRequest("admin", "admin@clinicacardenas.pe", "Juan Paredes Cárdenas", Role.ADMIN, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("recepcion", "recepcion@clinicacardenas.pe", "Lucía Mendoza Flores", Role.RECEPCION, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("dra.cardenas", "rcardenas@clinicacardenas.pe", "Dra. Rosa Cárdenas Vílchez", Role.ODONTOLOGO, DEMO_PASSWORD, "Ortodoncia", "COP 18452"));
-        userService.create(new UserService.UserRequest("dr.ramos", "aramos@clinicacardenas.pe", "Dr. Andrés Ramos Seminario", Role.ODONTOLOGO, DEMO_PASSWORD, "Endodoncia", "COP 21307"));
-        userService.create(new UserService.UserRequest("caja", "caja@clinicacardenas.pe", "Milagros Távara Ruiz", Role.CAJA, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("director", "direccion@clinicacardenas.pe", "Dr. Carlos Cárdenas Ortiz", Role.DIRECTOR, DEMO_PASSWORD, null, null));
+        userService.create(new UserService.UserRequest("admin", "admin@clinicacardenas.pe", "Juan Paredes Cárdenas", Role.ADMIN, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("recepcion", "recepcion@clinicacardenas.pe", "Lucía Mendoza Flores", Role.RECEPCION, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("dra.cardenas", "rcardenas@clinicacardenas.pe", "Dra. Rosa Cárdenas Vílchez", Role.ODONTOLOGO, demoPassword, "Ortodoncia", "COP 18452"));
+        userService.create(new UserService.UserRequest("dr.ramos", "aramos@clinicacardenas.pe", "Dr. Andrés Ramos Seminario", Role.ODONTOLOGO, demoPassword, "Endodoncia", "COP 21307"));
+        userService.create(new UserService.UserRequest("caja", "caja@clinicacardenas.pe", "Milagros Távara Ruiz", Role.CAJA, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("director", "direccion@clinicacardenas.pe", "Dr. Carlos Cárdenas Ortiz", Role.DIRECTOR, demoPassword, null, null));
         if (seedDemo) {
             try {
                 seedDemoData();
@@ -88,7 +88,7 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}",
-                "Clinica2026".equals(DEMO_PASSWORD) ? DEMO_PASSWORD : "(la de APP_SEED_PASSWORD)");
+                "Clinica2026".equals(demoPassword) ? demoPassword : "(la de APP_SEED_PASSWORD)");
     }
 
     private Patient patient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {

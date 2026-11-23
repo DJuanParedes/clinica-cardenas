@@ -366,7 +366,7 @@ public class AssistantService {
     List<String> freeSlots(Dentist d, Long patientId, int duration, Long excludeId, int max) {
         List<String> out = new ArrayList<>();
         LocalDateTime min = Dates.now().plusHours(2);
-        int dur = Math.max(15, Math.min(240, duration - duration % 15));
+        int dur = Math.clamp(duration - duration % 15L, 15, 240);
         for (int i = 0; i < 14 && out.size() < max; i++) {
             LocalDate day = Dates.today().plusDays(i);
             try {

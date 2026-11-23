@@ -85,7 +85,7 @@ public class ConfirmationFollowupController {
         } else if ("REPROGRAMAR".equals(result)) {
             jdbc.update("update appointments set reschedule_requested_at = ? where id = ?", Dates.now(), id);
         }
-        audit.record("CITA", id, "LLAMADA", text);
+        audit.register("CITA", id, "LLAMADA", text);
         // changeStatus guarda con JPA: se vuelca a la base antes de releer la lista con SQL en esta misma transacción.
         em.flush();
         return unconfirmed();

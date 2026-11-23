@@ -87,7 +87,7 @@ public class LanguageModel {
         }
     }
 
-    private String claude(String system, List<Map<String, String>> messages) throws Exception {
+    private String claude(String system, List<Map<String, String>> messages) throws java.io.IOException, InterruptedException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("max_tokens", 450);
@@ -107,7 +107,7 @@ public class LanguageModel {
         return sb.toString();
     }
 
-    private String openai(String system, List<Map<String, String>> messages) throws Exception {
+    private String openai(String system, List<Map<String, String>> messages) throws java.io.IOException, InterruptedException {
         List<Map<String, String>> all = new ArrayList<>();
         all.add(Map.of("role", "system", CONTENT, system));
         all.addAll(messages);

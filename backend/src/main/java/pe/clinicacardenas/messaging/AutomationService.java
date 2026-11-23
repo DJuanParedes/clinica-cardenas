@@ -84,7 +84,7 @@ public class AutomationService {
         jdbc.update("update automation_rules set active=?, amount=?, unit=?, send_time=?, updated_at=?, updated_by=? where code=?",
                 active, "DIA".equals(old.kind()) ? 0 : amount, "DIA".equals(old.kind()) ? HORAS : unit, time, Dates.now(), CurrentUser.usernameOrSystem(), code);
         AutomationRule now = rules().stream().filter(x -> x.code().equals(code)).findFirst().orElseThrow();
-        audit.record("AUTOMATIZACION", null, "EDITAR", now.name() + ": " + (active ? summary(now) : "desactivada"));
+        audit.register("AUTOMATIZACION", null, "EDITAR", now.name() + ": " + (active ? summary(now) : "desactivada"));
         int moved = DESPUES.equals(now.kind()) ? 0 : notifications.rescheduleFuture();
         Map<String, Object> m = new LinkedHashMap<>(view().stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow());
         m.put("rescheduled", moved);

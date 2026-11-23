@@ -82,7 +82,7 @@ public class DniLookupService {
                 throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "El servicio de consulta de DNI no respondió. Escribe los nombres a mano.");
             }
             JsonNode root = json.readTree(res.body());
-            // Algunos proveedores envuelven la respuesta: { success, data: {...} }
+            // Algunos proveedores envuelven la respuesta dentro de un objeto "data".
             JsonNode n = root.path("data").isObject() ? root.path("data") : root;
             Map<String, Object> m = parse(dni, n);
             if (m == null) throw new ApiException(HttpStatus.NOT_FOUND, "DNI_NO_ENCONTRADO", "RENIEC no tiene registrado el DNI " + dni + ". Revisa el número.");

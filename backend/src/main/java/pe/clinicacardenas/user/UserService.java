@@ -181,7 +181,7 @@ public class UserService {
         if (u.role == Role.ODONTOLOGO) {
             ensureDentist(u, r.specialty(), r.cop());
         }
-        audit.record(USUARIO, u.id, "CREAR", "Usuario " + u.username + " con rol " + u.role.label);
+        audit.register(USUARIO, u.id, "CREAR", "Usuario " + u.username + " con rol " + u.role.label);
         return view(u);
     }
 
@@ -213,7 +213,7 @@ public class UserService {
         } else {
             dentist.ifPresent(d -> { d.active = false; dentists.save(d); });
         }
-        audit.record(USUARIO, u.id, "EDITAR", changes.isEmpty() ? "Datos revisados sin cambios" : String.join(", ", changes));
+        audit.register(USUARIO, u.id, "EDITAR", changes.isEmpty() ? "Datos revisados sin cambios" : String.join(", ", changes));
         return view(u);
     }
 
@@ -242,7 +242,7 @@ public class UserService {
         u.updatedAt = Dates.now();
         u.updatedBy = u.username;
         users.save(u);
-        audit.record(USUARIO, u.id, "PERFIL", "Actualizó sus datos personales");
+        audit.register(USUARIO, u.id, "PERFIL", "Actualizó sus datos personales");
         return view(u);
     }
 
@@ -259,7 +259,7 @@ public class UserService {
         u.updatedAt = Dates.now();
         u.updatedBy = u.username;
         users.save(u);
-        audit.record(USUARIO, u.id, "CAMBIO_CLAVE", "Cambió su contraseña");
+        audit.register(USUARIO, u.id, "CAMBIO_CLAVE", "Cambió su contraseña");
     }
 
     private void ensureDentist(User u, String specialty, String cop) {
@@ -300,7 +300,7 @@ public class UserService {
         u.updatedBy = CurrentUser.usernameOrSystem();
         users.save(u);
         dentists.findByUserId(u.id).ifPresent(d -> { d.active = active; dentists.save(d); });
-        audit.record(USUARIO, u.id, active ? "ACTIVAR" : "DESACTIVAR", (active ? "Cuenta activada" : "Cuenta desactivada"));
+        audit.register(USUARIO, u.id, active ? "ACTIVAR" : "DESACTIVAR", (active ? "Cuenta activada" : "Cuenta desactivada"));
         return view(u);
     }
 
@@ -314,7 +314,7 @@ public class UserService {
         u.updatedAt = Dates.now();
         u.updatedBy = CurrentUser.usernameOrSystem();
         users.save(u);
-        audit.record(USUARIO, u.id, "CONTRASENA_ASIGNADA", "Contraseña temporal asignada por el administrador");
+        audit.register(USUARIO, u.id, "CONTRASENA_ASIGNADA", "Contraseña temporal asignada por el administrador");
     }
 
     @Transactional
@@ -323,7 +323,7 @@ public class UserService {
         u.failedAttempts = 0;
         u.lockedUntil = null;
         users.save(u);
-        audit.record(USUARIO, u.id, "DESBLOQUEAR", "Cuenta desbloqueada");
+        audit.register(USUARIO, u.id, "DESBLOQUEAR", "Cuenta desbloqueada");
         return view(u);
     }
 
@@ -387,7 +387,7 @@ public class UserService {
         schedules.deleteByDentistId(dentistId);
         schedules.flush();
         schedules.saveAll(parsed);
-        audit.record("ODONTOLOGO", dentistId, "HORARIO", parsed.size() + " bloques de atención");
+        audit.register("ODONTOLOGO", dentistId, "HORARIO", parsed.size() + " bloques de atención");
         return schedules.findByDentistIdOrderByWeekdayAscStartTimeAsc(dentistId);
     }
 }

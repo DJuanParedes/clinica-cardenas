@@ -57,14 +57,15 @@ public class LeadService {
 
     private static final Logger log = LoggerFactory.getLogger(LeadService.class);
 
-    public static final Map<String, String> STAGES = new LinkedHashMap<>();
+    private static final Map<String, String> STAGES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> STAGES = java.util.Collections.unmodifiableMap(STAGES_EDIT);
     static {
-        STAGES.put(NUEVO_2, "Nuevo");
-        STAGES.put(CONTACTADO_2, "Contactado");
-        STAGES.put(CITA_AGENDADA_2, "Cita agendada");
-        STAGES.put(ASISTIO_2, "Asistió a evaluación");
-        STAGES.put(GANADO_2, "Aceptó tratamiento");
-        STAGES.put(PERDIDO_2, "Perdido");
+        STAGES_EDIT.put(NUEVO_2, "Nuevo");
+        STAGES_EDIT.put(CONTACTADO_2, "Contactado");
+        STAGES_EDIT.put(CITA_AGENDADA_2, "Cita agendada");
+        STAGES_EDIT.put(ASISTIO_2, "Asistió a evaluación");
+        STAGES_EDIT.put(GANADO_2, "Aceptó tratamiento");
+        STAGES_EDIT.put(PERDIDO_2, "Perdido");
     }
     public static final List<String> OPEN = List.of(NUEVO_2, CONTACTADO_2, CITA_AGENDADA_2, ASISTIO_2);
     public static final List<String> LOST_REASONS = List.of("Precio", "No responde", "Eligió otra clínica", "Ya no le interesa",
@@ -108,7 +109,7 @@ public class LeadService {
         List<Object> a = new ArrayList<>();
         a.add(now);
         c.add("(l.stage in ('NUEVO', 'CONTACTADO', 'CITA_AGENDADA', 'ASISTIO') or l.closed_at >= ?)");
-        a.add(now.minusDays(Math.max(1, Math.min(closedDays, 365))));
+        a.add(now.minusDays(Math.clamp(closedDays, 1, 365)));
         if (q != null && !q.isBlank()) {
             c.add("(lower(l.full_name) like ? or l.phone like ? or lower(coalesce(l.interest, '')) like ?)");
             String like = "%" + q.trim().toLowerCase() + "%";
@@ -125,7 +126,7 @@ public class LeadService {
             BigDecimal value = BigDecimal.ZERO;
             for (Map<String, Object> card : cards) {
                 if (!st.getKey().equals(card.get(STAGE))) continue;
-                card.put("nextTask", nextTasks.get((Long) card.get("id")));
+                card.put("nextTask", nextTasks.get(card.get("id")));
                 items.add(card);
                 if (card.get(ESTIMATEDVALUE) instanceof BigDecimal b) value = value.add(b);
             }
@@ -209,7 +210,7 @@ public class LeadService {
     /** Métricas del embudo para los leads creados en los últimos {@code days} días. */
     @Transactional(readOnly = true)
     public Map<String, Object> metrics(int days) {
-        int d = Math.max(7, Math.min(days, 365));
+        int d = Math.clamp(days, 7, 365);
         LocalDateTime since = Dates.today().minusDays(d).atStartOfDay();
         List<Map<String, Object>> rows = jdbc.queryForList("select stage, lost_from_stage, source, lost_reason, estimated_value, created_at, closed_at from leads where created_at >= ?", since);
         List<String> order = List.of(NUEVO_2, CONTACTADO_2, CITA_AGENDADA_2, ASISTIO_2, GANADO_2);
@@ -284,7 +285,7 @@ public class LeadService {
             tasks.insert(t, by);
             event(id, "TAREA", "Tarea: " + t.title() + " para el " + t.dueDate(), by);
         }
-        audit.record("LEAD", id, "CREAR", c.name + " · " + c.source);
+        audit.register("LEAD", id, "CREAR", c.name + " · " + c.source);
         return get(id);
     }
 
@@ -296,7 +297,7 @@ public class LeadService {
                 update leads set full_name = ?, phone = ?, email = ?, source = ?, interest = ?, procedure_id = ?, estimated_value = ?,
                        assignee_id = ?, notes = ?, updated_at = ? where id = ?
                 """, c.name, c.phone, c.email, c.source, c.interest, c.procedureId, c.value, c.assigneeId, c.notes, Dates.now(), id);
-        audit.record("LEAD", id, "EDITAR", c.name);
+        audit.register("LEAD", id, "EDITAR", c.name);
         return get(id);
     }
 
@@ -338,7 +339,7 @@ public class LeadService {
         event(id, "PACIENTE", "Vinculado al paciente " + patientName(r.patientId()), by);
         if (List.of(NUEVO_2, CONTACTADO_2).contains(l.get(STAGE)) && hasFutureAppointment(r.patientId()))
             move(id, CITA_AGENDADA_2, null, "Ya tiene una cita agendada", by);
-        audit.record("LEAD", id, "VINCULAR", "Paciente #" + r.patientId());
+        audit.register("LEAD", id, "VINCULAR", "Paciente #" + r.patientId());
         return get(id);
     }
 
@@ -346,7 +347,7 @@ public class LeadService {
     public Map<String, Object> setWhatsappAuto(boolean on) {
         if (jdbc.update("update app_settings set v = ?, updated_at = ?, updated_by = ? where k = 'leads_whatsapp_auto'", String.valueOf(on), Dates.now(), CurrentUser.usernameOrSystem()) == 0)
             jdbc.update("insert into app_settings (k, v, updated_at, updated_by) values ('leads_whatsapp_auto', ?, ?, ?)", String.valueOf(on), Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record("LEAD", null, "WHATSAPP_AUTO", on ? "Activado" : "Desactivado");
+        audit.register("LEAD", null, "WHATSAPP_AUTO", on ? "Activado" : "Desactivado");
         return options();
     }
 
@@ -406,7 +407,7 @@ public class LeadService {
         jdbc.update("update leads set stage = ?, stage_changed_at = ?, lost_reason = ?, lost_from_stage = ?, closed_at = ?, updated_at = ? where id = ?",
                 to, Dates.now(), PERDIDO_2.equals(to) ? lostReason : null, PERDIDO_2.equals(to) ? from : null, closing ? Dates.now() : null, Dates.now(), id);
         event(id, "ETAPA", STAGES.get(from) + " → " + STAGES.get(to) + (lostReason != null ? " (" + lostReason + ")" : "") + (why != null ? " · " + why : ""), by);
-        audit.record("LEAD", id, "ETAPA", from + " → " + to);
+        audit.register("LEAD", id, "ETAPA", from + " → " + to);
     }
 
     private void event(Long id, String kind, String detail, String by) {

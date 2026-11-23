@@ -73,7 +73,6 @@ public class MailNotifier {
             s.send(msg);
             return true;
         } catch (Exception e) {
-            log.warn("No se pudo enviar el correo a {}: {}", to, e.getMessage());
             throw new pe.clinicacardenas.common.ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "CORREO_NO_ENVIADO",
                     "No se pudo enviar el correo: " + e.getMessage());
         }

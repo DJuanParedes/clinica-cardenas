@@ -99,7 +99,7 @@ public class KnowledgeBase {
     String horarioDe(long dentistId) {
         Map<Integer, List<String>> byDay = new TreeMap<>();
         jdbc.query("select weekday, start_time, end_time from dentist_schedules where dentist_id = ? order by weekday, start_time",
-                rs -> { byDay.computeIfAbsent(rs.getInt(1), k -> new ArrayList<>()).add(rs.getString(2).substring(0, 5) + " a " + rs.getString(3).substring(0, 5)); },
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> byDay.computeIfAbsent(rs.getInt(1), k -> new ArrayList<>()).add(rs.getString(2).substring(0, 5) + " a " + rs.getString(3).substring(0, 5)),
                 dentistId);
         if (byDay.isEmpty()) return "Por ahora no tiene horario de atención registrado.";
         List<String> parts = new ArrayList<>();
@@ -114,7 +114,7 @@ public class KnowledgeBase {
                 select s.weekday, min(s.start_time), max(s.end_time) from dentist_schedules s
                   join dentists d on d.id = s.dentist_id join users u on u.id = d.user_id
                  where d.active = true and u.active = true group by s.weekday order by s.weekday
-                """, rs -> { range.put(rs.getInt(1), new String[]{rs.getString(2).substring(0, 5), rs.getString(3).substring(0, 5)}); });
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> range.put(rs.getInt(1), new String[]{rs.getString(2).substring(0, 5), rs.getString(3).substring(0, 5)}));
         if (range.isEmpty()) return "El horario de atención se confirma por teléfono al " + phone + ".";
         List<String> parts = new ArrayList<>();
         range.forEach((day, r) -> parts.add(DIAS[day] + " de " + r[0] + " a " + r[1]));

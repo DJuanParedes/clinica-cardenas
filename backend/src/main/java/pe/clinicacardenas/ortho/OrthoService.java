@@ -128,7 +128,7 @@ public class OrthoService {
         m.put("dentistId", r.get("dentist_id"));
         m.put("dentistName", r.get("dentist_name"));
         m.put(APPLIANCE, r.get(APPLIANCE));
-        m.put("applianceLabel", APPLIANCES.get((String) r.get(APPLIANCE)));
+        m.put("applianceLabel", APPLIANCES.get(r.get(APPLIANCE)));
         m.put("angleClass", r.get("angle_class"));
         m.put(DIAGNOSIS, r.get(DIAGNOSIS));
         m.put(OBJECTIVES, r.get(OBJECTIVES));
@@ -136,9 +136,9 @@ public class OrthoService {
         m.put(STARTDATE, start);
         m.put("estimatedMonths", r.get("estimated_months"));
         m.put(STATUS, r.get(STATUS));
-        m.put("statusLabel", STATUSES.get((String) r.get(STATUS)));
+        m.put("statusLabel", STATUSES.get(r.get(STATUS)));
         m.put(CURRENTSTAGE, r.get("current_stage"));
-        m.put("currentStageLabel", STAGES.get((String) r.get("current_stage")));
+        m.put("currentStageLabel", STAGES.get(r.get("current_stage")));
         LocalDate end = r.get("end_date") == null ? null : Dates.toLocalDate(r.get("end_date"));
         m.put(ENDDATE, end);
         m.put("planId", r.get("plan_id"));
@@ -186,7 +186,7 @@ public class OrthoService {
             throw ApiException.notFound("El paciente");
         if (jdbc.queryForObject("select count(*) from ortho_cases where patient_id = ? and status in ('ACTIVO', 'RETENCION')", Long.class, patientId) > 0)
             throw ApiException.conflict("CASO_ABIERTO", "El paciente ya tiene un tratamiento de ortodoncia en curso.");
-        Clean c = validate(r, patientId, true);
+        Clean c = validate(r, patientId);
         GeneratedKeyHolder kh = new GeneratedKeyHolder();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement("""
@@ -209,7 +209,7 @@ public class OrthoService {
             return ps;
         }, kh);
         Long id = Objects.requireNonNull(kh.getKey()).longValue();
-        audit.record(HISTORIA, patientId, ORTODONCIA, "Inició caso de ortodoncia: " + APPLIANCES.get(c.appliance));
+        audit.register(HISTORIA, patientId, ORTODONCIA, "Inició caso de ortodoncia: " + APPLIANCES.get(c.appliance));
         return get(id);
     }
 
@@ -217,7 +217,7 @@ public class OrthoService {
     public Map<String, Object> update(Long id, CaseRequest r) {
         Map<String, Object> cur = get(id);
         Long patientId = ((Number) cur.get(PATIENTID)).longValue();
-        Clean c = validate(r, patientId, false);
+        Clean c = validate(r, patientId);
         String status = r.status() == null || r.status().isBlank() ? (String) cur.get(STATUS) : r.status().trim().toUpperCase();
         if (!STATUSES.containsKey(status)) throw ApiException.field(STATUS, "Estado no válido.");
         boolean closing = Set.of("FINALIZADO", "ABANDONADO").contains(status);
@@ -227,7 +227,7 @@ public class OrthoService {
                 """, c.dentistId, c.appliance, c.angleClass, c.diagnosis, c.objectives, c.startDate, c.estimatedMonths, status, c.stage, c.planId,
                 closing ? (cur.get(ENDDATE) != null ? cur.get(ENDDATE) : Dates.today()) : null, Dates.now(), id);
         if (!status.equals(cur.get(STATUS)) || !c.stage.equals(cur.get(CURRENTSTAGE)))
-            audit.record(HISTORIA, patientId, ORTODONCIA, "Caso de ortodoncia: " + STATUSES.get(status) + " · etapa " + STAGES.get(c.stage));
+            audit.register(HISTORIA, patientId, ORTODONCIA, "Caso de ortodoncia: " + STATUSES.get(status) + " · etapa " + STAGES.get(c.stage));
         return get(id);
     }
 
@@ -254,7 +254,7 @@ public class OrthoService {
                 """, id, r.controlDate(), stage, blank(r.upperWire()), blank(r.lowerWire()), blank(r.elastics()), hy, blank(r.notes()),
                 r.nextWeeks(), CurrentUser.usernameOrSystem(), Dates.now());
         if (!stage.equals(cur.get(CURRENTSTAGE))) jdbc.update("update ortho_cases set current_stage = ?, updated_at = ? where id = ?", stage, Dates.now(), id);
-        audit.record(HISTORIA, ((Number) cur.get(PATIENTID)).longValue(), ORTODONCIA, "Control de ortodoncia del " + r.controlDate()
+        audit.register(HISTORIA, ((Number) cur.get(PATIENTID)).longValue(), ORTODONCIA, "Control de ortodoncia del " + r.controlDate()
                 + (blank(r.upperWire()) != null ? " · arco sup. " + r.upperWire().trim() : ""));
         return get(id);
     }
@@ -322,7 +322,7 @@ public class OrthoService {
     private record Clean(Long dentistId, String appliance, String angleClass, String diagnosis, String objectives, LocalDate startDate,
                          Integer estimatedMonths, String stage, Long planId) {}
 
-    private Clean validate(CaseRequest r, Long patientId, boolean fresh) {
+    private Clean validate(CaseRequest r, Long patientId) {
         Map<String, String> e = new LinkedHashMap<>();
         String ap = r.appliance() == null ? "" : r.appliance().trim().toUpperCase();
         if (!APPLIANCES.containsKey(ap)) e.put(APPLIANCE, "Elige el tipo de aparato.");

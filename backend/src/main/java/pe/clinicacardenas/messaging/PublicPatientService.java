@@ -55,8 +55,7 @@ public class PublicPatientService {
     private final SurveyRepository surveys;
     private final SurveyLinks links;
     private final AuditService audit;
-    @org.springframework.beans.factory.annotation.Autowired @org.springframework.context.annotation.Lazy
-    private pe.clinicacardenas.crm.MarketingService marketing;
+    private final org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.MarketingService> marketing;
     private final String clinicName;
     private final String clinicAddress;
     private final String clinicPhone;
@@ -66,7 +65,8 @@ public class PublicPatientService {
                                 PatientRepository patientRepo, AnamnesisService anamnesis, SurveyRepository surveys, SurveyLinks links,
                                 AuditService audit, @Value("${app.company.trade-name}") String clinicName,
                                 @Value("${app.company.address}") String clinicAddress,
-                                @Value("${app.notifications.clinic-phone:987 654 000}") String clinicPhone) {
+                                @Value("${app.notifications.clinic-phone:987 654 000}") String clinicPhone, org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.MarketingService> marketing) {
+        this.marketing = marketing;
         this.jdbc = jdbc;
         this.agenda = agenda;
         this.appointments = appointments;
@@ -157,7 +157,7 @@ public class PublicPatientService {
                 new AgendaService.AppointmentRequest(p.id, r.dentistId(), r.startAt(), duration(r.reasonCode()), label, fn, null)));
         a.bookedVia = "WEB";
         appointments.save(a);
-        audit.record("CITA", a.id, "RESERVA_WEB", "Reservada por " + p.getFullName() + " desde el enlace público");
+        audit.register("CITA", a.id, "RESERVA_WEB", "Reservada por " + p.getFullName() + " desde el enlace público");
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", a.id);
         m.put(STARTAT, a.startAt);
@@ -238,7 +238,7 @@ public class PublicPatientService {
             jdbc.update("insert into clinical_histories (patient_id, allergies, current_medication, created_at, updated_at, updated_by) values (?,?,?,?,?,?)",
                     p.id, allergies, medication, Dates.now(), Dates.now(), "paciente (web)");
         }
-        audit.record("PACIENTE", p.id, "PRERREGISTRO", "Ficha llenada por el paciente desde el enlace web");
+        audit.register("PACIENTE", p.id, "PRERREGISTRO", "Ficha llenada por el paciente desde el enlace web");
         return Map.of("id", p.id, FIRSTNAME, p.firstName.split(" ")[0], "hcNumber", p.hcNumber == null ? "" : p.hcNumber,
                 MESSAGE, "¡Gracias! Tu ficha quedó registrada. Ya puedes reservar tu cita.", "bookingUrl", links.bookingUrl());
     }
@@ -270,7 +270,7 @@ public class PublicPatientService {
         s.comment = clean(r.comment(), 500);
         s.createdAt = Dates.now();
         surveys.save(s);
-        audit.record("CITA", a.id, "ENCUESTA", r.score() + " estrellas desde el enlace del mensaje");
+        audit.register("CITA", a.id, "ENCUESTA", r.score() + " estrellas desde el enlace del mensaje");
         return Map.of(MESSAGE, r.score() >= 4 ? "¡Gracias! Nos alegra que te haya gustado tu atención." : "Gracias por contarnos. Revisaremos tu comentario para mejorar.");
     }
 
@@ -321,6 +321,6 @@ public class PublicPatientService {
     /** v2.7: casilla opcional "acepto recibir promociones" (aparte del consentimiento de datos). */
     private void marketingOptIn(Patient p, PersonData d, String ip) {
         if (Boolean.TRUE.equals(d.marketingConsent()) && !Boolean.TRUE.equals(p.marketingConsent))
-            marketing.applyConsent(p, true, "WEB", "paciente (enlace web)", ip);
+            marketing.getObject().applyConsent(p, true, "WEB", "paciente (enlace web)", ip);
     }
 }

@@ -160,7 +160,7 @@ public class PortalService {
         pc.createdAt = now;
         codes.save(pc);
         notifications.accessCode(p, code);
-        audit.record(PACIENTE, p.id, "APP_CODIGO", "Código de acceso a la app enviado");
+        audit.register(PACIENTE, p.id, "APP_CODIGO", "Código de acceso a la app enviado");
         String sentTo = mask(p.phone, p.email, p.phone == null ? EMAIL : "WHATSAPP");
         res.put("sentTo", sentTo);
         res.put("message", "Listo, " + p.firstName.split(" ")[0] + ": te enviamos un código de 6 dígitos " + (p.phone == null ? "a tu correo " : "por WhatsApp al ") + sentTo + ". Vence en 15 minutos.");
@@ -201,12 +201,12 @@ public class PortalService {
         pc.usedAt = now;
         codes.save(pc);
         // Aceptó términos y política de privacidad (Ley N.° 29733) al activar: queda registro con versión y canal.
-        consents.record(p, "TERMINOS", "APP", "paciente:" + p.id, null);
+        consents.register(p, "TERMINOS", "APP", "paciente:" + p.id, null);
         if (!p.dataConsent || !consents.currentVersion("PRIVACIDAD").equals(p.consentVersion)) {
-            consents.record(p, "PRIVACIDAD", "APP", "paciente:" + p.id, null);
+            consents.register(p, "PRIVACIDAD", "APP", "paciente:" + p.id, null);
         }
-        audit.record(PACIENTE, p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
-        return session(p, acc);
+        audit.register(PACIENTE, p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
+        return session(p);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -238,10 +238,10 @@ public class PortalService {
         acc.lockedUntil = null;
         acc.lastLoginAt = now;
         accounts.save(acc);
-        return session(p, acc);
+        return session(p);
     }
 
-    private Map<String, Object> session(Patient p, PatientAccount acc) {
+    private Map<String, Object> session(Patient p) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("token", jwt.generate(PatientAccount.SUBJECT_PREFIX + p.id, PACIENTE));
         m.put("expiresInMinutes", jwt.getExpirationMinutes());
@@ -347,7 +347,7 @@ public class PortalService {
         p.notifyChannel = ch;
         p.updatedAt = Dates.now();
         patients.save(p);
-        audit.record(PACIENTE, p.id, "CANAL_AVISOS", "Desde la app: avisos por " + ch.toLowerCase());
+        audit.register(PACIENTE, p.id, "CANAL_AVISOS", "Desde la app: avisos por " + ch.toLowerCase());
         return profile(p);
     }
 

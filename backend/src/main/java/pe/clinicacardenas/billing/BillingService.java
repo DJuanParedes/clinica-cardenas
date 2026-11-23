@@ -237,7 +237,7 @@ public class BillingService {
         inv.xmlContent = signed.xml();
         inv.hash = signed.digestValue();
         invoices.save(inv);
-        audit.record("COMPROBANTE", inv.id, "GENERAR", inv.getFullNumber() + " · S/ " + inv.totalAmount.toPlainString());
+        audit.register("COMPROBANTE", inv.id, "GENERAR", inv.getFullNumber() + " · S/ " + inv.totalAmount.toPlainString());
         return detail(inv.id);
     }
 
@@ -338,7 +338,7 @@ public class BillingService {
                 }
             }
         }
-        audit.record("COMPROBANTE", inv.id, action, inv.getFullNumber() + " → " + res.status()
+        audit.register("COMPROBANTE", inv.id, action, inv.getFullNumber() + " → " + res.status()
                 + (res.code() == null ? "" : " (" + res.code() + ")"));
     }
 

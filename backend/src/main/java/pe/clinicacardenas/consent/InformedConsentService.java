@@ -119,13 +119,13 @@ public class InformedConsentService {
             String code = "P" + Long.toString(System.currentTimeMillis(), 36).toUpperCase();
             jdbc.update("insert into consent_templates (code, name, body, sort_order, updated_by, updated_at) values (?, ?, ?, 100, ?, ?)", code, name, body, by, Dates.now());
             id = jdbc.queryForObject("select id from consent_templates where code = ?", Long.class, code);
-            audit.record(CONSENTIMIENTO, id, "PLANTILLA_CREAR", name);
+            audit.register(CONSENTIMIENTO, id, "PLANTILLA_CREAR", name);
         } else {
             Map<String, Object> cur = template(id);
             boolean changed = !body.equals(cur.get("body"));
             jdbc.update("update consent_templates set name = ?, body = ?, active = ?, version = version + ?, updated_by = ?, updated_at = ? where id = ?",
                     name, body, r.active() == null ? cur.get(ACTIVE) : r.active(), changed ? 1 : 0, by, Dates.now(), id);
-            audit.record(CONSENTIMIENTO, id, "PLANTILLA_EDITAR", name + (changed ? " · nueva versión" : ""));
+            audit.register(CONSENTIMIENTO, id, "PLANTILLA_EDITAR", name + (changed ? " · nueva versión" : ""));
         }
         return template(id);
     }
@@ -243,7 +243,7 @@ public class InformedConsentService {
             notifications.direct(p, CONSENTIMIENTO, channel, dest, "Consentimiento informado para firmar · " + clinicName, text, "consentimiento:" + id,
                     List.of(NotificationService.WA_DOCUMENTO, signer.split(" ")[0], clinicName, String.valueOf(t.get("name")).toLowerCase(Locale.ROOT), url, String.valueOf(VALID_DAYS)));
         }
-        audit.record(HISTORIA, p.id, CONSENTIMIENTO, "Envió para firmar: " + t.get("name") + " · " + (PRESENCIAL.equals(channel) ? "en la clínica" : channel.toLowerCase()));
+        audit.register(HISTORIA, p.id, CONSENTIMIENTO, "Envió para firmar: " + t.get("name") + " · " + (PRESENCIAL.equals(channel) ? "en la clínica" : channel.toLowerCase()));
         Map<String, Object> out = new LinkedHashMap<>(requests("r.id = ?", id).get(0));
         out.put("url", url);
         return out;
@@ -256,7 +256,7 @@ public class InformedConsentService {
         String why = reason == null ? "" : reason.trim();
         if (why.length() < 3) throw ApiException.field("reason", "Indica por qué se anula.");
         jdbc.update("update consent_requests set status = 'ANULADO', cancel_reason = ? where id = ?", why.length() > 200 ? why.substring(0, 200) : why, id);
-        audit.record(HISTORIA, ((Number) r.get(PATIENT_ID)).longValue(), CONSENTIMIENTO, "Anuló el envío de " + r.get(TITLE) + ": " + why);
+        audit.register(HISTORIA, ((Number) r.get(PATIENT_ID)).longValue(), CONSENTIMIENTO, "Anuló el envío de " + r.get(TITLE) + ": " + why);
         return requests("r.id = ?", id).get(0);
     }
 
@@ -336,7 +336,7 @@ public class InformedConsentService {
                 update consent_requests set status = 'FIRMADO', signed_at = ?, signer_name = ?, signer_doc = ?, signer_relationship = ?,
                        signer_ip = ?, signer_agent = ?, file_id = ? where id = ?
                 """, now, name, doc, rel, ip, agent == null ? null : agent.substring(0, Math.min(250, agent.length())), f.id, id);
-        audit.record(HISTORIA, p.id, CONSENTIMIENTO, "Firmó a distancia: " + r.get(TITLE) + " · " + name + " (" + REL.get(rel) + ")");
+        audit.register(HISTORIA, p.id, CONSENTIMIENTO, "Firmó a distancia: " + r.get(TITLE) + " · " + name + " (" + REL.get(rel) + ")");
         return Map.of("message", "¡Listo! Tu consentimiento quedó firmado. La clínica ya lo tiene en tu ficha.", "signedAt", now);
     }
 

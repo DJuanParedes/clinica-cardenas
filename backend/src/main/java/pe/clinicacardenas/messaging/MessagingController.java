@@ -108,7 +108,7 @@ public class MessagingController {
     public Map<String, Object> updateLinks(@RequestBody LinksRequest r) {
         if (r.bookingEnabled() != null) put(RESERVA_PUBLICA_ACTIVA, r.bookingEnabled());
         if (r.registerEnabled() != null) put(PRERREGISTRO_ACTIVO, r.registerEnabled());
-        audit.record("CONFIGURACION", null, "ENLACES", "Reserva web " + (setting(RESERVA_PUBLICA_ACTIVA) ? "activa" : "pausada")
+        audit.register("CONFIGURACION", null, "ENLACES", "Reserva web " + (setting(RESERVA_PUBLICA_ACTIVA) ? "activa" : "pausada")
                 + " · prerregistro " + (setting(PRERREGISTRO_ACTIVO) ? "activo" : "pausado"));
         return publicLinks();
     }

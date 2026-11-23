@@ -169,7 +169,7 @@ public class ReportService {
 
     private Map<Long, String> dentistNames() {
         Map<Long, String> m = new HashMap<>();
-        jdbc.query("select d.id, u.full_name from dentists d join users u on u.id = d.user_id", rs -> { m.put(rs.getLong(1), rs.getString(2)); });
+        jdbc.query("select d.id, u.full_name from dentists d join users u on u.id = d.user_id", (org.springframework.jdbc.core.RowCallbackHandler) rs -> m.put(rs.getLong(1), rs.getString(2)));
         return m;
     }
 

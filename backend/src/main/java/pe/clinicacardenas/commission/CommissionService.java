@@ -37,7 +37,7 @@ public class CommissionService {
     private static final String PORCENTAJE = "PORCENTAJE";
     private static final String COMMISSION = "commission";
     private static final String DENTISTID = "dentistId";
-    private static final String LINES = "lines";
+    private static final String KEY_LINES = "lines";
     private static final String TREATMENTITEMID = "treatmentItemId";
     private static final String VALIDFROM = "validFrom";
     private static final String VALUE = "value";
@@ -172,7 +172,7 @@ public class CommissionService {
             rule.updatedBy = CurrentUser.usernameOrSystem();
         }
         rules.save(rule);
-        audit.record("COMISION_REGLA", rule.id, id == null ? "CREAR" : "EDITAR", rule.dentist.getFullName() + " · " + rule.getLabel()
+        audit.register("COMISION_REGLA", rule.id, id == null ? "CREAR" : "EDITAR", rule.dentist.getFullName() + " · " + rule.getLabel()
                 + " · desde " + rule.validFrom + (rule.validTo == null ? "" : " hasta " + rule.validTo) + (rule.active ? "" : " · inactiva"));
         return rule;
     }
@@ -272,7 +272,7 @@ public class CommissionService {
         out.put("dentist", Map.of("id", d.id, "fullName", d.getFullName(), "specialty", d.specialty));
         out.put("from", from);
         out.put("to", to);
-        out.put(LINES, eligible);
+        out.put(KEY_LINES, eligible);
         out.put("baseTotal", money(baseTotal));
         out.put("total", money(total));
         out.put("withoutRule", noRule);
@@ -291,10 +291,10 @@ public class CommissionService {
     public Map<String, Object> settle(SettleRequest r) {
         Dentist d = dentists.lockById(dentist(r.dentistId()).id).orElseThrow();
         Map<String, Object> calc = calculate(d.id, r.from(), r.to());
-        List<Map<String, Object>> eligible = (List<Map<String, Object>>) calc.get(LINES);
+        List<Map<String, Object>> eligible = (List<Map<String, Object>>) calc.get(KEY_LINES);
         Set<Long> chosen = r.itemIds() == null || r.itemIds().isEmpty() ? null : new HashSet<>(r.itemIds());
         List<Map<String, Object>> selected = eligible.stream()
-                .filter(m -> chosen == null || chosen.contains((Long) m.get(TREATMENTITEMID))).toList();
+                .filter(m -> chosen == null || chosen.contains(m.get(TREATMENTITEMID))).toList();
         if (selected.isEmpty()) {
             throw ApiException.badRequest("SIN_COMISIONES", "No hay comisiones por liquidar con la selección y el período indicados.");
         }
@@ -332,7 +332,7 @@ public class CommissionService {
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict("YA_LIQUIDADO", "Otro usuario acaba de liquidar alguno de estos procedimientos. Vuelve a calcular.");
         }
-        audit.record(LIQUIDACION, s.id, "CREAR", d.getFullName() + " · " + r.from() + " a " + r.to() + " · "
+        audit.register(LIQUIDACION, s.id, "CREAR", d.getFullName() + " · " + r.from() + " a " + r.to() + " · "
                 + selected.size() + " procedimientos · S/ " + s.totalAmount.toPlainString());
         return detail(s.id);
     }
@@ -369,7 +369,7 @@ public class CommissionService {
         s.paidAmount = money(s.paidAmount.add(amount));
         s.status = s.paidAmount.compareTo(s.totalAmount) >= 0 ? "PAGADA" : "PARCIAL";
         settlements.save(s);
-        audit.record(LIQUIDACION, s.id, "PAGO", s.dentist.getFullName() + " · S/ " + amount.toPlainString() + " · "
+        audit.register(LIQUIDACION, s.id, "PAGO", s.dentist.getFullName() + " · S/ " + amount.toPlainString() + " · "
                 + CashService.METHOD_LABEL.get(method) + " · estado " + s.status.toLowerCase());
         return detail(s.id);
     }
@@ -386,7 +386,7 @@ public class CommissionService {
         s.status = ANULADA;
         s.notes = (s.notes == null ? "" : s.notes + " · ") + "Anulada: " + reason.trim();
         settlements.save(s);
-        audit.record(LIQUIDACION, s.id, "ANULAR", s.dentist.getFullName() + " · " + reason.trim());
+        audit.register(LIQUIDACION, s.id, "ANULAR", s.dentist.getFullName() + " · " + reason.trim());
         return detail(s.id);
     }
 
@@ -401,7 +401,7 @@ public class CommissionService {
         CommissionSettlement s = settlements.findById(id).orElseThrow(() -> ApiException.notFound(LA_LIQUIDACION));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("settlement", s);
-        m.put(LINES, lines.findBySettlementIdOrderByDoneAtAsc(id));
+        m.put(KEY_LINES, lines.findBySettlementIdOrderByDoneAtAsc(id));
         m.put("payouts", payouts.findBySettlementIdOrderByPaidOnAsc(id));
         return m;
     }

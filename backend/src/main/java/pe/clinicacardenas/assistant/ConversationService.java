@@ -45,8 +45,7 @@ public class ConversationService {
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
     public static final List<String> MODES = List.of(AUTOMATICO, "FUERA_HORARIO", "APAGADO");
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false) @org.springframework.context.annotation.Lazy
-    private pe.clinicacardenas.crm.LeadService leads;
+    private final org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.LeadService> leadsProvider;
     private final JdbcTemplate jdbc;
     private final CareService care;
     private final AssistantService assistant;
@@ -58,7 +57,8 @@ public class ConversationService {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
     public ConversationService(JdbcTemplate jdbc, CareService care, AssistantService assistant, KnowledgeBase kb, LanguageModel llm,
-                               AuditService audit, ObjectMapper json, @Value("${app.notifications.url}") String notifUrl) {
+                               AuditService audit, ObjectMapper json, @Value("${app.notifications.url}") String notifUrl, org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.LeadService> leadsProvider) {
+        this.leadsProvider = leadsProvider;
         this.jdbc = jdbc;
         this.care = care;
         this.assistant = assistant;
@@ -113,7 +113,7 @@ public class ConversationService {
             if (r.pauseMinutes() < 5 || r.pauseMinutes() > 1440) throw ApiException.field("pauseMinutes", "Entre 5 minutos y 24 horas.");
             putSetting(ASISTENTE_PAUSA_MINUTOS, String.valueOf(r.pauseMinutes()));
         }
-        audit.record(ASISTENTE, 0L, "CONFIGURAR", "Modo " + setting(ASISTENTE_MODO, "") + " · pausa " + setting(ASISTENTE_PAUSA_MINUTOS, "") + " min");
+        audit.register(ASISTENTE, 0L, "CONFIGURAR", "Modo " + setting(ASISTENTE_MODO, "") + " · pausa " + setting(ASISTENTE_PAUSA_MINUTOS, "") + " min");
         return settings();
     }
 
@@ -144,7 +144,7 @@ public class ConversationService {
         return created == null ? Map.of() : created;
     }
 
-    private long record(String phone, String direction, String source, String body, String intent, String engine, String status, String author) {
+    private long storeMessage(String phone, String direction, String source, String body, String intent, String engine, String status, String author) {
         LocalDateTime now = Dates.now();
         jdbc.update("""
                 insert into wa_messages (phone, direction, source, body, intent, engine, status, author, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -198,9 +198,9 @@ public class ConversationService {
         String text = r.texto() == null ? "" : r.texto().trim();
         if (phone == null || text.isEmpty()) return Map.of(ACCION, "IGNORADO");
         Map<String, Object> t = ensureThread(phone);
-        record(phone, "IN", "PACIENTE", text, null, null, null, null);
+        storeMessage(phone, "IN", "PACIENTE", text, null, null, null, null);
         // v2.7: quien escribe sin ser paciente entra al embudo de ventas como lead nuevo
-        if (t.get(PATIENT_ID) == null && leads != null) leads.fromWhatsApp(phone, text);
+        if (t.get(PATIENT_ID) == null) leadsProvider.ifAvailable(l -> l.fromWhatsApp(phone, text));
 
         // Reserva por WhatsApp en curso: los números que escribe son opciones de fecha/hora, no "1 confirma / 2 reprograma".
         Long bookingPid = t.get(PATIENT_ID) == null ? null : ((Number) t.get(PATIENT_ID)).longValue();
@@ -213,7 +213,7 @@ public class ConversationService {
                 jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
                 reply = "Tuve un problema al revisar la agenda. Recepción te escribirá para terminar tu reserva.";
             }
-            record(phone, "OUT", "IA", reply, "RESERVA", "agenda", ENVIADO, null);
+            storeMessage(phone, "OUT", "IA", reply, "RESERVA", "agenda", ENVIADO, null);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put(ACCION, ASISTENTE);
             out.put("intencion", "RESERVA");
@@ -225,7 +225,7 @@ public class ConversationService {
         Map<String, Object> agendaReply = care.whatsappReply(r);
         Object respuesta = agendaReply.get(RESPUESTA);
         if (respuesta != null) {
-            record(phone, "OUT", "SISTEMA", String.valueOf(respuesta), String.valueOf(agendaReply.get(ACCION)), "agenda", ENVIADO, null);
+            storeMessage(phone, "OUT", "SISTEMA", String.valueOf(respuesta), String.valueOf(agendaReply.get(ACCION)), "agenda", ENVIADO, null);
             if ("REPROGRAMAR".equals(agendaReply.get(ACCION))) jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
             return agendaReply;
         }
@@ -248,7 +248,7 @@ public class ConversationService {
             jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
             return Map.of(ACCION, PERSONAL, "motivo", "Error del asistente");
         }
-        record(phone, "OUT", "IA", rep.text(), rep.intent(), rep.engine(), ENVIADO, null);
+        storeMessage(phone, "OUT", "IA", rep.text(), rep.intent(), rep.engine(), ENVIADO, null);
         if (rep.needsHuman()) jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
         if (rep.pauseAi()) jdbc.update("update wa_threads set manual_until = ? where phone = ?", Dates.now().plusMinutes(pause()), phone);
         Map<String, Object> out = new LinkedHashMap<>();
@@ -292,7 +292,7 @@ public class ConversationService {
         } catch (Exception e) {
             error = "El servicio de mensajes no respondió";
         }
-        long id = record(phone, "OUT", PERSONAL, text, null, null, status, CurrentUser.usernameOrSystem());
+        long id = storeMessage(phone, "OUT", PERSONAL, text, null, null, status, CurrentUser.usernameOrSystem());
         jdbc.update("update wa_threads set unread = 0, needs_attention = false, manual_until = ? where phone = ?",
                 Dates.now().plusMinutes(pause()), phone);
         if (!ENVIADO.equals(status)) throw new ApiException(HttpStatus.BAD_GATEWAY, "ENVIO_FALLIDO", "No se pudo enviar: " + error);

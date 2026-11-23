@@ -192,7 +192,7 @@ public class NotificationDispatcher {
         if (retry) log.debug("Notificación {} pendiente: {}", id, error);
     }
 
-    private HttpResponse<String> call(Notification n) throws Exception {
+    private HttpResponse<String> call(Notification n) throws java.io.IOException, InterruptedException {
         HttpRequest.Builder b;
         if (ANULAR.equals(n.operation)) {
             String target = n.idempotencyKey.substring("anular:".length());

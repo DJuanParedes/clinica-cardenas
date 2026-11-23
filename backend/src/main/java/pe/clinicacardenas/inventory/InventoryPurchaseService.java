@@ -120,7 +120,7 @@ public class InventoryPurchaseService {
             items.save(i);
         }
         if (paid) createExpense(id, date, supplier, docType, docNumber, total, method);
-        audit.record("COMPRA", id, "REGISTRAR", supplier + " · S/ " + total.toPlainString() + (paid ? "" : " · al crédito"));
+        audit.register("COMPRA", id, "REGISTRAR", supplier + " · S/ " + total.toPlainString() + (paid ? "" : " · al crédito"));
         return get(id);
     }
 
@@ -144,7 +144,7 @@ public class InventoryPurchaseService {
         if (method == null || !CashService.METHODS.contains(method)) throw ApiException.field("method", "Selecciona cómo se pagó.");
         createExpense(id, r.paidOn() == null ? Dates.today() : r.paidOn(), (String) p.get("supplier"), (String) p.get("docType"),
                 (String) p.get(DOCNUMBER), (BigDecimal) p.get("total"), method);
-        audit.record("COMPRA", id, "PAGAR", "S/ " + p.get("total"));
+        audit.register("COMPRA", id, "PAGAR", "S/ " + p.get("total"));
         return get(id);
     }
 

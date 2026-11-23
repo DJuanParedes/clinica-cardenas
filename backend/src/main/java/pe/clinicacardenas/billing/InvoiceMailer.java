@@ -72,7 +72,7 @@ public class InvoiceMailer {
         files.put(fileBase + ".pdf", pdf);
         if (xml != null) files.put(fileBase + ".xml", xml);
         boolean real = mail.sendHtml(email, inv.getDocTypeLabel() + " " + inv.getFullNumber() + " · Clínica Dental Cárdenas", html, files);
-        audit.record("COMPROBANTE", inv.id, "ENVIAR_CORREO", inv.getFullNumber() + " → " + email);
+        audit.register("COMPROBANTE", inv.id, "ENVIAR_CORREO", inv.getFullNumber() + " → " + email);
         return Map.of("message", real ? "Comprobante enviado a " + email + "." : "Correo registrado (el servidor de correo no está configurado: quedó simulado).",
                 "email", email, "simulated", !real);
     }

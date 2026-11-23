@@ -41,21 +41,22 @@ public class LabService {
     private static final String WORKTYPE = "workType";
 
 
-    public static final Map<String, String> WORK_TYPES = new LinkedHashMap<>();
+    private static final Map<String, String> WORK_TYPES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> WORK_TYPES = java.util.Collections.unmodifiableMap(WORK_TYPES_EDIT);
     static {
-        WORK_TYPES.put("CORONA", "Corona");
-        WORK_TYPES.put("PUENTE", "Puente fijo");
-        WORK_TYPES.put("INCRUSTACION", "Incrustación (inlay / onlay)");
-        WORK_TYPES.put("CARILLA", "Carillas");
-        WORK_TYPES.put("PERNO", "Perno muñón colado");
-        WORK_TYPES.put("PROTESIS_TOTAL", "Prótesis total");
-        WORK_TYPES.put("PROTESIS_PARCIAL", "Prótesis parcial removible");
-        WORK_TYPES.put("PROTESIS_IMPLANTE", "Prótesis sobre implante");
-        WORK_TYPES.put("PLACA", "Placa miorrelajante / de bruxismo");
-        WORK_TYPES.put("ORTODONCIA", "Aparato de ortodoncia / retenedor");
-        WORK_TYPES.put("ALINEADORES", "Alineadores");
-        WORK_TYPES.put("MODELOS", "Modelos de estudio / encerado");
-        WORK_TYPES.put("OTRO", "Otro trabajo");
+        WORK_TYPES_EDIT.put("CORONA", "Corona");
+        WORK_TYPES_EDIT.put("PUENTE", "Puente fijo");
+        WORK_TYPES_EDIT.put("INCRUSTACION", "Incrustación (inlay / onlay)");
+        WORK_TYPES_EDIT.put("CARILLA", "Carillas");
+        WORK_TYPES_EDIT.put("PERNO", "Perno muñón colado");
+        WORK_TYPES_EDIT.put("PROTESIS_TOTAL", "Prótesis total");
+        WORK_TYPES_EDIT.put("PROTESIS_PARCIAL", "Prótesis parcial removible");
+        WORK_TYPES_EDIT.put("PROTESIS_IMPLANTE", "Prótesis sobre implante");
+        WORK_TYPES_EDIT.put("PLACA", "Placa miorrelajante / de bruxismo");
+        WORK_TYPES_EDIT.put("ORTODONCIA", "Aparato de ortodoncia / retenedor");
+        WORK_TYPES_EDIT.put("ALINEADORES", "Alineadores");
+        WORK_TYPES_EDIT.put("MODELOS", "Modelos de estudio / encerado");
+        WORK_TYPES_EDIT.put("OTRO", "Otro trabajo");
     }
 
     public static final List<String> STATUSES = List.of(POR_ENVIAR_2, ENVIADA_2, EN_PRUEBA_2, RECIBIDA_2, ENTREGADA_2, ANULADA);
@@ -107,7 +108,7 @@ public class LabService {
         String ruc = clean(r.ruc(), 11);
         if (ruc != null && !RucValidator.isValid(ruc)) e.put("ruc", "El RUC no es válido.");
         String phone = clean(r.phone(), 15);
-        if (phone != null && !phone.replaceAll("[^0-9]", "").matches("^\\d{6,9}$")) e.put("phone", "Teléfono no válido.");
+        if (phone != null && !phone.replaceAll("\\D", "").matches("^\\d{6,9}$")) e.put("phone", "Teléfono no válido.");
         String email = clean(r.email(), 120);
         if (email != null && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (name != null) {
@@ -120,12 +121,12 @@ public class LabService {
             jdbc.update("insert into laboratories (name, ruc, phone, email, contact, address, notes, active, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?)",
                     name, ruc, phone, email, clean(r.contact(), 120), clean(r.address(), 200), clean(r.notes(), 300), active, Dates.now(), CurrentUser.usernameOrSystem());
             id = jdbc.queryForObject("select id from laboratories where name = ?", Long.class, name);
-            audit.record(LABORATORIO_2, id, "CREAR", name);
+            audit.register(LABORATORIO_2, id, "CREAR", name);
         } else {
             int n = jdbc.update("update laboratories set name=?, ruc=?, phone=?, email=?, contact=?, address=?, notes=?, active=? where id=?",
                     name, ruc, phone, email, clean(r.contact(), 120), clean(r.address(), 200), clean(r.notes(), 300), active, id);
             if (n == 0) throw ApiException.notFound("El laboratorio");
-            audit.record(LABORATORIO_2, id, "EDITAR", name + (active ? "" : " (inactivo)"));
+            audit.register(LABORATORIO_2, id, "EDITAR", name + (active ? "" : " (inactivo)"));
         }
         Long fid = id;
         return labs(true).stream().filter(l -> fid.equals(((Number) l.get("id")).longValue())).findFirst().orElseThrow();
@@ -235,7 +236,7 @@ public class LabService {
                 send ? ENVIADA_2 : POR_ENVIAR_2, send ? Dates.today() : null, r.dueDate(), v.cost, v.notes, Dates.now(), user);
         Long id = jdbc.queryForObject("select max(id) from lab_orders where created_by = ?", Long.class, user);
         event(id, send ? ENVIADA_2 : POR_ENVIAR_2, send ? "Orden creada y enviada al laboratorio" : "Orden creada");
-        audit.record(LABORATORIO_2, id, "ORDEN", WORK_TYPES.get(v.workType) + " · " + v.description + " · S/ " + v.cost);
+        audit.register(LABORATORIO_2, id, "ORDEN", WORK_TYPES.get(v.workType) + " · " + v.description + " · S/ " + v.cost);
         return get(id);
     }
 
@@ -253,7 +254,7 @@ public class LabService {
                   material=?, due_date=?, cost=?, notes=?, updated_at=?, updated_by=? where id=?""",
                 r.laboratoryId(), v.dentistId, v.planId, v.itemId, v.workType, v.description, v.teeth, v.shade, v.material, r.dueDate(), v.cost, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem(), id);
-        audit.record(LABORATORIO_2, id, "EDITAR", v.description);
+        audit.register(LABORATORIO_2, id, "EDITAR", v.description);
         return get(id);
     }
 
@@ -280,7 +281,7 @@ public class LabService {
         }
         jdbc.update("update lab_orders set updated_at=?, updated_by=? where id=?", Dates.now(), CurrentUser.usernameOrSystem(), id);
         event(id, to, note);
-        audit.record(LABORATORIO_2, id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
+        audit.register(LABORATORIO_2, id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
         return get(id);
     }
 

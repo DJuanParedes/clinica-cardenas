@@ -36,7 +36,7 @@ public class SimulatedSunatGateway implements SunatGateway {
     @Override
     public Response send(Invoice inv, String xml) {
         try {
-            Thread.sleep(350 + (long) (Math.random() * 450)); // latencia típica del servicio
+            Thread.sleep(350 + java.util.concurrent.ThreadLocalRandom.current().nextLong(450)); // latencia típica del servicio
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

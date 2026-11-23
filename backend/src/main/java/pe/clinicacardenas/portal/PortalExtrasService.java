@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 import pe.clinicacardenas.agenda.*;
 import pe.clinicacardenas.billing.BillingService;
 import pe.clinicacardenas.billing.Invoice;
-import pe.clinicacardenas.billing.InvoiceItem;
 import pe.clinicacardenas.billing.InvoiceItemRepository;
 import pe.clinicacardenas.cash.CashService;
 import pe.clinicacardenas.common.ApiException;
@@ -16,7 +15,6 @@ import pe.clinicacardenas.common.AuditService;
 import pe.clinicacardenas.common.Dates;
 import pe.clinicacardenas.files.FileService;
 import pe.clinicacardenas.files.PatientFile;
-import pe.clinicacardenas.files.SimplePdf;
 import pe.clinicacardenas.patient.Patient;
 import pe.clinicacardenas.patient.PatientRepository;
 
@@ -24,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -68,15 +65,11 @@ public class PortalExtrasService {
     private final InvoiceItemRepository invoiceItems;
     private final FileService files;
     private final AuditService audit;
-    private final String clinicName;
-    private final String clinicAddress;
 
     public PortalExtrasService(PatientRepository patients, AppointmentRepository appointments, AgendaService agenda,
                                PatientNoticeRepository notices, SurveyRepository surveys, SimulatedPaymentGateway gateway,
                                CashService cash, BillingService billing, InvoiceItemRepository invoiceItems,
-                               FileService files, AuditService audit,
-                               @Value("${app.company.trade-name}") String clinicName,
-                               @Value("${app.company.address}") String clinicAddress) {
+                               FileService files, AuditService audit) {
         this.patients = patients;
         this.appointments = appointments;
         this.agenda = agenda;
@@ -88,8 +81,6 @@ public class PortalExtrasService {
         this.invoiceItems = invoiceItems;
         this.files = files;
         this.audit = audit;
-        this.clinicName = clinicName;
-        this.clinicAddress = clinicAddress;
     }
 
     public record BookRequest(Long dentistId, LocalDateTime startAt, String reasonCode, String notes) {}
@@ -198,7 +189,7 @@ public class PortalExtrasService {
                 durationOf(r.reasonCode()), label, notes.length() > 480 ? notes.substring(0, 480) : notes, null));
         a.bookedVia = "APP";
         appointments.save(a);
-        audit.record("CITA", a.id, "RESERVA_APP", "Reservada por " + p.getFullName() + " desde la app");
+        audit.register("CITA", a.id, "RESERVA_APP", "Reservada por " + p.getFullName() + " desde la app");
         return Map.of("id", a.id, STARTAT, a.startAt, MESSAGE, "¡Listo! Tu cita quedó reservada.");
     }
 
@@ -283,7 +274,7 @@ public class PortalExtrasService {
                     p.getFullName(), null, List.of(new BillingService.LineRequest("Pago de tratamiento dental (app)",
                     BigDecimal.ONE, amount, null))));
             if (inv.get("invoice") instanceof Invoice created) {
-                try { billing.send(created.id); } catch (Exception e) { log.warn("Boleta del pago en línea no enviada a SUNAT: {}", e.getMessage()); }
+                sendToSunat(created.id);
                 out.put("invoiceId", created.id);
                 out.put("invoice", created.getFullNumber());
             }
@@ -387,5 +378,9 @@ public class PortalExtrasService {
         s.createdAt = Dates.now();
         surveys.save(s);
         return Map.of(MESSAGE, "¡Gracias por tu calificación!");
+    }
+
+    private void sendToSunat(Long invoiceId) {
+        try { billing.send(invoiceId); } catch (Exception e) { log.warn("Boleta del pago en línea no enviada a SUNAT: {}", e.getMessage()); }
     }
 }

@@ -216,7 +216,7 @@ public class AnnualReportService {
     @Transactional(readOnly = true)
     public String csv(int year) {
         Map<String, Object> r = report(year);
-        StringBuilder b = new StringBuilder("﻿");
+        StringBuilder b = new StringBuilder("\uFEFF");
         b.append("Reporte anual ").append(year).append(';').append(clinic).append('\n');
         b.append("Mes;Citas atendidas;Pacientes nuevos;Ingresos;Egresos;Resultado\n");
         for (Map<String, Object> m : (List<Map<String, Object>>) r.get(MONTHS))

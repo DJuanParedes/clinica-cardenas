@@ -123,7 +123,7 @@ public class InventoryService {
     private Map<Long, Object> nextExpiryByItem() {
         Map<Long, Object> m = new HashMap<>();
         jdbc.query("select item_id, min(expires_on) from inventory_lots where remaining > 0 and expires_on is not null group by item_id",
-                rs -> { m.put(rs.getLong(1), rs.getDate(2).toLocalDate()); });
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> m.put(rs.getLong(1), rs.getDate(2).toLocalDate()));
         return m;
     }
 
@@ -160,7 +160,7 @@ public class InventoryService {
             Long lot = newLot(i, null, r.lotCode(), r.expiresOn(), initial, i.unitCost);
             move(i, ENTRADA, initial, "Stock inicial", null, lot, null, null);
         }
-        audit.record("INVENTARIO", i.id, "CREAR", name);
+        audit.register("INVENTARIO", i.id, "CREAR", name);
         return i;
     }
 
@@ -293,7 +293,7 @@ public class InventoryService {
         i.updatedAt = Dates.now();
         items.save(i);
         images.delete(old);
-        audit.record("INVENTARIO", i.id, "FOTO", i.name);
+        audit.register("INVENTARIO", i.id, "FOTO", i.name);
         return i;
     }
 
@@ -345,10 +345,6 @@ public class InventoryService {
         }
         move(i, kind, delta, reason, null, lot, null, null, cost, r.patientId(), null);
         return Map.of("item", i, "message", "Movimiento registrado.");
-    }
-
-    private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId) {
-        move(i, kind, delta, reason, treatmentItemId, null, null, null);
     }
 
     private void move(InventoryItem i, String kind, BigDecimal delta, String reason, Long treatmentItemId,

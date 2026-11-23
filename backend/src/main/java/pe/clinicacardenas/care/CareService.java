@@ -124,7 +124,7 @@ public class CareService {
         w.createdAt = Dates.now();
         w.createdBy = CurrentUser.usernameOrSystem();
         waitlist.save(w);
-        audit.record(PACIENTE, p.id, LISTA_ESPERA, "Agregado a la lista de espera: " + w.reason);
+        audit.register(PACIENTE, p.id, LISTA_ESPERA, "Agregado a la lista de espera: " + w.reason);
         return w;
     }
 
@@ -233,7 +233,7 @@ public class CareService {
             i.createdBy = CurrentUser.usernameOrSystem();
             installments.save(i);
         }
-        audit.record("HISTORIA", p.patientId, "CUOTAS", count + " cuotas para \"" + p.title + "\" (S/ " + total.toPlainString() + ")");
+        audit.register("HISTORIA", p.patientId, "CUOTAS", count + " cuotas para \"" + p.title + "\" (S/ " + total.toPlainString() + ")");
         return installments(planId);
     }
 
@@ -324,7 +324,7 @@ public class CareService {
         notices.add(p.id, CONTROL, "Te toca tu control", recallText(k).substring(0, 1).toUpperCase() + recallText(k).substring(1), null);
         jdbc.update("insert into recall_log (patient_id, kind, sent_at, sent_by) values (?, ?, ?, ?)",
                 p.id, k, Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record(PACIENTE, p.id, "RECORDATORIO_CONTROL", k.toLowerCase());
+        audit.register(PACIENTE, p.id, "RECORDATORIO_CONTROL", k.toLowerCase());
         return Map.of("queued", queued, "message", queued > 0 ? "Recordatorio enviado." : "Ya se le envió este recordatorio este mes.");
     }
 
@@ -353,7 +353,7 @@ public class CareService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> satisfaction(int days) {
-        LocalDateTime since = Dates.now().minusDays(Math.max(1, Math.min(days, 365)));
+        LocalDateTime since = Dates.now().minusDays(Math.clamp(days, 1, 365));
         Map<String, Object> m = new LinkedHashMap<>();
         Map<String, Object> agg = jdbc.queryForMap("select count(*) as total, coalesce(avg(score), 0) as average from surveys where created_at >= ?", since);
         m.put("days", days);
@@ -397,7 +397,7 @@ public class CareService {
             for (Long id : ids) {
                 if (Boolean.FALSE.equals(jdbc.queryForObject("select marketing_consent from patients where id = ?", Boolean.class, id))) continue;
                 jdbc.update("update patients set marketing_consent = false, marketing_consent_at = ? where id = ?", Dates.now(), id);
-                audit.record(PACIENTE, id, "PUBLICIDAD_BAJA", "Pidió la baja de promociones por WhatsApp");
+                audit.register(PACIENTE, id, "PUBLICIDAD_BAJA", "Pidió la baja de promociones por WhatsApp");
             }
             out.put(ACCION, "BAJA_PUBLICIDAD");
             out.put(RESPUESTA, "Listo, ya no te enviaremos promociones. Seguirás recibiendo los avisos de tus citas. Si cambias de opinión, avísanos en recepción.");
@@ -432,7 +432,7 @@ public class CareService {
         } else if ("2".equals(option)) {
             next.rescheduleRequestedAt = Dates.now();
             appointments.save(next);
-            audit.record("CITA", next.id, "SOLICITA_REPROGRAMAR", "El paciente respondió 2 por WhatsApp");
+            audit.register("CITA", next.id, "SOLICITA_REPROGRAMAR", "El paciente respondió 2 por WhatsApp");
             notices.add(next.patient.id, "CITA_REPROGRAMAR", "Recibimos tu pedido",
                     "Recepción te contactará para elegir un nuevo horario. También puedes reprogramar desde la app.", next.id);
             out.put(ACCION, "REPROGRAMAR");

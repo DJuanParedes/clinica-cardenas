@@ -81,7 +81,9 @@ public class AnamnesisService {
             List<String> options = q.options() == null ? List.of() : q.options().stream().map(o -> clean(o, 80)).filter(Objects::nonNull).distinct().toList();
             if (CHOICE.equals(type) && options.size() < 2) { e.put(QUESTIONS, "La pregunta \"" + label + "\" necesita al menos 2 opciones."); break; }
             String qid = q.id() == null || q.id().isBlank() ? slug(label) : q.id().trim();
-            while (ids.contains(qid)) qid = qid + "_" + n;
+            StringBuilder unique = new StringBuilder(qid);
+            while (ids.contains(unique.toString())) unique.append('_').append(n);
+            qid = unique.toString();
             ids.add(qid);
             clean.add(new Question(qid, clean(q.section(), 60) == null ? "General" : clean(q.section(), 60), label, type,
                     CHOICE.equals(type) ? options : null, YES_NO.equals(type) && Boolean.TRUE.equals(q.alert())));
@@ -98,12 +100,12 @@ public class AnamnesisService {
             jdbc.update("insert into anamnesis_templates (code, name, specialty, questions, active, sort_order, updated_at, updated_by) values (?,?,?,?,?,?,?,?)",
                     code, name, clean(r.specialty(), 60), questions, active, (max == null ? 0 : max) + 1, Dates.now(), user);
             id = jdbc.queryForObject("select id from anamnesis_templates where code = ?", Long.class, code);
-            audit.record(ANAMNESIS, id, "CREAR", "Plantilla " + name);
+            audit.register(ANAMNESIS, id, "CREAR", "Plantilla " + name);
         } else {
             int c = jdbc.update("update anamnesis_templates set name=?, specialty=?, questions=?, active=?, updated_at=?, updated_by=? where id=?",
                     name, clean(r.specialty(), 60), questions, active, Dates.now(), user, id);
             if (c == 0) throw ApiException.notFound("La plantilla");
-            audit.record(ANAMNESIS, id, "EDITAR", "Plantilla " + name + " (" + clean.size() + " preguntas)");
+            audit.register(ANAMNESIS, id, "EDITAR", "Plantilla " + name + " (" + clean.size() + " preguntas)");
         }
         Long fid = id;
         return templates(true).stream().filter(t -> fid.equals(((Number) t.get("id")).longValue())).findFirst().orElseThrow();
@@ -173,10 +175,10 @@ public class AnamnesisService {
         if (recordId == null) {
             jdbc.update("insert into anamnesis_records (patient_id, template_id, template_name, questions, answers, alerts, created_at, created_by) values (?,?,?,?,?,?,?,?)",
                     patientId, templateId, templateName, write(questions), write(answers), alertText, Dates.now(), user);
-            audit.record(HISTORIA, patientId, ANAMNESIS, templateName + (alertText == null ? "" : " · alertas: " + alertText));
+            audit.register(HISTORIA, patientId, ANAMNESIS, templateName + (alertText == null ? "" : " · alertas: " + alertText));
         } else {
             jdbc.update("update anamnesis_records set answers=?, alerts=?, updated_at=? where id=?", write(answers), alertText, Dates.now(), recordId);
-            audit.record(HISTORIA, patientId, ANAMNESIS, "Corrigió " + templateName);
+            audit.register(HISTORIA, patientId, ANAMNESIS, "Corrigió " + templateName);
         }
         return Map.of("records", records(patientId), "alerts", alerts(patientId));
     }
@@ -226,7 +228,7 @@ public class AnamnesisService {
                 values (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 patientId, at, r.systolic(), r.diastolic(), r.heartRate(), r.respRate(), r.temperature(), r.spo2(), r.weight(), r.height(),
                 r.glucose(), clean(r.notes(), 250), CurrentUser.usernameOrSystem());
-        audit.record(HISTORIA, patientId, "SIGNOS_VITALES", (r.systolic() == null ? "" : "PA " + r.systolic() + "/" + r.diastolic() + " ")
+        audit.register(HISTORIA, patientId, "SIGNOS_VITALES", (r.systolic() == null ? "" : "PA " + r.systolic() + "/" + r.diastolic() + " ")
                 + (r.heartRate() == null ? "" : "FC " + r.heartRate()));
         return vitals(patientId);
     }
@@ -240,7 +242,7 @@ public class AnamnesisService {
             throw ApiException.badRequest("NO_PERMITIDO", "Solo quien lo registró puede borrarlo, y solo el mismo día.");
         }
         jdbc.update("delete from vital_signs where id = ?", id);
-        audit.record(HISTORIA, patientId, "SIGNOS_VITALES", "Borró un registro de signos vitales");
+        audit.register(HISTORIA, patientId, "SIGNOS_VITALES", "Borró un registro de signos vitales");
         return vitals(patientId);
     }
 

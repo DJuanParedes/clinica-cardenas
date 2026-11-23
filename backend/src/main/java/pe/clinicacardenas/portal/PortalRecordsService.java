@@ -81,7 +81,7 @@ public class PortalRecordsService {
         p.updatedAt = Dates.now();
         p.updatedBy = "paciente (app)";
         patients.save(p);
-        if (!changes.isEmpty()) audit.record(PACIENTE, p.id, "EDITAR", "El paciente actualizó su " + String.join(" y ", changes) + " desde la app");
+        if (!changes.isEmpty()) audit.register(PACIENTE, p.id, "EDITAR", "El paciente actualizó su " + String.join(" y ", changes) + " desde la app");
         return Map.of("phone", p.phone, EMAIL_2, p.email == null ? "" : p.email, "message", "Datos de contacto actualizados.");
     }
 
@@ -237,7 +237,7 @@ public class PortalRecordsService {
                 values (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)""", patientId, r.planId(), title.length() > 150 ? title.substring(0, 150) : title,
                 r.description() == null || r.description().isBlank() ? null : r.description().trim(), kind, r.dueDate(),
                 CurrentUser.usernameOrSystem(), Dates.now());
-        audit.record(PACIENTE, patientId, "ARCHIVO_SOLICITADO", title);
+        audit.register(PACIENTE, patientId, "ARCHIVO_SOLICITADO", title);
         return fileRequests(patientId);
     }
 
@@ -258,7 +258,7 @@ public class PortalRecordsService {
                 "Subido por " + by + " para el pedido #" + requestId, null, true);
         jdbc.update("update file_requests set status = 'RECIBIDO', file_id = ?, fulfilled_by = ?, fulfilled_at = ? where id = ?",
                 f.id, by, Dates.now(), requestId);
-        audit.record(PACIENTE, patientId, "ARCHIVO_RECIBIDO", fr.get(TITLE) + " · por " + by);
+        audit.register(PACIENTE, patientId, "ARCHIVO_RECIBIDO", fr.get(TITLE) + " · por " + by);
         return fileRequests(patientId);
     }
 

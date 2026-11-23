@@ -186,7 +186,7 @@ public class OnlineChargeService {
         String url = mp.testMode() && pref.hasNonNull("sandbox_init_point") ? pref.get("sandbox_init_point").asText() : pref.path("init_point").asText();
         jdbc.update("update online_charges set preference_id = ?, checkout_url = ?, updated_at = ? where id = ?",
                 pref.path("id").asText(), url, Dates.now(), id);
-        audit.record(COBRO_EN_LINEA, id, "CREAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · " + desc);
+        audit.register(COBRO_EN_LINEA, id, "CREAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · " + desc);
         return view(id);
     }
 
@@ -231,7 +231,7 @@ public class OnlineChargeService {
         Map<String, Object> c = status(id, null);
         if (!PENDIENTE.equals(c.get(STATUS))) throw ApiException.conflict("COBRO_CERRADO", "Este cobro ya no está pendiente (" + c.get("statusLabel") + ").");
         jdbc.update("update online_charges set status = 'CANCELADO', updated_at = ? where id = ? and status = 'PENDIENTE'", Dates.now(), id);
-        audit.record(COBRO_EN_LINEA, id, "CANCELAR", "Link de pago anulado");
+        audit.register(COBRO_EN_LINEA, id, "CANCELAR", "Link de pago anulado");
         return view(id);
     }
 
@@ -308,7 +308,7 @@ public class OnlineChargeService {
                         update online_charges set status = 'APROBADO', mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
                                mp_method = ?, payment_id = ?, updated_at = ? where id = ?
                         """, mpId, st, detail, methodId, paymentId, Dates.now(), id);
-                audit.record(COBRO_EN_LINEA, id, "APROBADO", "Mercado Pago " + mpId + " · S/ " + paidAmount.toPlainString());
+                audit.register(COBRO_EN_LINEA, id, "APROBADO", "Mercado Pago " + mpId + " · S/ " + paidAmount.toPlainString());
             } else if ("rejected".equals(st) || "cancelled".equals(st)) {
                 jdbc.update("update online_charges set mp_status = ?, mp_status_detail = ?, mp_method = ?, updated_at = ? where id = ? and status = 'PENDIENTE'",
                         st, detail, methodId, Dates.now(), id);

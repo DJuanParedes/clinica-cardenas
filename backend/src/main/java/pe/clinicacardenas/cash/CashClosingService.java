@@ -223,7 +223,7 @@ public class CashClosingService {
                       status = 'CERRADA' where day = ?
                     """, append(args, day));
         }
-        audit.record("CAJA", null, "CIERRE", "Caja del " + day.format(DMY) + " · contado S/ " + money(counted) + " · diferencia S/ " + money(diff));
+        audit.register("CAJA", null, "CIERRE", "Caja del " + day.format(DMY) + " · contado S/ " + money(counted) + " · diferencia S/ " + money(diff));
         return summary(day);
     }
 
@@ -235,7 +235,7 @@ public class CashClosingService {
         if (reason.length() < 5) throw ApiException.field("reason", "Explica por qué se reabre la caja.");
         jdbc.update("update cash_closings set status = 'REABIERTA', reopened_at = ?, reopened_by = ?, reopen_reason = ? where day = ?",
                 Dates.now(), CurrentUser.usernameOrSystem(), reason.substring(0, Math.min(300, reason.length())), day);
-        audit.record("CAJA", null, "REAPERTURA", "Caja del " + day.format(DMY) + " · " + reason);
+        audit.register("CAJA", null, "REAPERTURA", "Caja del " + day.format(DMY) + " · " + reason);
         return summary(day);
     }
 

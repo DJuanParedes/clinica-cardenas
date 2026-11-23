@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
  */
 @Service
 public class BookingFlow {
+    private static final java.util.regex.Pattern YES = java.util.regex.Pattern.compile("^(si|sí|ok|okey|confirmo|confirmar|dale|de acuerdo|claro|correcto|reservar?)\\b.*", java.util.regex.Pattern.CANON_EQ);
     private static final String FECHA = "FECHA";
 
 
@@ -129,7 +130,7 @@ public class BookingFlow {
             save(pid, "HORA", day, options.stream().map(o -> o.dentistId() + ";" + o.start()).toList(), null, null);
             return listSlots(day, options, "Sin problema. ");
         }
-        if (!n.matches("^(si|sí|ok|okey|confirmo|confirmar|dale|de acuerdo|claro|correcto|reservar?)\\b.*")) {
+        if (!YES.matcher(n).matches()) {
             return "Responde *SÍ* para reservar o *NO* para elegir otro horario.";
         }
         long dentistId = ((Number) s.get("dentist_id")).longValue();

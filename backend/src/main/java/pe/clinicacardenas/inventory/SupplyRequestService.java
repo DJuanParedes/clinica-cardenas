@@ -43,8 +43,7 @@ public class SupplyRequestService {
     /** Catálogo mínimo para pedir: nombre, unidad y si hay stock (sin costos ni proveedores). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> catalog() {
-        return jdbc.queryForList("""
-                select id, name, unit, category, (stock > 0) as available from inventory_items where active = true order by name""");
+        return jdbc.queryForList("select id, name, unit, category, (stock > 0) as available from inventory_items where active = true order by name");
     }
 
     @Transactional
@@ -63,7 +62,7 @@ public class SupplyRequestService {
                 r.itemId(), r.itemId() == null ? text : null, r.quantity().setScale(2, RoundingMode.HALF_UP), urgency,
                 r.note() == null || r.note().isBlank() ? null : r.note().trim(), CurrentUser.usernameOrSystem(), Dates.now());
         Long id = jdbc.queryForObject("select last_insert_id()", Long.class);
-        audit.record("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).map(x -> x.name).orElse(text)) + " × " + r.quantity());
+        audit.register("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).map(x -> x.name).orElse(text)) + " × " + r.quantity());
         return get(id);
     }
 
@@ -114,7 +113,7 @@ public class SupplyRequestService {
         } else {
             throw ApiException.field("action", "Elige entregar o rechazar.");
         }
-        audit.record("SOLICITUD_INSUMO", id, action, text == null ? "" : text);
+        audit.register("SOLICITUD_INSUMO", id, action, text == null ? "" : text);
         return get(id);
     }
 

@@ -45,7 +45,8 @@ public class AgendaService {
 
     public AgendaService(AppointmentRepository appointments, DentistRepository dentists,
                          DentistScheduleRepository schedules, PatientRepository patients, AuditService audit,
-                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events) {
+                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.notifications = notifications;
         this.events = events;
         this.appointments = appointments;
@@ -55,8 +56,7 @@ public class AgendaService {
         this.audit = audit;
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public record AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
                                      String reason, String notes, String changeReason, String category) {
@@ -255,7 +255,7 @@ public class AgendaService {
         a.createdAt = Dates.now();
         a.createdBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
+        audit.register("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
                 + " el " + a.startAt.format(DMY_HM));
         notifications.appointmentCreated(a);   // HU-23: recordatorio programado
         events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.CREATED));
@@ -285,7 +285,7 @@ public class AgendaService {
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
+        audit.register("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
                 + " · " + r.changeReason().trim());
         if (!previousStart.equals(a.startAt) || !previousDentist.equals(a.dentist.getFullName())) {
             notifications.appointmentRescheduled(a, previousStart, previousDentist);   // HU-24
@@ -317,7 +317,7 @@ public class AgendaService {
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
+        audit.register("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
                 + (r.reason() == null || r.reason().isBlank() ? "" : " · " + r.reason().trim()));
         if (a.status == AppointmentStatus.CANCELADA) {
             notifications.appointmentCancelled(a, r.reason());   // HU-24
@@ -350,7 +350,7 @@ public class AgendaService {
                     throw ApiException.conflict("CITA_PASADA", "La cita ya pasó: no se puede confirmar.");
                 }
             }
-            default -> { }
+            default -> { /* los demás casos no requieren acción */ }
         }
     }
 

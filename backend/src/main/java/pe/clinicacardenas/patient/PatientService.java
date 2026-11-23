@@ -99,7 +99,7 @@ public class PatientService {
             return cb.and(ps.toArray(new Predicate[0]));
         };
         String query = q == null ? "" : q.trim();
-        PageRequest pr = PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 50));
+        PageRequest pr = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 50));
         Page<Patient> result;
         String mode;
         if (mine) {
@@ -257,10 +257,10 @@ public class PatientService {
         repo.save(p);
         if (p.hcNumber == null) { p.hcNumber = String.format("%06d", p.id); repo.save(p); }
         if (p.dataConsent && consents != null) {
-            if (WEB_IP.get() != null) consents.record(p, "PRIVACIDAD", "WEB", "paciente (enlace web)", WEB_IP.get().isBlank() ? null : WEB_IP.get());
+            if (WEB_IP.get() != null) consents.register(p, "PRIVACIDAD", "WEB", "paciente (enlace web)", WEB_IP.get().isBlank() ? null : WEB_IP.get());
             else consents.recordInitial(p);
         }
-        audit.record("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc + (WEB_IP.get() != null ? " · registrado desde la web" : ""));
+        audit.register("PACIENTE", p.id, "CREAR", p.getFullName() + " · " + type + " " + doc + (WEB_IP.get() != null ? " · registrado desde la web" : ""));
         events.publishEvent(new ContactSync.PatientSaved(p.id));
         return p;
     }
@@ -288,7 +288,7 @@ public class PatientService {
         p.updatedAt = Dates.now();
         p.updatedBy = CurrentUser.usernameOrSystem();
         repo.save(p);
-        audit.record("PACIENTE", p.id, "EDITAR", changes.isEmpty() ? "Datos actualizados" : "Actualizó " + String.join(", ", changes));
+        audit.register("PACIENTE", p.id, "EDITAR", changes.isEmpty() ? "Datos actualizados" : "Actualizó " + String.join(", ", changes));
         events.publishEvent(new ContactSync.PatientSaved(p.id));
         return p;
     }

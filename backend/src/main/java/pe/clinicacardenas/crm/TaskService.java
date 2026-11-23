@@ -38,13 +38,14 @@ public class TaskService {
     private static final String TITLE = "title";
 
 
-    public static final Map<String, String> KINDS = new LinkedHashMap<>();
+    private static final Map<String, String> KINDS_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> KINDS = java.util.Collections.unmodifiableMap(KINDS_EDIT);
     static {
-        KINDS.put("LLAMAR", "Llamar");
-        KINDS.put("WHATSAPP", "Escribir por WhatsApp");
-        KINDS.put("COBRAR", "Cobrar");
-        KINDS.put("RECORDAR", "Recordar");
-        KINDS.put("OTRO", "Otro");
+        KINDS_EDIT.put("LLAMAR", "Llamar");
+        KINDS_EDIT.put("WHATSAPP", "Escribir por WhatsApp");
+        KINDS_EDIT.put("COBRAR", "Cobrar");
+        KINDS_EDIT.put("RECORDAR", "Recordar");
+        KINDS_EDIT.put("OTRO", "Otro");
     }
 
     private final JdbcTemplate jdbc;
@@ -98,7 +99,7 @@ public class TaskService {
             switch (sc) {
                 case "mine" -> { c.add("t.assignee_id = ?"); a.add(me == null ? -1L : me); }
                 case "unassigned" -> c.add("t.assignee_id is null");
-                default -> { }
+                default -> { /* los demás casos no requieren acción */ }
             }
         }
         if (assigneeId != null) { c.add("t.assignee_id = ?"); a.add(assigneeId); }
@@ -203,7 +204,7 @@ public class TaskService {
     public Map<String, Object> create(TaskRequest r) {
         NewTask t = validate(r, true);
         Long id = insert(t, CurrentUser.usernameOrSystem());
-        audit.record(TAREA, id, "CREAR", t.title() + (t.patientId() != null ? " · paciente #" + t.patientId() : "") + (t.leadId() != null ? " · lead #" + t.leadId() : ""));
+        audit.register(TAREA, id, "CREAR", t.title() + (t.patientId() != null ? " · paciente #" + t.patientId() : "") + (t.leadId() != null ? " · lead #" + t.leadId() : ""));
         if (t.leadId() != null) leadEvent(t.leadId(), TAREA, "Tarea: " + t.title() + " para el " + t.dueDate());
         return get(id);
     }
@@ -216,7 +217,7 @@ public class TaskService {
                 r.dueDate(), r.dueTime(), r.priority()), false);
         jdbc.update("update tasks set kind = ?, title = ?, notes = ?, assignee_id = ?, due_date = ?, due_time = ?, priority = ?, updated_at = ? where id = ?",
                 t.kind(), t.title(), t.notes(), t.assigneeId(), t.dueDate(), t.dueTime(), t.priority(), Dates.now(), id);
-        audit.record(TAREA, id, "EDITAR", t.title() + " · para el " + t.dueDate());
+        audit.register(TAREA, id, "EDITAR", t.title() + " · para el " + t.dueDate());
         return get(id);
     }
 
@@ -234,7 +235,7 @@ public class TaskService {
         if ("CANCELADA".equals(status) && (result == null || result.isBlank())) throw ApiException.field(RESULT, "Indica por qué se cancela.");
         jdbc.update("update tasks set status = ?, result = ?, completed_at = ?, completed_by = ?, updated_at = ? where id = ?",
                 status, result == null || result.isBlank() ? null : result, Dates.now(), CurrentUser.usernameOrSystem(), Dates.now(), id);
-        audit.record(TAREA, id, HECHA.equals(status) ? "COMPLETAR" : "CANCELAR", cur.get(TITLE) + (result == null || result.isBlank() ? "" : " · " + result));
+        audit.register(TAREA, id, HECHA.equals(status) ? "COMPLETAR" : "CANCELAR", cur.get(TITLE) + (result == null || result.isBlank() ? "" : " · " + result));
         Long lead = idOf(cur.get("lead"));
         if (lead != null) leadEvent(lead, TAREA, (HECHA.equals(status) ? "Tarea hecha: " : "Tarea cancelada: ") + cur.get(TITLE)
                 + (result == null || result.isBlank() ? "" : " — " + result));
@@ -246,7 +247,7 @@ public class TaskService {
         Map<String, Object> cur = get(id);
         if (PENDIENTE.equals(cur.get(STATUS))) return cur;
         jdbc.update("update tasks set status = 'PENDIENTE', completed_at = null, completed_by = null, updated_at = ? where id = ?", Dates.now(), id);
-        audit.record(TAREA, id, "REABRIR", String.valueOf(cur.get(TITLE)));
+        audit.register(TAREA, id, "REABRIR", String.valueOf(cur.get(TITLE)));
         return get(id);
     }
 

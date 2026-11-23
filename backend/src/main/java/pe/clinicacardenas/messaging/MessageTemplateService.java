@@ -27,23 +27,24 @@ public class MessageTemplateService {
 
 
     /** Variables que se pueden usar en cualquier plantilla y un ejemplo para la vista previa. */
-    public static final Map<String, String> VARIABLES = new LinkedHashMap<>();
+    private static final Map<String, String> VARIABLES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> VARIABLES = java.util.Collections.unmodifiableMap(VARIABLES_EDIT);
     static {
-        VARIABLES.put("paciente", "María");
-        VARIABLES.put("paciente_completo", "María Fernanda Quispe Huamán");
-        VARIABLES.put("fecha", "Martes 24 de noviembre");
-        VARIABLES.put("hora", "10:30");
-        VARIABLES.put("fecha_hora", "Martes 24 de noviembre a las 10:30");
-        VARIABLES.put("fecha_anterior", "Lunes 23 de noviembre a las 16:00");
-        VARIABLES.put("odontologo", "Dra. Rosa Cárdenas Vílchez (Ortodoncia)");
-        VARIABLES.put("especialidad", "Ortodoncia");
-        VARIABLES.put("motivo", "Control de ortodoncia");
-        VARIABLES.put("motivo_cancelacion", " (el paciente avisó que viaja)");
-        VARIABLES.put("clinica", "Clínica Dental Cárdenas");
-        VARIABLES.put("direccion", "Av. Los Guindos Mz. B lote 18, Chaclacayo");
-        VARIABLES.put("telefono_clinica", "987 654 000");
-        VARIABLES.put("enlace_citas", "https://clinica.pe/reservar");
-        VARIABLES.put("enlace_encuesta", "https://clinica.pe/encuesta/abc123");
+        VARIABLES_EDIT.put("paciente", "María");
+        VARIABLES_EDIT.put("paciente_completo", "María Fernanda Quispe Huamán");
+        VARIABLES_EDIT.put("fecha", "Martes 24 de noviembre");
+        VARIABLES_EDIT.put("hora", "10:30");
+        VARIABLES_EDIT.put("fecha_hora", "Martes 24 de noviembre a las 10:30");
+        VARIABLES_EDIT.put("fecha_anterior", "Lunes 23 de noviembre a las 16:00");
+        VARIABLES_EDIT.put("odontologo", "Dra. Rosa Cárdenas Vílchez (Ortodoncia)");
+        VARIABLES_EDIT.put("especialidad", "Ortodoncia");
+        VARIABLES_EDIT.put("motivo", "Control de ortodoncia");
+        VARIABLES_EDIT.put("motivo_cancelacion", " (el paciente avisó que viaja)");
+        VARIABLES_EDIT.put("clinica", "Clínica Dental Cárdenas");
+        VARIABLES_EDIT.put("direccion", "Av. Los Guindos Mz. B lote 18, Chaclacayo");
+        VARIABLES_EDIT.put("telefono_clinica", "987 654 000");
+        VARIABLES_EDIT.put("enlace_citas", "https://clinica.pe/reservar");
+        VARIABLES_EDIT.put("enlace_encuesta", "https://clinica.pe/encuesta/abc123");
     }
 
     private static final Pattern VAR = Pattern.compile("\\{([a-z_]+)\\}");
@@ -105,7 +106,7 @@ public class MessageTemplateService {
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la plantilla.", e);
         jdbc.update("update message_templates set subject=?, body=?, buttons=?, updated_at=?, updated_by=? where code=?",
                 subject, body, btn.isEmpty() ? null : write(btn), Dates.now(), CurrentUser.usernameOrSystem(), code);
-        audit.record("PLANTILLA", null, "EDITAR", code);
+        audit.register("PLANTILLA", null, "EDITAR", code);
         return get(code);
     }
 
@@ -113,7 +114,7 @@ public class MessageTemplateService {
     public Map<String, Object> restore(String code) {
         Map<String, Object> t = get(code);
         jdbc.update("update message_templates set body = default_body, updated_at=?, updated_by=? where code=?", Dates.now(), CurrentUser.usernameOrSystem(), code);
-        audit.record("PLANTILLA", null, "RESTAURAR", (String) t.get("name"));
+        audit.register("PLANTILLA", null, "RESTAURAR", (String) t.get("name"));
         return get(code);
     }
 
@@ -149,7 +150,7 @@ public class MessageTemplateService {
             String like = "%" + q.trim().toLowerCase() + "%";
             args.add(like); args.add(like);
         }
-        sql.append(" order by n.id desc limit ").append(Math.max(1, Math.min(limit, 300)));
+        sql.append(" order by n.id desc limit ").append(Math.clamp(limit, 1, 300));
         return jdbc.queryForList(sql.toString(), args.toArray());
     }
 

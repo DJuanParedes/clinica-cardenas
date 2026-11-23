@@ -290,7 +290,7 @@ public final class SimplePdf {
         }
         int xref = out.size();
         StringBuilder x = new StringBuilder("xref\n0 " + (total + 1) + "\n0000000000 65535 f \n");
-        for (int off : offsets) x.append(String.format("%010d 00000 n \n", off));
+        for (int off : offsets) x.append(String.format("%010d", off)).append(" 00000 n \n");
         x.append("trailer\n<< /Size ").append(total + 1).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF\n");
         write(out, x.toString());
         return out.toByteArray();

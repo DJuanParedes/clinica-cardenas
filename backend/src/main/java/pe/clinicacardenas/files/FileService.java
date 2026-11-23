@@ -145,9 +145,8 @@ public class FileService {
         if (signature != null) pdf.jpeg(signature, 200);
         pdf.signatureLine("Firma: " + (r.signerName() == null || r.signerName().isBlank() ? p.getFullName() : r.signerName().trim()));
         if (RECETA.equals(kind)) pdf.space(30).signatureLine("Firma y sello del odontólogo");
-        PatientFile f = store(p, pdf.build(), APPLICATION_PDF, kind, title, null, null,
+        return store(p, pdf.build(), APPLICATION_PDF, kind, title, null, null,
                 r.shareWithPatient() == null || r.shareWithPatient(), signature == null ? null : Dates.now());
-        return f;
     }
 
     /** v2.8: guarda un PDF ya generado (consentimiento firmado a distancia). */
@@ -178,7 +177,7 @@ public class FileService {
         f.createdAt = Dates.now();
         f.createdBy = CurrentUser.usernameOrSystem();
         files.save(f);
-        audit.record("HISTORIA", p.id, ARCHIVO, "Agregó " + kind.toLowerCase() + ": " + title);
+        audit.register("HISTORIA", p.id, ARCHIVO, "Agregó " + kind.toLowerCase() + ": " + title);
         return f;
     }
 
@@ -196,7 +195,7 @@ public class FileService {
         f.deletedAt = Dates.now();
         f.deletedBy = CurrentUser.usernameOrSystem();
         files.save(f);
-        audit.record("HISTORIA", f.patientId, "ARCHIVO_ELIMINADO", f.title);
+        audit.register("HISTORIA", f.patientId, "ARCHIVO_ELIMINADO", f.title);
     }
 
     @Transactional
@@ -233,7 +232,7 @@ public class FileService {
         String[] p = token.split("\\.");
         if (p.length != 3) throw ApiException.notFound("El enlace");
         String payload = p[0] + "." + p[1];
-        if (!MessageDigestEquals(sign(prefix + payload), p[2])) throw ApiException.notFound("El enlace");
+        if (!digestEquals(sign(prefix + payload), p[2])) throw ApiException.notFound("El enlace");
         if (Long.parseLong(p[1]) < System.currentTimeMillis() / 1000) {
             throw new ApiException(HttpStatus.GONE, "ENLACE_VENCIDO", "El enlace venció. Vuelve a abrirlo desde la app.");
         }
@@ -250,7 +249,7 @@ public class FileService {
         }
     }
 
-    private static boolean MessageDigestEquals(String a, String b) {
+    private static boolean digestEquals(String a, String b) {
         return java.security.MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 

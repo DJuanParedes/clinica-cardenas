@@ -27,7 +27,7 @@ public class ClinicalService {
     private static final String PENDIENTE = "PENDIENTE";
     private static final String PLAN_CERRADO = "PLAN_CERRADO";
     private static final String REALIZADO = "REALIZADO";
-    private static final String ITEMS = "items";
+    private static final String KEY_ITEMS = "items";
 
 
     private final PatientRepository patients;
@@ -160,7 +160,7 @@ public class ClinicalService {
         h.updatedAt = Dates.now();
         h.updatedBy = CurrentUser.usernameOrSystem();
         histories.save(h);
-        audit.record(HISTORIA, patientId, isNew ? "CREAR" : "EDITAR", "Antecedentes clínicos");
+        audit.register(HISTORIA, patientId, isNew ? "CREAR" : "EDITAR", "Antecedentes clínicos");
         return h;
     }
 
@@ -182,7 +182,7 @@ public class ClinicalService {
         d.createdAt = Dates.now();
         d.createdBy = CurrentUser.usernameOrSystem();
         diagnoses.save(d);
-        audit.record(HISTORIA, patientId, "DIAGNOSTICO", (d.cie10Code == null ? "" : d.cie10Code + " ") + d.description);
+        audit.register(HISTORIA, patientId, "DIAGNOSTICO", (d.cie10Code == null ? "" : d.cie10Code + " ") + d.description);
         return d;
     }
 
@@ -242,7 +242,7 @@ public class ClinicalService {
         odontogram.deleteByPatientId(patientId);
         odontogram.flush();
         odontogram.saveAll(toSave);
-        audit.record(HISTORIA, patientId, "ODONTOGRAMA", toSave.size() + " marcas registradas");
+        audit.register(HISTORIA, patientId, "ODONTOGRAMA", toSave.size() + " marcas registradas");
         return odontogram(patientId);
     }
 
@@ -284,7 +284,7 @@ public class ClinicalService {
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("plan", p);
-        m.put(ITEMS, its);
+        m.put(KEY_ITEMS, its);
         m.put("evolutions", evolutions.findByPlanIdOrderBySessionDateDescIdDesc(p.id));
         m.put("total", total);
         m.put("doneAmount", done);
@@ -298,10 +298,10 @@ public class ClinicalService {
     }
 
     private TreatmentItem buildItem(Long planId, PlanItemRequest r, int order) {
-        if (r.procedureId() == null) throw ApiException.field(ITEMS, "Selecciona el procedimiento.");
+        if (r.procedureId() == null) throw ApiException.field(KEY_ITEMS, "Selecciona el procedimiento.");
         Procedure proc = procedures.findById(r.procedureId()).orElseThrow(() -> ApiException.notFound("El procedimiento"));
         if (r.tooth() != null && !OdontogramRules.isValidTooth(r.tooth())) {
-            throw ApiException.field(ITEMS, "La pieza " + r.tooth() + " no existe en la notación FDI.");
+            throw ApiException.field(KEY_ITEMS, "La pieza " + r.tooth() + " no existe en la notación FDI.");
         }
         BigDecimal price = r.price();
         PromotionService.Applied promo = null;
@@ -310,7 +310,7 @@ public class ClinicalService {
             price = promo.price();
         }
         if (price == null) price = proc.price;
-        if (price.signum() < 0) throw ApiException.field(ITEMS, "El precio no puede ser negativo.");
+        if (price.signum() < 0) throw ApiException.field(KEY_ITEMS, "El precio no puede ser negativo.");
         TreatmentItem i = new TreatmentItem();
         if (promo != null && promo.promotionId() != null) {
             i.listPrice = promo.listPrice();
@@ -329,7 +329,7 @@ public class ClinicalService {
     public Map<String, Object> createPlan(Long patientId, PlanRequest r) {
         patient(patientId);
         if (r.title() == null || r.title().isBlank()) throw ApiException.field("title", "Ponle un nombre al plan.");
-        if (r.items() == null || r.items().isEmpty()) throw ApiException.field(ITEMS, "Agrega al menos un procedimiento.");
+        if (r.items() == null || r.items().isEmpty()) throw ApiException.field(KEY_ITEMS, "Agrega al menos un procedimiento.");
         TreatmentPlan p = new TreatmentPlan();
         p.patientId = patientId;
         p.dentist = currentDentist();
@@ -343,7 +343,7 @@ public class ClinicalService {
         for (PlanItemRequest ir : r.items()) {
             items.save(buildItem(p.id, ir, order++));
         }
-        audit.record(HISTORIA, patientId, "PLAN_CREAR", p.title + " · " + r.items().size() + " procedimientos");
+        audit.register(HISTORIA, patientId, "PLAN_CREAR", p.title + " · " + r.items().size() + " procedimientos");
         return planView(p);
     }
 
@@ -353,7 +353,7 @@ public class ClinicalService {
         if (!ACTIVO.equals(p.status)) throw ApiException.badRequest(PLAN_CERRADO, "El plan ya no está activo.");
         int order = items.findByPlanIdOrderBySortOrderAscIdAsc(planId).size();
         items.save(buildItem(planId, r, order));
-        audit.record(HISTORIA, p.patientId, "PLAN_ITEM", "Procedimiento agregado a " + p.title);
+        audit.register(HISTORIA, p.patientId, "PLAN_ITEM", "Procedimiento agregado a " + p.title);
         return planView(p);
     }
 
@@ -373,7 +373,7 @@ public class ClinicalService {
         applyItemStatus(i, status, p, used);
         items.save(i);
         refreshPlanStatus(p);
-        audit.record(HISTORIA, p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
+        audit.register(HISTORIA, p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
         return planView(p);
     }
 
@@ -414,7 +414,7 @@ public class ClinicalService {
             items.save(item);
         }
         refreshPlanStatus(p);
-        audit.record(HISTORIA, p.patientId, "EVOLUCION", "Sesión del " + date + " en " + p.title);
+        audit.register(HISTORIA, p.patientId, "EVOLUCION", "Sesión del " + date + " en " + p.title);
         return planView(p);
     }
 
@@ -423,7 +423,7 @@ public class ClinicalService {
         TreatmentPlan p = plan(planId);
         p.status = ANULADO;
         plans.save(p);
-        audit.record(HISTORIA, p.patientId, "PLAN_ANULAR", p.title);
+        audit.register(HISTORIA, p.patientId, "PLAN_ANULAR", p.title);
         return planView(p);
     }
 

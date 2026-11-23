@@ -157,7 +157,7 @@ public class PatientProfileService {
             for (String t : tags) jdbc.update("insert into patient_tags (patient_id, tag) values (?, ?)", patientId, t);
             if (!new HashSet<>(before).equals(new HashSet<>(tags))) changes.add("etiquetas");
         }
-        if (!changes.isEmpty()) audit.record(PACIENTE, patientId, "EDITAR", "Actualizó " + String.join(", ", changes));
+        if (!changes.isEmpty()) audit.register(PACIENTE, patientId, "EDITAR", "Actualizó " + String.join(", ", changes));
         return profile(patientId);
     }
 
@@ -172,7 +172,7 @@ public class PatientProfileService {
                   is_guardian, pays, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 patientId, v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record(PACIENTE, patientId, FAMILIAR, "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
+        audit.register(PACIENTE, patientId, FAMILIAR, "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
         return profile(patientId);
     }
 
@@ -184,7 +184,7 @@ public class PatientProfileService {
                 update patient_relations set related_patient_id=?, full_name=?, doc_type=?, doc_number=?, relationship=?, phone=?, email=?,
                   is_guardian=?, pays=?, notes=? where id = ?""",
                 v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes, relationId);
-        audit.record(PACIENTE, patientId, FAMILIAR, "Actualizó el familiar " + v.name);
+        audit.register(PACIENTE, patientId, FAMILIAR, "Actualizó el familiar " + v.name);
         return profile(patientId);
     }
 
@@ -192,7 +192,7 @@ public class PatientProfileService {
     public Map<String, Object> deleteRelation(Long patientId, Long relationId) {
         String name = owned(patientId, relationId);
         jdbc.update("delete from patient_relations where id = ?", relationId);
-        audit.record(PACIENTE, patientId, FAMILIAR, "Quitó el vínculo con " + name);
+        audit.register(PACIENTE, patientId, FAMILIAR, "Quitó el vínculo con " + name);
         return profile(patientId);
     }
 

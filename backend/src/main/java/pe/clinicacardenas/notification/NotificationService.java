@@ -92,7 +92,7 @@ public class NotificationService {
         boolean hasEmail = p.email != null && !p.email.isBlank();
         boolean hasPhone = p.phone != null && !p.phone.isBlank();
         switch (pref) {
-            case NINGUNO -> { }
+            case NINGUNO -> { /* el paciente no quiere avisos */ }
             case EMAIL_2 -> {
                 if (hasEmail) t.add(new Target(EMAIL_2, p.email));
                 else if (hasPhone) t.add(new Target(WHATSAPP_2, p.phone)); // sin correo: se usa WhatsApp
@@ -121,24 +121,7 @@ public class NotificationService {
         return a.dentist.getFullName() + (a.dentist.specialty == null || a.dentist.specialty.isBlank() ? "" : " (" + a.dentist.specialty + ")");
     }
 
-    private String body(String channel, String intro, Appointment a, String closing) {
-        String dentist = a.dentist.getFullName() + " (" + a.dentist.specialty + ")";
-        if (WHATSAPP_2.equals(channel)) {
-            return intro + "\n\n📅 " + when(a.startAt) + "\n🦷 " + dentist + "\n📍 " + clinicAddress
-                    + (closing == null ? "" : "\n\n" + closing) + "\n\n" + clinicName + " · ¡Que tu sonrisa sea para toda la vida!";
-        }
-        return intro + "\n\nFecha: " + when(a.startAt) + "\nOdontólogo: " + dentist + "\nMotivo: " + a.reason
-                + "\nDirección: " + clinicAddress + (closing == null ? "" : "\n\n" + closing)
-                + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
-    }
-
     /** Por WhatsApp el paciente puede responder 1 o 2 (lo procesa el webhook del microservicio). */
-    private static String replyHint(String channel) {
-        return WHATSAPP_2.equals(channel)
-                ? "Responde *1* para confirmar tu asistencia o *2* si necesitas reprogramar."
-                : "Si no puedes asistir, avísanos respondiendo este mensaje.";
-    }
-
     /**
      * Mensaje libre a un paciente por sus canales preferidos (recordatorios de control, lista de espera, cuotas).
      * La clave evita enviar dos veces el mismo aviso.
@@ -349,7 +332,7 @@ public class NotificationService {
         repo.findByIdempotencyKey(key).ifPresent(n -> {
             n.templateCode = templateCode;
             if (WHATSAPP_2.equals(t.channel()) && !r.buttons().isEmpty()) {
-                try { n.waButtons = JSON.writeValueAsString(r.buttons()); } catch (Exception ignored) { }
+                try { n.waButtons = JSON.writeValueAsString(r.buttons()); } catch (Exception ignored) { /* sin botones: se envía solo el texto */ }
             }
             repo.save(n);
         });
@@ -409,7 +392,7 @@ public class NotificationService {
         return n;
     }
 
-    private java.util.function.Function<Long, Appointment> appointmentLoader = id -> null;
+    private java.util.function.LongFunction<Appointment> appointmentLoader = id -> null;
 
     @org.springframework.beans.factory.annotation.Autowired
     void setAppointmentLoader(@org.springframework.context.annotation.Lazy pe.clinicacardenas.agenda.AppointmentRepository appts) {
@@ -511,7 +494,7 @@ public class NotificationService {
                     wa("recordatorio_cita", firstName(a.patient), when(a.startAt), dentistText(a), clinicAddress));
             queued++;
         }
-        audit.record("CITA", a.id, RECORDATORIO, queued > 0 ? "Recordatorio enviado por " + ts.stream().map(Target::channel).toList()
+        audit.register("CITA", a.id, RECORDATORIO, queued > 0 ? "Recordatorio enviado por " + ts.stream().map(Target::channel).toList()
                 : "Recordatorio no reenviado: ya se había enviado");
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("queued", queued);
@@ -570,7 +553,7 @@ public class NotificationService {
         copy.status = PENDIENTE;
         copy.createdAt = Dates.now();
         repo.save(copy);
-        audit.record("NOTIFICACION", copy.id, "REENVIAR", n.type + " por " + n.channel + " a " + n.destination);
+        audit.register("NOTIFICACION", copy.id, "REENVIAR", n.type + " por " + n.channel + " a " + n.destination);
         events.publishEvent(new Queued());
         return copy;
     }

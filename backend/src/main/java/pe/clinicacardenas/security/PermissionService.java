@@ -52,7 +52,7 @@ public class PermissionService {
         roleRows.set(jdbc.queryForList("select code, name, description, base_role as baseRole, custom, hidden from roles order by custom, name"));
         for (Map<String, Object> r : roleRows.get()) m.putIfAbsent((String) r.get("code"), new TreeSet<>());
         jdbc.query("select role_code, permission_code from role_permissions",
-                rs -> { m.computeIfAbsent(rs.getString(1), k -> new TreeSet<>()).add(rs.getString(2)); });
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> m.computeIfAbsent(rs.getString(1), k -> new TreeSet<>()).add(rs.getString(2)));
         if (!catalog.get().isEmpty()) {
             Set<String> all = new TreeSet<>();
             catalog.get().forEach(c -> all.add((String) c.get("code")));
@@ -81,8 +81,9 @@ public class PermissionService {
                 && base.name().equals(r.get(BASEROLE)));
     }
 
-    private static Boolean asBool(Object o) {
-        return o instanceof Boolean b ? b : o instanceof Number n ? n.intValue() != 0 : Boolean.FALSE;
+    private static boolean asBool(Object o) {
+        if (o instanceof Boolean b) return b;
+        return o instanceof Number n && n.intValue() != 0;
     }
 
     public static boolean has(String permission) {
@@ -173,7 +174,7 @@ public class PermissionService {
         if (!"VACIO".equals(from) && roleRows.get().stream().noneMatch(x -> from.equals(x.get("code")))) throw ApiException.field("copyFrom", "El rol a copiar no existe.");
         for (String p : seed) if (!ADMIN_ONLY.contains(p)) jdbc.update("insert into role_permissions (role_code, permission_code) values (?, ?)", unique, p);
         load();
-        audit.record("ROL", null, "CREAR", name + " (basado en " + base.label + ")");
+        audit.register("ROL", null, "CREAR", name + " (basado en " + base.label + ")");
         return matrix();
     }
 
@@ -214,7 +215,7 @@ public class PermissionService {
         }
         jdbc.update("update roles set name = ?, description = ?, hidden = ? where code = ?", name, desc, hidden, code);
         load();
-        audit.record("ROL", null, "EDITAR", row.get("name") + (name.equals(row.get("name")) ? "" : " → " + name) + (hidden ? " · oculto" : ""));
+        audit.register("ROL", null, "EDITAR", row.get("name") + (name.equals(row.get("name")) ? "" : " → " + name) + (hidden ? " · oculto" : ""));
         return matrix();
     }
 
@@ -240,7 +241,7 @@ public class PermissionService {
         jdbc.update("delete from role_permissions where role_code = ?", code);
         jdbc.update("delete from roles where code = ?", code);
         load();
-        audit.record("ROL", null, "ELIMINAR", row.get("name") + (n > 0 ? " · " + n + " usuario(s) pasados a " + label(reassignTo) : ""));
+        audit.register("ROL", null, "ELIMINAR", row.get("name") + (n > 0 ? " · " + n + " usuario(s) pasados a " + label(reassignTo) : ""));
         return matrix();
     }
 
@@ -266,7 +267,7 @@ public class PermissionService {
         jdbc.update("delete from role_permissions where role_code = ?", roleCode);
         for (String p : next) jdbc.update("insert into role_permissions (role_code, permission_code) values (?, ?)", roleCode, p);
         load();
-        audit.record("ROL", null, "PERMISOS", label(roleCode) + (added.isEmpty() ? "" : " · agregados: " + String.join(", ", added))
+        audit.register("ROL", null, "PERMISOS", label(roleCode) + (added.isEmpty() ? "" : " · agregados: " + String.join(", ", added))
                 + (removed.isEmpty() ? "" : " · quitados: " + String.join(", ", removed)));
         return matrix();
     }
@@ -288,7 +289,7 @@ public class PermissionService {
         String desc = e.description() == null ? (String) p.get(DESCRIPTION) : (e.description().isBlank() ? null : e.description().trim());
         jdbc.update("update permissions set label = ?, group_name = ?, description = ? where code = ?", label, group, desc, code);
         load();
-        audit.record("PERMISO", null, "EDITAR", code + ": " + label + " (" + group + ")");
+        audit.register("PERMISO", null, "EDITAR", code + ": " + label + " (" + group + ")");
         return matrix();
     }
 }

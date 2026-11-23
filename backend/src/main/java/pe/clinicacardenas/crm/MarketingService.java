@@ -192,11 +192,11 @@ public class MarketingService {
         if (id == null) {
             jdbc.update("insert into segments (name, description, filters, created_by, created_at) values (?, ?, ?, ?, ?)", name, desc, js, by, Dates.now());
             id = jdbc.queryForObject("select id from segments where name = ?", Long.class, name);
-            audit.record(SEGMENTO, id, "CREAR", name + " · " + f.describe());
+            audit.register(SEGMENTO, id, "CREAR", name + " · " + f.describe());
         } else {
             if (jdbc.update("update segments set name = ?, description = ?, filters = ?, updated_by = ?, updated_at = ? where id = ?", name, desc, js, by, Dates.now(), id) == 0)
                 throw ApiException.notFound(EL_SEGMENTO);
-            audit.record(SEGMENTO, id, "EDITAR", name + " · " + f.describe());
+            audit.register(SEGMENTO, id, "EDITAR", name + " · " + f.describe());
         }
         final Long sid = id;
         return segments().stream().filter(s -> sid.equals(((Number) s.get("id")).longValue())).findFirst().orElseThrow();
@@ -207,7 +207,7 @@ public class MarketingService {
         String name = segmentName(id);
         if (name == null) throw ApiException.notFound(EL_SEGMENTO);
         jdbc.update("delete from segments where id = ?", id);
-        audit.record(SEGMENTO, id, "ELIMINAR", name);
+        audit.register(SEGMENTO, id, "ELIMINAR", name);
     }
 
     /** Crea la misma tarea para cada paciente del segmento (sin repetirla a quien ya la tiene pendiente). */
@@ -232,7 +232,7 @@ public class MarketingService {
                     base.priority(), SEGMENTO, ref == null ? null : ref.substring(0, Math.min(150, ref.length()))), by);
             created++;
         }
-        audit.record(SEGMENTO, r.segmentId(), "TAREAS", created + " tareas \"" + base.title() + "\" · " + ref);
+        audit.register(SEGMENTO, r.segmentId(), "TAREAS", created + " tareas \"" + base.title() + "\" · " + ref);
         return Map.of("created", created, "skipped", skipped);
     }
 
@@ -250,11 +250,11 @@ public class MarketingService {
 
     /** Registra la aceptación (con la versión del texto) o la baja, y deja constancia en la auditoría. */
     public void applyConsent(Patient p, boolean accepted, String channel, String by, String ip) {
-        if (accepted) consents.record(p, "PUBLICIDAD", channel, by, ip);
+        if (accepted) consents.register(p, "PUBLICIDAD", channel, by, ip);
         p.marketingConsent = accepted;
         p.marketingConsentAt = Dates.now();
         patients.save(p);
-        audit.record("PACIENTE", p.id, accepted ? "PUBLICIDAD_ACEPTA" : "PUBLICIDAD_BAJA", (accepted ? "Acepta" : "No acepta / baja de") + " promociones · " + channel);
+        audit.register("PACIENTE", p.id, accepted ? "PUBLICIDAD_ACEPTA" : "PUBLICIDAD_BAJA", (accepted ? "Acepta" : "No acepta / baja de") + " promociones · " + channel);
     }
 
     // ------------------------------------------------------------------ cumpleaños
@@ -279,7 +279,7 @@ public class MarketingService {
         }
         if (s.active() != null) put(CUMPLEANOS_ACTIVO, String.valueOf(s.active()));
         if (s.createTask() != null) put(CUMPLEANOS_TAREA, String.valueOf(s.createTask()));
-        audit.record("MARKETING", null, CUMPLEANOS, "Saludo " + (Boolean.TRUE.equals(s.active()) ? "activo" : "inactivo") + " · " + setting(CUMPLEANOS_HORA)
+        audit.register("MARKETING", null, CUMPLEANOS, "Saludo " + (Boolean.TRUE.equals(s.active()) ? "activo" : "inactivo") + " · " + setting(CUMPLEANOS_HORA)
                 + (Boolean.TRUE.equals(s.createTask()) ? " · con tarea de llamada" : ""));
         return birthdaySettings();
     }

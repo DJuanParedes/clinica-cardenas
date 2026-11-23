@@ -147,14 +147,14 @@ public class PromotionService {
                     insert into promotions (name, procedure_id, family, discount_type, value, valid_from, valid_to, conditions, active, created_at, created_by)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", name, r.procedureId(), fam, type, r.value(), r.validFrom(), r.validTo(),
                     blank(r.conditions()), r.active() == null || r.active(), Dates.now(), CurrentUser.usernameOrSystem());
-            audit.record("PROMOCION", null, "CREAR", name);
+            audit.register("PROMOCION", null, "CREAR", name);
         } else {
             int n = jdbc.update("""
                     update promotions set name = ?, procedure_id = ?, family = ?, discount_type = ?, value = ?, valid_from = ?, valid_to = ?,
                            conditions = ?, active = ? where id = ?""", name, r.procedureId(), fam, type, r.value(), r.validFrom(), r.validTo(),
                     blank(r.conditions()), r.active() == null || r.active(), id);
             if (n == 0) throw ApiException.notFound("La promoción");
-            audit.record("PROMOCION", id, "EDITAR", name);
+            audit.register("PROMOCION", id, "EDITAR", name);
         }
         return promotions();
     }
@@ -182,7 +182,7 @@ public class PromotionService {
         p.durationMin = r.durationMin();
         if (r.active() != null) p.active = r.active();
         procedures.save(p);
-        audit.record("PROCEDIMIENTO", p.id, id == null ? "CREAR" : "EDITAR", p.code + " " + p.name + " · S/ " + p.price);
+        audit.register("PROCEDIMIENTO", p.id, id == null ? "CREAR" : "EDITAR", p.code + " " + p.name + " · S/ " + p.price);
         return p;
     }
 

@@ -175,12 +175,12 @@ public class DeletionService {
         if (own != null && count(SELECT_COUNT_FROM + x.table() + WHERE + x.pk() + " = ? and (" + own.where() + ")", id) > 0) {
             p.block("No se puede: son " + own.why() + ".");
         }
-        walk(x.table(), x.pk(), List.of(id), x.blockedBy(), p, new HashSet<>(), 0);
+        walk(x.table(), List.of(id), x.blockedBy(), p, new HashSet<>(), 0);
         p.deletes.add(new String[]{x.table(), x.pk() + " = ?", String.valueOf(id)});
         return p;
     }
 
-    private void walk(String table, String pk, List<?> ids, Set<String> blockedBy, Plan p, Set<String> seen, int depth) {
+    private void walk(String table, List<?> ids, Set<String> blockedBy, Plan p, Set<String> seen, int depth) {
         if (ids.isEmpty() || depth > 6) return;
         for (Ref r : refs.get().getOrDefault(table, List.of())) {
             String key = r.table() + "." + r.column() + ":" + ids;
@@ -214,7 +214,7 @@ public class DeletionService {
             if (tablesWithId.get().contains(r.table())) {
                 List<Long> child = jdbc.queryForList("select id from " + r.table() + WHERE + where, Long.class, args);
                 if (child.isEmpty()) continue;
-                walk(r.table(), "id", child, Set.of(), p, seen, depth + 1);
+                walk(r.table(), child, Set.of(), p, seen, depth + 1);
                 p.deletes.add(new String[]{r.table(), "id in (" + in(child) + ")", join(child)});
                 p.counts.merge(name, (long) child.size(), Long::sum);
             } else {
@@ -350,7 +350,7 @@ public class DeletionService {
         String reason = c.reason() == null || c.reason().isBlank() ? null : c.reason().trim();
         jdbc.update("insert into deleted_records (entity, entity_id, label, summary, data, reason, deleted_by, deleted_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
                 x.key(), rawId, cut(label, 200), cut(summary, 500), data, reason == null ? null : cut(reason, 300), CurrentUser.usernameOrSystem(), Dates.now());
-        audit.record(x.title().toUpperCase(Locale.ROOT).replace(' ', '_'), "id".equals(x.pk()) ? (Long) id : null, "ELIMINAR",
+        audit.register(x.title().toUpperCase(Locale.ROOT).replace(' ', '_'), "id".equals(x.pk()) ? (Long) id : null, "ELIMINAR",
                 label + " · " + summary + (reason == null ? "" : " · motivo: " + reason));
         return Map.of("ok", true, "label", label, "summary", summary);
     }

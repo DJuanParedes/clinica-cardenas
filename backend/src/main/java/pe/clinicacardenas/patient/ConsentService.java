@@ -65,11 +65,11 @@ public class ConsentService {
     /** Aceptación registrada por el personal en recepción (presencial). */
     @Transactional
     public void recordInitial(Patient p) {
-        record(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
+        register(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
     }
 
     @Transactional
-    public void record(Patient p, String code, String channel, String registeredBy, String ip) {
+    public void register(Patient p, String code, String channel, String registeredBy, String ip) {
         String version = currentVersion(code);
         jdbc.update("""
                 insert into consent_records (patient_id, doc_code, doc_version, channel, accepted_by, registered_by, ip, accepted_at)
@@ -83,7 +83,7 @@ public class ConsentService {
             if (p.dataConsentAt == null) p.dataConsentAt = Dates.now();
             patients.save(p);
         }
-        audit.record("PACIENTE", p.id, "CONSENTIMIENTO", code + " v" + version + " · " + channel + " · aceptó " + acceptedBy(p));
+        audit.register("PACIENTE", p.id, "CONSENTIMIENTO", code + " v" + version + " · " + channel + " · aceptó " + acceptedBy(p));
     }
 
     /** Copia escaneada o foto del consentimiento firmado en recepción. */
@@ -100,7 +100,7 @@ public class ConsentService {
                   select id from (select id from consent_records where patient_id = ? and doc_code = 'PRIVACIDAD'
                                    order by accepted_at desc limit 1) t)
                 """, f.id, patientId);
-        audit.record("PACIENTE", p.id, "CONSENTIMIENTO_FIRMADO", "Adjuntó la copia firmada");
+        audit.register("PACIENTE", p.id, "CONSENTIMIENTO_FIRMADO", "Adjuntó la copia firmada");
         return history(patientId);
     }
 

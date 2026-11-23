@@ -119,7 +119,7 @@ public class CampaignService {
         jdbc.query("""
                 select n.status, count(*) from campaign_recipients r join notifications n on n.id = r.notification_id
                  where r.campaign_id = ? group by n.status
-                """, rs -> { by.put(rs.getString(1), rs.getLong(2)); }, id);
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> by.put(rs.getString(1), rs.getLong(2)), id);
         long total = by.values().stream().mapToLong(Long::longValue).sum();
         long delivered = by.getOrDefault("ENTREGADO", 0L) + by.getOrDefault("LEIDO", 0L);
         s.put("messages", total);
@@ -158,7 +158,7 @@ public class CampaignService {
                 values (?, ?, ?, ?, ?, ?, 'BORRADOR', ?, ?)
                 """, c.name, r.segmentId(), marketing.write(c.filters), c.channel, c.subject, c.body, by, Dates.now());
         Long id = jdbc.queryForObject("select max(id) from campaigns where created_by = ?", Long.class, by);
-        audit.record(CAMPANA, id, "CREAR", c.name + " · " + c.filters.describe());
+        audit.register(CAMPANA, id, "CREAR", c.name + " · " + c.filters.describe());
         return get(id);
     }
 
@@ -169,7 +169,7 @@ public class CampaignService {
         Clean c = validate(r);
         jdbc.update("update campaigns set name = ?, segment_id = ?, filters = ?, channel = ?, subject = ?, body = ?, updated_by = ?, updated_at = ? where id = ?",
                 c.name, r.segmentId(), marketing.write(c.filters), c.channel, c.subject, c.body, CurrentUser.usernameOrSystem(), Dates.now(), id);
-        audit.record(CAMPANA, id, "EDITAR", c.name);
+        audit.register(CAMPANA, id, "EDITAR", c.name);
         return get(id);
     }
 
@@ -185,7 +185,7 @@ public class CampaignService {
             int h = at.getHour();
             if (h < 8 || h >= 20) throw ApiException.field(SCHEDULEDAT, "Programa el envío entre las 08:00 y las 20:00.");
             jdbc.update("update campaigns set status = 'PROGRAMADA', scheduled_at = ?, updated_by = ?, updated_at = ? where id = ?", at, CurrentUser.usernameOrSystem(), now, id);
-            audit.record(CAMPANA, id, "PROGRAMAR", "Para el " + at);
+            audit.register(CAMPANA, id, "PROGRAMAR", "Para el " + at);
             return get(id);
         }
         int h = now.getHour();
@@ -200,7 +200,7 @@ public class CampaignService {
         String st = status(id);
         if (!Set.of(BORRADOR_2, PROGRAMADA_2).contains(st)) throw ApiException.conflict(CAMPANA_CERRADA, LA_CAMPANA_YA_SE_ENVIO_O_SE_CANCELO);
         jdbc.update("update campaigns set status = 'CANCELADA', updated_by = ?, updated_at = ? where id = ?", CurrentUser.usernameOrSystem(), Dates.now(), id);
-        audit.record(CAMPANA, id, "CANCELAR", "");
+        audit.register(CAMPANA, id, "CANCELAR", "");
         return get(id);
     }
 
@@ -231,7 +231,7 @@ public class CampaignService {
             if (!sent.isEmpty()) people++;
         }
         jdbc.update("update campaigns set status = 'ENVIADA', sent_at = ?, recipients = ? where id = ?", Dates.now(), people, id);
-        audit.record(CAMPANA, id, "ENVIAR", c.get("name") + " · " + people + " pacientes");
+        audit.register(CAMPANA, id, "ENVIAR", c.get("name") + " · " + people + " pacientes");
         log.info("Campaña {} enviada a {} pacientes", id, people);
         return people;
     }

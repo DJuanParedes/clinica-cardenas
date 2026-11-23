@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import pe.clinicacardenas.common.Dates;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 
 /** HU-13, HU-14 y HU-15. */

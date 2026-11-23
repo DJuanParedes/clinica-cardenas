@@ -248,7 +248,7 @@ public class CashService {
         pay.cashier = CurrentUser.usernameOrSystem();
         pay.status = VALIDO;
         payments.save(pay);
-        audit.record("PAGO", pay.id, "REGISTRAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · "
+        audit.register("PAGO", pay.id, "REGISTRAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · "
                 + METHOD_LABEL.get(method) + " · " + concept);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("payment", pay);
@@ -274,7 +274,7 @@ public class CashService {
         pay.voidedAt = Dates.now();
         pay.voidedBy = CurrentUser.usernameOrSystem();
         payments.save(pay);
-        audit.record("PAGO", pay.id, "ANULAR", "S/ " + pay.amount.toPlainString() + " · " + pay.voidReason);
+        audit.register("PAGO", pay.id, "ANULAR", "S/ " + pay.amount.toPlainString() + " · " + pay.voidReason);
         return pay;
     }
 
@@ -309,7 +309,7 @@ public class CashService {
         x.createdAt = Dates.now();
         x.createdBy = CurrentUser.usernameOrSystem();
         expenses.save(x);
-        audit.record(EGRESO, x.id, "REGISTRAR", concept + " · S/ " + amount.toPlainString());
+        audit.register(EGRESO, x.id, "REGISTRAR", concept + " · S/ " + amount.toPlainString());
         return x;
     }
 
@@ -321,7 +321,7 @@ public class CashService {
         x.status = ANULADO;
         x.voidReason = reason.trim();
         expenses.save(x);
-        audit.record(EGRESO, x.id, "ANULAR", x.concept + " · " + x.voidReason);
+        audit.register(EGRESO, x.id, "ANULAR", x.concept + " · " + x.voidReason);
         return x;
     }
 
@@ -345,7 +345,7 @@ public class CashService {
         if (!itemIds.isEmpty()) {
             String in = String.join(",", Collections.nCopies(itemIds.size(), "?"));
             jdbc.query("select ti.id, pr.name from treatment_items ti join procedures pr on pr.id = ti.procedure_id where ti.id in (" + in + ")",
-                    rs -> { items.put(rs.getLong(1), rs.getString(2)); }, itemIds.toArray());
+                    (org.springframework.jdbc.core.RowCallbackHandler) rs -> items.put(rs.getLong(1), rs.getString(2)), itemIds.toArray());
         }
 
         BigDecimal income = BigDecimal.ZERO;
