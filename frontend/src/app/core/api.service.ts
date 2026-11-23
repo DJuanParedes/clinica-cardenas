@@ -263,7 +263,9 @@ export class Api {
   plans(pid: number): Observable<PlanView[]> { return this.http.get<PlanView[]>(`/api/patients/${pid}/plans`); }
   createPlan(pid: number, body: any): Observable<PlanView> { return this.http.post<PlanView>(`/api/patients/${pid}/plans`, body); }
   addPlanItem(planId: number, body: any): Observable<PlanView> { return this.http.post<PlanView>(`/api/plans/${planId}/items`, body); }
-  setItemStatus(itemId: number, status: string): Observable<PlanView> { return this.http.patch<PlanView>(`/api/plan-items/${itemId}`, { status }); }
+  setItemStatus(itemId: number, status: string, supplies?: { itemId: number; quantity: number }[] | null): Observable<PlanView> { return this.http.patch<PlanView>(`/api/plan-items/${itemId}`, { status, supplies: supplies ?? null }); }
+  /** v2.10: kit del procedimiento y catálogo, para indicar lo usado en la atención. */
+  itemSupplies(itemId: number): Observable<{ kit: any[]; catalog: any[] }> { return this.http.get<{ kit: any[]; catalog: any[] }>(`/api/plan-items/${itemId}/supplies`); }
   addEvolution(planId: number, body: any): Observable<PlanView> { return this.http.post<PlanView>(`/api/plans/${planId}/evolutions`, body); }
   cancelPlan(planId: number): Observable<PlanView> { return this.http.post<PlanView>(`/api/plans/${planId}/cancel`, {}); }
 
@@ -509,7 +511,7 @@ export interface CashReport {
 }
 
 export interface CommissionRule {
-  id: number; dentist: Dentist; procedure?: Procedure; calcType: string; value: number; base: string;
+  id: number; dentist: Dentist; procedure?: Procedure; category?: string | null; scope?: string; calcType: string; value: number; base: string;
   validFrom: string; validTo?: string; active: boolean; notes?: string; label: string; createdBy: string;
 }
 

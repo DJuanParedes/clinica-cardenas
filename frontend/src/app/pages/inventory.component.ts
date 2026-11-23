@@ -75,7 +75,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
                 <td><div class="prod"><button type="button" class="ph" (click)="edit(i)" [attr.aria-label]="'Ver ' + i.name"><app-product-thumb [src]="i.imageUrl" [name]="i.name" [size]="48" /></button>
                   <div><button type="button" class="link strong" (click)="edit(i)">{{ i.name }}</button><div class="muted small">{{ i.unit }}{{ i.unitCost != null ? ' · ' + money(i.unitCost) + ' c/u' : '' }}</div></div></div></td>
                 <td><span class="tag" [class.teal]="i.category === 'INSUMO'" [class.grey]="i.category === 'INSTRUMENTAL'" [class.amber]="i.category === 'MEDICAMENTO'">{{ catLabel(i.category) }}</span></td>
-                <td class="small">{{ i.brand || '—' }}<div class="muted">{{ i.supplier || '' }}</div></td>
+                <td class="small brand">{{ i.brand || '—' }}<div class="muted">{{ i.supplier || '' }}</div></td>
                 <td class="num tabular strong">{{ n(i.stock) }}</td>
                 <td class="num tabular muted">{{ n(i.minStock) }}</td>
                 <td class="small nowrap">
@@ -88,9 +88,9 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
                   @else { <span class="tag green">Suficiente</span> }
                 </td>
                 <td class="right nowrap">
-                  <button class="btn sm ghost" type="button" (click)="openLots(i)" title="Ver lotes"><app-icon name="eye" [size]="14" /> Ver</button>
-                  <button class="btn sm" type="button" (click)="openMove(i, 'ENTRADA')"><app-icon name="arrowDown" [size]="14" /> Entrada</button>
-                  <button class="btn sm" type="button" (click)="openMove(i, 'SALIDA')"><app-icon name="arrowUp" [size]="14" /> Salida</button>
+                  <button class="btn sm ghost" type="button" (click)="openLots(i)" title="Ver lotes"><app-icon name="eye" [size]="14" /><span class="lbl"> Ver</span></button>
+                  <button class="btn sm" type="button" (click)="openMove(i, 'ENTRADA')" title="Registrar entrada" aria-label="Entrada"><app-icon name="arrowDown" [size]="14" /><span class="lbl"> Entrada</span></button>
+                  <button class="btn sm" type="button" (click)="openMove(i, 'SALIDA')" title="Registrar salida" aria-label="Salida"><app-icon name="arrowUp" [size]="14" /><span class="lbl"> Salida</span></button>
                 </td>
               </tr>
             } @empty {
@@ -426,6 +426,9 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
     .plus { color: var(--green-ink, #1f7a4d); font-weight: 700; }
     .minus { color: var(--gum-ink, #b4234a); font-weight: 700; }
     .center { text-align: center; padding: 24px; }
+    @media (max-width: 1500px) and (min-width: 901px) { .lbl { display: none; } }
+    .prod > div { min-width: 140px; }
+    .brand { max-width: 170px; }
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
     .kpi { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
     .kpi strong { font-size: 22px; }

@@ -16,8 +16,10 @@ public class ClinicalController {
     private static final String PLAN = "hasAuthority('PLAN_TRATAMIENTO')";
 
     private final ClinicalService service;
+    private final pe.clinicacardenas.inventory.InventoryService inventory;
 
-    public ClinicalController(ClinicalService service) {
+    public ClinicalController(ClinicalService service, pe.clinicacardenas.inventory.InventoryService inventory) {
+        this.inventory = inventory;
         this.service = service;
     }
 
@@ -79,7 +81,13 @@ public class ClinicalController {
     @PatchMapping("/plan-items/{itemId}")
     @PreAuthorize(PLAN)
     public Map<String, Object> itemStatus(@PathVariable Long itemId, @RequestBody ClinicalService.ItemStatusRequest r) {
-        return service.setItemStatus(itemId, r.status());
+        return service.setItemStatus(itemId, r.status(), r.supplies());
+    }
+
+    @GetMapping("/plan-items/{itemId}/supplies")
+    @PreAuthorize(PLAN)
+    public Map<String, Object> itemSupplies(@PathVariable Long itemId) {
+        return inventory.usageForm(itemId);
     }
 
     @PostMapping("/plans/{planId}/evolutions")

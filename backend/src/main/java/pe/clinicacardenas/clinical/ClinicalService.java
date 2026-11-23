@@ -64,8 +64,12 @@ public class ClinicalService {
     public record OdontogramRequest(List<OdontogramMark> entries) {}
     public record PlanItemRequest(Long procedureId, Integer tooth, BigDecimal price) {}
     public record PlanRequest(String title, String notes, List<PlanItemRequest> items) {}
-    public record ItemStatusRequest(String status) {}
-    public record EvolutionRequest(Long itemId, LocalDate sessionDate, String notes, Boolean markDone) {}
+    public record ItemStatusRequest(String status, List<TreatmentItemDone.Used> supplies) {}
+    public record EvolutionRequest(Long itemId, LocalDate sessionDate, String notes, Boolean markDone, List<TreatmentItemDone.Used> supplies) {
+        public EvolutionRequest(Long itemId, LocalDate sessionDate, String notes, Boolean markDone) {
+            this(itemId, sessionDate, notes, markDone, null);
+        }
+    }
 
     private Patient patient(Long id) {
         return patients.findById(id).orElseThrow(() -> ApiException.notFound("El paciente"));
@@ -80,7 +84,7 @@ public class ClinicalService {
      * Cambia el estado de un procedimiento registrando quién y cuándo lo realizó. Un procedimiento ya cobrado
      * o liquidado en comisiones no puede volver a pendiente: se perdería la trazabilidad de caja.
      */
-    private void applyItemStatus(TreatmentItem i, String status, TreatmentPlan p) {
+    private void applyItemStatus(TreatmentItem i, String status, TreatmentPlan p, List<TreatmentItemDone.Used> used) {
         boolean wasDone = "REALIZADO".equals(i.status);
         boolean nowDone = "REALIZADO".equals(status);
         if (wasDone && !nowDone) {
@@ -96,7 +100,7 @@ public class ClinicalService {
         i.status = status;
         if (nowDone && !wasDone) {
             events.publishEvent(new TreatmentItemDone(i.id, i.procedure.id,
-                    i.procedure.name + (i.tooth == null ? "" : " · pieza " + i.tooth)));
+                    i.procedure.name + (i.tooth == null ? "" : " · pieza " + i.tooth), used));
             i.doneAt = Dates.now();
             Dentist d = currentDentist();
             i.doneByDentistId = d != null ? d.id : (p.dentist == null ? null : p.dentist.id);
@@ -346,13 +350,18 @@ public class ClinicalService {
 
     @Transactional
     public Map<String, Object> setItemStatus(Long itemId, String status) {
+        return setItemStatus(itemId, status, null);
+    }
+
+    @Transactional
+    public Map<String, Object> setItemStatus(Long itemId, String status, List<TreatmentItemDone.Used> used) {
         TreatmentItem i = items.findById(itemId).orElseThrow(() -> ApiException.notFound("El procedimiento del plan"));
         if (!Set.of("PENDIENTE", "EN_PROCESO", "REALIZADO").contains(status)) {
             throw ApiException.field("status", "Estado inválido.");
         }
         TreatmentPlan p = plan(i.planId);
         if ("ANULADO".equals(p.status)) throw ApiException.badRequest("PLAN_CERRADO", "El plan está anulado.");
-        applyItemStatus(i, status, p);
+        applyItemStatus(i, status, p, used);
         items.save(i);
         refreshPlanStatus(p);
         audit.record("HISTORIA", p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
@@ -392,7 +401,7 @@ public class ClinicalService {
         evolutions.save(e);
         if (item != null) {
             String next = Boolean.TRUE.equals(r.markDone()) ? "REALIZADO" : ("PENDIENTE".equals(item.status) ? "EN_PROCESO" : item.status);
-            applyItemStatus(item, next, p);
+            applyItemStatus(item, next, p, r.supplies());
             items.save(item);
         }
         refreshPlanStatus(p);

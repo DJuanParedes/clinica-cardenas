@@ -117,6 +117,39 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
       </section>
     }
 
+    <app-modal [open]="!!use" title="Materiales usados en esta atención" [subtitle]="use?.label || ''" [width]="640" (close)="use = null; load()">
+      @if (use) {
+        <div class="stack">
+          <p class="muted small">Viene cargado el kit estándar del procedimiento. Ajusta las cantidades a lo que realmente usaste,
+            quita lo que no usaste o agrega otro material. Se descuenta del inventario al confirmar.</p>
+          @if (use.loading) { <div class="skeleton" style="height: 120px"></div> }
+          @else {
+            <table class="table use">
+              <thead><tr><th>Material</th><th class="right">Cantidad</th><th class="right">Stock</th><th></th></tr></thead>
+              <tbody>
+                @for (r of use.rows; track $index) {
+                  <tr>
+                    <td><select class="input" [(ngModel)]="r.itemId" (ngModelChange)="syncRow(r)" [attr.aria-label]="'Material ' + ($index + 1)">
+                      <option [ngValue]="null">Elige un material…</option>
+                      @for (c of use.catalog; track c.itemId) { <option [ngValue]="c.itemId">{{ c.name }}</option> }
+                    </select></td>
+                    <td class="right"><input class="input qty tabular" type="number" min="0" step="0.5" [(ngModel)]="r.quantity" [attr.aria-label]="'Cantidad ' + ($index + 1)" /> <span class="muted small">{{ r.unit }}</span></td>
+                    <td class="right tabular" [class.gum]="r.stock != null && r.quantity > r.stock">{{ r.stock ?? '—' }}</td>
+                    <td class="right"><button class="btn sm ghost" type="button" (click)="use.rows.splice($index, 1)" aria-label="Quitar">✕</button></td>
+                  </tr>
+                } @empty { <tr><td colspan="4" class="muted small">Este procedimiento no tiene kit. Agrega lo que usaste o confirma sin materiales.</td></tr> }
+              </tbody>
+            </table>
+            <button class="btn sm" type="button" (click)="use.rows.push({ itemId: null, quantity: 1, unit: '', stock: null })"><app-icon name="plus" [size]="14" /> Agregar material</button>
+          }
+          <div class="row end">
+            <button class="btn" type="button" (click)="use = null; load()">Cancelar</button>
+            <button class="btn primary" type="button" [disabled]="busy || use.loading" (click)="confirmUse()">Marcar realizado y descontar</button>
+          </div>
+        </div>
+      }
+    </app-modal>
+
     <app-modal [open]="modal" [title]="addTo ? 'Agregar procedimiento' : 'Nuevo plan de tratamiento'" [width]="720" (close)="modal = false">
       <form class="stack" (ngSubmit)="submitModal()">
         @if (!addTo) {
@@ -162,6 +195,10 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
     </app-modal>
   `,
   styles: [`
+    .use .input { min-width: 0; }
+    .use .qty { width: 84px; display: inline-block; }
+    .use .gum { color: var(--gum); font-weight: 700; }
+    .row.end { justify-content: flex-end; gap: 8px; }
     .head { margin-bottom: 14px; }
     .plan { margin-bottom: 18px; }
     .progress { min-width: 260px; }
@@ -233,8 +270,47 @@ export class PlanTabComponent implements OnInit {
     this.plans = this.plans.map((p) => (p.plan.id === view.plan.id ? view : p));
   }
 
+  /** v2.10: al marcar como realizado se confirma lo que realmente se usó (precargado con el kit del procedimiento). */
+  use: { label: string; loading: boolean; rows: { itemId: number | null; quantity: number; unit: string; stock: number | null }[];
+    catalog: any[]; done: (supplies: { itemId: number; quantity: number }[]) => void } | null = null;
+
+  private askUsage(itemId: number, label: string, done: (supplies: { itemId: number; quantity: number }[]) => void) {
+    this.use = { label, loading: true, rows: [], catalog: [], done };
+    this.api.itemSupplies(itemId).subscribe({
+      next: (r) => {
+        if (!this.use) return;
+        this.use.catalog = r.catalog;
+        this.use.rows = r.kit.map((k: any) => ({ itemId: k.itemId, quantity: Number(k.quantity), unit: k.unit, stock: Number(k.stock) }));
+        this.use.loading = false;
+      },
+      error: () => { this.use = null; done([]); },
+    });
+  }
+
+  syncRow(r: { itemId: number | null; unit: string; stock: number | null }) {
+    const c = this.use?.catalog.find((x) => x.itemId === r.itemId);
+    r.unit = c?.unit || ''; r.stock = c ? Number(c.stock) : null;
+  }
+
+  confirmUse() {
+    if (!this.use) return;
+    const supplies = this.use.rows.filter((r) => r.itemId && Number(r.quantity) > 0).map((r) => ({ itemId: r.itemId!, quantity: Number(r.quantity) }));
+    const done = this.use.done;
+    this.use = null;
+    done(supplies);
+  }
+
   setStatus(v: PlanView, itemId: number, status: string) {
-    this.api.setItemStatus(itemId, status).subscribe({
+    const item = v.items.find((i) => i.id === itemId);
+    if (status === 'REALIZADO' && item?.status !== 'REALIZADO') {
+      this.askUsage(itemId, item ? item.procedure.name + (item.tooth ? ' · pieza ' + item.tooth : '') : '', (supplies) => this.saveStatus(itemId, status, supplies));
+      return;
+    }
+    this.saveStatus(itemId, status, null);
+  }
+
+  private saveStatus(itemId: number, status: string, supplies: { itemId: number; quantity: number }[] | null) {
+    this.api.setItemStatus(itemId, status, supplies).subscribe({
       next: (view) => { this.replace(view); this.toast.ok('Estado actualizado.'); },
       error: (e) => { this.toast.error(apiError(e).message); this.load(); },
     });
@@ -243,8 +319,18 @@ export class PlanTabComponent implements OnInit {
   addEvolution(v: PlanView) {
     const f = this.evo[v.plan.id];
     if (!f.notes.trim()) { this.toast.warn('Describe lo realizado en la sesión.'); return; }
+    if (f.itemId && f.markDone) {
+      const item = v.items.find((i) => i.id === f.itemId);
+      this.askUsage(f.itemId, item ? item.procedure.name + (item.tooth ? ' · pieza ' + item.tooth : '') : '', (supplies) => this.saveEvolution(v, supplies));
+      return;
+    }
+    this.saveEvolution(v, null);
+  }
+
+  private saveEvolution(v: PlanView, supplies: { itemId: number; quantity: number }[] | null) {
+    const f = this.evo[v.plan.id];
     this.busy = true;
-    this.api.addEvolution(v.plan.id, { ...f, markDone: f.itemId ? f.markDone : false }).subscribe({
+    this.api.addEvolution(v.plan.id, { ...f, markDone: f.itemId ? f.markDone : false, supplies }).subscribe({
       next: (view) => {
         this.busy = false;
         this.replace(view);
