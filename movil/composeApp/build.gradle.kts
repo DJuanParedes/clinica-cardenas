@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -52,6 +53,11 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.sqldelight.coroutines)
         }
+        // Pruebas del código común (dominio y traducción de errores): se ejecutan en la JVM y en iOS.
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
             implementation(libs.sqldelight.native.driver)
@@ -70,8 +76,8 @@ android {
         applicationId = "pe.clinicacardenas.pacientes"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 6
-        versionName = "2.4.0"
+        versionCode = 7
+        versionName = "2.5.0"
     }
     packaging {
         resources {

@@ -13,6 +13,10 @@ import platform.UserNotifications.UNTimeIntervalNotificationTrigger
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationOpenSettingsURLString
+import platform.UserNotifications.UNAuthorizationStatusAuthorized
+import platform.UserNotifications.UNAuthorizationStatusDenied
+import platform.UserNotifications.UNAuthorizationStatusProvisional
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionBadge
 import platform.UserNotifications.UNAuthorizationOptionSound
@@ -111,4 +115,36 @@ class IosPlatformActions : PlatformActions {
             dispatch_async(dispatch_get_main_queue()) { onResult(ok) }
         }
     }
+
+    // ------------------------------------------------------------- permiso de notificaciones
+    // iOS muestra el diálogo una sola vez: si el usuario lo rechaza, solo se puede activar desde Ajustes,
+    // por eso cualquier rechazo se informa como DENEGADO_PARA_SIEMPRE.
+
+    private var lastPermission = "NO_PREGUNTADO"
+
+    private fun refreshPermission(onResult: ((String) -> Unit)? = null) {
+        center.getNotificationSettingsWithCompletionHandler { settings ->
+            val state = when (settings?.authorizationStatus) {
+                UNAuthorizationStatusAuthorized,
+                UNAuthorizationStatusProvisional -> "CONCEDIDO"
+                UNAuthorizationStatusDenied -> "DENEGADO_PARA_SIEMPRE"
+                else -> "NO_PREGUNTADO"
+            }
+            lastPermission = state
+            if (onResult != null) dispatch_async(dispatch_get_main_queue()) { onResult(state) }
+        }
+    }
+
+    override fun notificationPermission(): String {
+        refreshPermission()
+        return lastPermission
+    }
+
+    override fun requestNotificationPermission(onResult: (String) -> Unit) {
+        center.requestAuthorizationWithOptions(UNAuthorizationOptionAlert or UNAuthorizationOptionSound or UNAuthorizationOptionBadge) { _, _ ->
+            refreshPermission(onResult)
+        }
+    }
+
+    override fun openAppSettings() = openUrl(UIApplicationOpenSettingsURLString)
 }

@@ -148,4 +148,18 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
             }
         }
     }
+
+    // ------------------------------------------------------------- permiso de notificaciones
+
+    override fun notificationPermission(): String = MainActivity.current?.notificationState()
+        ?: if (NotificationManagerCompat.from(context).areNotificationsEnabled()) "CONCEDIDO" else "NO_PREGUNTADO"
+
+    override fun requestNotificationPermission(onResult: (String) -> Unit) {
+        val activity = MainActivity.current ?: return onResult(notificationPermission())
+        activity.runOnUiThread { activity.requestNotifications(onResult) }
+    }
+
+    override fun openAppSettings() = start(
+        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName)),
+    )
 }

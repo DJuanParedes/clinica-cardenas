@@ -1,6 +1,5 @@
 package pe.clinicacardenas.pacientes.data.repository
 
-import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -17,15 +16,11 @@ import pe.clinicacardenas.pacientes.data.remote.CodeResponse
 import pe.clinicacardenas.pacientes.data.remote.DentistDto
 import pe.clinicacardenas.pacientes.data.remote.LoginRequest
 import pe.clinicacardenas.pacientes.data.remote.PingDto
-import pe.clinicacardenas.pacientes.db.Cita
 import pe.clinicacardenas.pacientes.platform.PlatformActions
-import pe.clinicacardenas.pacientes.platform.Reminder
-
-/** Citas que se muestran en la app y de dónde salieron. */
-data class AppointmentsResult(val data: AppointmentsDto, val offline: Boolean, val reminders: Int)
 
 /**
- * Repositorio único de la app (patrón Repository): combina el API REST, la base local y las funciones del teléfono.
+ * Repositorio de las funciones en línea del paciente (cuenta, pagos, documentos, reservas y reprogramación).
+ * Las citas y su sincronización offline-first están en el dominio (casos de uso) y en AppointmentLocal/Remote.
  * Si el servidor responde 401 se cierra la sesión.
  */
 class ClinicRepository(
@@ -64,28 +59,8 @@ class ClinicRepository(
         session.start(api.activate(ActivateRequest(docType, docNumber.trim(), code.trim(), password, dataConsent)))
     }
 
-    /** Descarga las citas, las guarda para usarlas sin conexión y programa los recordatorios del teléfono. */
-    suspend fun appointments(): AppointmentsResult = try {
-        val data = guarded { api.appointments() }
-        cache(data)
-        AppointmentsResult(data, offline = false, reminders = scheduleReminders(data))
-    } catch (e: ApiException) {
-        if (e.code != "SIN_CONEXION") throw e
-        val cached = store.cachedAppointments()
-        if (cached.isEmpty()) throw e
-        val upcoming = cached.filter { it.proxima == 1L }.map { it.toDto() }
-        AppointmentsResult(
-            AppointmentsDto(next = upcoming.firstOrNull(), upcoming = upcoming, past = cached.filter { it.proxima == 0L }.map { it.toDto() }.reversed()),
-            offline = true,
-            reminders = 0,
-        )
-    }
-
-    suspend fun confirm(id: Long): AppointmentsResult {
-        val data = guarded { api.confirm(id) }
-        cache(data)
-        return AppointmentsResult(data, offline = false, reminders = scheduleReminders(data))
-    }
+    // Las citas ya no se piden aquí: las lee la pantalla desde la base local (ObserveAppointmentsUseCase)
+    // y las actualiza la sincronización (SyncAppointmentsUseCase). Ver domain/usecase.
 
     suspend fun account(): AccountDto = guarded { api.account() }
 
@@ -151,33 +126,6 @@ class ClinicRepository(
         session.clear()
     }
 
-    private fun cache(data: AppointmentsDto) {
-        val upcomingIds = data.upcoming.map { it.id }.toSet()
-        store.replaceAppointments((data.upcoming + data.past).distinctBy { it.id }.map { it.toCita(it.id in upcomingIds) })
-    }
-
-    private fun scheduleReminders(data: AppointmentsDto): Int {
-        val clinic = session.patient.value?.clinic?.name ?: "la clínica"
-        val now = Clock.System.now().toEpochMilliseconds()
-        val list = mutableListOf<Reminder>()
-        for (a in data.upcoming) {
-            if (a.status != "PROGRAMADA" && a.status != "CONFIRMADA") continue
-            val start = epochMillis(a.startAt)
-            val hour = a.startAt.substringAfter('T').take(5)
-            for ((hours, label, slot) in listOf(Triple(24, "mañana", 1), Triple(2, "en 2 horas", 2))) {
-                val at = start - hours * 3_600_000L
-                if (at <= now + 60_000) continue
-                list += Reminder(
-                    id = (a.id * 10 + slot).toInt(),
-                    atEpochMillis = at,
-                    title = "Tu cita es $label · $hour",
-                    body = "${a.reason} con ${a.dentist.fullName} en $clinic.",
-                )
-            }
-        }
-        return platform.scheduleReminders(list)
-    }
-
     companion object {
         private const val KEY_LAST_NOTICE = "avisos.ultimo"
 
@@ -185,28 +133,3 @@ class ClinicRepository(
             LocalDateTime.parse(iso.take(19)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
     }
 }
-
-private fun AppointmentDto.toCita(upcoming: Boolean) = Cita(
-    id = id,
-    inicio = startAt,
-    fin = endAt,
-    duracion = durationMin.toLong(),
-    motivo = reason,
-    estado = status,
-    odontologo = dentist.fullName,
-    especialidad = dentist.specialty,
-    color = dentist.color,
-    puede_confirmar = if (canConfirm) 1L else 0L,
-    proxima = if (upcoming) 1L else 0L,
-)
-
-private fun Cita.toDto() = AppointmentDto(
-    id = id,
-    startAt = inicio,
-    endAt = fin,
-    durationMin = duracion.toInt(),
-    reason = motivo,
-    status = estado,
-    dentist = DentistDto(odontologo, especialidad, color),
-    canConfirm = false, // sin conexión no se puede confirmar
-)
