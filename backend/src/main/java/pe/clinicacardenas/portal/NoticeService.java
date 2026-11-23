@@ -42,6 +42,7 @@ public class NoticeService {
     }
 
     @EventListener
+    @Transactional(propagation = Propagation.REQUIRED)
     public void on(AppointmentEvent e) {
         switch (e.type()) {
             case CREATED -> appointmentCreated(e.appointment());
@@ -50,16 +51,19 @@ public class NoticeService {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentCreated(Appointment a) {
         add(a.patient.id, "CITA_CREADA", "Cita reservada",
                 "Tu cita de " + a.reason.toLowerCase() + " con " + a.dentist.getFullName() + " es el " + when(a) + ".", a.id);
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentRescheduled(Appointment a) {
         add(a.patient.id, "CITA_REPROGRAMADA", "Cita reprogramada",
                 "Tu cita ahora es el " + when(a) + " con " + a.dentist.getFullName() + ".", a.id);
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
     public void appointmentStatus(Appointment a) {
         switch (a.status) {
             case CONFIRMADA -> add(a.patient.id, "CITA_CONFIRMADA", "Cita confirmada",

@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 @Service
 public class InvoiceMailer {
 
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
 
     private final BillingService billing;
     private final MailNotifier mail;

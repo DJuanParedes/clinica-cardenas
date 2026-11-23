@@ -154,7 +154,7 @@ public class NotificationService {
 
     /** Texto libre como parámetro de plantilla: una sola línea, sin el pie de baja (ya está en la plantilla), máx. 700. */
     private static String waText(String s) {
-        String t = s == null ? "" : s.replaceAll("\\s*\\n+\\s*", " · ").replaceAll(" {2,}", " ").trim();
+        String t = s == null ? "" : s.replaceAll("[ \\t]*+\\r?+\\n[ \\t\\r\\n]*+", " · ").replaceAll(" {2,}+", " ").trim();
         return t.length() > 700 ? t.substring(0, 699) + "…" : t;
     }
 

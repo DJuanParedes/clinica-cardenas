@@ -235,6 +235,7 @@ public class CashClosingService {
                 """, LocalDate.class, today.minusDays(14).atStartOfDay(), today.atStartOfDay(), today.minusDays(14), today);
     }
 
+    @Transactional(readOnly = true)
     public byte[] pdf(LocalDate day) {
         Map<String, Object> s = summary(day);
         @SuppressWarnings("unchecked")

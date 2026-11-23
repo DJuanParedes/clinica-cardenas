@@ -30,6 +30,12 @@ import java.util.*;
 @Service
 public class MarketingService {
 
+    /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private MarketingService self;
+
+
     private static final Logger log = LoggerFactory.getLogger(MarketingService.class);
     public static final int MAX_BULK_TASKS = 500;
 
@@ -299,7 +305,7 @@ public class MarketingService {
         try {
             LocalTime at = LocalTime.parse(Optional.ofNullable(setting("cumpleanos_hora")).orElse("09:00"));
             if (Dates.now().toLocalTime().isBefore(at)) return;
-            runBirthdays(false);
+            self.runBirthdays(false);
         } catch (Exception e) {
             log.warn("Saludos de cumpleaños: {}", e.getMessage());
         }

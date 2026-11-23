@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public class PortalRecordsService {
 
     private static final Pattern PHONE = Pattern.compile("^9\\d{8}$");
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final JdbcTemplate jdbc;

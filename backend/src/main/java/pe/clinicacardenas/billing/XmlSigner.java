@@ -91,7 +91,11 @@ public class XmlSigner {
 
             String digest = ((Element) doc.getElementsByTagNameNS(XMLSignature.XMLNS, "DigestValue").item(0)).getTextContent();
 
-            var t = TransformerFactory.newInstance().newTransformer();
+            // Sin acceso a DTD ni hojas de estilo externas (evita XXE al serializar el XML firmado).
+            TransformerFactory tf = TransformerFactory.newInstance();
+            tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+            var t = tf.newTransformer();
             t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
             StringWriter out = new StringWriter();
             t.transform(new DOMSource(doc), new StreamResult(out));

@@ -27,6 +27,12 @@ import java.util.*;
 @Service
 public class CampaignService {
 
+    /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private CampaignService self;
+
+
     private static final Logger log = LoggerFactory.getLogger(CampaignService.class);
     public static final int MAX_RECIPIENTS = 2000;
 
@@ -186,7 +192,7 @@ public class CampaignService {
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     public void tick() {
         for (Long id : jdbc.queryForList("select id from campaigns where status = 'PROGRAMADA' and scheduled_at <= ?", Long.class, Dates.now())) {
-            try { send(id); } catch (Exception e) { log.warn("Campaña {}: {}", id, e.getMessage()); }
+            try { self.send(id); } catch (Exception e) { log.warn("Campaña {}: {}", id, e.getMessage()); }
         }
     }
 

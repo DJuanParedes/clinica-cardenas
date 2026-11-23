@@ -94,7 +94,7 @@ public class LabService {
         String phone = clean(r.phone(), 15);
         if (phone != null && !phone.replaceAll("[^0-9]", "").matches("^\\d{6,9}$")) e.put("phone", "Teléfono no válido.");
         String email = clean(r.email(), 120);
-        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) e.put("email", "Correo no válido.");
+        if (email != null && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (name != null) {
             Integer dup = jdbc.queryForObject("select count(*) from laboratories where lower(name) = lower(?) and id <> ?", Integer.class, name, id == null ? -1L : id);
             if (dup != null && dup > 0) e.put("name", "Ya existe un laboratorio con ese nombre.");
@@ -158,21 +158,24 @@ public class LabService {
     }
 
     public Map<String, Object> summary(Long patientId) {
-        String pf = patientId == null ? "" : " and o.patient_id = " + patientId;
+        // Filtro por paciente siempre como parámetro enlazado (nunca concatenado en el SQL).
+        String pf = patientId == null ? "" : " and o.patient_id = ?";
+        Object[] pa = patientId == null ? new Object[0] : new Object[]{patientId};
         Map<String, Object> s = new LinkedHashMap<>();
-        s.put("porEnviar", count("o.status = 'POR_ENVIAR'" + pf));
-        s.put("enLaboratorio", count("o.status in ('ENVIADA','EN_PRUEBA')" + pf));
-        s.put("vencidas", jdbc.queryForObject("select count(*) from lab_orders o where o.status in ('ENVIADA','EN_PRUEBA') and o.due_date < ?" + pf, Integer.class, Dates.today()));
-        s.put("porEntregar", count("o.status = 'RECIBIDA'" + pf));
-        BigDecimal cost = jdbc.queryForObject("select coalesce(sum(o.cost),0) from lab_orders o where o.status <> 'ANULADA'" + pf, BigDecimal.class);
+        s.put("porEnviar", count("o.status = 'POR_ENVIAR'" + pf, pa));
+        s.put("enLaboratorio", count("o.status in ('ENVIADA','EN_PRUEBA')" + pf, pa));
+        Object[] va = patientId == null ? new Object[]{Dates.today()} : new Object[]{Dates.today(), patientId};
+        s.put("vencidas", jdbc.queryForObject("select count(*) from lab_orders o where o.status in ('ENVIADA','EN_PRUEBA') and o.due_date < ?" + pf, Integer.class, va));
+        s.put("porEntregar", count("o.status = 'RECIBIDA'" + pf, pa));
+        BigDecimal cost = jdbc.queryForObject("select coalesce(sum(o.cost),0) from lab_orders o where o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
         BigDecimal paid = jdbc.queryForObject("select coalesce(sum(pp.amount),0) from lab_order_payments pp join expenses x on x.id = pp.expense_id"
-                + " join lab_orders o on o.id = pp.order_id where x.status = 'VALIDO' and o.status <> 'ANULADA'" + pf, BigDecimal.class);
+                + " join lab_orders o on o.id = pp.order_id where x.status = 'VALIDO' and o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
         s.put("porPagar", cost.subtract(paid).max(BigDecimal.ZERO));
         return s;
     }
 
-    private Integer count(String cond) {
-        return jdbc.queryForObject("select count(*) from lab_orders o where " + cond, Integer.class);
+    private Integer count(String cond, Object... args) {
+        return jdbc.queryForObject("select count(*) from lab_orders o where " + cond, Integer.class, args);
     }
 
     public Map<String, Object> get(Long id) {

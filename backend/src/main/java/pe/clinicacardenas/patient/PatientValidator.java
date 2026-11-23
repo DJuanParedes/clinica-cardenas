@@ -13,7 +13,7 @@ public final class PatientValidator {
     private static final Pattern PAS = Pattern.compile("^[A-Z0-9]{6,12}$");
     private static final Pattern NAME = Pattern.compile("^[\\p{L}][\\p{L} '.-]{1,79}$");
     private static final Pattern PHONE = Pattern.compile("^\\+?\\d{6,12}$");
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
 
     private PatientValidator() {}
 

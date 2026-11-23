@@ -33,6 +33,12 @@ import java.util.*;
 @Service
 public class CareService {
 
+    /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private CareService self;
+
+
     private static final Logger log = LoggerFactory.getLogger(CareService.class);
     private static final Locale ES = new Locale("es", "PE");
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'a las' h:mm a", ES);
@@ -315,12 +321,12 @@ public class CareService {
     @Scheduled(cron = "0 0 10 * * MON", zone = "America/Lima")
     public void autoRecalls() {
         int n = 0;
-        for (Map<String, Object> r : recalls()) {
+        for (Map<String, Object> r : self.recalls()) {
             Object last = r.get("lastRecallAt");
             if (last instanceof java.sql.Timestamp t && t.toLocalDateTime().isAfter(Dates.now().minusDays(30))) continue;
             if (last instanceof LocalDateTime t && t.isAfter(Dates.now().minusDays(30))) continue;
             try {
-                sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
+                self.sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
                 n++;
             } catch (Exception e) {
                 log.warn("Recordatorio de control no enviado: {}", e.getMessage());
