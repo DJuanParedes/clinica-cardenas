@@ -118,8 +118,9 @@ public record SegmentFilter(List<String> sources, List<String> tags, String sex,
                 .filter(o -> o.get("code").equals(x)).map(o -> o.get("label")).findFirst().orElse(x)).toList()));
         if (tags != null) s.add("Etiqueta: " + String.join(", ", tags));
         if (sex != null) s.add("F".equals(sex) ? "Mujeres" : "Hombres");
-        if (ageMin != null || ageMax != null) s.add(ageMin != null && ageMax != null ? ageMin + " a " + ageMax + ANOS
-                : ageMin != null ? "Desde " + ageMin + ANOS : "Hasta " + ageMax + ANOS);
+        if (ageMin != null && ageMax != null) s.add(ageMin + " a " + ageMax + ANOS);
+        else if (ageMin != null) s.add("Desde " + ageMin + ANOS);
+        else if (ageMax != null) s.add("Hasta " + ageMax + ANOS);
         if (birthdayMonth != null) s.add("Cumpleaños en " + MONTHS[birthdayMonth - 1]);
         if (visit != null) s.add(switch (visit) {
             case NUNCA_2 -> "Nunca atendidos";

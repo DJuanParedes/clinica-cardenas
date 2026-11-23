@@ -133,7 +133,7 @@ public class NotificationService {
             String k = key + ":" + t.channel();
             if (repo.existsByIdempotencyKey(k)) continue;
             add(p, null, type, ENVIAR, t, subject, "Hola " + firstName(p) + ", " + text
-                    + (WHATSAPP_2.equals(t.channel()) ? "\n\n" + clinicName : "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone), k, null);
+                    + (WHATSAPP_2.equals(t.channel()) ? "\n\n" + clinicName : signature()), k, null);
             n++;
         }
         return n;
@@ -262,7 +262,7 @@ public class NotificationService {
             if (repo.existsByIdempotencyKey(k)) continue;
             String b = WHATSAPP_2.equals(t.channel())
                     ? text + "\n\n_Responde *BAJA* si no deseas recibir más promociones._"
-                    : text.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone
+                    : text.replace("*", "") + signature()
                       + "\n\nSi no deseas recibir más promociones, respóndenos BAJA por WhatsApp o avísanos en recepción.";
             // v2.9: fuera de la ventana de 24 h Meta solo acepta plantillas aprobadas de categoría marketing.
             Wa meta = "CUMPLEANOS".equals(type) ? wa(WA_CUMPLEANOS, clinicName, waText(text))
@@ -294,7 +294,7 @@ public class NotificationService {
         Target t = new Target(channel, destination);
         String k = key + ":" + channel;
         if (repo.existsByIdempotencyKey(k)) return out;
-        String b = WHATSAPP_2.equals(channel) ? body : body.replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
+        String b = WHATSAPP_2.equals(channel) ? body : body.replace("*", "") + signature();
         Wa meta = waTemplate == null || waTemplate.isEmpty() ? null : new Wa(waTemplate.get(0), waTemplate.subList(1, waTemplate.size()));
         add(p, null, type, ENVIAR, t, subject, b, k, null, meta);
         repo.findByIdempotencyKey(k).ifPresent(n -> out.add(new Sent(channel, n.id)));
@@ -326,7 +326,7 @@ public class NotificationService {
                                  Map<String, String> vars, String key, LocalDateTime scheduledFor, Wa metaTemplate) {
         var r = templates.render(templateCode, vars);
         String body = WHATSAPP_2.equals(t.channel()) ? r.body()
-                : r.body().replace("*", "") + "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
+                : r.body().replace("*", "") + signature();
         if (repo.existsByIdempotencyKey(key)) return;
         add(p, appointmentId, type, operation, t, r.subject(), body, key, scheduledFor, r.customized() ? null : metaTemplate);
         repo.findByIdempotencyKey(key).ifPresent(n -> {
@@ -506,8 +506,9 @@ public class NotificationService {
     /** HU-22: código para activar la cuenta de la aplicación del paciente. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void accessCode(Patient p, String code) {
-        Target t = p.phone != null && !p.phone.isBlank() ? new Target(WHATSAPP_2, p.phone)
-                : p.email != null ? new Target(EMAIL_2, p.email) : null;
+        Target t = null;
+        if (p.phone != null && !p.phone.isBlank()) t = new Target(WHATSAPP_2, p.phone);
+        else if (p.email != null) t = new Target(EMAIL_2, p.email);
         if (t == null) return;
         String text = "Hola " + firstName(p) + ", tu código para activar la app de " + clinicName + " es: " + code
                 + "\nVence en 15 minutos. Si no lo pediste, ignora este mensaje.";
@@ -556,5 +557,9 @@ public class NotificationService {
         audit.register("NOTIFICACION", copy.id, "REENVIAR", n.type + " por " + n.channel + " a " + n.destination);
         events.publishEvent(new Queued());
         return copy;
+    }
+
+    private String signature() {
+        return "\n\nAtentamente,\n" + clinicName + "\nTeléfono / WhatsApp: " + clinicPhone;
     }
 }

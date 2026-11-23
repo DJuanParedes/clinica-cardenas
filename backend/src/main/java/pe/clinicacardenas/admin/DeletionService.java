@@ -123,10 +123,8 @@ public class DeletionService {
                   from information_schema.key_column_usage k
                   join information_schema.columns c on c.table_schema = k.table_schema and c.table_name = k.table_name and c.column_name = k.column_name
                  where k.table_schema = database() and k.referenced_table_name is not null
-                """, rs -> {
-            m.computeIfAbsent(rs.getString(1), x -> new ArrayList<>())
-                    .add(new Ref(rs.getString(2), rs.getString(3), "YES".equals(rs.getString(4))));
-        });
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> m.computeIfAbsent(rs.getString(1), x -> new ArrayList<>())
+                    .add(new Ref(rs.getString(2), rs.getString(3), "YES".equals(rs.getString(4)))));
         tablesWithId.set(new HashSet<>(jdbc.queryForList(
                 "select table_name from information_schema.columns where table_schema = database() and column_name = 'id'", String.class)));
         refs.set(m);

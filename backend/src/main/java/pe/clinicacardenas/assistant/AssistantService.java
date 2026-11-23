@@ -206,8 +206,9 @@ public class AssistantService {
     private void cambio(Turn t, boolean cancelar) {
         Appointment next = t.next;
         if (next == null) {
+            String purpose = cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?";
             t.out.append(t.patient == null ? "No encuentro una cita con este número. Indícanos tu nombre completo y DNI para ayudarte."
-                    : "No tienes citas pendientes" + (cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?"));
+                    : "No tienes citas pendientes" + purpose);
             t.human = t.patient == null;
             return;
         }

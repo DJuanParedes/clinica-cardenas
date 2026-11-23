@@ -90,9 +90,8 @@ public class OnlineChargeService {
         m.put("enabled", enabled());
         m.put("testMode", enabled() && mp.testMode());
         m.put("methods", List.of("TARJETA", "YAPE"));
-        m.put("message", enabled()
-                ? (mp.testMode() ? "Mercado Pago en modo de pruebas: usa tarjetas de prueba, no se cobra dinero real." : "Mercado Pago activo: los cobros son reales.")
-                : "Para cobrar en línea configura PAGOS_MODO=mercadopago y MP_ACCESS_TOKEN en el servidor.");
+        String mode = mp.testMode() ? "Mercado Pago en modo de pruebas: usa tarjetas de prueba, no se cobra dinero real." : "Mercado Pago activo: los cobros son reales.";
+        m.put("message", enabled() ? mode : "Para cobrar en línea configura PAGOS_MODO=mercadopago y MP_ACCESS_TOKEN en el servidor.");
         return m;
     }
 
@@ -289,8 +288,9 @@ public class OnlineChargeService {
                     log.warn("Cobro {}: Mercado Pago aprobó S/ {} y se esperaba S/ {}", id, paidAmount, c.get(AMOUNT));
                 }
                 Long itemId = c.get(TREATMENT_ITEM_ID) == null ? null : ((Number) c.get(TREATMENT_ITEM_ID)).longValue();
-                String method = "yape".equalsIgnoreCase(methodId) ? "YAPE"
-                        : "bank_transfer".equals(typeId) || "account_money".equals(typeId) ? "TRANSFERENCIA" : "TARJETA";
+                String method = "TARJETA";
+                if ("yape".equalsIgnoreCase(methodId)) method = "YAPE";
+                else if ("bank_transfer".equals(typeId) || "account_money".equals(typeId)) method = "TRANSFERENCIA";
                 String reference = "MP-" + mpId;
                 String notes = "Mercado Pago · " + labelMethod(methodId, typeId) + " · operación " + mpId;
                 Map<String, Object> reg;

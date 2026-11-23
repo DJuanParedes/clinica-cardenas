@@ -215,7 +215,9 @@ public class LabService {
         r.put(BALANCE, ANULADA.equals(r.get(STATUS)) ? BigDecimal.ZERO : cost.subtract(paid).max(BigDecimal.ZERO));
         r.put("workTypeLabel", WORK_TYPES.getOrDefault((String) r.get(WORKTYPE), (String) r.get(WORKTYPE)));
         Object due = r.get("dueDate");
-        LocalDate d = due instanceof java.sql.Date sd ? sd.toLocalDate() : due instanceof LocalDate ld ? ld : null;
+        LocalDate d = null;
+        if (due instanceof java.sql.Date sd) d = sd.toLocalDate();
+        else if (due instanceof LocalDate ld) d = ld;
         String st = (String) r.get(STATUS);
         boolean inLab = ENVIADA_2.equals(st) || EN_PRUEBA_2.equals(st);
         r.put("overdue", inLab && d != null && d.isBefore(Dates.today()));

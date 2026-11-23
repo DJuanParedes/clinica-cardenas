@@ -51,8 +51,8 @@ public class KardexService {
             List<Map<String, Object>> first = jdbc.queryForList(
                     "select stock_after - quantity as q, coalesce(value_after, 0) - coalesce(total_cost, 0) as v from inventory_moves where item_id = ? order by id limit 1", itemId);
             qty0 = first.isEmpty() ? (BigDecimal) it.get(0).get("stock") : ((BigDecimal) first.get(0).get("q"));
-            val0 = first.isEmpty() ? qty0.multiply(it.get(0).get(UNIT_COST) == null ? BigDecimal.ZERO : (BigDecimal) it.get(0).get(UNIT_COST))
-                    : ((BigDecimal) first.get(0).get("v")).max(BigDecimal.ZERO);
+            BigDecimal unitCost = it.get(0).get(UNIT_COST) == null ? BigDecimal.ZERO : (BigDecimal) it.get(0).get(UNIT_COST);
+            val0 = first.isEmpty() ? qty0.multiply(unitCost) : ((BigDecimal) first.get(0).get("v")).max(BigDecimal.ZERO);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
         BigDecimal inQ = BigDecimal.ZERO;

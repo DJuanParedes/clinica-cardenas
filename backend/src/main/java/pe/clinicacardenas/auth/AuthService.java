@@ -106,7 +106,8 @@ public class AuthService {
         // Verificación en 2 pasos: además de la contraseña, un código de 6 dígitos.
         //   APP    → el de Google Authenticator / Microsoft Authenticator (cambia cada 30 s)
         //   CORREO → uno de un solo uso que se envía al correo de la cuenta (vence en 10 min); no hay que instalar nada
-        String method = u.twoFactorMethod != null ? u.twoFactorMethod : (u.totpEnabled ? "APP" : null);
+        String method = u.twoFactorMethod;
+        if (method == null && u.totpEnabled) method = "APP";
         if ("APP".equals(method)) {
             if (code == null || code.isBlank()) {
                 throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.", Map.of(METHOD, "APP"));

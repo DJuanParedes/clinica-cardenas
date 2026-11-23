@@ -80,8 +80,8 @@ public class PatientInsightsService {
             BigDecimal done = rs.getBigDecimal(3);
             long items = rs.getLong(4);
             long doneItems = rs.getLong(5);
-            int pct = total.signum() > 0 ? done.multiply(BigDecimal.valueOf(100)).divide(total, 0, RoundingMode.DOWN).intValue()
-                    : items > 0 ? (int) (doneItems * 100 / items) : 0;
+            int byItems = items > 0 ? (int) (doneItems * 100 / items) : 0;
+            int pct = total.signum() > 0 ? done.multiply(BigDecimal.valueOf(100)).divide(total, 0, RoundingMode.DOWN).intValue() : byItems;
             m.put("budget", Map.of("total", total, "done", done, "percent", pct, "items", items, "doneItems", doneItems));
         });
         jdbc.query("""

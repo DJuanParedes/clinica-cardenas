@@ -93,12 +93,13 @@ public class AutomationService {
 
     static String summary(AutomationRule r) {
         String t = r.sendTime() == null ? "" : " a las " + r.sendTime().toString().substring(0, 5);
+        String days = r.amount() + (r.amount() == 1 ? " día" : " días");
+        String hoursAfter = r.amount() == 0 ? "de inmediato" : r.amount() + " horas después";
         return switch (r.kind()) {
-            case ANTES -> "DIAS".equals(r.unit()) ? r.amount() + (r.amount() == 1 ? " día" : " días") + " antes" + t
+            case ANTES -> "DIAS".equals(r.unit()) ? days + " antes" + t
                     : r.amount() + " horas antes (si la cita es antes, 2 horas antes)";
             case "DIA" -> "El día de la cita" + t;
-            case DESPUES -> "Al quedar atendida, " + ("DIAS".equals(r.unit()) ? r.amount() + (r.amount() == 1 ? " día" : " días") + " después" + t
-                    : r.amount() == 0 ? "de inmediato" : r.amount() + " horas después");
+            case DESPUES -> "Al quedar atendida, " + ("DIAS".equals(r.unit()) ? days + " después" + t : hoursAfter);
             default -> r.kind();
         };
     }

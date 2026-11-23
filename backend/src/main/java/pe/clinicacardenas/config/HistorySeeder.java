@@ -153,7 +153,9 @@ public class HistorySeeder {
                 Patient p = pick(ps);
                 LocalDateTime at = day.atTime(slots[s][0], slots[s][1]);
                 int roll = rnd.nextInt(100);
-                AppointmentStatus st = roll < 78 ? AppointmentStatus.ATENDIDA : roll < 89 ? AppointmentStatus.CANCELADA : AppointmentStatus.NO_ASISTIO;
+                AppointmentStatus st = AppointmentStatus.NO_ASISTIO;
+                if (roll < 78) st = AppointmentStatus.ATENDIDA;
+                else if (roll < 89) st = AppointmentStatus.CANCELADA;
                 String code = pick(menu.get(d.id));
                 Procedure pr = proc.get(code);
                 Appointment a = new Appointment();

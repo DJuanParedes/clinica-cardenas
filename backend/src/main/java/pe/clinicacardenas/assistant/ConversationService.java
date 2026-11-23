@@ -369,7 +369,7 @@ public class ConversationService {
         String phone = phone(rawPhone);
         if (phone == null || thread(phone) == null) throw ApiException.notFound("La conversación");
         if (r.aiEnabled() != null) {
-            jdbc.update("update wa_threads set ai_enabled = ?" + (r.aiEnabled() ? ", manual_until = null" : "") + " where phone = ?", r.aiEnabled(), phone);
+            jdbc.update("update wa_threads set ai_enabled = ?" + (Boolean.TRUE.equals(r.aiEnabled()) ? ", manual_until = null" : "") + " where phone = ?", r.aiEnabled(), phone);
         }
         if (Boolean.TRUE.equals(r.attended())) jdbc.update("update wa_threads set needs_attention = false where phone = ?", phone);
         return conversation(phone);

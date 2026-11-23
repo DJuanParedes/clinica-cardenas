@@ -50,11 +50,13 @@ public class LanguageModel {
                          @Value("${app.assistant.timeout-ms:6000}") int timeoutMs) {
         this.json = json;
         String p = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
-        if (p.isEmpty()) p = !anthropicKey.isBlank() ? CLAUDE : !url.isBlank() ? OPENAI : LOCAL;
+        if (p.isEmpty() && !anthropicKey.isBlank()) p = CLAUDE;
+        else if (p.isEmpty()) p = url.isBlank() ? LOCAL : OPENAI;
         this.provider = p;
-        this.apiKey = CLAUDE.equals(p) ? (anthropicKey.isBlank() ? apiKey : anthropicKey) : apiKey;
-        this.model = !model.isBlank() ? model.trim() : CLAUDE.equals(p) ? "claude-haiku-5-5" : OPENAI.equals(p) ? "llama3.2" : LOCAL;
-        this.url = url.isBlank() ? (CLAUDE.equals(p) ? "https://api.anthropic.com/v1/messages" : "") : url.trim().replaceAll("/+$", "");
+        this.apiKey = CLAUDE.equals(p) && !anthropicKey.isBlank() ? anthropicKey : apiKey;
+        this.model = model.isBlank() ? defaultModel(p) : model.trim();
+        String claudeUrl = CLAUDE.equals(p) ? "https://api.anthropic.com/v1/messages" : "";
+        this.url = url.isBlank() ? claudeUrl : url.trim().replaceAll("/+$", "");
         this.timeoutMs = timeoutMs;
     }
 
@@ -80,6 +82,10 @@ public class LanguageModel {
             String text = CLAUDE.equals(provider) ? claude(system, messages) : openai(system, messages);
             lastError = null;
             return text == null || text.isBlank() ? null : text.trim();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            lastError = "Interrumpido";
+            return null;
         } catch (Exception e) {
             lastError = e.getClass().getSimpleName() + ": " + e.getMessage();
             log.warn("Asistente: el modelo {} no respondió ({}); se usa la respuesta local", engineName(), lastError);
@@ -124,5 +130,10 @@ public class LanguageModel {
         HttpResponse<String> res = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() / 100 != 2) throw new IllegalStateException("HTTP " + res.statusCode() + " " + res.body().substring(0, Math.min(200, res.body().length())));
         return json.readTree(res.body()).path("choices").path(0).path("message").path(CONTENT).asText();
+    }
+
+    private static String defaultModel(String provider) {
+        if (CLAUDE.equals(provider)) return "claude-haiku-5-5";
+        return OPENAI.equals(provider) ? "llama3.2" : LOCAL;
     }
 }

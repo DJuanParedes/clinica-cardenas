@@ -139,6 +139,7 @@ public class NotificationDispatcher {
                 error = "Microservicio no disponible (HTTP " + code + ")";
             }
         } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             status = PENDIENTE;
             retry = true;
             error = "Sin conexión con el microservicio de notificaciones";

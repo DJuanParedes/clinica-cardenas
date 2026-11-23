@@ -279,6 +279,8 @@ public class FileService {
     }
 
     private static String clean(String s) {
-        return s == null || s.isBlank() ? null : (s.trim().length() > 500 ? s.trim().substring(0, 500) : s.trim());
+        if (s == null || s.isBlank()) return null;
+        String t = s.trim();
+        return t.length() > 500 ? t.substring(0, 500) : t;
     }
 }

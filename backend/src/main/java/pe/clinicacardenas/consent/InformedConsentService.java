@@ -201,7 +201,8 @@ public class InformedConsentService {
         String signer = minor && p.guardianName != null && !p.guardianName.isBlank() ? p.guardianName : p.getFullName();
         v.put("firmante", signer);
         v.put("documento_firmante", minor && p.guardianDocNumber != null ? "DNI " + p.guardianDocNumber : p.docType + " " + p.docNumber);
-        v.put("condicion", minor ? (REL.getOrDefault(p.guardianRelationship == null ? "TUTOR" : p.guardianRelationship, "apoderado(a)") + " de " + p.getFullName() + " (menor de edad)") : PACIENTE_2);
+        String relation = p.guardianRelationship == null ? "TUTOR" : p.guardianRelationship;
+        v.put("condicion", minor ? (REL.getOrDefault(relation, "apoderado(a)") + " de " + p.getFullName() + " (menor de edad)") : PACIENTE_2);
         v.put(PACIENTE_2, p.getFullName());
         v.put("documento", p.docType + " " + p.docNumber);
         v.put("odontologo", dentist == null ? "odontólogo(a) tratante" : dentist);
@@ -276,9 +277,9 @@ public class InformedConsentService {
         m.put("expired", PENDIENTE.equals(r.get(STATUS)) && Dates.toLocalDateTime(r.get("expires_at")).isBefore(Dates.now()));
         m.put("patientName", p.getFullName());
         m.put("minor", p.isMinor());
-        m.put("signerName", p.isMinor() ? (p.guardianName == null ? "" : p.guardianName) : p.getFullName());
-        m.put(SIGNERDOC, p.isMinor() ? (p.guardianDocNumber == null ? "" : p.guardianDocNumber) : p.docNumber);
-        m.put(RELATIONSHIP, p.isMinor() ? (p.guardianRelationship == null ? "" : p.guardianRelationship) : PACIENTE);
+        m.put("signerName", p.isMinor() ? nz(p.guardianName) : p.getFullName());
+        m.put(SIGNERDOC, p.isMinor() ? nz(p.guardianDocNumber) : p.docNumber);
+        m.put(RELATIONSHIP, p.isMinor() ? nz(p.guardianRelationship) : PACIENTE);
         m.put("signedAt", r.get("signed_at"));
         m.put("hash", ((String) r.get("body_hash")).substring(0, 16));
         return m;
@@ -388,4 +389,6 @@ public class InformedConsentService {
         String[] p = email.split("@");
         return p[0].charAt(0) + "***@" + p[1];
     }
+
+    private static String nz(String s) { return s == null ? "" : s; }
 }

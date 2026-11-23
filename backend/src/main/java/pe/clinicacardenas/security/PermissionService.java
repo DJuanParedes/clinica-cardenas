@@ -202,7 +202,7 @@ public class PermissionService {
         if (Boolean.TRUE.equals(jdbc.queryForObject("select count(*) > 0 from roles where lower(name) = lower(?) and code <> ?", Boolean.class, name, code))) {
             throw ApiException.field("name", "Ya existe un rol con ese nombre.");
         }
-        String desc = e.description() == null ? (String) row.get(DESCRIPTION) : (e.description().isBlank() ? null : e.description().trim());
+        String desc = e.description() == null ? (String) row.get(DESCRIPTION) : blankToNull(e.description());
         boolean hidden = e.hidden() == null ? asBool(row.get(HIDDEN)) : e.hidden();
         if (hidden && !asBool(row.get(HIDDEN))) {
             if (LOCKED_ROLE.name().equals(code)) throw ApiException.badRequest("ROL_PROTEGIDO", "El rol Administrador no se puede ocultar.");
@@ -286,10 +286,12 @@ public class PermissionService {
         String group = e.group() == null ? (String) p.get(GROUP) : e.group().trim();
         if (label.length() < 3 || label.length() > 120) throw ApiException.field(LABEL, "El nombre debe tener de 3 a 120 caracteres.");
         if (group.length() < 3 || group.length() > 40) throw ApiException.field(GROUP, "El grupo debe tener de 3 a 40 caracteres.");
-        String desc = e.description() == null ? (String) p.get(DESCRIPTION) : (e.description().isBlank() ? null : e.description().trim());
+        String desc = e.description() == null ? (String) p.get(DESCRIPTION) : blankToNull(e.description());
         jdbc.update("update permissions set label = ?, group_name = ?, description = ? where code = ?", label, group, desc, code);
         load();
         audit.register("PERMISO", null, "EDITAR", code + ": " + label + " (" + group + ")");
         return matrix();
     }
+
+    private static String blankToNull(String s) { return s.isBlank() ? null : s.trim(); }
 }

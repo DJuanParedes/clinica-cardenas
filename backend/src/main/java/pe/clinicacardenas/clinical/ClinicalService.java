@@ -111,7 +111,8 @@ public class ClinicalService {
                     i.procedure.name + (i.tooth == null ? "" : " · pieza " + i.tooth), used));
             i.doneAt = Dates.now();
             Dentist d = currentDentist();
-            i.doneByDentistId = d != null ? d.id : (p.dentist == null ? null : p.dentist.id);
+            Long planDentist = p.dentist == null ? null : p.dentist.id;
+            i.doneByDentistId = d != null ? d.id : planDentist;
         } else if (!nowDone) {
             i.doneAt = null;
             i.doneByDentistId = null;
@@ -409,7 +410,8 @@ public class ClinicalService {
         e.createdBy = CurrentUser.usernameOrSystem();
         evolutions.save(e);
         if (item != null) {
-            String next = Boolean.TRUE.equals(r.markDone()) ? REALIZADO : (PENDIENTE.equals(item.status) ? "EN_PROCESO" : item.status);
+            String progress = PENDIENTE.equals(item.status) ? "EN_PROCESO" : item.status;
+        String next = Boolean.TRUE.equals(r.markDone()) ? REALIZADO : progress;
             applyItemStatus(item, next, p, r.supplies());
             items.save(item);
         }

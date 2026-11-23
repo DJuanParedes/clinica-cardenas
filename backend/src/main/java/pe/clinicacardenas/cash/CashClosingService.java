@@ -185,8 +185,9 @@ public class CashClosingService {
         List<Map<String, Object>> lines = new ArrayList<>();
         BigDecimal diff = BigDecimal.ZERO;
         for (var x : expected.entrySet()) {
-            BigDecimal declared = EFECTIVO.equals(x.getKey()) ? counted
-                    : (r.declared() != null && r.declared().get(x.getKey()) != null ? r.declared().get(x.getKey()) : x.getValue());
+            BigDecimal other = r.declared() == null ? null : r.declared().get(x.getKey());
+            if (other == null) other = x.getValue();
+            BigDecimal declared = EFECTIVO.equals(x.getKey()) ? counted : other;
             // Un medio distinto al efectivo puede quedar en negativo (se pagaron egresos por Yape o transferencia).
             BigDecimal d = declared.subtract(x.getValue());
             diff = diff.add(d);
@@ -240,7 +241,7 @@ public class CashClosingService {
     }
 
     public List<Map<String, Object>> history(int limit) {
-        List<LocalDate> days = jdbc.queryForList("select day from cash_closings order by day desc limit ?", LocalDate.class, Math.min(Math.max(limit, 1), 120));
+        List<LocalDate> days = jdbc.queryForList("select day from cash_closings order by day desc limit ?", LocalDate.class, Math.clamp(limit, 1, 120));
         List<Map<String, Object>> out = new ArrayList<>();
         for (LocalDate d : days) out.add(find(d));
         return out;

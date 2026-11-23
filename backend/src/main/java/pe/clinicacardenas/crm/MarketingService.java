@@ -213,7 +213,8 @@ public class MarketingService {
     /** Crea la misma tarea para cada paciente del segmento (sin repetirla a quien ya la tiene pendiente). */
     @Transactional
     public Map<String, Object> bulkTasks(BulkTaskRequest r) {
-        SegmentFilter f = r.segmentId() != null ? segmentFilter(r.segmentId()) : (r.filters() == null ? SegmentFilter.empty() : r.filters()).clean();
+        SegmentFilter given = r.filters() == null ? SegmentFilter.empty() : r.filters();
+        SegmentFilter f = r.segmentId() != null ? segmentFilter(r.segmentId()) : given.clean();
         String ref = r.segmentId() != null ? segmentName(r.segmentId()) : f.describe();
         var base = tasks.validate(new TaskService.TaskRequest(null, null, r.kind(), r.title(), r.notes(), r.assigneeId(), r.dueDate(), r.dueTime(), r.priority()), true);
         List<Long> ids = ids(f);
@@ -306,7 +307,10 @@ public class MarketingService {
             m.put("turns", year - bd.getYear());
             m.put(PHONE, r.get(PHONE));
             Object mc = r.get("marketing_consent");
-            m.put("marketingConsent", mc == null ? null : (mc instanceof Boolean b ? b : ((Number) mc).intValue() != 0));
+            Boolean consent = null;
+        if (mc instanceof Boolean b) consent = b;
+        else if (mc != null) consent = ((Number) mc).intValue() != 0;
+        m.put("marketingConsent", consent);
             m.put("greeted", ((Number) r.get("greeted")).longValue() > 0);
             m.put("tasked", ((Number) r.get("tasked")).longValue() > 0);
             out.add(m);

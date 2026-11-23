@@ -331,6 +331,7 @@ public class AnamnesisService {
         if (s == null) return "p";
         String n = java.text.Normalizer.normalize(s.toLowerCase(), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         n = n.replaceAll("[^a-z0-9]+", "_").replaceAll("(^_)|(_$)", "");
-        return n.isEmpty() ? "p" : (n.length() > 30 ? n.substring(0, 30) : n);
+        if (n.isEmpty()) return "p";
+        return n.length() > 30 ? n.substring(0, 30) : n;
     }
 }

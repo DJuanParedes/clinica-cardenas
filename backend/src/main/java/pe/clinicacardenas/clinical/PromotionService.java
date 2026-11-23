@@ -115,7 +115,7 @@ public class PromotionService {
             LocalDate f = ((java.sql.Date) r.get("validFrom")).toLocalDate();
             LocalDate t = ((java.sql.Date) r.get(VALIDTO)).toLocalDate();
             boolean on = Boolean.TRUE.equals(r.get("active")) || Integer.valueOf(1).equals(r.get("active"));
-            r.put("state", !on ? "INACTIVA" : today.isBefore(f) ? "PROGRAMADA" : today.isAfter(t) ? "VENCIDA" : "VIGENTE");
+            r.put("state", promotionState(on, today, f, t));
             if (r.get(LISTPRICE) != null) r.put("finalPrice", apply((BigDecimal) r.get(LISTPRICE), (String) r.get(DISCOUNTTYPE), (BigDecimal) r.get(VALUE)));
         }
         return rows;
@@ -188,5 +188,11 @@ public class PromotionService {
 
     private static String blank(String v) {
         return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    private static String promotionState(boolean on, LocalDate today, LocalDate from, LocalDate to) {
+        if (!on) return "INACTIVA";
+        if (today.isBefore(from)) return "PROGRAMADA";
+        return today.isAfter(to) ? "VENCIDA" : "VIGENTE";
     }
 }

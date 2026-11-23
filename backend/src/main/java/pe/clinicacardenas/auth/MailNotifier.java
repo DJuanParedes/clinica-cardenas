@@ -67,7 +67,9 @@ public class MailNotifier {
             h.setSubject(subject);
             h.setText(html.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim(), html);
             for (java.util.Map.Entry<String, byte[]> a : attachments.entrySet()) {
-                String type = a.getKey().endsWith(".pdf") ? "application/pdf" : a.getKey().endsWith(".xml") ? "application/xml" : "application/octet-stream";
+                String type = "application/octet-stream";
+                if (a.getKey().endsWith(".pdf")) type = "application/pdf";
+                else if (a.getKey().endsWith(".xml")) type = "application/xml";
                 h.addAttachment(a.getKey(), new org.springframework.core.io.ByteArrayResource(a.getValue()), type);
             }
             s.send(msg);

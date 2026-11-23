@@ -47,7 +47,9 @@ public class ReportService {
     }
 
     private static BigDecimal money(Object v) {
-        BigDecimal b = v == null ? BigDecimal.ZERO : v instanceof BigDecimal x ? x : new BigDecimal(v.toString());
+        BigDecimal b = BigDecimal.ZERO;
+            if (v instanceof BigDecimal x) b = x;
+            else if (v != null) b = new BigDecimal(v.toString());
         return b.setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -65,7 +67,8 @@ public class ReportService {
     public static String grouping(LocalDate from, LocalDate to, String requested) {
         if (requested != null && List.of("day", "week", MONTH).contains(requested)) return requested;
         long days = ChronoUnit.DAYS.between(from, to) + 1;
-        return days <= 45 ? "day" : days <= 186 ? "week" : MONTH;
+        if (days <= 45) return "day";
+        return days <= 186 ? "week" : MONTH;
     }
 
     public static LocalDate bucket(LocalDate d, String g) {
@@ -200,7 +203,9 @@ public class ReportService {
             byStatus.merge(st, 1L, Long::sum);
             LocalDateTime start = Dates.toLocalDateTime(r.get("start_at"));
             long[] b = series.computeIfAbsent(bucket(start.toLocalDate(), g), k -> new long[3]);
-            int idx = ATENDIDA.equals(st) ? 0 : (CANCELADA.equals(st) || NO_ASISTIO.equals(st)) ? 1 : 2;
+            int idx = 2;
+            if (ATENDIDA.equals(st)) idx = 0;
+            else if (CANCELADA.equals(st) || NO_ASISTIO.equals(st)) idx = 1;
             b[idx]++;
             long did = ((Number) r.get(DENTIST_ID)).longValue();
             long[] d = byDentist.computeIfAbsent(did, k -> new long[4]);

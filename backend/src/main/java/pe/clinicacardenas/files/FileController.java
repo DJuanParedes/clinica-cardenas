@@ -66,7 +66,9 @@ public class FileController {
     }
 
     static ResponseEntity<byte[]> serve(FileService service, PatientFile f) {
-        String ext = f.contentType.endsWith("pdf") ? ".pdf" : f.contentType.endsWith("png") ? ".png" : ".jpg";
+        String ext = ".jpg";
+        if (f.contentType.endsWith("pdf")) ext = ".pdf";
+        else if (f.contentType.endsWith("png")) ext = ".png";
         String name = f.title.replaceAll("[^\\p{L}\\p{N} _-]", "").trim().replace(' ', '_') + ext;
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(f.contentType))

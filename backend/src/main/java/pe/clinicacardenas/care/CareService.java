@@ -193,7 +193,8 @@ public class CareService {
         LocalDate today = Dates.today();
         for (Installment i : list) {
             cumulative = cumulative.add(i.amount);
-            String status = paid.compareTo(cumulative) >= 0 ? "PAGADA" : i.dueDate.isBefore(today) ? "VENCIDA" : "PENDIENTE";
+            String overdue = i.dueDate.isBefore(today) ? "VENCIDA" : "PENDIENTE";
+            String status = paid.compareTo(cumulative) >= 0 ? "PAGADA" : overdue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", i.id);
             m.put("number", i.number);
@@ -329,7 +330,7 @@ public class CareService {
     }
 
     private static boolean recentlyRecalled(Object last) {
-        LocalDateTime at = last instanceof java.sql.Timestamp t ? t.toLocalDateTime() : last instanceof LocalDateTime l ? l : null;
+        LocalDateTime at = pe.clinicacardenas.common.Dates.toLocalDateTime(last);
         return at != null && at.isAfter(Dates.now().minusDays(30));
     }
 
@@ -385,8 +386,9 @@ public class CareService {
         if (phone.startsWith("51") && phone.length() == 11) phone = phone.substring(2);
         String text = r.texto() == null ? "" : r.texto().trim().toLowerCase();
         // v2.6: también los botones "Confirmar" / "No podré asistir" de los recordatorios
-        String option = text.matches("^1\\b.*|^s[ií]\\b.*|^confirm(o|ar|ado)\\b.*") ? "1"
-                : text.matches("^2\\b.*|^reprogram.*|^no podr[eé] asistir.*|^no puedo.*") ? "2" : null;
+        String option = null;
+        if (text.matches("^1\\b.*|^s[ií]\\b.*|^confirm(o|ar|ado)\\b.*")) option = "1";
+        else if (text.matches("^2\\b.*|^reprogram.*|^no podr[eé] asistir.*|^no puedo.*")) option = "2";
         Map<String, Object> out = new LinkedHashMap<>();
         if (phone.length() != 9) return Map.of(ACCION, "IGNORADO");
         List<Long> ids = jdbc.queryForList("select id from patients where replace(replace(phone, ' ', ''), '-', '') = ? and active = true",

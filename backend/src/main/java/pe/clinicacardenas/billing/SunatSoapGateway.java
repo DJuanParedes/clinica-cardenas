@@ -85,6 +85,9 @@ public class SunatSoapGateway implements SunatGateway {
         HttpResponse<String> res;
         try {
             res = post(body, Duration.ofSeconds(15));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return error(null, "SUNAT no respondió (interrumpido). El comprobante queda pendiente; reintenta el envío.");
         } catch (Exception e) {
             return error(null, "SUNAT no respondió (" + reason(e) + "). El comprobante queda pendiente; reintenta el envío.");
         }
@@ -118,6 +121,9 @@ public class SunatSoapGateway implements SunatGateway {
         HttpResponse<String> res;
         try {
             res = post(body, Duration.ofSeconds(10));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("SUNAT no respondió (interrumpido)");
         } catch (Exception e) {
             throw new IllegalStateException("SUNAT no respondió (" + reason(e) + ")");
         }

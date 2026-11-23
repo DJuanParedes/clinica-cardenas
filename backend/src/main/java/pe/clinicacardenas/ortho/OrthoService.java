@@ -225,7 +225,7 @@ public class OrthoService {
                 update ortho_cases set dentist_id = ?, appliance = ?, angle_class = ?, diagnosis = ?, objectives = ?, start_date = ?,
                        estimated_months = ?, status = ?, current_stage = ?, plan_id = ?, end_date = ?, updated_at = ? where id = ?
                 """, c.dentistId, c.appliance, c.angleClass, c.diagnosis, c.objectives, c.startDate, c.estimatedMonths, status, c.stage, c.planId,
-                closing ? (cur.get(ENDDATE) != null ? cur.get(ENDDATE) : Dates.today()) : null, Dates.now(), id);
+                closing ? endDateOr(cur.get(ENDDATE)) : null, Dates.now(), id);
         if (!status.equals(cur.get(STATUS)) || !c.stage.equals(cur.get(CURRENTSTAGE)))
             audit.register(HISTORIA, patientId, ORTODONCIA, "Caso de ortodoncia: " + STATUSES.get(status) + " · etapa " + STAGES.get(c.stage));
         return get(id);
@@ -357,4 +357,6 @@ public class OrthoService {
         for (int i = 0; i < kv.length; i += 2) m.put(kv[i], kv[i + 1]);
         return Collections.unmodifiableMap(m);
     }
+
+    private static Object endDateOr(Object current) { return current != null ? current : Dates.today(); }
 }

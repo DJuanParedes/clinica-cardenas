@@ -160,7 +160,8 @@ public class MessageTemplateService {
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             String v = vars.get(m.group(1));
-            m.appendReplacement(sb, Matcher.quoteReplacement(v == null ? (VARIABLES.containsKey(m.group(1)) ? "" : m.group()) : v));
+            String unknown = VARIABLES.containsKey(m.group(1)) ? "" : m.group();
+            m.appendReplacement(sb, Matcher.quoteReplacement(v == null ? unknown : v));
         }
         m.appendTail(sb);
         return sb.toString();

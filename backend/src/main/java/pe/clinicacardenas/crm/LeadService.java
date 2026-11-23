@@ -225,7 +225,8 @@ public class LeadService {
         Map<String, Long> reasons = new LinkedHashMap<>();
         for (Map<String, Object> r : rows) {
             String st = (String) r.get(STAGE);
-            String eff = PERDIDO_2.equals(st) ? (r.get("lost_from_stage") == null ? NUEVO_2 : (String) r.get("lost_from_stage")) : st;
+            String lostFrom = r.get("lost_from_stage") == null ? NUEVO_2 : (String) r.get("lost_from_stage");
+            String eff = PERDIDO_2.equals(st) ? lostFrom : st;
             int idx = Math.max(0, order.indexOf(eff));
             for (int i = 0; i <= idx; i++) reached[i]++;
             BigDecimal v = r.get("estimated_value") instanceof BigDecimal b ? b : BigDecimal.ZERO;

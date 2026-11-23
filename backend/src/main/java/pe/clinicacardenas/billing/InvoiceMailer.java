@@ -55,9 +55,8 @@ public class InvoiceMailer {
     @Transactional(readOnly = true)
     public Map<String, Object> send(Long id, String to) {
         Invoice inv = billing.get(id);
-        String email = to == null || to.isBlank()
-                ? (inv.patientId == null ? null : patients.findById(inv.patientId).map(p -> p.email).orElse(null))
-                : to.trim();
+        String patientEmail = inv.patientId == null ? null : patients.findById(inv.patientId).map(p -> p.email).orElse(null);
+        String email = to == null || to.isBlank() ? patientEmail : to.trim();
         if (email == null || !EMAIL.matcher(email).matches()) throw ApiException.field("email", "Escribe un correo válido para enviar el comprobante.");
         if ("BORRADOR".equals(inv.status) || "RECHAZADO".equals(inv.status)) {
             throw ApiException.badRequest("NO_ENVIABLE", "Solo se envían comprobantes emitidos (no borradores ni rechazados).");
