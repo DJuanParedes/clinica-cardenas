@@ -22,6 +22,8 @@ public class PermissionService {
 
     /** El administrador conserva siempre todos los permisos para que nadie quede fuera del sistema. */
     public static final Role LOCKED_ROLE = Role.ADMIN;
+    /** v2.11: permisos que solo puede tener el administrador (nadie más puede tocar roles y permisos). */
+    public static final Set<String> ADMIN_ONLY = Set.of("ROLES");
 
     private final JdbcTemplate jdbc;
     private final AuditService audit;
@@ -35,10 +37,10 @@ public class PermissionService {
     }
 
     private synchronized void load() {
-        catalog = jdbc.queryForList("select code, group_name as `group`, label from permissions order by sort_order");
+        catalog = jdbc.queryForList("select code, group_name as `group`, label, description from permissions order by sort_order");
         Map<String, Set<String>> m = new HashMap<>();
         for (Role r : Role.values()) m.put(r.name(), new TreeSet<>());
-        roleRows = jdbc.queryForList("select code, name, description, base_role as baseRole, custom from roles order by custom, name");
+        roleRows = jdbc.queryForList("select code, name, description, base_role as baseRole, custom, hidden from roles order by custom, name");
         for (Map<String, Object> r : roleRows) m.putIfAbsent((String) r.get("code"), new TreeSet<>());
         jdbc.query("select role_code, permission_code from role_permissions",
                 rs -> { m.computeIfAbsent(rs.getString(1), k -> new TreeSet<>()).add(rs.getString(2)); });
@@ -92,6 +94,7 @@ public class PermissionService {
         for (Map<String, Object> r : roleRows) {
             String code = (String) r.get("code");
             boolean custom = asBool(r.get("custom"));
+            if (asBool(r.get("hidden"))) continue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", code);
             m.put("label", r.get("name"));
@@ -123,16 +126,18 @@ public class PermissionService {
             m.put("baseRole", r.get("baseRole"));
             m.put("baseRoleLabel", r.get("baseRole") == null ? null : label((String) r.get("baseRole")));
             m.put("locked", LOCKED_ROLE.name().equals(code));
+            m.put("hidden", asBool(r.get("hidden")));
             m.put("permissions", forRole(code));
             m.put("users", custom
                     ? jdbc.queryForObject("select count(*) from users where access_role_code = ? and active = true", Long.class, code)
                     : jdbc.queryForObject("select count(*) from users where role_code = ? and access_role_code is null and active = true", Long.class, code));
             roles.add(m);
         }
-        return Map.of("permissions", catalog, "roles", roles);
+        return Map.of("permissions", catalog, "roles", roles, "adminOnly", ADMIN_ONLY);
     }
 
-    public record NewRole(String name, String description, String baseRole) {}
+    /** copyFrom: código de un rol existente para copiar sus permisos, "VACIO" para empezar sin permisos, o nada para copiar el puesto base. */
+    public record NewRole(String name, String description, String baseRole, String copyFrom) {}
 
     /** Crea un rol personalizado a partir de un puesto base, copiando sus permisos para luego ajustarlos. */
     @Transactional
@@ -154,23 +159,79 @@ public class PermissionService {
         for (int k = 2; Boolean.TRUE.equals(jdbc.queryForObject("select count(*) > 0 from roles where code = ?", Boolean.class, unique)); k++) unique = code + k;
         jdbc.update("insert into roles (code, name, description, base_role, custom, created_at) values (?, ?, ?, ?, true, now())",
                 unique, name, r.description() == null || r.description().isBlank() ? null : r.description().trim(), base.name());
-        for (String p : forRole(base.name())) jdbc.update("insert into role_permissions (role_code, permission_code) values (?, ?)", unique, p);
+        String from = r.copyFrom() == null || r.copyFrom().isBlank() ? base.name() : r.copyFrom();
+        Set<String> seed = "VACIO".equals(from) ? Set.of() : new TreeSet<>(forRole(from));
+        if (!"VACIO".equals(from) && roleRows.stream().noneMatch(x -> from.equals(x.get("code")))) throw ApiException.field("copyFrom", "El rol a copiar no existe.");
+        for (String p : seed) if (!ADMIN_ONLY.contains(p)) jdbc.update("insert into role_permissions (role_code, permission_code) values (?, ?)", unique, p);
         load();
         audit.record("ROL", null, "CREAR", name + " (basado en " + base.label + ")");
         return matrix();
     }
 
-    @Transactional
-    public Map<String, Object> deleteRole(String code) {
+    private Map<String, Object> row(String code) {
         if (byRole.isEmpty()) load();
-        Map<String, Object> row = roleRows.stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El rol"));
-        if (!asBool(row.get("custom"))) throw ApiException.badRequest("ROL_BASE", "Los roles base del sistema no se eliminan; solo puedes cambiar sus permisos.");
-        Long n = jdbc.queryForObject("select count(*) from users where access_role_code = ?", Long.class, code);
-        if (n != null && n > 0) throw ApiException.conflict("ROL_EN_USO", "Hay " + n + " usuario(s) con este rol. Cámbialos de rol antes de eliminarlo.");
+        return roleRows.stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El rol"));
+    }
+
+    private long usersWith(String code, boolean custom) {
+        Long n = custom
+                ? jdbc.queryForObject("select count(*) from users where access_role_code = ?", Long.class, code)
+                : jdbc.queryForObject("select count(*) from users where role_code = ? and access_role_code is null", Long.class, code);
+        return n == null ? 0 : n;
+    }
+
+    public record RoleEdit(String name, String description, Boolean hidden) {}
+
+    /** v2.11: cambia nombre, descripción o visibilidad de cualquier rol (también los del sistema). */
+    @Transactional
+    public Map<String, Object> editRole(String code, RoleEdit e) {
+        Map<String, Object> row = row(code);
+        boolean custom = asBool(row.get("custom"));
+        String name = e.name() == null ? (String) row.get("name") : e.name().trim();
+        if (name.length() < 3 || name.length() > 60) throw ApiException.field("name", "Ponle un nombre de 3 a 60 caracteres.");
+        if (Boolean.TRUE.equals(jdbc.queryForObject("select count(*) > 0 from roles where lower(name) = lower(?) and code <> ?", Boolean.class, name, code))) {
+            throw ApiException.field("name", "Ya existe un rol con ese nombre.");
+        }
+        String desc = e.description() == null ? (String) row.get("description") : (e.description().isBlank() ? null : e.description().trim());
+        boolean hidden = e.hidden() == null ? asBool(row.get("hidden")) : e.hidden();
+        if (hidden && !asBool(row.get("hidden"))) {
+            if (LOCKED_ROLE.name().equals(code)) throw ApiException.badRequest("ROL_PROTEGIDO", "El rol Administrador no se puede ocultar.");
+            long n = usersWith(code, custom);
+            if (n > 0) throw ApiException.conflict("ROL_EN_USO", "Hay " + n + " usuario(s) con este rol. Cámbialos de rol antes de ocultarlo.");
+            if (!custom) {
+                Long derived = jdbc.queryForObject("select count(*) from roles where base_role = ? and hidden = false", Long.class, code);
+                if (derived != null && derived > 0) throw ApiException.conflict("ROL_EN_USO", "Hay roles creados a partir de este puesto. Ocúltalos o elimínalos primero.");
+            }
+        }
+        jdbc.update("update roles set name = ?, description = ?, hidden = ? where code = ?", name, desc, hidden, code);
+        load();
+        audit.record("ROL", null, "EDITAR", row.get("name") + (name.equals(row.get("name")) ? "" : " → " + name) + (hidden ? " · oculto" : ""));
+        return matrix();
+    }
+
+    /** Elimina un rol creado por la clínica. Si tiene usuarios, se pasan antes al rol indicado en reassignTo. */
+    @Transactional
+    public Map<String, Object> deleteRole(String code, String reassignTo) {
+        Map<String, Object> row = row(code);
+        if (!asBool(row.get("custom"))) throw ApiException.badRequest("ROL_BASE", "Los roles del sistema no se eliminan porque el programa depende de ellos; puedes renombrarlos u ocultarlos.");
+        long n = usersWith(code, true);
+        if (n > 0) {
+            if (reassignTo == null || reassignTo.isBlank() || reassignTo.equals(code)) {
+                throw ApiException.conflict("ROL_EN_USO", "Hay " + n + " usuario(s) con este rol. Elige a qué rol pasarlos.");
+            }
+            Map<String, Object> target = row(reassignTo);
+            if (asBool(target.get("hidden"))) throw ApiException.field("reassignTo", "Ese rol está oculto.");
+            if (asBool(target.get("custom"))) {
+                jdbc.update("update users set role_code = ?, access_role_code = ? where access_role_code = ?", target.get("baseRole"), reassignTo, code);
+            } else {
+                if (LOCKED_ROLE.name().equals(reassignTo)) throw ApiException.field("reassignTo", "Para dar acceso de administrador, cámbialo desde Usuarios y accesos.");
+                jdbc.update("update users set role_code = ?, access_role_code = null where access_role_code = ?", reassignTo, code);
+            }
+        }
         jdbc.update("delete from role_permissions where role_code = ?", code);
         jdbc.update("delete from roles where code = ?", code);
         load();
-        audit.record("ROL", null, "ELIMINAR", (String) row.get("name"));
+        audit.record("ROL", null, "ELIMINAR", row.get("name") + (n > 0 ? " · " + n + " usuario(s) pasados a " + label(reassignTo) : ""));
         return matrix();
     }
 
@@ -186,6 +247,7 @@ public class PermissionService {
         Set<String> next = new TreeSet<>(permissions == null ? Set.of() : permissions);
         for (String p : next) {
             if (!valid.contains(p)) throw ApiException.field("permissions", "Permiso desconocido: " + p);
+            if (ADMIN_ONLY.contains(p)) throw ApiException.field("permissions", "Administrar roles y permisos es exclusivo del administrador.");
         }
         Set<String> before = forRole(roleCode);
         Set<String> added = new TreeSet<>(next);
@@ -197,6 +259,27 @@ public class PermissionService {
         load();
         audit.record("ROL", null, "PERMISOS", label(roleCode) + (added.isEmpty() ? "" : " · agregados: " + String.join(", ", added))
                 + (removed.isEmpty() ? "" : " · quitados: " + String.join(", ", removed)));
+        return matrix();
+    }
+
+    public record PermissionEdit(String label, String group, String description) {}
+
+    /**
+     * v2.11: cambia cómo se llama, en qué grupo aparece y la descripción de un permiso. El código no cambia, porque
+     * el programa lo usa para decidir qué se puede hacer; por la misma razón no se crean ni borran permisos desde aquí.
+     */
+    @Transactional
+    public Map<String, Object> editPermission(String code, PermissionEdit e) {
+        if (byRole.isEmpty()) load();
+        Map<String, Object> p = catalog.stream().filter(c -> code.equals(c.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El permiso"));
+        String label = e.label() == null ? (String) p.get("label") : e.label().trim();
+        String group = e.group() == null ? (String) p.get("group") : e.group().trim();
+        if (label.length() < 3 || label.length() > 120) throw ApiException.field("label", "El nombre debe tener de 3 a 120 caracteres.");
+        if (group.length() < 3 || group.length() > 40) throw ApiException.field("group", "El grupo debe tener de 3 a 40 caracteres.");
+        String desc = e.description() == null ? (String) p.get("description") : (e.description().isBlank() ? null : e.description().trim());
+        jdbc.update("update permissions set label = ?, group_name = ?, description = ? where code = ?", label, group, desc, code);
+        load();
+        audit.record("PERMISO", null, "EDITAR", code + ": " + label + " (" + group + ")");
         return matrix();
     }
 }
