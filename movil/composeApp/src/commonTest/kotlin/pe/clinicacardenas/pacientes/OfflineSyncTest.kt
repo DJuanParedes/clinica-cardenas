@@ -117,4 +117,15 @@ class OfflineSyncTest {
         assertFalse(r.pulled)
         assertTrue(remote.log.isEmpty())
     }
+
+    @Test
+    fun laFaltaDeRedNoGastaIntentos() = runTest {
+        remote.offline = true
+        request(booking())
+        sync()
+        sync()
+        val op = local.operations.value.single()
+        assertEquals(0, op.attempts)
+        assertEquals(0L, op.nextAttemptAt)
+    }
 }

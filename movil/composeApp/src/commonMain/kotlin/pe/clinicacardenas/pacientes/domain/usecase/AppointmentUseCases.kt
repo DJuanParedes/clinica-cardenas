@@ -31,7 +31,7 @@ class ObserveAppointmentsUseCase(private val local: AppointmentLocalRepository) 
  * 2. Solo si la subida no se cortó por falta de red, **baja** las citas del servicio y las guarda.
  *
  * Reintento acotado: como máximo [MAX_ATTEMPTS] intentos por operación, con espera creciente (30 s, 60 s, 120 s…).
- * Se reintenta solo lo que falló por la red o por el servicio; un rechazo de negocio (400/409) marca la operación
+ * La falta de red no cuenta como intento (la operación no llegó). Se reintenta solo lo que falló en el servicio (5xx); un rechazo de negocio (400/409) marca la operación
  * como fallida al instante, con su motivo visible. Política de conflictos: manda el servicio.
  */
 class SyncAppointmentsUseCase(
@@ -58,6 +58,11 @@ class SyncAppointmentsUseCase(
                     }
                     local.completeOperation(op, serverId)
                     sent++
+                } catch (e: DomainError.SinConexion) {
+                    // Sin red la operación ni siquiera llegó al servicio: no gasta intentos ni espera.
+                    // Se corta la pasada; todo queda pendiente para la próxima sincronización.
+                    offline = true
+                    break
                 } catch (e: DomainError) {
                     val attempts = op.attempts + 1
                     if (e.retryable && attempts < MAX_ATTEMPTS) {
@@ -66,10 +71,6 @@ class SyncAppointmentsUseCase(
                     } else {
                         local.failOperation(op, attempts, e.message)
                         failed++
-                    }
-                    if (e is DomainError.SinConexion) {
-                        offline = true
-                        break // sin red no tiene sentido intentar las demás ahora
                     }
                 }
             }

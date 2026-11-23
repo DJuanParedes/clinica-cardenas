@@ -96,7 +96,7 @@ class FakeRemote : AppointmentRemoteRepository {
 
     override suspend fun confirm(appointmentId: Long) {
         check(); log += "confirm:$appointmentId"
-        server.replaceAll { if (it.id == appointmentId) it.copy(status = "CONFIRMADA", canConfirm = false) else it }
+        for (i in server.indices) if (server[i].id == appointmentId) server[i] = server[i].copy(status = "CONFIRMADA", canConfirm = false)
     }
 
     override suspend fun book(payload: String, key: String): Long {
