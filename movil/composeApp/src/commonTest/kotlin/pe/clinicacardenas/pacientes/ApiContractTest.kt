@@ -50,6 +50,8 @@ class ApiContractTest {
         val key = "${req.method.value} $path"
         when {
             Fixtures.byRoute.containsKey(key) -> json(this, Fixtures.byRoute.getValue(key))
+            path.endsWith("/me/notifications") -> json(this, Fixtures.byRoute.getValue("GET /api/v1/portal/me"))
+            path.endsWith("/auth/code") -> json(this, """{"message":"Te enviamos un código","sentTo":"9•• ••• 111"}""")
             path.endsWith("/confirm") -> json(this, Fixtures.byRoute.getValue("GET /api/v1/portal/appointments"))
             path.endsWith("/pdf") -> respond(byteArrayOf(37, 80, 68, 70), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/pdf"))
             path.contains("/link") -> json(this, """{"url":"/api/public/files/x?firma=abc","expiresAt":"2026-12-01T10:00"}""")
