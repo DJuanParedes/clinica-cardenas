@@ -56,7 +56,7 @@ public class LanguageModel {
         this.apiKey = CLAUDE.equals(p) && !anthropicKey.isBlank() ? anthropicKey : apiKey;
         this.model = model.isBlank() ? defaultModel(p) : model.trim();
         String claudeUrl = CLAUDE.equals(p) ? "https://api.anthropic.com/v1/messages" : "";
-        this.url = url.isBlank() ? claudeUrl : url.trim().replaceAll("/+$", "");
+        this.url = url.isBlank() ? claudeUrl : stripTrailingSlashes(url.trim());
         this.timeoutMs = timeoutMs;
     }
 
@@ -135,5 +135,11 @@ public class LanguageModel {
     private static String defaultModel(String provider) {
         if (CLAUDE.equals(provider)) return "claude-haiku-5-5";
         return OPENAI.equals(provider) ? "llama3.2" : LOCAL;
+    }
+
+    private static String stripTrailingSlashes(String u) {
+        int end = u.length();
+        while (end > 0 && u.charAt(end - 1) == '/') end--;
+        return u.substring(0, end);
     }
 }

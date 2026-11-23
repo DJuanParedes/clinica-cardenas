@@ -87,8 +87,7 @@ public class DataSeeder implements ApplicationRunner {
                 log.warn("No se pudo crear la historia de demostración: {}", e.toString());
             }
         }
-        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}",
-                "Clinica2026".equals(demoPassword) ? demoPassword : "(la de APP_SEED_PASSWORD)");
+        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña: la de APP_SEED_PASSWORD");
     }
 
     private Patient patient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {
