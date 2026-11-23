@@ -28,6 +28,11 @@ import java.util.*;
  */
 @Service
 public class AssistantService {
+    private static final String DESPEDIDA = "DESPEDIDA";
+    private static final String GRACIAS = "GRACIAS";
+    private static final String PRECIO = "PRECIO";
+    private static final String HORARIO = "horario";
+
 
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
     private static final Locale ES = new Locale("es", "PE");
@@ -71,12 +76,12 @@ public class AssistantService {
         if (n.matches(".*\\b(mi cita|mis citas|tengo cita|cuando es|a que hora (es|tengo)|proxima cita|para cuando)\\b.*")) return "MI_CITA";
         if (n.matches(".*\\b(disponib\\w*|hay (espacio|cupo|turno)|cupos?|turnos?|separar (una )?cita|sacar (una )?cita|reservar|agendar|quiero (una |otra |nueva )?cita|necesito (una |otra )?cita|pedir (una |otra )?cita|otra cita|nueva cita|reservar (una )?cita|atender(me)? (hoy|manana))\\b.*")) return "DISPONIBILIDAD";
         if (n.matches(".*\\b(deuda|saldo|debo|debemos|mi cuenta|pendiente de pago)\\b.*")) return "PAGO";
-        if (n.matches(".*\\b(cuanto|precio\\w*|costo\\w*|cuesta|vale|tarifa\\w*|cobran)\\b.*")) return "PRECIO";
+        if (n.matches(".*\\b(cuanto|precio\\w*|costo\\w*|cuesta|vale|tarifa\\w*|cobran)\\b.*")) return PRECIO;
         if (n.matches(".*\\b(pagar|pago\\w*|yape|plin|tarjeta|transferencia|cuota\\w*|boleta|factura)\\b.*")) return "PAGO";
         if (n.matches(".*\\b(horario\\w*|abren|cierran|hasta que hora|a que hora atienden|que dias atienden|atienden (hoy|manana|los|el|en)? ?(domingo|sabado|feriado|lunes|martes|miercoles|jueves|viernes|hoy|manana)\\w*)\\b.*")) return "HORARIO";
         if (n.matches(".*\\b(donde|direccion|ubicacion|ubicados|como llego|quedan|local|mapa|referencia)\\b.*")) return "UBICACION";
-        if (n.matches("^(muchas )?(gracias|grax|thank\\w*|mil gracias|ok gracias|listo gracias)\\b.*")) return "GRACIAS";
-        if (n.matches("^(chau|chao|adios|hasta luego|nos vemos|bye)\\b.*")) return "DESPEDIDA";
+        if (n.matches("^(muchas )?(gracias|grax|thank\\w*|mil gracias|ok gracias|listo gracias)\\b.*")) return GRACIAS;
+        if (n.matches("^(chau|chao|adios|hasta luego|nos vemos|bye)\\b.*")) return DESPEDIDA;
         if (n.matches("^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|holi|alo)\\b.*") && n.split(" ").length <= 4) return "SALUDO";
         return "OTRO";
     }
@@ -120,17 +125,17 @@ public class AssistantService {
 
         switch (intent) {
             case "SALUDO" -> saludo(t);
-            case "GRACIAS" -> t.out.append("¡Con gusto").append(t.comaNombre()).append("! 😊 Si necesitas algo más, escríbenos por aquí.");
-            case "DESPEDIDA" -> t.out.append("¡Hasta pronto").append(t.comaNombre()).append("! Que tengas un excelente día 🦷✨");
+            case GRACIAS -> t.out.append("¡Con gusto").append(t.comaNombre()).append("! 😊 Si necesitas algo más, escríbenos por aquí.");
+            case DESPEDIDA -> t.out.append("¡Hasta pronto").append(t.comaNombre()).append("! Que tengas un excelente día 🦷✨");
             case "MI_CITA" -> miCita(t);
             case "CONFIRMAR" -> confirmar(t);
             case "REPROGRAMAR" -> cambio(t, false);
             case "CANCELAR" -> cambio(t, true);
             case "DISPONIBILIDAD" -> disponibilidad(t);
-            case "PRECIO" -> precio(t);
+            case PRECIO -> precio(t);
             case "PAGO" -> pago(t);
-            case "HORARIO" -> t.out.append(doc("horario")).append("\n\n📍 ").append(kb.address).append(" · ☎ ").append(kb.phone);
-            case "UBICACION" -> t.out.append("📍 Estamos en *").append(kb.address).append("*.\n☎ Teléfono y WhatsApp: ").append(kb.phone).append("\n\n").append(doc("horario"));
+            case "HORARIO" -> t.out.append(doc(HORARIO)).append("\n\n📍 ").append(kb.address).append(" · ☎ ").append(kb.phone);
+            case "UBICACION" -> t.out.append("📍 Estamos en *").append(kb.address).append("*.\n☎ Teléfono y WhatsApp: ").append(kb.phone).append("\n\n").append(doc(HORARIO));
             case "URGENCIA" -> urgencia(t);
             case "HUMANO" -> {
                 t.out.append("¡Claro! Ya avisé a recepción: una persona del equipo te escribirá por aquí en breve. 🙌");
@@ -142,7 +147,7 @@ public class AssistantService {
         String base = t.out.toString().trim();
         String finalText = base;
         String engine = "local";
-        if (llm.enabled() && !"GRACIAS".equals(intent) && !"DESPEDIDA".equals(intent)) {
+        if (llm.enabled() && !GRACIAS.equals(intent) && !DESPEDIDA.equals(intent)) {
             String redacted = llm.complete(systemPrompt(), List.of(Map.of("role", "user", "content", userPrompt(text, base, hits, p, t.upcoming, history))));
             if (redacted != null && redacted.length() <= 1500) {
                 finalText = redacted;
@@ -201,8 +206,9 @@ public class AssistantService {
     private void cambio(Turn t, boolean cancelar) {
         Appointment next = t.next;
         if (next == null) {
+            String purpose = cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?";
             t.out.append(t.patient == null ? "No encuentro una cita con este número. Indícanos tu nombre completo y DNI para ayudarte."
-                    : "No tienes citas pendientes" + (cancelar ? " que cancelar." : " que reprogramar. ¿Quieres reservar una nueva?"));
+                    : "No tienes citas pendientes" + purpose);
             t.human = t.patient == null;
             return;
         }
@@ -241,7 +247,7 @@ public class AssistantService {
     }
 
     private void precio(Turn t) {
-        List<TextSearch.Doc> catalogo = kb.docs().stream().filter(d -> "PRECIO".equals(d.kind())).toList();
+        List<TextSearch.Doc> catalogo = kb.docs().stream().filter(d -> PRECIO.equals(d.kind())).toList();
         List<TextSearch.Hit> precios = TextSearch.search(catalogo, t.text, 3);
         if (precios.isEmpty()) {
             t.out.append("El costo depende del tratamiento. La *consulta de evaluación* es el primer paso: ahí el odontólogo te explica el plan y el presupuesto exacto.");
@@ -312,7 +318,7 @@ public class AssistantService {
         StringBuilder u = new StringBuilder("CONTEXTO (base de conocimiento de la clínica):\n");
         Set<String> seen = new HashSet<>();
         for (TextSearch.Hit h : hits) if (seen.add(h.doc().id())) u.append("- ").append(h.doc().title().split(" ·")[0]).append(": ").append(h.doc().text()).append('\n');
-        u.append("- Horario general: ").append(doc("horario")).append('\n');
+        u.append("- Horario general: ").append(doc(HORARIO)).append('\n');
         u.append("- Dirección: ").append(kb.address).append(". Teléfono: ").append(kb.phone).append('\n');
         u.append("\nPACIENTE: ");
         if (p == null) u.append("número no registrado en la clínica.\n");
@@ -361,7 +367,7 @@ public class AssistantService {
     List<String> freeSlots(Dentist d, Long patientId, int duration, Long excludeId, int max) {
         List<String> out = new ArrayList<>();
         LocalDateTime min = Dates.now().plusHours(2);
-        int dur = Math.max(15, Math.min(240, duration - duration % 15));
+        int dur = Math.clamp(duration - duration % 15L, 15, 240);
         for (int i = 0; i < 14 && out.size() < max; i++) {
             LocalDate day = Dates.today().plusDays(i);
             try {

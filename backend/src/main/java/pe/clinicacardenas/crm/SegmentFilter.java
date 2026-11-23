@@ -18,8 +18,13 @@ import java.util.*;
 public record SegmentFilter(List<String> sources, List<String> tags, String sex, Integer ageMin, Integer ageMax,
                             Integer birthdayMonth, String visit, String nextAppointment, String budget, Boolean debt,
                             String task, String marketing, String registered, Long dentistId) {
+    private static final String ANOS = " años";
+    private static final String CON_3M_2 = "CON_3M";
+    private static final String NUNCA_2 = "NUNCA";
+    private static final String OPCION_NO_VALIDA = "Opción no válida.";
 
-    public static final Set<String> VISITS = Set.of("NUNCA", "SIN_3M", "SIN_6M", "SIN_12M", "CON_3M");
+
+    public static final Set<String> VISITS = Set.of(NUNCA_2, "SIN_3M", "SIN_6M", "SIN_12M", CON_3M_2);
 
     public static SegmentFilter empty() {
         return new SegmentFilter(null, null, null, null, null, null, null, null, null, null, null, null, null, null);
@@ -38,13 +43,17 @@ public record SegmentFilter(List<String> sources, List<String> tags, String sex,
         if (ageMin != null && ageMax != null && ageMin > ageMax) e.put("ageMax", "La edad máxima no puede ser menor que la mínima.");
         if (birthdayMonth != null && (birthdayMonth < 1 || birthdayMonth > 12)) e.put("birthdayMonth", "Mes no válido.");
         String v = code(visit);
-        if (v != null && !VISITS.contains(v)) e.put("visit", "Opción no válida.");
-        String na = code(nextAppointment), tk = code(task), bu = code(budget), mk = code(marketing), rg = code(registered);
-        if (na != null && !Set.of("CON", "SIN").contains(na)) e.put("nextAppointment", "Opción no válida.");
-        if (tk != null && !Set.of("CON", "SIN").contains(tk)) e.put("task", "Opción no válida.");
-        if (bu != null && !"PENDIENTE".equals(bu)) e.put("budget", "Opción no válida.");
-        if (mk != null && !Set.of("SI", "NO", "SIN_RESPUESTA").contains(mk)) e.put("marketing", "Opción no válida.");
-        if (rg != null && !Set.of("30D", "90D", "365D").contains(rg)) e.put("registered", "Opción no válida.");
+        if (v != null && !VISITS.contains(v)) e.put("visit", OPCION_NO_VALIDA);
+        String na = code(nextAppointment);
+        String tk = code(task);
+        String bu = code(budget);
+        String mk = code(marketing);
+        String rg = code(registered);
+        if (na != null && !Set.of("CON", "SIN").contains(na)) e.put("nextAppointment", OPCION_NO_VALIDA);
+        if (tk != null && !Set.of("CON", "SIN").contains(tk)) e.put("task", OPCION_NO_VALIDA);
+        if (bu != null && !"PENDIENTE".equals(bu)) e.put("budget", OPCION_NO_VALIDA);
+        if (mk != null && !Set.of("SI", "NO", "SIN_RESPUESTA").contains(mk)) e.put("marketing", OPCION_NO_VALIDA);
+        if (rg != null && !Set.of("30D", "90D", "365D").contains(rg)) e.put("registered", OPCION_NO_VALIDA);
         if (!e.isEmpty()) throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los filtros.", e);
         return new SegmentFilter(src.isEmpty() ? null : src, tg.isEmpty() ? null : tg, sx, ageMin, ageMax, birthdayMonth, v, na, bu,
                 Boolean.TRUE.equals(debt) ? Boolean.TRUE : null, tk, mk, rg, dentistId);
@@ -73,8 +82,8 @@ public record SegmentFilter(List<String> sources, List<String> tags, String sex,
         String lastVisit = "(select max(av.start_at) from appointments av where av.patient_id = p.id and av.status = 'ATENDIDA')";
         if (visit != null) {
             switch (visit) {
-                case "NUNCA" -> c.add(lastVisit + " is null");
-                case "CON_3M" -> { c.add(lastVisit + " >= ?"); a.add(now.minusMonths(3)); }
+                case NUNCA_2 -> c.add(lastVisit + " is null");
+                case CON_3M_2 -> { c.add(lastVisit + " >= ?"); a.add(now.minusMonths(3)); }
                 default -> {
                     int m = Integer.parseInt(visit.replaceAll("\\D", ""));
                     c.add(lastVisit + " < ?"); a.add(now.minusMonths(m));
@@ -109,12 +118,13 @@ public record SegmentFilter(List<String> sources, List<String> tags, String sex,
                 .filter(o -> o.get("code").equals(x)).map(o -> o.get("label")).findFirst().orElse(x)).toList()));
         if (tags != null) s.add("Etiqueta: " + String.join(", ", tags));
         if (sex != null) s.add("F".equals(sex) ? "Mujeres" : "Hombres");
-        if (ageMin != null || ageMax != null) s.add(ageMin != null && ageMax != null ? ageMin + " a " + ageMax + " años"
-                : ageMin != null ? "Desde " + ageMin + " años" : "Hasta " + ageMax + " años");
+        if (ageMin != null && ageMax != null) s.add(ageMin + " a " + ageMax + ANOS);
+        else if (ageMin != null) s.add("Desde " + ageMin + ANOS);
+        else if (ageMax != null) s.add("Hasta " + ageMax + ANOS);
         if (birthdayMonth != null) s.add("Cumpleaños en " + MONTHS[birthdayMonth - 1]);
         if (visit != null) s.add(switch (visit) {
-            case "NUNCA" -> "Nunca atendidos";
-            case "CON_3M" -> "Vinieron en los últimos 3 meses";
+            case NUNCA_2 -> "Nunca atendidos";
+            case CON_3M_2 -> "Vinieron en los últimos 3 meses";
             default -> "Sin visita hace " + visit.replaceAll("\\D", "") + " meses";
         });
         if (nextAppointment != null) s.add("CON".equals(nextAppointment) ? "Con próxima cita" : "Sin próxima cita");

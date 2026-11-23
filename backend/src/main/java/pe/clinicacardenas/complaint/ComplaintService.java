@@ -39,11 +39,40 @@ import java.util.regex.Pattern;
  */
 @Service
 public class ComplaintService {
+    private static final String N = " N.° ";
+    private static final String EMAIL_2 = "EMAIL";
+    private static final String RECLAMO = "RECLAMO";
+    private static final String RESPONDIDO = "RESPONDIDO";
+    private static final String KEY_ADDRESS = "address";
+    private static final String AMOUNT = "amount";
+    private static final String DETAIL = "detail";
+    private static final String DOCNUMBER = "docNumber";
+    private static final String DOCTYPE = "docType";
+    private static final String DUEDATE = "dueDate";
+    private static final String EMAIL_3 = "email";
+    private static final String FILEDAT = "filedAt";
+    private static final String FULLNAME = "fullName";
+    private static final String GUARDIANDOC = "guardianDoc";
+    private static final String GUARDIANNAME = "guardianName";
+    private static final String MINOR = "minor";
+    private static final String NOTICEEMAIL = "noticeEmail";
+    private static final String NUMBER = "number";
+    private static final String PHONE = "phone";
+    private static final String PROVIDERNOTES = "providerNotes";
+    private static final String RECLAMOS_CORREO_AVISO = "reclamos_correo_aviso";
+    private static final String REQUEST = "request";
+    private static final String RESPONDEDAT = "respondedAt";
+    private static final String RESPONSE = "response";
+    private static final String RESPONSECHANNEL = "responseChannel";
+    private static final String SERVICE = "service";
+    private static final String STATUS = "status";
+    private static final String TERMDAYS = "termDays";
 
-    public static final List<String> KINDS = List.of("RECLAMO", "QUEJA");
+
+    public static final List<String> KINDS = List.of(RECLAMO, "QUEJA");
     public static final List<String> DOC_TYPES = List.of("DNI", "CE", "PASAPORTE", "RUC");
-    public static final List<String> STATUSES = List.of("PENDIENTE", "EN_PROCESO", "RESPONDIDO");
-    public static final List<String> CHANNELS = List.of("EMAIL", "DOMICILIO", "PRESENCIAL");
+    public static final List<String> STATUSES = List.of("PENDIENTE", "EN_PROCESO", RESPONDIDO);
+    public static final List<String> CHANNELS = List.of(EMAIL_2, "DOMICILIO", "PRESENCIAL");
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DMYH = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
@@ -54,7 +83,10 @@ public class ComplaintService {
     private final MailNotifier mail;
     private final TaskService tasks;
     private final AuditService audit;
-    private final String ruc, businessName, tradeName, address;
+    private final String ruc;
+    private final String businessName;
+    private final String tradeName;
+    private final String address;
 
     public ComplaintService(JdbcTemplate jdbc, MailNotifier mail, TaskService tasks, AuditService audit,
                             @Value("${app.company.ruc}") String ruc, @Value("${app.company.business-name}") String businessName,
@@ -92,8 +124,8 @@ public class ComplaintService {
         m.put("businessName", businessName);
         m.put("tradeName", tradeName);
         m.put("ruc", ruc);
-        m.put("address", address);
-        m.put("termDays", termDays());
+        m.put(KEY_ADDRESS, address);
+        m.put(TERMDAYS, termDays());
         m.put("today", Dates.today());
         m.put("nextNumber", String.format("%d-%06d", Dates.today().getYear(), nextNumber(Dates.today().getYear(), false)));
         return m;
@@ -107,31 +139,32 @@ public class ComplaintService {
         String kind = up(r.kind());
         if (!KINDS.contains(kind)) e.put("kind", "Elige si es un reclamo o una queja.");
         String name = clean(r.fullName(), 150);
-        if (name == null || name.length() < 5 || !name.contains(" ")) e.put("fullName", "Escribe tus nombres y apellidos.");
+        if (name == null || name.length() < 5 || !name.contains(" ")) e.put(FULLNAME, "Escribe tus nombres y apellidos.");
         String docType = up(r.docType());
         String doc = r.docNumber() == null ? "" : r.docNumber().replaceAll("\\s", "").toUpperCase(Locale.ROOT);
-        if (!DOC_TYPES.contains(docType)) e.put("docType", "Elige el tipo de documento.");
-        else if (!validDoc(docType, doc)) e.put("docNumber", "El número de documento no es válido.");
+        if (!DOC_TYPES.contains(docType)) e.put(DOCTYPE, "Elige el tipo de documento.");
+        else if (!validDoc(docType, doc)) e.put(DOCNUMBER, "El número de documento no es válido.");
         String addr = clean(r.address(), 250);
-        if (addr == null || addr.length() < 5) e.put("address", "Escribe tu domicilio.");
+        if (addr == null || addr.length() < 5) e.put(KEY_ADDRESS, "Escribe tu domicilio.");
         String phone = clean(r.phone(), 20);
-        if (phone != null && !phone.replaceAll("[^0-9]", "").matches("\\d{6,12}")) e.put("phone", "El teléfono no es válido.");
+        if (phone != null && !phone.replaceAll("\\D", "").matches("\\d{6,12}")) e.put(PHONE, "El teléfono no es válido.");
         String email = clean(r.email(), 120);
-        if (email != null && !EMAIL.matcher(email).matches()) e.put("email", "El correo no es válido.");
+        if (email != null && !EMAIL.matcher(email).matches()) e.put(EMAIL_3, "El correo no es válido.");
         boolean minor = Boolean.TRUE.equals(r.minor());
         String gName = minor ? clean(r.guardianName(), 150) : null;
         String gDoc = minor && r.guardianDoc() != null ? r.guardianDoc().replaceAll("\\s", "") : null;
-        if (minor && (gName == null || gName.length() < 5)) e.put("guardianName", "Escribe el nombre del padre, madre o apoderado.");
-        if (minor && (gDoc == null || !gDoc.matches("[0-9A-Za-z]{8,12}"))) e.put("guardianDoc", "Escribe el documento del padre, madre o apoderado.");
+        if (minor && (gName == null || gName.length() < 5)) e.put(GUARDIANNAME, "Escribe el nombre del padre, madre o apoderado.");
+        if (minor && (gDoc == null || !gDoc.matches("[0-9A-Za-z]{8,12}"))) e.put(GUARDIANDOC, "Escribe el documento del padre, madre o apoderado.");
         String service = clean(r.service(), 250);
-        if (service == null || service.length() < 3) e.put("service", "Indica el servicio o tratamiento.");
+        if (service == null || service.length() < 3) e.put(SERVICE, "Indica el servicio o tratamiento.");
         BigDecimal amount = r.amount();
-        if (amount != null && (amount.signum() < 0 || amount.compareTo(new BigDecimal("1000000")) > 0)) e.put("amount", "El monto no es válido.");
+        if (amount != null && (amount.signum() < 0 || amount.compareTo(new BigDecimal("1000000")) > 0)) e.put(AMOUNT, "El monto no es válido.");
         String detail = clean(r.detail(), 4000);
-        if (detail == null || detail.length() < 15) e.put("detail", "Cuéntanos qué pasó (mínimo 15 caracteres).");
+        if (detail == null || detail.length() < 15) e.put(DETAIL, "Cuéntanos qué pasó (mínimo 15 caracteres).");
         String request = clean(r.request(), 2000);
-        if (request == null || request.length() < 5) e.put("request", "Indica qué solicitas.");
+        if (request == null || request.length() < 5) e.put(REQUEST, "Indica qué solicitas.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos marcados.", e);
+        java.util.Objects.requireNonNull(name);
 
         LocalDateTime now = Dates.now();
         int year = now.getYear();
@@ -179,37 +212,37 @@ public class ComplaintService {
         LocalDate taskDue = subtractBusinessDays(due, 2);
         if (taskDue.isBefore(now.toLocalDate())) taskDue = now.toLocalDate();
         Long taskId = tasks.insert(new TaskService.NewTask(patientId, null, "OTRO",
-                "Responder " + kind.toLowerCase(Locale.ROOT) + " N.° " + label + " (" + name + ")",
+                "Responder " + kind.toLowerCase(Locale.ROOT) + N + label + " (" + name + ")",
                 "Libro de reclamaciones. Plazo legal: " + due.format(DMY) + ". Pedido: " + cut(request, 300),
-                null, taskDue, null, "ALTA", "RECLAMO", label), "sistema");
+                null, taskDue, null, "ALTA", RECLAMO, label), "sistema");
         jdbc.update("update complaints set task_id = ? where id = ?", taskId, id);
-        audit.record("RECLAMO", id, "REGISTRAR", kind + " " + label + " · " + name);
+        audit.register(RECLAMO, id, "REGISTRAR", kind + " " + label + " · " + name);
 
         Map<String, Object> c = get(id);
         boolean sent = false;
         if (email != null) {
-            sent = mail.sendHtml(email, "Hoja de " + kind.toLowerCase(Locale.ROOT) + " N.° " + label + " · " + tradeName,
+            sent = mail.sendHtml(email, "Hoja de " + kind.toLowerCase(Locale.ROOT) + N + label + " · " + tradeName,
                     "<p>Hola " + esc(name.split(" ")[0]) + ",</p><p>Registramos tu " + kind.toLowerCase(Locale.ROOT)
                             + " en el Libro de Reclamaciones de " + esc(tradeName) + " con el <b>N.° " + label + "</b> (código de consulta <b>"
                             + code + "</b>). Adjuntamos la copia de tu hoja.</p><p>Te responderemos a más tardar el <b>"
                             + due.format(DMY) + "</b>.</p><p>Atentamente,<br>" + esc(businessName) + " · RUC " + ruc + "</p>",
-                    "hoja-reclamacion-" + label + ".pdf", pdf(c), "application/pdf");
+                    "hoja-reclamacion-" + label + ".pdf", pdf(c));
             if (sent) jdbc.update("update complaints set copy_sent = true where id = ?", id);
         }
-        String notice = setting("reclamos_correo_aviso", "");
+        String notice = setting(RECLAMOS_CORREO_AVISO, "");
         if (!notice.isBlank()) {
-            mail.send(notice, "Nuevo " + kind.toLowerCase(Locale.ROOT) + " N.° " + label + " en el Libro de Reclamaciones",
+            mail.send(notice, "Nuevo " + kind.toLowerCase(Locale.ROOT) + N + label + " en el Libro de Reclamaciones",
                     name + " (" + docType + " " + doc + ") registró un " + kind.toLowerCase(Locale.ROOT) + ".\n\nServicio: " + service
                             + "\nDetalle: " + detail + "\nPedido: " + request + "\n\nPlazo para responder: " + due.format(DMY));
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("number", label);
+        out.put(NUMBER, label);
         out.put("code", code);
         out.put("kind", kind);
-        out.put("filedAt", now);
-        out.put("dueDate", due);
+        out.put(FILEDAT, now);
+        out.put(DUEDATE, due);
         out.put("copySent", sent);
-        out.put("email", email);
+        out.put(EMAIL_3, email);
         return out;
     }
 
@@ -217,9 +250,9 @@ public class ComplaintService {
     public Map<String, Object> lookup(String code, String doc) {
         Map<String, Object> c = byCode(code, doc);
         Map<String, Object> out = new LinkedHashMap<>();
-        for (String k : List.of("number", "code", "kind", "filedAt", "dueDate", "status", "service", "detail", "request", "response", "respondedAt"))
+        for (String k : List.of(NUMBER, "code", "kind", FILEDAT, DUEDATE, STATUS, SERVICE, DETAIL, REQUEST, RESPONSE, RESPONDEDAT))
             out.put(k, c.get(k));
-        if (!"RESPONDIDO".equals(c.get("status"))) out.put("response", null);
+        if (!RESPONDIDO.equals(c.get(STATUS))) out.put(RESPONSE, null);
         return out;
     }
 
@@ -267,8 +300,8 @@ public class ComplaintService {
         m.put("dueSoon", jdbc.queryForObject("select count(*) from complaints where status <> 'RESPONDIDO' and due_date between ? and ?",
                 Long.class, today, addBusinessDays(today, 3)));
         m.put("year", jdbc.queryForObject("select count(*) from complaints where year = ?", Long.class, today.getYear()));
-        m.put("termDays", termDays());
-        m.put("noticeEmail", setting("reclamos_correo_aviso", ""));
+        m.put(TERMDAYS, termDays());
+        m.put(NOTICEEMAIL, setting(RECLAMOS_CORREO_AVISO, ""));
         return m;
     }
 
@@ -281,24 +314,24 @@ public class ComplaintService {
     @Transactional
     public Map<String, Object> update(Long id, UpdateRequest r) {
         Map<String, Object> c = get(id);
-        if ("RESPONDIDO".equals(c.get("status"))) throw ApiException.badRequest("YA_RESPONDIDO", "Esta hoja ya fue respondida.");
-        String st = r.status() == null ? (String) c.get("status") : up(r.status());
-        if (!List.of("PENDIENTE", "EN_PROCESO").contains(st)) throw ApiException.field("status", "Estado no válido.");
+        if (RESPONDIDO.equals(c.get(STATUS))) throw ApiException.badRequest("YA_RESPONDIDO", "Esta hoja ya fue respondida.");
+        String st = r.status() == null ? (String) c.get(STATUS) : up(r.status());
+        if (!List.of("PENDIENTE", "EN_PROCESO").contains(st)) throw ApiException.field(STATUS, "Estado no válido.");
         jdbc.update("update complaints set status = ?, provider_notes = ? where id = ?", st, clean(r.providerNotes(), 4000), id);
-        audit.record("RECLAMO", id, "ACTUALIZAR", c.get("number") + " · " + st);
+        audit.register(RECLAMO, id, "ACTUALIZAR", c.get(NUMBER) + " · " + st);
         return get(id);
     }
 
     @Transactional
     public Map<String, Object> respond(Long id, RespondRequest r) {
         Map<String, Object> c = get(id);
-        if ("RESPONDIDO".equals(c.get("status"))) throw ApiException.badRequest("YA_RESPONDIDO", "Esta hoja ya fue respondida.");
+        if (RESPONDIDO.equals(c.get(STATUS))) throw ApiException.badRequest("YA_RESPONDIDO", "Esta hoja ya fue respondida.");
         String response = clean(r.response(), 6000);
-        if (response == null || response.length() < 20) throw ApiException.field("response", "Escribe la respuesta (mínimo 20 caracteres).");
+        if (response == null || response.length() < 20) throw ApiException.field(RESPONSE, "Escribe la respuesta (mínimo 20 caracteres).");
         String channel = up(r.channel());
         if (!CHANNELS.contains(channel)) throw ApiException.field("channel", "Indica cómo se entregó la respuesta.");
-        String email = (String) c.get("email");
-        if ("EMAIL".equals(channel) && (email == null || email.isBlank()))
+        String email = (String) c.get(EMAIL_3);
+        if (EMAIL_2.equals(channel) && (email == null || email.isBlank()))
             throw ApiException.field("channel", "El consumidor no dejó correo: entrégala en su domicilio o en la clínica.");
         LocalDateTime now = Dates.now();
         jdbc.update("""
@@ -310,51 +343,51 @@ public class ComplaintService {
             jdbc.update("update tasks set status = 'HECHA', result = 'Respondido', completed_at = ?, completed_by = ? where id = ? and status = 'PENDIENTE'",
                     now, CurrentUser.usernameOrSystem(), ((Number) taskId).longValue());
         Map<String, Object> done = get(id);
-        if ("EMAIL".equals(channel) && !Boolean.FALSE.equals(r.sendEmail())) {
-            boolean ok = mail.sendHtml(email, "Respuesta a tu " + ((String) c.get("kind")).toLowerCase(Locale.ROOT) + " N.° " + c.get("number") + " · " + tradeName,
-                    "<p>Hola " + esc(((String) c.get("fullName")).split(" ")[0]) + ",</p><p>Te enviamos la respuesta a tu "
-                            + ((String) c.get("kind")).toLowerCase(Locale.ROOT) + " N.° " + c.get("number") + ":</p><blockquote>"
+        if (EMAIL_2.equals(channel) && !Boolean.FALSE.equals(r.sendEmail())) {
+            boolean ok = mail.sendHtml(email, "Respuesta a tu " + ((String) c.get("kind")).toLowerCase(Locale.ROOT) + N + c.get(NUMBER) + " · " + tradeName,
+                    "<p>Hola " + esc(((String) c.get(FULLNAME)).split(" ")[0]) + ",</p><p>Te enviamos la respuesta a tu "
+                            + ((String) c.get("kind")).toLowerCase(Locale.ROOT) + N + c.get(NUMBER) + ":</p><blockquote>"
                             + esc(response).replace("\n", "<br>") + "</blockquote><p>Adjuntamos la hoja completa.</p><p>Atentamente,<br>"
                             + esc(businessName) + " · RUC " + ruc + "</p>",
-                    "respuesta-reclamacion-" + c.get("number") + ".pdf", pdf(done), "application/pdf");
+                    "respuesta-reclamacion-" + c.get(NUMBER) + ".pdf", pdf(done));
             if (ok) jdbc.update("update complaints set response_sent = true where id = ?", id);
         }
-        audit.record("RECLAMO", id, "RESPONDER", c.get("number") + " · " + channel.toLowerCase(Locale.ROOT));
+        audit.register(RECLAMO, id, "RESPONDER", c.get(NUMBER) + " · " + channel.toLowerCase(Locale.ROOT));
         return get(id);
     }
 
     @Transactional
     public Map<String, Object> settings(Map<String, String> body) {
-        if (body.containsKey("termDays")) {
+        if (body.containsKey(TERMDAYS)) {
             int d;
             try {
-                d = Integer.parseInt(body.get("termDays").trim());
+                d = Integer.parseInt(body.get(TERMDAYS).trim());
             } catch (Exception e) {
-                throw ApiException.field("termDays", "Escribe un número de días.");
+                throw ApiException.field(TERMDAYS, "Escribe un número de días.");
             }
-            if (d < 1 || d > 30) throw ApiException.field("termDays", "Entre 1 y 30 días hábiles.");
+            if (d < 1 || d > 30) throw ApiException.field(TERMDAYS, "Entre 1 y 30 días hábiles.");
             putSetting("reclamos_plazo_dias", String.valueOf(d));
         }
-        if (body.containsKey("noticeEmail")) {
-            String m = body.get("noticeEmail") == null ? "" : body.get("noticeEmail").trim();
-            if (!m.isEmpty() && !EMAIL.matcher(m).matches()) throw ApiException.field("noticeEmail", "El correo no es válido.");
-            putSetting("reclamos_correo_aviso", m);
+        if (body.containsKey(NOTICEEMAIL)) {
+            String m = body.get(NOTICEEMAIL) == null ? "" : body.get(NOTICEEMAIL).trim();
+            if (!m.isEmpty() && !EMAIL.matcher(m).matches()) throw ApiException.field(NOTICEEMAIL, "El correo no es válido.");
+            putSetting(RECLAMOS_CORREO_AVISO, m);
         }
-        audit.record("RECLAMO", null, "CONFIGURAR", "Plazo " + termDays() + " días hábiles");
+        audit.register(RECLAMO, null, "CONFIGURAR", "Plazo " + termDays() + " días hábiles");
         return summary();
     }
 
     /** Reporte para INDECOPI/SUSALUD: todas las hojas del año en CSV (separado por punto y coma, abre en Excel). */
     public String csv(int year) {
-        StringBuilder sb = new StringBuilder("﻿N.°;Código;Tipo;Fecha;Consumidor;Documento;Menor de edad;Apoderado;Domicilio;Teléfono;Correo;"
+        StringBuilder sb = new StringBuilder("\uFEFFN.°;Código;Tipo;Fecha;Consumidor;Documento;Menor de edad;Apoderado;Domicilio;Teléfono;Correo;"
                 + "Servicio;Monto;Detalle;Pedido;Estado;Plazo;Respondido el;Medio;Respuesta;Observaciones del proveedor\n");
         for (Map<String, Object> c : list(null, year, null)) {
             sb.append(String.join(";", List.of(
-                    s(c.get("number")), s(c.get("code")), s(c.get("kind")), fmt(c.get("filedAt")), s(c.get("fullName")),
-                    s(c.get("docType")) + " " + s(c.get("docNumber")), Boolean.TRUE.equals(c.get("minor")) ? "Sí" : "No",
-                    s(c.get("guardianName")), s(c.get("address")), s(c.get("phone")), s(c.get("email")), s(c.get("service")),
-                    s(c.get("amount")), s(c.get("detail")), s(c.get("request")), s(c.get("status")), fmt(c.get("dueDate")),
-                    fmt(c.get("respondedAt")), s(c.get("responseChannel")), s(c.get("response")), s(c.get("providerNotes")))
+                    s(c.get(NUMBER)), s(c.get("code")), s(c.get("kind")), fmt(c.get(FILEDAT)), s(c.get(FULLNAME)),
+                    s(c.get(DOCTYPE)) + " " + s(c.get(DOCNUMBER)), Boolean.TRUE.equals(c.get(MINOR)) ? "Sí" : "No",
+                    s(c.get(GUARDIANNAME)), s(c.get(KEY_ADDRESS)), s(c.get(PHONE)), s(c.get(EMAIL_3)), s(c.get(SERVICE)),
+                    s(c.get(AMOUNT)), s(c.get(DETAIL)), s(c.get(REQUEST)), s(c.get(STATUS)), fmt(c.get(DUEDATE)),
+                    fmt(c.get(RESPONDEDAT)), s(c.get(RESPONSECHANNEL)), s(c.get(RESPONSE)), s(c.get(PROVIDERNOTES)))
                     .stream().map(ComplaintService::csvCell).toList())).append('\n');
         }
         return sb.toString();
@@ -363,33 +396,33 @@ public class ComplaintService {
     // ------------------------------------------------------------------ PDF de la hoja
 
     public byte[] pdf(Map<String, Object> c) {
-        boolean minor = Boolean.TRUE.equals(c.get("minor"));
+        boolean minor = Boolean.TRUE.equals(c.get(MINOR));
         SimplePdf p = new SimplePdf()
                 .header(businessName, "RUC " + ruc + " · " + address)
-                .title("LIBRO DE RECLAMACIONES · HOJA DE RECLAMACIÓN N.° " + c.get("number"))
-                .paragraph("Código de identificación: " + c.get("code") + "      Fecha: " + fmt(c.get("filedAt")), 10, true)
+                .title("LIBRO DE RECLAMACIONES · HOJA DE RECLAMACIÓN N.° " + c.get(NUMBER))
+                .paragraph("Código de identificación: " + c.get("code") + "      Fecha: " + fmt(c.get(FILEDAT)), 10, true)
                 .space(6)
                 .paragraph("1. IDENTIFICACIÓN DEL CONSUMIDOR RECLAMANTE", 10, true)
-                .paragraph("Nombre: " + c.get("fullName") + "\n" + c.get("docType") + ": " + c.get("docNumber")
-                        + "\nDomicilio: " + c.get("address")
-                        + "\nTeléfono: " + s(c.get("phone")) + "      Correo: " + s(c.get("email"))
-                        + (minor ? "\nMenor de edad. Padre, madre o apoderado: " + c.get("guardianName") + " · Doc. " + c.get("guardianDoc") : ""), 10, false)
+                .paragraph("Nombre: " + c.get(FULLNAME) + "\n" + c.get(DOCTYPE) + ": " + c.get(DOCNUMBER)
+                        + "\nDomicilio: " + c.get(KEY_ADDRESS)
+                        + "\nTeléfono: " + s(c.get(PHONE)) + "      Correo: " + s(c.get(EMAIL_3))
+                        + (minor ? "\nMenor de edad. Padre, madre o apoderado: " + c.get(GUARDIANNAME) + " · Doc. " + c.get(GUARDIANDOC) : ""), 10, false)
                 .space(6)
                 .paragraph("2. IDENTIFICACIÓN DEL BIEN CONTRATADO", 10, true)
-                .paragraph("Servicio: " + c.get("service") + (c.get("amount") == null ? "" : "\nMonto reclamado: S/ " + c.get("amount")), 10, false)
+                .paragraph("Servicio: " + c.get(SERVICE) + (c.get(AMOUNT) == null ? "" : "\nMonto reclamado: S/ " + c.get(AMOUNT)), 10, false)
                 .space(6)
                 .paragraph("3. DETALLE DE LA RECLAMACIÓN Y PEDIDO DEL CONSUMIDOR", 10, true)
-                .paragraph("Tipo: " + c.get("kind") + ("RECLAMO".equals(c.get("kind"))
+                .paragraph("Tipo: " + c.get("kind") + (RECLAMO.equals(c.get("kind"))
                         ? " (disconformidad relacionada con el servicio)" : " (disconformidad no relacionada con el servicio, o malestar respecto a la atención)"), 10, false)
-                .paragraph("Detalle: " + c.get("detail"), 10, false)
-                .paragraph("Pedido: " + c.get("request"), 10, false)
+                .paragraph("Detalle: " + c.get(DETAIL), 10, false)
+                .paragraph("Pedido: " + c.get(REQUEST), 10, false)
                 .space(6)
                 .paragraph("4. OBSERVACIONES Y ACCIONES ADOPTADAS POR EL PROVEEDOR", 10, true);
-        if ("RESPONDIDO".equals(c.get("status"))) {
-            if (c.get("providerNotes") != null) p.paragraph(s(c.get("providerNotes")), 10, false);
-            p.paragraph("Respuesta (" + fmt(c.get("respondedAt")) + ", " + s(c.get("responseChannel")).toLowerCase(Locale.ROOT) + "): " + c.get("response"), 10, false);
+        if (RESPONDIDO.equals(c.get(STATUS))) {
+            if (c.get(PROVIDERNOTES) != null) p.paragraph(s(c.get(PROVIDERNOTES)), 10, false);
+            p.paragraph("Respuesta (" + fmt(c.get(RESPONDEDAT)) + ", " + s(c.get(RESPONSECHANNEL)).toLowerCase(Locale.ROOT) + "): " + c.get(RESPONSE), 10, false);
         } else {
-            p.paragraph("Pendiente de respuesta. Fecha máxima de respuesta: " + fmt(c.get("dueDate")) + " (" + termDays() + " días hábiles).", 10, false);
+            p.paragraph("Pendiente de respuesta. Fecha máxima de respuesta: " + fmt(c.get(DUEDATE)) + " (" + termDays() + " días hábiles).", 10, false);
         }
         p.space(10).paragraph("RECLAMO: disconformidad relacionada a los productos o servicios. QUEJA: disconformidad no relacionada a los "
                 + "productos o servicios, o malestar o descontento respecto a la atención al público. La formulación del reclamo no impide "
@@ -404,7 +437,7 @@ public class ComplaintService {
     /** 8:00 de lunes a viernes: correo al aviso de la clínica con las hojas por vencer o vencidas. */
     @Scheduled(cron = "0 0 8 * * MON-FRI", zone = "America/Lima")
     public void dailyReminder() {
-        String to = setting("reclamos_correo_aviso", "");
+        String to = setting(RECLAMOS_CORREO_AVISO, "");
         if (to.isBlank()) return;
         LocalDate today = Dates.today();
         List<Map<String, Object>> l = jdbc.queryForList("""
@@ -434,9 +467,20 @@ public class ComplaintService {
     }
 
     static LocalDate easter(int y) {
-        int a = y % 19, b = y / 100, c = y % 100, d = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3,
-                h = (19 * a + b - d - g + 15) % 30, i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
-                m = (a + 11 * h + 22 * l) / 451, month = (h + l - 7 * m + 114) / 31, day = ((h + l - 7 * m + 114) % 31) + 1;
+        int a = y % 19;
+        int b = y / 100;
+        int c = y % 100;
+        int d = b / 4;
+        int e = b % 4;
+        int f = (b + 8) / 25;
+        int g = (b - f + 1) / 3;
+        int h = (19 * a + b - d - g + 15) % 30;
+        int i = c / 4;
+        int k = c % 4;
+        int l = (32 + 2 * e + 2 * i - h - k) % 7;
+        int m = (a + 11 * h + 22 * l) / 451;
+        int month = (h + l - 7 * m + 114) / 31;
+        int day = ((h + l - 7 * m + 114) % 31) + 1;
         return LocalDate.of(y, month, day);
     }
 
@@ -477,38 +521,38 @@ public class ComplaintService {
     private Map<String, Object> row(java.sql.ResultSet rs) throws java.sql.SQLException {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", rs.getLong("id"));
-        m.put("number", label(rs.getInt("year"), rs.getInt("number")));
+        m.put(NUMBER, label(rs.getInt("year"), rs.getInt(NUMBER)));
         m.put("code", rs.getString("code"));
         m.put("kind", rs.getString("kind"));
-        m.put("filedAt", rs.getObject("filed_at", LocalDateTime.class));
-        m.put("fullName", rs.getString("full_name"));
-        m.put("docType", rs.getString("doc_type"));
-        m.put("docNumber", rs.getString("doc_number"));
-        m.put("address", rs.getString("address"));
-        m.put("phone", rs.getString("phone"));
-        m.put("email", rs.getString("email"));
-        m.put("minor", rs.getBoolean("is_minor"));
-        m.put("guardianName", rs.getString("guardian_name"));
-        m.put("guardianDoc", rs.getString("guardian_doc"));
-        m.put("service", rs.getString("service"));
-        m.put("amount", rs.getBigDecimal("amount"));
-        m.put("detail", rs.getString("detail"));
-        m.put("request", rs.getString("request"));
+        m.put(FILEDAT, rs.getObject("filed_at", LocalDateTime.class));
+        m.put(FULLNAME, rs.getString("full_name"));
+        m.put(DOCTYPE, rs.getString("doc_type"));
+        m.put(DOCNUMBER, rs.getString("doc_number"));
+        m.put(KEY_ADDRESS, rs.getString(KEY_ADDRESS));
+        m.put(PHONE, rs.getString(PHONE));
+        m.put(EMAIL_3, rs.getString(EMAIL_3));
+        m.put(MINOR, rs.getBoolean("is_minor"));
+        m.put(GUARDIANNAME, rs.getString("guardian_name"));
+        m.put(GUARDIANDOC, rs.getString("guardian_doc"));
+        m.put(SERVICE, rs.getString(SERVICE));
+        m.put(AMOUNT, rs.getBigDecimal(AMOUNT));
+        m.put(DETAIL, rs.getString(DETAIL));
+        m.put(REQUEST, rs.getString(REQUEST));
         long pid = rs.getLong("patient_id");
         m.put("patientId", rs.wasNull() ? null : pid);
         m.put("patientName", rs.getString("patient_name"));
         m.put("hcNumber", rs.getString("hc_number"));
-        m.put("status", rs.getString("status"));
+        m.put(STATUS, rs.getString(STATUS));
         LocalDate due = rs.getObject("due_date", LocalDate.class);
-        m.put("dueDate", due);
-        boolean open = !"RESPONDIDO".equals(rs.getString("status"));
+        m.put(DUEDATE, due);
+        boolean open = !RESPONDIDO.equals(rs.getString(STATUS));
         m.put("overdue", open && due.isBefore(Dates.today()));
         m.put("daysLeft", open ? businessDaysBetween(Dates.today(), due) : null);
-        m.put("providerNotes", rs.getString("provider_notes"));
-        m.put("response", rs.getString("response"));
-        m.put("respondedAt", rs.getObject("responded_at", LocalDateTime.class));
+        m.put(PROVIDERNOTES, rs.getString("provider_notes"));
+        m.put(RESPONSE, rs.getString(RESPONSE));
+        m.put(RESPONDEDAT, rs.getObject("responded_at", LocalDateTime.class));
         m.put("respondedBy", rs.getString("responded_by"));
-        m.put("responseChannel", rs.getString("response_channel"));
+        m.put(RESPONSECHANNEL, rs.getString("response_channel"));
         m.put("responseSent", rs.getBoolean("response_sent"));
         m.put("copySent", rs.getBoolean("copy_sent"));
         long tid = rs.getLong("task_id");
@@ -579,6 +623,7 @@ public class ComplaintService {
     }
 
     private static String cut(String s, int max) {
+        if (s == null) return "";
         return s.length() > max ? s.substring(0, max - 1) + "…" : s;
     }
 

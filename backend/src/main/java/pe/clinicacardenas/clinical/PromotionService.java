@@ -23,8 +23,15 @@ import java.util.*;
  */
 @Service
 public class PromotionService {
+    private static final String PORCENTAJE = "PORCENTAJE";
+    private static final String DISCOUNTTYPE = "discountType";
+    private static final String LISTPRICE = "listPrice";
+    private static final String PROCEDUREID = "procedureId";
+    private static final String VALIDTO = "validTo";
+    private static final String VALUE = "value";
 
-    public static final List<String> TYPES = List.of("PORCENTAJE", "MONTO", "PRECIO");
+
+    public static final List<String> TYPES = List.of(PORCENTAJE, "MONTO", "PRECIO");
 
     private final JdbcTemplate jdbc;
     private final ProcedureRepository procedures;
@@ -49,11 +56,11 @@ public class PromotionService {
         BigDecimal best = p.price;
         Map<String, Object> bestPromo = null;
         for (Map<String, Object> pr : active(day)) {
-            Object pid = pr.get("procedureId");
+            Object pid = pr.get(PROCEDUREID);
             boolean applies = pid != null ? ((Number) pid).longValue() == p.id
                     : pr.get("family") != null && pr.get("family").equals(p.family);
             if (!applies) continue;
-            BigDecimal v = apply(p.price, (String) pr.get("discountType"), (BigDecimal) pr.get("value"));
+            BigDecimal v = apply(p.price, (String) pr.get(DISCOUNTTYPE), (BigDecimal) pr.get(VALUE));
             if (v.compareTo(best) < 0) { best = v; bestPromo = pr; }
         }
         if (bestPromo == null) return new Applied(p.price, null, null, null);
@@ -62,7 +69,7 @@ public class PromotionService {
 
     static BigDecimal apply(BigDecimal price, String type, BigDecimal value) {
         BigDecimal r = switch (type) {
-            case "PORCENTAJE" -> price.subtract(price.multiply(value).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+            case PORCENTAJE -> price.subtract(price.multiply(value).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
             case "MONTO" -> price.subtract(value);
             default -> value;
         };
@@ -87,7 +94,7 @@ public class PromotionService {
                 m.put("id", a.promotionId());
                 m.put("name", a.promotionName());
                 m.put("price", a.price());
-                m.put("listPrice", a.listPrice());
+                m.put(LISTPRICE, a.listPrice());
                 p.promotion = m;
             }
         }
@@ -97,6 +104,10 @@ public class PromotionService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> promotions() {
+        return promotionsInternal();
+    }
+
+    private List<Map<String, Object>> promotionsInternal() {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select pr.id, pr.name, pr.procedure_id as procedureId, p.name as procedureName, pr.family, pr.discount_type as discountType,
                        pr.value, pr.valid_from as validFrom, pr.valid_to as validTo, pr.conditions, pr.active, p.price as listPrice,
@@ -105,10 +116,11 @@ public class PromotionService {
                  order by pr.active desc, pr.valid_to desc""");
         LocalDate today = Dates.today();
         for (Map<String, Object> r : rows) {
-            LocalDate f = ((java.sql.Date) r.get("validFrom")).toLocalDate(), t = ((java.sql.Date) r.get("validTo")).toLocalDate();
+            LocalDate f = ((java.sql.Date) r.get("validFrom")).toLocalDate();
+            LocalDate t = ((java.sql.Date) r.get(VALIDTO)).toLocalDate();
             boolean on = Boolean.TRUE.equals(r.get("active")) || Integer.valueOf(1).equals(r.get("active"));
-            r.put("state", !on ? "INACTIVA" : today.isBefore(f) ? "PROGRAMADA" : today.isAfter(t) ? "VENCIDA" : "VIGENTE");
-            if (r.get("listPrice") != null) r.put("finalPrice", apply((BigDecimal) r.get("listPrice"), (String) r.get("discountType"), (BigDecimal) r.get("value")));
+            r.put("state", promotionState(on, today, f, t));
+            if (r.get(LISTPRICE) != null) r.put("finalPrice", apply((BigDecimal) r.get(LISTPRICE), (String) r.get(DISCOUNTTYPE), (BigDecimal) r.get(VALUE)));
         }
         return rows;
     }
@@ -119,36 +131,36 @@ public class PromotionService {
         String name = r.name() == null ? "" : r.name().trim();
         if (name.length() < 3) e.put("name", "Ponle un nombre a la promoción.");
         String type = r.discountType() == null ? "" : r.discountType().toUpperCase();
-        if (!TYPES.contains(type)) e.put("discountType", "Selecciona el tipo de descuento.");
-        if (r.value() == null || r.value().signum() <= 0) e.put("value", "Ingresa el valor.");
-        else if ("PORCENTAJE".equals(type) && r.value().compareTo(new BigDecimal("90")) > 0) e.put("value", "Máximo 90 %.");
-        if (r.procedureId() == null && (r.family() == null || r.family().isBlank())) e.put("procedureId", "Elige el procedimiento o la familia a la que aplica.");
-        if (r.validFrom() == null || r.validTo() == null) e.put("validTo", "Indica desde y hasta cuándo es válida.");
-        else if (r.validTo().isBefore(r.validFrom())) e.put("validTo", "La fecha final debe ser posterior a la inicial.");
+        if (!TYPES.contains(type)) e.put(DISCOUNTTYPE, "Selecciona el tipo de descuento.");
+        if (r.value() == null || r.value().signum() <= 0) e.put(VALUE, "Ingresa el valor.");
+        else if (PORCENTAJE.equals(type) && r.value().compareTo(new BigDecimal("90")) > 0) e.put(VALUE, "Máximo 90 %.");
+        if (r.procedureId() == null && (r.family() == null || r.family().isBlank())) e.put(PROCEDUREID, "Elige el procedimiento o la familia a la que aplica.");
+        if (r.validFrom() == null || r.validTo() == null) e.put(VALIDTO, "Indica desde y hasta cuándo es válida.");
+        else if (r.validTo().isBefore(r.validFrom())) e.put(VALIDTO, "La fecha final debe ser posterior a la inicial.");
         if (r.procedureId() != null) {
             Procedure p = procedures.findById(r.procedureId()).orElse(null);
-            if (p == null) e.put("procedureId", "El procedimiento no existe.");
-            else if (r.value() != null && TYPES.contains(type) && !"PORCENTAJE".equals(type) && r.value().compareTo(p.price) >= 0) {
-                e.put("value", "PRECIO".equals(type) ? "El precio promocional debe ser menor al de lista (" + p.price + ")." : "El descuento no puede ser mayor o igual al precio.");
+            if (p == null) e.put(PROCEDUREID, "El procedimiento no existe.");
+            else if (r.value() != null && TYPES.contains(type) && !PORCENTAJE.equals(type) && r.value().compareTo(p.price) >= 0) {
+                e.put(VALUE, "PRECIO".equals(type) ? "El precio promocional debe ser menor al de lista (" + p.price + ")." : "El descuento no puede ser mayor o igual al precio.");
             }
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la promoción.", e);
         String fam = r.procedureId() != null ? null : r.family().trim();
         if (id == null) {
             jdbc.update("""
-                    insert into promotions (name, procedure_id, family, discount_type, value, valid_from, valid_to, conditions, active, created_at, created_by)
+                    insert into promotionsInternal(name, procedure_id, family, discount_type, value, valid_from, valid_to, conditions, active, created_at, created_by)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", name, r.procedureId(), fam, type, r.value(), r.validFrom(), r.validTo(),
                     blank(r.conditions()), r.active() == null || r.active(), Dates.now(), CurrentUser.usernameOrSystem());
-            audit.record("PROMOCION", null, "CREAR", name);
+            audit.register("PROMOCION", null, "CREAR", name);
         } else {
             int n = jdbc.update("""
                     update promotions set name = ?, procedure_id = ?, family = ?, discount_type = ?, value = ?, valid_from = ?, valid_to = ?,
                            conditions = ?, active = ? where id = ?""", name, r.procedureId(), fam, type, r.value(), r.validFrom(), r.validTo(),
                     blank(r.conditions()), r.active() == null || r.active(), id);
             if (n == 0) throw ApiException.notFound("La promoción");
-            audit.record("PROMOCION", id, "EDITAR", name);
+            audit.register("PROMOCION", id, "EDITAR", name);
         }
-        return promotions();
+        return promotionsInternal();
     }
 
     @Transactional
@@ -174,11 +186,17 @@ public class PromotionService {
         p.durationMin = r.durationMin();
         if (r.active() != null) p.active = r.active();
         procedures.save(p);
-        audit.record("PROCEDIMIENTO", p.id, id == null ? "CREAR" : "EDITAR", p.code + " " + p.name + " · S/ " + p.price);
+        audit.register("PROCEDIMIENTO", p.id, id == null ? "CREAR" : "EDITAR", p.code + " " + p.name + " · S/ " + p.price);
         return p;
     }
 
     private static String blank(String v) {
         return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    private static String promotionState(boolean on, LocalDate today, LocalDate from, LocalDate to) {
+        if (!on) return "INACTIVA";
+        if (today.isBefore(from)) return "PROGRAMADA";
+        return today.isAfter(to) ? "VENCIDA" : "VIGENTE";
     }
 }

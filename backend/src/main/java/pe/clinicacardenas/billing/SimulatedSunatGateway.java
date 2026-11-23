@@ -24,6 +24,8 @@ import java.time.temporal.ChronoUnit;
 @Component
 @ConditionalOnProperty(name = "app.sunat.mode", havingValue = "interno")
 public class SimulatedSunatGateway implements SunatGateway {
+    private static final String INTERNO = "INTERNO";
+
 
     private final String companyRuc;
 
@@ -34,7 +36,7 @@ public class SimulatedSunatGateway implements SunatGateway {
     @Override
     public Response send(Invoice inv, String xml) {
         try {
-            Thread.sleep(350 + (long) (Math.random() * 450)); // latencia típica del servicio
+            Thread.sleep(350 + java.util.concurrent.ThreadLocalRandom.current().nextLong(450)); // latencia típica del servicio
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -65,14 +67,14 @@ public class SimulatedSunatGateway implements SunatGateway {
                 return reject(inv, "3277", "El importe total no coincide con la suma de valor de venta e IGV.");
             }
         } catch (Exception e) {
-            return new Response("ERROR", "0306", "No se pudo leer el XML enviado: " + e.getMessage(), null, "INTERNO");
+            return new Response("ERROR", "0306", "No se pudo leer el XML enviado: " + e.getMessage(), null, INTERNO);
         }
         String desc = "La " + docLabel + " numero " + id + ", ha sido aceptada";
-        return new Response("ACEPTADO", "0", desc, cdr(inv, "0", desc), "INTERNO");
+        return new Response("ACEPTADO", "0", desc, cdr(inv, "0", desc), INTERNO);
     }
 
     private Response reject(Invoice inv, String code, String description) {
-        return new Response("RECHAZADO", code, description, cdr(inv, code, description), "INTERNO");
+        return new Response("RECHAZADO", code, description, cdr(inv, code, description), INTERNO);
     }
 
     private String cdr(Invoice inv, String code, String description) {

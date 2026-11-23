@@ -74,7 +74,7 @@ public class NoticeService {
                     "Se canceló tu cita del " + when(a) + (a.statusReason == null ? "." : ": " + a.statusReason + "."), a.id);
             case ATENDIDA -> save(a.patient.id, "ENCUESTA", "¿Cómo te atendimos?",
                     "Califica tu cita con " + a.dentist.getFullName() + ". Nos ayuda a mejorar.", a.id);
-            default -> { }
+            default -> { /* los demás casos no requieren acción */ }
         }
     }
 }

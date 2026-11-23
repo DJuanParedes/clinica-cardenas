@@ -33,19 +33,41 @@ import java.util.*;
  */
 @Service
 public class LeadService {
+    private static final String ASISTIO_2 = "ASISTIO";
+    private static final String CITA_AGENDADA_2 = "CITA_AGENDADA";
+    private static final String CONTACTADO_2 = "CONTACTADO";
+    private static final String GANADO_2 = "GANADO";
+    private static final String NUEVO_2 = "NUEVO";
+    private static final String PERDIDO_2 = "PERDIDO";
+    private static final String CLOSED_AT = "closed_at";
+    private static final String EMAIL = "email";
+    private static final String ESTIMATEDVALUE = "estimatedValue";
+    private static final String FULLNAME = "fullName";
+    private static final String INTEREST = "interest";
+    private static final String LABEL = "label";
+    private static final String LOSTREASON = "lostReason";
+    private static final String LOST_REASON = "lost_reason";
+    private static final String NOTES = "notes";
+    private static final String PATIENT = "patient";
+    private static final String PHONE = "phone";
+    private static final String SISTEMA = "sistema";
+    private static final String SOURCE = "source";
+    private static final String STAGE = "stage";
+
 
     private static final Logger log = LoggerFactory.getLogger(LeadService.class);
 
-    public static final Map<String, String> STAGES = new LinkedHashMap<>();
+    private static final Map<String, String> STAGES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> STAGES = java.util.Collections.unmodifiableMap(STAGES_EDIT);
     static {
-        STAGES.put("NUEVO", "Nuevo");
-        STAGES.put("CONTACTADO", "Contactado");
-        STAGES.put("CITA_AGENDADA", "Cita agendada");
-        STAGES.put("ASISTIO", "Asistió a evaluación");
-        STAGES.put("GANADO", "Aceptó tratamiento");
-        STAGES.put("PERDIDO", "Perdido");
+        STAGES_EDIT.put(NUEVO_2, "Nuevo");
+        STAGES_EDIT.put(CONTACTADO_2, "Contactado");
+        STAGES_EDIT.put(CITA_AGENDADA_2, "Cita agendada");
+        STAGES_EDIT.put(ASISTIO_2, "Asistió a evaluación");
+        STAGES_EDIT.put(GANADO_2, "Aceptó tratamiento");
+        STAGES_EDIT.put(PERDIDO_2, "Perdido");
     }
-    public static final List<String> OPEN = List.of("NUEVO", "CONTACTADO", "CITA_AGENDADA", "ASISTIO");
+    public static final List<String> OPEN = List.of(NUEVO_2, CONTACTADO_2, CITA_AGENDADA_2, ASISTIO_2);
     public static final List<String> LOST_REASONS = List.of("Precio", "No responde", "Eligió otra clínica", "Ya no le interesa",
             "Distancia u horario", "Otro");
 
@@ -87,7 +109,7 @@ public class LeadService {
         List<Object> a = new ArrayList<>();
         a.add(now);
         c.add("(l.stage in ('NUEVO', 'CONTACTADO', 'CITA_AGENDADA', 'ASISTIO') or l.closed_at >= ?)");
-        a.add(now.minusDays(Math.max(1, Math.min(closedDays, 365))));
+        a.add(now.minusDays(Math.clamp(closedDays, 1, 365)));
         if (q != null && !q.isBlank()) {
             c.add("(lower(l.full_name) like ? or l.phone like ? or lower(coalesce(l.interest, '')) like ?)");
             String like = "%" + q.trim().toLowerCase() + "%";
@@ -103,12 +125,12 @@ public class LeadService {
             List<Map<String, Object>> items = new ArrayList<>();
             BigDecimal value = BigDecimal.ZERO;
             for (Map<String, Object> card : cards) {
-                if (!st.getKey().equals(card.get("stage"))) continue;
-                card.put("nextTask", nextTasks.get((Long) card.get("id")));
+                if (!st.getKey().equals(card.get(STAGE))) continue;
+                card.put("nextTask", nextTasks.get(card.get("id")));
                 items.add(card);
-                if (card.get("estimatedValue") instanceof BigDecimal b) value = value.add(b);
+                if (card.get(ESTIMATEDVALUE) instanceof BigDecimal b) value = value.add(b);
             }
-            stages.add(Map.of("code", st.getKey(), "label", st.getValue(), "count", items.size(), "value", value, "items", items));
+            stages.add(Map.of("code", st.getKey(), LABEL, st.getValue(), "count", items.size(), "value", value, "items", items));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("stages", stages);
@@ -118,7 +140,7 @@ public class LeadService {
 
     public Map<String, Object> options() {
         Map<String, Object> o = new LinkedHashMap<>();
-        o.put("stages", STAGES.entrySet().stream().map(e -> Map.of("code", e.getKey(), "label", e.getValue())).toList());
+        o.put("stages", STAGES.entrySet().stream().map(e -> Map.of("code", e.getKey(), LABEL, e.getValue())).toList());
         o.put("sources", PatientProfileService.SOURCES);
         o.put("lostReasons", LOST_REASONS);
         o.put("assignees", tasks.assignees());
@@ -143,43 +165,47 @@ public class LeadService {
     private Map<String, Object> card(java.sql.ResultSet rs) throws java.sql.SQLException {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", rs.getLong("id"));
-        m.put("fullName", rs.getString("full_name"));
-        m.put("phone", rs.getString("phone"));
-        m.put("email", rs.getString("email"));
-        String src = rs.getString("source");
-        m.put("source", src);
-        m.put("sourceLabel", PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(src)).map(x -> x.get("label")).findFirst().orElse(src));
-        m.put("interest", rs.getString("interest"));
+        m.put(FULLNAME, rs.getString("full_name"));
+        m.put(PHONE, rs.getString(PHONE));
+        m.put(EMAIL, rs.getString(EMAIL));
+        String src = rs.getString(SOURCE);
+        m.put(SOURCE, src);
+        m.put("sourceLabel", PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(src)).map(x -> x.get(LABEL)).findFirst().orElse(src));
+        m.put(INTEREST, rs.getString(INTEREST));
         long proc = rs.getLong("procedure_id");
         m.put("procedure", rs.wasNull() ? null : Map.of("id", proc, "name", rs.getString("procedure_name")));
-        m.put("estimatedValue", rs.getBigDecimal("estimated_value"));
-        String stage = rs.getString("stage");
-        m.put("stage", stage);
+        m.put(ESTIMATEDVALUE, rs.getBigDecimal("estimated_value"));
+        String stage = rs.getString(STAGE);
+        m.put(STAGE, stage);
         m.put("stageLabel", STAGES.get(stage));
         long aid = rs.getLong("assignee_id");
-        m.put("assignee", rs.wasNull() ? null : Map.of("id", aid, "fullName", rs.getString("assignee_name")));
+        m.put("assignee", rs.wasNull() ? null : Map.of("id", aid, FULLNAME, rs.getString("assignee_name")));
         long pid = rs.getLong("patient_id");
-        m.put("patient", rs.wasNull() ? null : Map.of("id", pid, "fullName", rs.getString("patient_name")));
+        m.put(PATIENT, rs.wasNull() ? null : Map.of("id", pid, FULLNAME, rs.getString("patient_name")));
         m.put("nextAppointment", rs.getTimestamp("next_appt") == null ? null : rs.getTimestamp("next_appt").toLocalDateTime());
-        m.put("lostReason", rs.getString("lost_reason"));
-        m.put("notes", rs.getString("notes"));
+        m.put(LOSTREASON, rs.getString(LOST_REASON));
+        m.put(NOTES, rs.getString(NOTES));
         LocalDateTime changed = rs.getTimestamp("stage_changed_at").toLocalDateTime();
         m.put("stageChangedAt", changed);
         m.put("daysInStage", ChronoUnit.DAYS.between(changed.toLocalDate(), Dates.today()));
         m.put("createdAt", rs.getTimestamp("created_at").toLocalDateTime());
         m.put("createdBy", rs.getString("created_by"));
-        m.put("closedAt", rs.getTimestamp("closed_at") == null ? null : rs.getTimestamp("closed_at").toLocalDateTime());
+        m.put("closedAt", rs.getTimestamp(CLOSED_AT) == null ? null : rs.getTimestamp(CLOSED_AT).toLocalDateTime());
         return m;
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> get(Long id) {
+        return getInternal(id);
+    }
+
+    private Map<String, Object> getInternal(Long id) {
         List<Map<String, Object>> l = jdbc.query(SELECT + " where l.id = ?", (rs, i) -> card(rs), Dates.now(), id);
         if (l.isEmpty()) throw ApiException.notFound("El lead");
         Map<String, Object> m = l.get(0);
-        if (m.get("patient") == null && m.get("phone") != null)
+        if (m.get(PATIENT) == null && m.get(PHONE) != null)
             m.put("phoneMatches", jdbc.queryForList("select id, concat(first_name, ' ', last_name) as fullName, doc_number as docNumber from patients "
-                    + "where active = true and replace(replace(phone, ' ', ''), '-', '') = ? order by last_name limit 5", m.get("phone")));
+                    + "where active = true and replace(replace(phone, ' ', ''), '-', '') = ? order by last_name limit 5", m.get(PHONE)));
         m.put("events", jdbc.queryForList("select kind, detail, created_by as createdBy, created_at as createdAt from lead_events where lead_id = ? order by created_at desc, id desc", id));
         m.put("tasks", tasks.list("all", "TODAS", null, null, null, id, null).get("items"));
         return m;
@@ -188,31 +214,36 @@ public class LeadService {
     /** Métricas del embudo para los leads creados en los últimos {@code days} días. */
     @Transactional(readOnly = true)
     public Map<String, Object> metrics(int days) {
-        int d = Math.max(7, Math.min(days, 365));
+        int d = Math.clamp(days, 7, 365);
         LocalDateTime since = Dates.today().minusDays(d).atStartOfDay();
         List<Map<String, Object>> rows = jdbc.queryForList("select stage, lost_from_stage, source, lost_reason, estimated_value, created_at, closed_at from leads where created_at >= ?", since);
-        List<String> order = List.of("NUEVO", "CONTACTADO", "CITA_AGENDADA", "ASISTIO", "GANADO");
+        List<String> order = List.of(NUEVO_2, CONTACTADO_2, CITA_AGENDADA_2, ASISTIO_2, GANADO_2);
         long[] reached = new long[order.size()];
-        long won = 0, lost = 0, open = 0;
-        BigDecimal pipeline = BigDecimal.ZERO, wonValue = BigDecimal.ZERO;
+        long won = 0;
+        long lost = 0;
+        long open = 0;
+        BigDecimal pipeline = BigDecimal.ZERO;
+        BigDecimal wonValue = BigDecimal.ZERO;
         long winDays = 0;
         Map<String, long[]> bySource = new LinkedHashMap<>();
         Map<String, Long> reasons = new LinkedHashMap<>();
         for (Map<String, Object> r : rows) {
-            String st = (String) r.get("stage");
-            String eff = "PERDIDO".equals(st) ? (r.get("lost_from_stage") == null ? "NUEVO" : (String) r.get("lost_from_stage")) : st;
+            String st = (String) r.get(STAGE);
+            String lostFrom = r.get("lost_from_stage") == null ? NUEVO_2 : (String) r.get("lost_from_stage");
+            String eff = PERDIDO_2.equals(st) ? lostFrom : st;
             int idx = Math.max(0, order.indexOf(eff));
             for (int i = 0; i <= idx; i++) reached[i]++;
             BigDecimal v = r.get("estimated_value") instanceof BigDecimal b ? b : BigDecimal.ZERO;
-            long[] s = bySource.computeIfAbsent((String) r.get("source"), k -> new long[2]);
+            long[] s = bySource.computeIfAbsent((String) r.get(SOURCE), k -> new long[2]);
             s[0]++;
-            if ("GANADO".equals(st)) {
+            if (GANADO_2.equals(st)) {
                 won++; s[1]++; wonValue = wonValue.add(v);
-                LocalDateTime cl = Dates.toLocalDateTime(r.get("closed_at")), cr = Dates.toLocalDateTime(r.get("created_at"));
+                LocalDateTime cl = Dates.toLocalDateTime(r.get(CLOSED_AT));
+                LocalDateTime cr = Dates.toLocalDateTime(r.get("created_at"));
                 if (cl != null && cr != null) winDays += ChronoUnit.DAYS.between(cr, cl);
-            } else if ("PERDIDO".equals(st)) {
+            } else if (PERDIDO_2.equals(st)) {
                 lost++;
-                String reason = r.get("lost_reason") == null ? "Otro" : ((String) r.get("lost_reason")).split(":")[0].trim();
+                String reason = r.get(LOST_REASON) == null ? "Otro" : ((String) r.get(LOST_REASON)).split(":")[0].trim();
                 reasons.merge(reason, 1L, Long::sum);
             } else { open++; pipeline = pipeline.add(v); }
         }
@@ -228,14 +259,14 @@ public class LeadService {
         m.put("avgDaysToWin", won == 0 ? null : BigDecimal.valueOf(winDays / (double) won).setScale(1, RoundingMode.HALF_UP));
         List<Map<String, Object>> funnel = new ArrayList<>();
         for (int i = 0; i < order.size(); i++) {
-            funnel.add(Map.of("stage", order.get(i), "label", STAGES.get(order.get(i)), "reached", reached[i],
+            funnel.add(Map.of(STAGE, order.get(i), LABEL, STAGES.get(order.get(i)), "reached", reached[i],
                     "percent", rows.isEmpty() ? 0 : Math.round(reached[i] * 100.0 / rows.size())));
         }
         m.put("funnel", funnel);
         List<Map<String, Object>> src = new ArrayList<>();
         bySource.entrySet().stream().sorted((x, y) -> Long.compare(y.getValue()[0], x.getValue()[0])).forEach(e -> src.add(Map.of(
-                "source", e.getKey(),
-                "label", PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(e.getKey())).map(x -> x.get("label")).findFirst().orElse(e.getKey()),
+                SOURCE, e.getKey(),
+                LABEL, PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(e.getKey())).map(x -> x.get(LABEL)).findFirst().orElse(e.getKey()),
                 "total", e.getValue()[0], "won", e.getValue()[1],
                 "conversion", Math.round(e.getValue()[1] * 1000.0 / e.getValue()[0]) / 10.0)));
         m.put("bySource", src);
@@ -259,69 +290,69 @@ public class LeadService {
             tasks.insert(t, by);
             event(id, "TAREA", "Tarea: " + t.title() + " para el " + t.dueDate(), by);
         }
-        audit.record("LEAD", id, "CREAR", c.name + " · " + c.source);
-        return get(id);
+        audit.register("LEAD", id, "CREAR", c.name + " · " + c.source);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> update(Long id, LeadRequest r) {
-        get(id);
+        getInternal(id);
         Clean c = validate(r, id);
         jdbc.update("""
                 update leads set full_name = ?, phone = ?, email = ?, source = ?, interest = ?, procedure_id = ?, estimated_value = ?,
                        assignee_id = ?, notes = ?, updated_at = ? where id = ?
                 """, c.name, c.phone, c.email, c.source, c.interest, c.procedureId, c.value, c.assigneeId, c.notes, Dates.now(), id);
-        audit.record("LEAD", id, "EDITAR", c.name);
-        return get(id);
+        audit.register("LEAD", id, "EDITAR", c.name);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> stage(Long id, StageRequest r) {
-        Map<String, Object> l = get(id);
+        Map<String, Object> l = getInternal(id);
         String st = r.stage() == null ? "" : r.stage().trim().toUpperCase();
-        if (!STAGES.containsKey(st)) throw ApiException.field("stage", "Etapa no válida.");
-        if (st.equals(l.get("stage"))) return l;
+        if (!STAGES.containsKey(st)) throw ApiException.field(STAGE, "Etapa no válida.");
+        if (st.equals(l.get(STAGE))) return l;
         String reason = null;
-        if ("PERDIDO".equals(st)) {
+        if (PERDIDO_2.equals(st)) {
             reason = r.lostReason() == null ? "" : r.lostReason().trim();
-            if (reason.isBlank()) throw ApiException.field("lostReason", "Indica por qué se perdió.");
-            if (reason.length() > 200) throw ApiException.field("lostReason", "Máximo 200 caracteres.");
+            if (reason.isBlank()) throw ApiException.field(LOSTREASON, "Indica por qué se perdió.");
+            if (reason.length() > 200) throw ApiException.field(LOSTREASON, "Máximo 200 caracteres.");
         }
-        if ("GANADO".equals(st) && l.get("patient") == null)
+        if (GANADO_2.equals(st) && l.get(PATIENT) == null)
             throw ApiException.badRequest("SIN_PACIENTE", "Primero registra o vincula al paciente: así el tratamiento queda en su ficha.");
         move(id, st, reason, null, CurrentUser.usernameOrSystem());
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> note(Long id, NoteRequest r) {
-        get(id);
+        getInternal(id);
         String t = r.text() == null ? "" : r.text().trim();
         if (t.length() < 2 || t.length() > 500) throw ApiException.field("text", "Escribe una nota de 2 a 500 caracteres.");
         event(id, "NOTA", t, CurrentUser.usernameOrSystem());
         jdbc.update("update leads set updated_at = ? where id = ?", Dates.now(), id);
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> linkPatient(Long id, LinkRequest r) {
-        Map<String, Object> l = get(id);
+        Map<String, Object> l = getInternal(id);
         if (r.patientId() == null || jdbc.queryForObject("select count(*) from patients where id = ? and active = true", Long.class, r.patientId()) == 0)
             throw ApiException.field("patientId", "El paciente no existe.");
         jdbc.update("update leads set patient_id = ?, updated_at = ? where id = ?", r.patientId(), Dates.now(), id);
         String by = CurrentUser.usernameOrSystem();
         event(id, "PACIENTE", "Vinculado al paciente " + patientName(r.patientId()), by);
-        if (List.of("NUEVO", "CONTACTADO").contains(l.get("stage")) && hasFutureAppointment(r.patientId()))
-            move(id, "CITA_AGENDADA", null, "Ya tiene una cita agendada", by);
-        audit.record("LEAD", id, "VINCULAR", "Paciente #" + r.patientId());
-        return get(id);
+        if (List.of(NUEVO_2, CONTACTADO_2).contains(l.get(STAGE)) && hasFutureAppointment(r.patientId()))
+            move(id, CITA_AGENDADA_2, null, "Ya tiene una cita agendada", by);
+        audit.register("LEAD", id, "VINCULAR", "Paciente #" + r.patientId());
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> setWhatsappAuto(boolean on) {
         if (jdbc.update("update app_settings set v = ?, updated_at = ?, updated_by = ? where k = 'leads_whatsapp_auto'", String.valueOf(on), Dates.now(), CurrentUser.usernameOrSystem()) == 0)
             jdbc.update("insert into app_settings (k, v, updated_at, updated_by) values ('leads_whatsapp_auto', ?, ?, ?)", String.valueOf(on), Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record("LEAD", null, "WHATSAPP_AUTO", on ? "Activado" : "Desactivado");
+        audit.register("LEAD", null, "WHATSAPP_AUTO", on ? "Activado" : "Desactivado");
         return options();
     }
 
@@ -336,15 +367,15 @@ public class LeadService {
             List<Map<String, Object>> open = jdbc.queryForList("select id, stage, appointment_id from leads where patient_id = ? and stage in ('NUEVO', 'CONTACTADO', 'CITA_AGENDADA', 'ASISTIO')", a.patient.id);
             for (Map<String, Object> l : open) {
                 Long id = ((Number) l.get("id")).longValue();
-                String st = (String) l.get("stage");
-                if (e.type() == AppointmentEvent.Type.CREATED && List.of("NUEVO", "CONTACTADO").contains(st)) {
+                String st = (String) l.get(STAGE);
+                if (e.type() == AppointmentEvent.Type.CREATED && List.of(NUEVO_2, CONTACTADO_2).contains(st)) {
                     jdbc.update("update leads set appointment_id = ? where id = ?", a.id, id);
-                    move(id, "CITA_AGENDADA", null, "Cita agendada para el " + a.startAt.toLocalDate() + " " + a.startAt.toLocalTime(), "sistema");
-                } else if (e.type() == AppointmentEvent.Type.STATUS && a.status == AppointmentStatus.ATENDIDA && !"ASISTIO".equals(st)) {
-                    move(id, "ASISTIO", null, "Fue atendido el " + a.startAt.toLocalDate(), "sistema");
-                } else if (e.type() == AppointmentEvent.Type.STATUS && a.status == AppointmentStatus.CANCELADA && "CITA_AGENDADA".equals(st)
+                    move(id, CITA_AGENDADA_2, null, "Cita agendada para el " + a.startAt.toLocalDate() + " " + a.startAt.toLocalTime(), SISTEMA);
+                } else if (e.type() == AppointmentEvent.Type.STATUS && a.status == AppointmentStatus.ATENDIDA && !ASISTIO_2.equals(st)) {
+                    move(id, ASISTIO_2, null, "Fue atendido el " + a.startAt.toLocalDate(), SISTEMA);
+                } else if (e.type() == AppointmentEvent.Type.STATUS && a.status == AppointmentStatus.CANCELADA && CITA_AGENDADA_2.equals(st)
                         && a.id.equals(l.get("appointment_id") == null ? null : ((Number) l.get("appointment_id")).longValue()) && !hasFutureAppointment(a.patient.id)) {
-                    move(id, "CONTACTADO", null, "Canceló su cita", "sistema");
+                    move(id, CONTACTADO_2, null, "Canceló su cita", SISTEMA);
                 }
             }
         } catch (RuntimeException ex) {
@@ -366,8 +397,8 @@ public class LeadService {
             String interest = text == null ? null : text.trim().replaceAll("\\s+", " ");
             if (interest != null && interest.length() > 150) interest = interest.substring(0, 147) + "…";
             Clean c = new Clean("Contacto WhatsApp " + p.substring(0, 3) + " " + p.substring(3, 6) + " " + p.substring(6), p, null, "WHATSAPP", interest, null, null, null, null);
-            Long id = insert(c, null, "sistema", Dates.now());
-            event(id, "CREADO", "Escribió por WhatsApp" + (interest == null ? "" : ": “" + interest + "”"), "sistema");
+            Long id = insert(c, null, SISTEMA, Dates.now());
+            event(id, "CREADO", "Escribió por WhatsApp" + (interest == null ? "" : ": “" + interest + "”"), SISTEMA);
         } catch (RuntimeException ex) {
             log.warn("No se pudo crear el lead de WhatsApp: {}", ex.getMessage());
         }
@@ -377,11 +408,11 @@ public class LeadService {
 
     private void move(Long id, String to, String lostReason, String why, String by) {
         String from = jdbc.queryForObject("select stage from leads where id = ?", String.class, id);
-        boolean closing = "GANADO".equals(to) || "PERDIDO".equals(to);
+        boolean closing = GANADO_2.equals(to) || PERDIDO_2.equals(to);
         jdbc.update("update leads set stage = ?, stage_changed_at = ?, lost_reason = ?, lost_from_stage = ?, closed_at = ?, updated_at = ? where id = ?",
-                to, Dates.now(), "PERDIDO".equals(to) ? lostReason : null, "PERDIDO".equals(to) ? from : null, closing ? Dates.now() : null, Dates.now(), id);
+                to, Dates.now(), PERDIDO_2.equals(to) ? lostReason : null, PERDIDO_2.equals(to) ? from : null, closing ? Dates.now() : null, Dates.now(), id);
         event(id, "ETAPA", STAGES.get(from) + " → " + STAGES.get(to) + (lostReason != null ? " (" + lostReason + ")" : "") + (why != null ? " · " + why : ""), by);
-        audit.record("LEAD", id, "ETAPA", from + " → " + to);
+        audit.register("LEAD", id, "ETAPA", from + " → " + to);
     }
 
     private void event(Long id, String kind, String detail, String by) {
@@ -421,32 +452,32 @@ public class LeadService {
     private Clean validate(LeadRequest r, Long id) {
         Map<String, String> e = new LinkedHashMap<>();
         String name = r.fullName() == null ? "" : r.fullName().trim().replaceAll("\\s+", " ");
-        if (name.length() < 3 || name.length() > 120) e.put("fullName", "Escribe el nombre (3 a 120 caracteres).");
+        if (name.length() < 3 || name.length() > 120) e.put(FULLNAME, "Escribe el nombre (3 a 120 caracteres).");
         String phone = r.phone() == null ? "" : r.phone().replaceAll("[\\s-]", "");
         if (phone.startsWith("+51")) phone = phone.substring(3);
-        if (!phone.isEmpty() && !phone.matches("9\\d{8}")) e.put("phone", "Celular de 9 dígitos que empiece con 9.");
+        if (!phone.isEmpty() && !phone.matches("9\\d{8}")) e.put(PHONE, "Celular de 9 dígitos que empiece con 9.");
         String email = r.email() == null ? "" : r.email().trim().toLowerCase();
-        if (!email.isEmpty() && !email.matches("^[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+$")) e.put("email", "Correo no válido.");
-        if (phone.isEmpty() && email.isEmpty()) e.put("phone", "Indica un celular o un correo para poder contactarlo.");
+        if (!email.isEmpty() && !pe.clinicacardenas.common.Emails.valid(email)) e.put(EMAIL, "Correo no válido.");
+        if (phone.isEmpty() && email.isEmpty()) e.put(PHONE, "Indica un celular o un correo para poder contactarlo.");
         String source = r.source() == null ? "" : r.source().trim().toUpperCase();
-        if (PatientProfileService.SOURCES.stream().noneMatch(x -> x.get("code").equals(source))) e.put("source", "Elige de dónde llegó.");
+        if (PatientProfileService.SOURCES.stream().noneMatch(x -> x.get("code").equals(source))) e.put(SOURCE, "Elige de dónde llegó.");
         String interest = r.interest() == null || r.interest().isBlank() ? null : r.interest().trim();
-        if (interest != null && interest.length() > 150) e.put("interest", "Máximo 150 caracteres.");
+        if (interest != null && interest.length() > 150) e.put(INTEREST, "Máximo 150 caracteres.");
         if (r.procedureId() != null && jdbc.queryForObject("select count(*) from procedures where id = ?", Long.class, r.procedureId()) == 0)
             e.put("procedureId", "Procedimiento no válido.");
         BigDecimal v = r.estimatedValue();
-        if (v != null && (v.signum() < 0 || v.compareTo(new BigDecimal("100000")) > 0)) e.put("estimatedValue", "Entre S/ 0 y S/ 100 000.");
+        if (v != null && (v.signum() < 0 || v.compareTo(new BigDecimal("100000")) > 0)) e.put(ESTIMATEDVALUE, "Entre S/ 0 y S/ 100 000.");
         if (r.assigneeId() != null && tasks.assignees().stream().noneMatch(u -> r.assigneeId().equals(((Number) u.get("id")).longValue())))
             e.put("assigneeId", "Responsable no válido.");
         String notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().trim();
-        if (notes != null && notes.length() > 1000) e.put("notes", "Máximo 1000 caracteres.");
+        if (notes != null && notes.length() > 1000) e.put(NOTES, "Máximo 1000 caracteres.");
         if (r.followUpDate() != null && r.followUpDate().isBefore(Dates.today())) e.put("followUpDate", "La fecha no puede ser pasada.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del lead.", e);
         if (!phone.isEmpty()) {
             List<Long> dup = jdbc.queryForList("select id from leads where phone = ? and stage in ('NUEVO', 'CONTACTADO', 'CITA_AGENDADA', 'ASISTIO') and id <> ?",
                     Long.class, phone, id == null ? -1L : id);
             if (!dup.isEmpty()) throw ApiException.conflict("LEAD_DUPLICADO", "Ya hay un lead abierto con ese celular (#" + dup.get(0) + ").",
-                    Map.of("phone", "Ya hay un lead abierto con ese celular.", "leadId", String.valueOf(dup.get(0))));
+                    Map.of(PHONE, "Ya hay un lead abierto con ese celular.", "leadId", String.valueOf(dup.get(0))));
         }
         BigDecimal value = v;
         if (value == null && r.procedureId() != null)
@@ -470,7 +501,7 @@ public class LeadService {
     }
 
     private static String sourceLabel(String code) {
-        return PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(code)).map(x -> x.get("label")).findFirst().orElse(code);
+        return PatientProfileService.SOURCES.stream().filter(x -> x.get("code").equals(code)).map(x -> x.get(LABEL)).findFirst().orElse(code);
     }
 
     private String setting(String k) {

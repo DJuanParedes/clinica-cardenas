@@ -22,6 +22,8 @@ import java.util.Map;
  */
 @Service
 public class ConsentService {
+    private static final String PRIVACIDAD = "PRIVACIDAD";
+
 
     private final JdbcTemplate jdbc;
     private final PatientRepository patients;
@@ -63,17 +65,21 @@ public class ConsentService {
     /** Aceptación registrada por el personal en recepción (presencial). */
     @Transactional
     public void recordInitial(Patient p) {
-        record(p, "PRIVACIDAD", "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
+        registerInternal(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
     }
 
     @Transactional
-    public void record(Patient p, String code, String channel, String registeredBy, String ip) {
+    public void register(Patient p, String code, String channel, String registeredBy, String ip) {
+        registerInternal(p, code, channel, registeredBy, ip);
+    }
+
+    private void registerInternal(Patient p, String code, String channel, String registeredBy, String ip) {
         String version = currentVersion(code);
         jdbc.update("""
                 insert into consent_records (patient_id, doc_code, doc_version, channel, accepted_by, registered_by, ip, accepted_at)
                 values (?, ?, ?, ?, ?, ?, ?, ?)
                 """, p.id, code, version, channel, acceptedBy(p), registeredBy, ip, Dates.now());
-        if ("PRIVACIDAD".equals(code)) {
+        if (PRIVACIDAD.equals(code)) {
             p.consentVersion = version;
             p.consentChannel = channel;
             p.consentBy = registeredBy;
@@ -81,7 +87,7 @@ public class ConsentService {
             if (p.dataConsentAt == null) p.dataConsentAt = Dates.now();
             patients.save(p);
         }
-        audit.record("PACIENTE", p.id, "CONSENTIMIENTO", code + " v" + version + " · " + channel + " · aceptó " + acceptedBy(p));
+        audit.register("PACIENTE", p.id, "CONSENTIMIENTO", code + " v" + version + " · " + channel + " · aceptó " + acceptedBy(p));
     }
 
     /** Copia escaneada o foto del consentimiento firmado en recepción. */
@@ -98,7 +104,7 @@ public class ConsentService {
                   select id from (select id from consent_records where patient_id = ? and doc_code = 'PRIVACIDAD'
                                    order by accepted_at desc limit 1) t)
                 """, f.id, patientId);
-        audit.record("PACIENTE", p.id, "CONSENTIMIENTO_FIRMADO", "Adjuntó la copia firmada");
+        audit.register("PACIENTE", p.id, "CONSENTIMIENTO_FIRMADO", "Adjuntó la copia firmada");
         return history(patientId);
     }
 
@@ -107,7 +113,7 @@ public class ConsentService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("accepted", p.dataConsent);
         m.put("version", p.consentVersion);
-        m.put("currentVersion", currentVersion("PRIVACIDAD"));
+        m.put("currentVersion", currentVersion(PRIVACIDAD));
         m.put("signedFileId", p.consentFileId);
         m.put("acceptedBy", p.dataConsent ? acceptedBy(p) : null);
         m.put("records", jdbc.queryForList("""

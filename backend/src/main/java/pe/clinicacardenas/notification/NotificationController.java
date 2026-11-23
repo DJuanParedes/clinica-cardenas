@@ -82,7 +82,7 @@ public class NotificationController {
         p.notifyChannel = ch;
         p.updatedAt = Dates.now();
         patients.save(p);
-        audit.record("PACIENTE", p.id, "CANAL_AVISOS", "Avisos por " + ch.toLowerCase());
+        audit.register("PACIENTE", p.id, "CANAL_AVISOS", "Avisos por " + ch.toLowerCase());
         return p;
     }
 

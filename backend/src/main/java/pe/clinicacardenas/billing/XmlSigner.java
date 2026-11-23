@@ -46,7 +46,7 @@ public class XmlSigner {
     private final X509Certificate cert;
 
     public XmlSigner(@Value("${app.sunat.certificado:classpath:sunat/certificado-demo.p12}") String location,
-                     @Value("${app.sunat.certificado-clave:clinica-demo}") String password) throws Exception {
+                     @Value("${app.sunat.certificado-clave:clinica-demo}") String password) throws java.security.GeneralSecurityException, java.io.IOException {
         KeyStore ks = KeyStore.getInstance("PKCS12");
         try (InputStream in = new DefaultResourceLoader().getResource(location).getInputStream()) {
             ks.load(in, password.toCharArray());

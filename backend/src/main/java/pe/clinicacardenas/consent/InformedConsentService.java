@@ -38,12 +38,29 @@ import java.util.regex.Pattern;
  */
 @Service
 public class InformedConsentService {
+    private static final String CONSENTIMIENTO = "CONSENTIMIENTO";
+    private static final String EMAIL = "EMAIL";
+    private static final String HISTORIA = "HISTORIA";
+    private static final String PACIENTE = "PACIENTE";
+    private static final String PENDIENTE = "PENDIENTE";
+    private static final String PRESENCIAL = "PRESENCIAL";
+    private static final String WHATSAPP = "WHATSAPP";
+    private static final String ACTIVE = "active";
+    private static final String CHANNEL = "channel";
+    private static final String PACIENTE_2 = "paciente";
+    private static final String PATIENT_ID = "patient_id";
+    private static final String RELATIONSHIP = "relationship";
+    private static final String SIGNATUREJPEG = "signatureJpeg";
+    private static final String SIGNERDOC = "signerDoc";
+    private static final String STATUS = "status";
+    private static final String TITLE = "title";
 
-    public static final List<String> VARIABLES = List.of("firmante", "documento_firmante", "condicion", "paciente", "documento",
+
+    public static final List<String> VARIABLES = List.of("firmante", "documento_firmante", "condicion", PACIENTE_2, "documento",
             "odontologo", "clinica", "procedimiento", "pieza", "fecha");
     public static final int VALID_DAYS = 7;
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final Map<String, String> REL = Map.of("PACIENTE", "paciente", "MADRE", "madre", "PADRE", "padre", "TUTOR", "tutor(a) legal");
+    private static final Map<String, String> REL = Map.of(PACIENTE, PACIENTE_2, "MADRE", "madre", "PADRE", "padre", "TUTOR", "tutor(a) legal");
 
     private final JdbcTemplate jdbc;
     private final PatientRepository patients;
@@ -52,7 +69,8 @@ public class InformedConsentService {
     private final SurveyLinks links;
     private final AuditService audit;
     private final byte[] key;
-    private final String clinicName, clinicAddress;
+    private final String clinicName;
+    private final String clinicAddress;
 
     public InformedConsentService(JdbcTemplate jdbc, PatientRepository patients, FileService files, NotificationService notifications, SurveyLinks links,
                           AuditService audit, @Value("${app.jwt.secret}") String secret,
@@ -101,13 +119,13 @@ public class InformedConsentService {
             String code = "P" + Long.toString(System.currentTimeMillis(), 36).toUpperCase();
             jdbc.update("insert into consent_templates (code, name, body, sort_order, updated_by, updated_at) values (?, ?, ?, 100, ?, ?)", code, name, body, by, Dates.now());
             id = jdbc.queryForObject("select id from consent_templates where code = ?", Long.class, code);
-            audit.record("CONSENTIMIENTO", id, "PLANTILLA_CREAR", name);
+            audit.register(CONSENTIMIENTO, id, "PLANTILLA_CREAR", name);
         } else {
             Map<String, Object> cur = template(id);
             boolean changed = !body.equals(cur.get("body"));
             jdbc.update("update consent_templates set name = ?, body = ?, active = ?, version = version + ?, updated_by = ?, updated_at = ? where id = ?",
-                    name, body, r.active() == null ? cur.get("active") : r.active(), changed ? 1 : 0, by, Dates.now(), id);
-            audit.record("CONSENTIMIENTO", id, "PLANTILLA_EDITAR", name + (changed ? " · nueva versión" : ""));
+                    name, body, r.active() == null ? cur.get(ACTIVE) : r.active(), changed ? 1 : 0, by, Dates.now(), id);
+            audit.register(CONSENTIMIENTO, id, "PLANTILLA_EDITAR", name + (changed ? " · nueva versión" : ""));
         }
         return template(id);
     }
@@ -142,9 +160,9 @@ public class InformedConsentService {
                  where %s order by r.created_at desc limit 300
                 """.formatted(where), args)) {
             Map<String, Object> m = new LinkedHashMap<>(r);
-            boolean expired = "PENDIENTE".equals(r.get("status")) && Dates.toLocalDateTime(r.get("expiresAt")).isBefore(Dates.now());
+            boolean expired = PENDIENTE.equals(r.get(STATUS)) && Dates.toLocalDateTime(r.get("expiresAt")).isBefore(Dates.now());
             m.put("expired", expired);
-            if ("PENDIENTE".equals(r.get("status")) && !expired) m.put("url", url(((Number) r.get("id")).longValue()));
+            if (PENDIENTE.equals(r.get(STATUS)) && !expired) m.put("url", url(((Number) r.get("id")).longValue()));
             out.add(m);
         }
         return out;
@@ -156,23 +174,23 @@ public class InformedConsentService {
         Patient p = patients.findById(patientId).orElseThrow(() -> ApiException.notFound("El paciente"));
         if (r.templateId() == null) throw ApiException.field("templateId", "Elige el consentimiento.");
         Map<String, Object> t = template(r.templateId());
-        if (!Boolean.TRUE.equals(t.get("active")) && !(t.get("active") instanceof Number n && n.intValue() == 1))
+        if (!Boolean.TRUE.equals(t.get(ACTIVE)) && !(t.get(ACTIVE) instanceof Number n && n.intValue() == 1))
             throw ApiException.field("templateId", "Esa plantilla está desactivada.");
         String procedure = r.procedure() == null ? "" : r.procedure().trim();
         if (procedure.length() < 3 || procedure.length() > 300) throw ApiException.field("procedure", "Describe el procedimiento (3 a 300 caracteres).");
         if (r.tooth() != null && !((r.tooth() >= 11 && r.tooth() <= 48) || (r.tooth() >= 51 && r.tooth() <= 85)))
             throw ApiException.field("tooth", "Pieza dental inválida (notación FDI).");
-        String channel = r.channel() == null ? "WHATSAPP" : r.channel().trim().toUpperCase();
-        if (!Set.of("WHATSAPP", "EMAIL", "PRESENCIAL").contains(channel)) throw ApiException.field("channel", "Canal no válido.");
+        String channel = r.channel() == null ? WHATSAPP : r.channel().trim().toUpperCase();
+        if (!Set.of(WHATSAPP, EMAIL, PRESENCIAL).contains(channel)) throw ApiException.field(CHANNEL, "Canal no válido.");
         boolean minor = p.isMinor();
         String phone = minor && p.guardianPhone != null && !p.guardianPhone.isBlank() ? p.guardianPhone : p.phone;
         String dest = switch (channel) {
-            case "WHATSAPP" -> phone == null || phone.isBlank() ? null : phone;
-            case "EMAIL" -> p.email == null || p.email.isBlank() ? null : p.email;
+            case WHATSAPP -> phone == null || phone.isBlank() ? null : phone;
+            case EMAIL -> p.email == null || p.email.isBlank() ? null : p.email;
             default -> null;
         };
-        if (!"PRESENCIAL".equals(channel) && dest == null)
-            throw ApiException.field("channel", "WHATSAPP".equals(channel) ? "El paciente no tiene celular registrado." : "El paciente no tiene correo registrado.");
+        if (!PRESENCIAL.equals(channel) && dest == null)
+            throw ApiException.field(CHANNEL, WHATSAPP.equals(channel) ? "El paciente no tiene celular registrado." : "El paciente no tiene correo registrado.");
         String dentist = null;
         if (r.dentistId() != null) {
             List<String> d = jdbc.queryForList("select u.full_name from dentists d join users u on u.id = d.user_id where d.id = ?", String.class, r.dentistId());
@@ -183,8 +201,9 @@ public class InformedConsentService {
         String signer = minor && p.guardianName != null && !p.guardianName.isBlank() ? p.guardianName : p.getFullName();
         v.put("firmante", signer);
         v.put("documento_firmante", minor && p.guardianDocNumber != null ? "DNI " + p.guardianDocNumber : p.docType + " " + p.docNumber);
-        v.put("condicion", minor ? (REL.getOrDefault(p.guardianRelationship == null ? "TUTOR" : p.guardianRelationship, "apoderado(a)") + " de " + p.getFullName() + " (menor de edad)") : "paciente");
-        v.put("paciente", p.getFullName());
+        String relation = p.guardianRelationship == null ? "TUTOR" : p.guardianRelationship;
+        v.put("condicion", minor ? (REL.getOrDefault(relation, "apoderado(a)") + " de " + p.getFullName() + " (menor de edad)") : PACIENTE_2);
+        v.put(PACIENTE_2, p.getFullName());
         v.put("documento", p.docType + " " + p.docNumber);
         v.put("odontologo", dentist == null ? "odontólogo(a) tratante" : dentist);
         v.put("clinica", clinicName);
@@ -218,14 +237,14 @@ public class InformedConsentService {
         }, kh);
         long id = Objects.requireNonNull(kh.getKey()).longValue();
         String url = url(id);
-        if (!"PRESENCIAL".equals(channel)) {
+        if (!PRESENCIAL.equals(channel)) {
             String text = "Hola " + signer.split(" ")[0] + ", " + clinicName + " te envía el *consentimiento informado* para "
                     + (minor ? p.getFullName() + ": " : "tu tratamiento: ") + procedure + ".\n\nLéelo con calma y fírmalo desde tu celular aquí:\n" + url
                     + "\n\nEl enlace vence en " + VALID_DAYS + " días. Si tienes dudas, pregúntanos antes de firmar.";
-            notifications.direct(p, "CONSENTIMIENTO", channel, dest, "Consentimiento informado para firmar · " + clinicName, text, "consentimiento:" + id,
+            notifications.direct(p, CONSENTIMIENTO, channel, dest, "Consentimiento informado para firmar · " + clinicName, text, "consentimiento:" + id,
                     List.of(NotificationService.WA_DOCUMENTO, signer.split(" ")[0], clinicName, String.valueOf(t.get("name")).toLowerCase(Locale.ROOT), url, String.valueOf(VALID_DAYS)));
         }
-        audit.record("HISTORIA", p.id, "CONSENTIMIENTO", "Envió para firmar: " + t.get("name") + " · " + ("PRESENCIAL".equals(channel) ? "en la clínica" : channel.toLowerCase()));
+        audit.register(HISTORIA, p.id, CONSENTIMIENTO, "Envió para firmar: " + t.get("name") + " · " + (PRESENCIAL.equals(channel) ? "en la clínica" : channel.toLowerCase()));
         Map<String, Object> out = new LinkedHashMap<>(requests("r.id = ?", id).get(0));
         out.put("url", url);
         return out;
@@ -234,11 +253,11 @@ public class InformedConsentService {
     @Transactional
     public Map<String, Object> cancel(Long id, String reason) {
         Map<String, Object> r = one(id);
-        if (!"PENDIENTE".equals(r.get("status"))) throw ApiException.conflict("CONSENTIMIENTO_CERRADO", "El consentimiento ya se firmó o se anuló.");
+        if (!PENDIENTE.equals(r.get(STATUS))) throw ApiException.conflict("CONSENTIMIENTO_CERRADO", "El consentimiento ya se firmó o se anuló.");
         String why = reason == null ? "" : reason.trim();
         if (why.length() < 3) throw ApiException.field("reason", "Indica por qué se anula.");
         jdbc.update("update consent_requests set status = 'ANULADO', cancel_reason = ? where id = ?", why.length() > 200 ? why.substring(0, 200) : why, id);
-        audit.record("HISTORIA", ((Number) r.get("patient_id")).longValue(), "CONSENTIMIENTO", "Anuló el envío de " + r.get("title") + ": " + why);
+        audit.register(HISTORIA, ((Number) r.get(PATIENT_ID)).longValue(), CONSENTIMIENTO, "Anuló el envío de " + r.get(TITLE) + ": " + why);
         return requests("r.id = ?", id).get(0);
     }
 
@@ -248,19 +267,19 @@ public class InformedConsentService {
     @Transactional
     public Map<String, Object> open(String token) {
         Map<String, Object> r = one(resolve(token));
-        Patient p = patients.findById(((Number) r.get("patient_id")).longValue()).orElseThrow();
+        Patient p = patients.findById(((Number) r.get(PATIENT_ID)).longValue()).orElseThrow();
         if (r.get("opened_at") == null) jdbc.update("update consent_requests set opened_at = ? where id = ?", Dates.now(), r.get("id"));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("clinic", clinicName);
-        m.put("title", r.get("title"));
+        m.put(TITLE, r.get(TITLE));
         m.put("body", r.get("body"));
-        m.put("status", r.get("status"));
-        m.put("expired", "PENDIENTE".equals(r.get("status")) && Dates.toLocalDateTime(r.get("expires_at")).isBefore(Dates.now()));
+        m.put(STATUS, r.get(STATUS));
+        m.put("expired", PENDIENTE.equals(r.get(STATUS)) && Dates.toLocalDateTime(r.get("expires_at")).isBefore(Dates.now()));
         m.put("patientName", p.getFullName());
         m.put("minor", p.isMinor());
-        m.put("signerName", p.isMinor() ? (p.guardianName == null ? "" : p.guardianName) : p.getFullName());
-        m.put("signerDoc", p.isMinor() ? (p.guardianDocNumber == null ? "" : p.guardianDocNumber) : p.docNumber);
-        m.put("relationship", p.isMinor() ? (p.guardianRelationship == null ? "" : p.guardianRelationship) : "PACIENTE");
+        m.put("signerName", p.isMinor() ? nz(p.guardianName) : p.getFullName());
+        m.put(SIGNERDOC, p.isMinor() ? nz(p.guardianDocNumber) : p.docNumber);
+        m.put(RELATIONSHIP, p.isMinor() ? nz(p.guardianRelationship) : PACIENTE);
         m.put("signedAt", r.get("signed_at"));
         m.put("hash", ((String) r.get("body_hash")).substring(0, 16));
         return m;
@@ -270,55 +289,55 @@ public class InformedConsentService {
     public Map<String, Object> sign(String token, SignRequest s, String ip, String agent) {
         Long id = resolve(token);
         Map<String, Object> r = jdbc.queryForList("select * from consent_requests where id = ? for update", id).get(0);
-        if ("FIRMADO".equals(r.get("status"))) throw ApiException.conflict("YA_FIRMADO", "Este consentimiento ya fue firmado.");
-        if (!"PENDIENTE".equals(r.get("status"))) throw ApiException.conflict("ANULADO", "Este consentimiento fue anulado por la clínica.");
+        if ("FIRMADO".equals(r.get(STATUS))) throw ApiException.conflict("YA_FIRMADO", "Este consentimiento ya fue firmado.");
+        if (!PENDIENTE.equals(r.get(STATUS))) throw ApiException.conflict("ANULADO", "Este consentimiento fue anulado por la clínica.");
         if (Dates.toLocalDateTime(r.get("expires_at")).isBefore(Dates.now()))
             throw ApiException.conflict("VENCIDO", "El enlace venció. Pide a la clínica que te lo envíe de nuevo.");
-        Patient p = patients.findById(((Number) r.get("patient_id")).longValue()).orElseThrow();
+        Patient p = patients.findById(((Number) r.get(PATIENT_ID)).longValue()).orElseThrow();
         Map<String, String> e = new LinkedHashMap<>();
         String name = s.signerName() == null ? "" : s.signerName().trim().replaceAll("\\s+", " ");
         if (name.length() < 5 || name.length() > 120) e.put("signerName", "Escribe tu nombre completo.");
         String doc = s.signerDoc() == null ? "" : s.signerDoc().trim();
-        if (!doc.matches("\\d{8}|[A-Za-z0-9]{9,12}")) e.put("signerDoc", "Escribe tu DNI (8 dígitos) o carné de extranjería.");
-        String rel = s.relationship() == null || s.relationship().isBlank() ? "PACIENTE" : s.relationship().trim().toUpperCase();
-        if (!REL.containsKey(rel)) e.put("relationship", "Indica quién firma.");
-        if (p.isMinor() && "PACIENTE".equals(rel)) e.put("relationship", "El paciente es menor de edad: firma su madre, padre o tutor.");
-        if (!p.isMinor() && !"PACIENTE".equals(rel)) e.put("relationship", "El paciente es mayor de edad: debe firmar él mismo.");
-        if ("PACIENTE".equals(rel) && !doc.equals(p.docNumber)) e.put("signerDoc", "El documento no coincide con el del paciente.");
+        if (!doc.matches("\\d{8}|[A-Za-z0-9]{9,12}")) e.put(SIGNERDOC, "Escribe tu DNI (8 dígitos) o carné de extranjería.");
+        String rel = s.relationship() == null || s.relationship().isBlank() ? PACIENTE : s.relationship().trim().toUpperCase();
+        if (!REL.containsKey(rel)) e.put(RELATIONSHIP, "Indica quién firma.");
+        if (p.isMinor() && PACIENTE.equals(rel)) e.put(RELATIONSHIP, "El paciente es menor de edad: firma su madre, padre o tutor.");
+        if (!p.isMinor() && !PACIENTE.equals(rel)) e.put(RELATIONSHIP, "El paciente es mayor de edad: debe firmar él mismo.");
+        if (PACIENTE.equals(rel) && !doc.equals(p.docNumber)) e.put(SIGNERDOC, "El documento no coincide con el del paciente.");
         if (!Boolean.TRUE.equals(s.accepted())) e.put("accepted", "Marca que leíste y entendiste el documento.");
         byte[] sig = null;
-        if (s.signatureJpeg() == null || s.signatureJpeg().isBlank()) e.put("signatureJpeg", "Firma en el recuadro.");
+        if (s.signatureJpeg() == null || s.signatureJpeg().isBlank()) e.put(SIGNATUREJPEG, "Firma en el recuadro.");
         else {
             String b64 = s.signatureJpeg().contains(",") ? s.signatureJpeg().substring(s.signatureJpeg().indexOf(',') + 1) : s.signatureJpeg();
-            try { sig = Base64.getDecoder().decode(b64); } catch (IllegalArgumentException ex) { e.put("signatureJpeg", "La firma no es válida."); }
-            if (sig != null && (sig.length > 400_000 || SimplePdf.jpegSize(sig) == null)) e.put("signatureJpeg", "La firma no es válida.");
+            try { sig = Base64.getDecoder().decode(b64); } catch (IllegalArgumentException ex) { e.put(SIGNATUREJPEG, "La firma no es válida."); }
+            if (sig != null && (sig.length > 400_000 || SimplePdf.jpegSize(sig) == null)) e.put(SIGNATUREJPEG, "La firma no es válida.");
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos antes de firmar.", e);
         LocalDateTime now = Dates.now();
         String sentTo = (String) r.get("sent_to");
-        String via = switch ((String) r.get("channel")) {
-            case "WHATSAPP" -> "enlace enviado por WhatsApp al ***" + (sentTo == null ? "" : sentTo.substring(Math.max(0, sentTo.length() - 3)));
-            case "EMAIL" -> "enlace enviado por correo a " + mask(sentTo);
+        String via = switch ((String) r.get(CHANNEL)) {
+            case WHATSAPP -> "enlace enviado por WhatsApp al ***" + (sentTo == null ? "" : sentTo.substring(Math.max(0, sentTo.length() - 3)));
+            case EMAIL -> "enlace enviado por correo a " + mask(sentTo);
             default -> "firmado en la clínica (tablet)";
         };
         SimplePdf pdf = new SimplePdf()
                 .header(clinicName, clinicAddress)
-                .title((String) r.get("title"))
+                .title((String) r.get(TITLE))
                 .paragraph("Paciente: " + p.getFullName() + "    " + p.docType + " " + p.docNumber
                         + (p.hcNumber == null ? "" : "    HC " + p.hcNumber), 10, false)
                 .space(8)
                 .paragraph((String) r.get("body"), 10.5f, false)
                 .space(18);
         pdf.jpeg(sig, 200);
-        pdf.signatureLine("Firma: " + name + " · DNI/CE " + doc + ("PACIENTE".equals(rel) ? "" : " · " + REL.get(rel) + " del paciente"));
+        pdf.signatureLine("Firma: " + name + " · DNI/CE " + doc + (PACIENTE.equals(rel) ? "" : " · " + REL.get(rel) + " del paciente"));
         pdf.space(10).paragraph("Constancia de firma electrónica: firmado el " + now.format(DMY) + " · " + via + " · IP " + (ip == null ? "-" : ip)
                 + " · código de verificación del texto (SHA-256): " + r.get("body_hash"), 8, false);
-        PatientFile f = files.storeSigned(p.id, pdf.build(), "CONSENTIMIENTO", (String) r.get("title"), now);
+        PatientFile f = files.storeSigned(p.id, pdf.build(), CONSENTIMIENTO, (String) r.get(TITLE), now);
         jdbc.update("""
                 update consent_requests set status = 'FIRMADO', signed_at = ?, signer_name = ?, signer_doc = ?, signer_relationship = ?,
                        signer_ip = ?, signer_agent = ?, file_id = ? where id = ?
                 """, now, name, doc, rel, ip, agent == null ? null : agent.substring(0, Math.min(250, agent.length())), f.id, id);
-        audit.record("HISTORIA", p.id, "CONSENTIMIENTO", "Firmó a distancia: " + r.get("title") + " · " + name + " (" + REL.get(rel) + ")");
+        audit.register(HISTORIA, p.id, CONSENTIMIENTO, "Firmó a distancia: " + r.get(TITLE) + " · " + name + " (" + REL.get(rel) + ")");
         return Map.of("message", "¡Listo! Tu consentimiento quedó firmado. La clínica ya lo tiene en tu ficha.", "signedAt", now);
     }
 
@@ -370,4 +389,6 @@ public class InformedConsentService {
         String[] p = email.split("@");
         return p[0].charAt(0) + "***@" + p[1];
     }
+
+    private static String nz(String s) { return s == null ? "" : s; }
 }

@@ -22,6 +22,17 @@ import java.util.function.BiConsumer;
  */
 @Service
 public class DeletionService {
+    private static final String IN = " in (";
+    private static final String WHERE = " where ";
+    private static final String APPOINTMENTS = "appointments";
+    private static final String DENTISTS = "dentists";
+    private static final String LAB_ORDERS = "lab_orders";
+    private static final String PATIENTS = "patients";
+    private static final String SELECT_COUNT_FROM = "select count(*) from ";
+    private static final String T_NAME = "t.name";
+    private static final String TREATMENT_ITEMS = "treatment_items";
+    private static final String TREATMENT_PLANS = "treatment_plans";
+
 
     /** Una tabla que referencia a otra. */
     record Ref(String table, String column, boolean nullable) {}
@@ -39,7 +50,7 @@ public class DeletionService {
             "commission_lines", new Keep("settlement_id is not null", "comisiones ya liquidadas a un odontólogo"),
             "commission_payouts", new Keep("1=1", "pagos de comisiones"),
             "commission_settlements", new Keep("1=1", "liquidaciones de comisiones"),
-            "treatment_items", new Keep("invoice_id is not null", "tratamientos ya facturados")
+            TREATMENT_ITEMS, new Keep("invoice_id is not null", "tratamientos ya facturados")
     );
 
     /**
@@ -62,8 +73,8 @@ public class DeletionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final ObjectMapper json;
-    private volatile Map<String, List<Ref>> refs;
-    private volatile Set<String> tablesWithId;
+    private final java.util.concurrent.atomic.AtomicReference<Map<String, List<Ref>>> refs = new java.util.concurrent.atomic.AtomicReference<>();
+    private final java.util.concurrent.atomic.AtomicReference<Set<String>> tablesWithId = new java.util.concurrent.atomic.AtomicReference<>();
 
     private final org.springframework.context.ApplicationEventPublisher events;
 
@@ -73,25 +84,25 @@ public class DeletionService {
         this.audit = audit;
         this.json = json;
         for (Entity x : List.of(
-                new Entity("patients", "Paciente", "patients", "id", "concat_ws(' · ', concat(t.first_name, ' ', t.last_name), concat(t.doc_type, ' ', t.doc_number))", Set.of(), this::checkPatient),
-                e("appointments", "Cita", "appointments", "concat_ws(' · ', (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), date_format(t.start_at, '%d/%m/%Y %H:%i'), t.reason)"),
-                new Entity("users", "Usuario", "users", "id", "concat(t.full_name, ' (', t.username, ')')", Set.of("dentists"), this::checkUser),
-                e("dentists", "Odontólogo", "dentists", "coalesce((select u.full_name from users u where u.id = t.user_id), concat('Odontólogo ', t.id))",
-                        "appointments", "treatment_plans", "treatment_items", "diagnoses", "ortho_cases", "commission_settlements"),
-                e("procedures", "Procedimiento", "procedures", "concat_ws(' · ', t.code, t.name)", "treatment_items"),
-                e("treatment_plans", "Plan de tratamiento", "treatment_plans", "concat_ws(' · ', t.title, (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id))"),
-                e("treatment_items", "Tratamiento del plan", "treatment_items", "concat_ws(' · ', (select pr.name from procedures pr where pr.id = t.procedure_id), concat('pieza ', t.tooth))"),
+                new Entity(PATIENTS, "Paciente", PATIENTS, "id", "concat_ws(' · ', concat(t.first_name, ' ', t.last_name), concat(t.doc_type, ' ', t.doc_number))", Set.of(), this::checkPatient),
+                e(APPOINTMENTS, "Cita", APPOINTMENTS, "concat_ws(' · ', (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), date_format(t.start_at, '%d/%m/%Y %H:%i'), t.reason)"),
+                new Entity("users", "Usuario", "users", "id", "concat(t.full_name, ' (', t.username, ')')", Set.of(DENTISTS), this::checkUser),
+                e(DENTISTS, "Odontólogo", DENTISTS, "coalesce((select u.full_name from users u where u.id = t.user_id), concat('Odontólogo ', t.id))",
+                        APPOINTMENTS, TREATMENT_PLANS, TREATMENT_ITEMS, "diagnoses", "ortho_cases", "commission_settlements"),
+                e("procedures", "Procedimiento", "procedures", "concat_ws(' · ', t.code, t.name)", TREATMENT_ITEMS),
+                e(TREATMENT_PLANS, "Plan de tratamiento", TREATMENT_PLANS, "concat_ws(' · ', t.title, (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id))"),
+                e(TREATMENT_ITEMS, "Tratamiento del plan", TREATMENT_ITEMS, "concat_ws(' · ', (select pr.name from procedures pr where pr.id = t.procedure_id), concat('pieza ', t.tooth))"),
                 e("tasks", "Tarea", "tasks", "t.title"),
                 e("leads", "Oportunidad (CRM)", "leads", "t.full_name"),
-                e("lab_orders", "Orden de laboratorio", "lab_orders", "concat_ws(' · ', t.work_type, t.description)"),
-                e("laboratories", "Laboratorio", "laboratories", "t.name", "lab_orders"),
+                e(LAB_ORDERS, "Orden de laboratorio", LAB_ORDERS, "concat_ws(' · ', t.work_type, t.description)"),
+                e("laboratories", "Laboratorio", "laboratories", T_NAME, LAB_ORDERS),
                 e("commission_rules", "Regla de comisión", "commission_rules", "concat_ws(' · ', coalesce(t.category, 'General'), t.calc_type, t.value)", "commission_lines"),
-                e("consent_templates", "Plantilla de consentimiento", "consent_templates", "t.name", "consent_requests"),
-                e("anamnesis_templates", "Formulario de anamnesis", "anamnesis_templates", "t.name", "anamnesis_records"),
-                e("campaigns", "Campaña", "campaigns", "t.name"),
-                e("segments", "Segmento", "segments", "t.name"),
-                e("promotions", "Promoción", "promotions", "t.name"),
-                e("inventory_items", "Material de inventario", "inventory_items", "t.name"),
+                e("consent_templates", "Plantilla de consentimiento", "consent_templates", T_NAME, "consent_requests"),
+                e("anamnesis_templates", "Formulario de anamnesis", "anamnesis_templates", T_NAME, "anamnesis_records"),
+                e("campaigns", "Campaña", "campaigns", T_NAME),
+                e("segments", "Segmento", "segments", T_NAME),
+                e("promotions", "Promoción", "promotions", T_NAME),
+                e("inventory_items", "Material de inventario", "inventory_items", T_NAME),
                 e("inventory_purchases", "Compra de inventario", "inventory_purchases", "concat_ws(' · ', t.supplier, t.doc_number, date_format(t.purchase_date, '%d/%m/%Y'))"),
                 e("supply_requests", "Pedido de material", "supply_requests", "coalesce(t.item_text, concat('Pedido ', t.id))"),
                 new Entity("expenses", "Egreso de caja", "expenses", "id", "concat_ws(' · ', t.concept, date_format(t.expense_date, '%d/%m/%Y'), concat('S/ ', t.amount))", Set.of(), this::checkExpense),
@@ -105,20 +116,18 @@ public class DeletionService {
     // ------------------------------------------------------------------ esquema
 
     private void loadSchema() {
-        if (refs != null) return;
+        if (refs.get() != null) return;
         Map<String, List<Ref>> m = new HashMap<>();
         jdbc.query("""
                 select k.referenced_table_name, k.table_name, k.column_name, c.is_nullable
                   from information_schema.key_column_usage k
                   join information_schema.columns c on c.table_schema = k.table_schema and c.table_name = k.table_name and c.column_name = k.column_name
                  where k.table_schema = database() and k.referenced_table_name is not null
-                """, rs -> {
-            m.computeIfAbsent(rs.getString(1), x -> new ArrayList<>())
-                    .add(new Ref(rs.getString(2), rs.getString(3), "YES".equals(rs.getString(4))));
-        });
-        tablesWithId = new HashSet<>(jdbc.queryForList(
-                "select table_name from information_schema.columns where table_schema = database() and column_name = 'id'", String.class));
-        refs = m;
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> m.computeIfAbsent(rs.getString(1), x -> new ArrayList<>())
+                    .add(new Ref(rs.getString(2), rs.getString(3), "YES".equals(rs.getString(4)))));
+        tablesWithId.set(new HashSet<>(jdbc.queryForList(
+                "select table_name from information_schema.columns where table_schema = database() and column_name = 'id'", String.class)));
+        refs.set(m);
     }
 
     // ------------------------------------------------------------------ plan
@@ -161,21 +170,21 @@ public class DeletionService {
         Plan p = new Plan();
         if (x.check() != null) x.check().accept(id, p);
         Keep own = ALWAYS_KEEP.get(x.table());
-        if (own != null && count("select count(*) from " + x.table() + " where " + x.pk() + " = ? and (" + own.where() + ")", id) > 0) {
+        if (own != null && count(SELECT_COUNT_FROM + x.table() + WHERE + x.pk() + " = ? and (" + own.where() + ")", id) > 0) {
             p.block("No se puede: son " + own.why() + ".");
         }
-        walk(x.table(), x.pk(), List.of(id), x.blockedBy(), p, new HashSet<>(), 0);
+        walk(x.table(), List.of(id), x.blockedBy(), p, new HashSet<>(), 0);
         p.deletes.add(new String[]{x.table(), x.pk() + " = ?", String.valueOf(id)});
         return p;
     }
 
-    private void walk(String table, String pk, List<?> ids, Set<String> blockedBy, Plan p, Set<String> seen, int depth) {
+    private void walk(String table, List<?> ids, Set<String> blockedBy, Plan p, Set<String> seen, int depth) {
         if (ids.isEmpty() || depth > 6) return;
-        for (Ref r : refs.getOrDefault(table, List.of())) {
+        for (Ref r : refs.get().getOrDefault(table, List.of())) {
             String key = r.table() + "." + r.column() + ":" + ids;
             if (!seen.add(key)) continue;
             Object[] args = ids.toArray();
-            long n = count("select count(*) from " + r.table() + " where " + r.column() + " in (" + in(ids) + ")", args);
+            long n = count(SELECT_COUNT_FROM + r.table() + WHERE + r.column() + IN + in(ids) + ")", args);
             if (n == 0) continue;
             String name = TableNames.of(r.table());
             if (depth == 0 && blockedBy.contains(r.table())) {
@@ -185,25 +194,25 @@ public class DeletionService {
             Keep keep = ALWAYS_KEEP.get(r.table());
             String extra = "";
             if (keep != null) {
-                long kept = count("select count(*) from " + r.table() + " where " + r.column() + " in (" + in(ids) + ") and (" + keep.where() + ")", args);
+                long kept = count(SELECT_COUNT_FROM + r.table() + WHERE + r.column() + IN + in(ids) + ") and (" + keep.where() + ")", args);
                 if (kept > 0) {
                     p.block(kept + " " + keep.why() + ".");
                     if ("1=1".equals(keep.where())) continue;
                 }
                 extra = " and not (" + keep.where() + ")";
             }
-            String where = r.column() + " in (" + in(ids) + ")" + extra;
+            String where = r.column() + IN + in(ids) + ")" + extra;
             if (r.nullable() && !FORCE_CASCADE.contains(r.table() + "." + r.column())) {
-                long m = count("select count(*) from " + r.table() + " where " + where, args);
+                long m = count(SELECT_COUNT_FROM + r.table() + WHERE + where, args);
                 if (m == 0) continue;
                 p.nulls.add(new String[]{r.table(), r.column(), where, join(ids)});
                 p.unlinked.merge(name, m, Long::sum);
                 continue;
             }
-            if (tablesWithId.contains(r.table())) {
-                List<Long> child = jdbc.queryForList("select id from " + r.table() + " where " + where, Long.class, args);
+            if (tablesWithId.get().contains(r.table())) {
+                List<Long> child = jdbc.queryForList("select id from " + r.table() + WHERE + where, Long.class, args);
                 if (child.isEmpty()) continue;
-                walk(r.table(), "id", child, Set.of(), p, seen, depth + 1);
+                walk(r.table(), child, Set.of(), p, seen, depth + 1);
                 p.deletes.add(new String[]{r.table(), "id in (" + in(child) + ")", join(child)});
                 p.counts.merge(name, (long) child.size(), Long::sum);
             } else {
@@ -317,7 +326,7 @@ public class DeletionService {
         for (String[] d : p.deletes) {
             copy.computeIfAbsent(d[0], k -> new ArrayList<Map<String, Object>>());
             @SuppressWarnings("unchecked") List<Map<String, Object>> rows = (List<Map<String, Object>>) copy.get(d[0]);
-            rows.addAll(jdbc.queryForList("select * from " + d[0] + " where " + d[1], params(d[2])));
+            rows.addAll(jdbc.queryForList("select * from " + d[0] + WHERE + d[1], params(d[2])));
         }
         Map<String, Object> nulled = new LinkedHashMap<>();
         for (String[] n : p.nulls) {
@@ -325,8 +334,8 @@ public class DeletionService {
             jdbc.update("update " + n[0] + " set " + n[1] + " = null where " + n[2], params(n[3]));
         }
         int cancelled = cancelPendingMessages(p, x.table(), id);
-        for (String[] d : p.deletes) jdbc.update("delete from " + d[0] + " where " + d[1], params(d[2]));
-        if (cancelled > 0) events.publishEvent(new pe.clinicacardenas.notification.NotificationService.Queued());
+        for (String[] d : p.deletes) jdbc.update("delete from " + d[0] + WHERE + d[1], params(d[2]));
+        if (cancelled > 0) events.publishEvent(pe.clinicacardenas.notification.NotificationService.Queued.INSTANCE);
 
         String summary = p.counts.isEmpty() ? "Solo el registro" : "Con él: " + p.counts.entrySet().stream()
                 .map(en -> en.getValue() + " " + en.getKey()).reduce((a, b) -> a + ", " + b).orElse("");
@@ -339,7 +348,7 @@ public class DeletionService {
         String reason = c.reason() == null || c.reason().isBlank() ? null : c.reason().trim();
         jdbc.update("insert into deleted_records (entity, entity_id, label, summary, data, reason, deleted_by, deleted_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
                 x.key(), rawId, cut(label, 200), cut(summary, 500), data, reason == null ? null : cut(reason, 300), CurrentUser.usernameOrSystem(), Dates.now());
-        audit.record(x.title().toUpperCase(Locale.ROOT).replace(' ', '_'), "id".equals(x.pk()) ? (Long) id : null, "ELIMINAR",
+        audit.register(x.title().toUpperCase(Locale.ROOT).replace(' ', '_'), "id".equals(x.pk()) ? (Long) id : null, "ELIMINAR",
                 label + " · " + summary + (reason == null ? "" : " · motivo: " + reason));
         return Map.of("ok", true, "label", label, "summary", summary);
     }
@@ -350,11 +359,12 @@ public class DeletionService {
      */
     /** Condición y parámetros de los avisos pendientes de las citas/pacientes que se eliminarían; null si no hay. */
     private Object[] pendingMessages(Plan p, String rootTable, Object rootId) {
-        List<Object> appts = new ArrayList<>(), patients = new ArrayList<>();
+        List<Object> appts = new ArrayList<>();
+        List<Object> patients = new ArrayList<>();
         for (String[] d : p.deletes) {
-            if (d[0].equals("appointments")) appts.addAll(jdbc.queryForList("select id from appointments where " + d[1], Long.class, params(d[2])));
+            if (d[0].equals(APPOINTMENTS)) appts.addAll(jdbc.queryForList("select id from appointments where " + d[1], Long.class, params(d[2])));
         }
-        if ("patients".equals(rootTable)) patients.add(rootId);
+        if (PATIENTS.equals(rootTable)) patients.add(rootId);
         if (appts.isEmpty() && patients.isEmpty()) return null;
         String where = "status in ('PENDIENTE','PROGRAMADO','FALLIDO') and operation <> 'ANULAR' and ("
                 + (appts.isEmpty() ? "1=0" : "appointment_id in (" + in(appts) + ")") + " or "

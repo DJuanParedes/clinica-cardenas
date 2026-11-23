@@ -41,6 +41,8 @@ import java.util.zip.ZipOutputStream;
 @Component
 @ConditionalOnProperty(name = "app.sunat.mode", havingValue = "soap", matchIfMissing = true)
 public class SunatSoapGateway implements SunatGateway {
+    private static final String ERROR_2 = "ERROR";
+
 
     private static final Logger log = LoggerFactory.getLogger(SunatSoapGateway.class);
     private static final String CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
@@ -83,6 +85,9 @@ public class SunatSoapGateway implements SunatGateway {
         HttpResponse<String> res;
         try {
             res = post(body, Duration.ofSeconds(15));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return error(null, "SUNAT no respondió (interrumpido). El comprobante queda pendiente; reintenta el envío.");
         } catch (Exception e) {
             return error(null, "SUNAT no respondió (" + reason(e) + "). El comprobante queda pendiente; reintenta el envío.");
         }
@@ -101,7 +106,7 @@ public class SunatSoapGateway implements SunatGateway {
                 if (st.isPresent()) return st.get();
             }
             int n = Integer.parseInt(code);
-            return new Response(n >= 2000 && n < 4000 ? "RECHAZADO" : "ERROR", code, msg, null, environment);
+            return new Response(n >= 2000 && n < 4000 ? "RECHAZADO" : ERROR_2, code, msg, null, environment);
         }
         return error(null, "SUNAT respondió HTTP " + res.statusCode() + " sin constancia. Reintenta el envío en unos minutos.");
     }
@@ -116,6 +121,9 @@ public class SunatSoapGateway implements SunatGateway {
         HttpResponse<String> res;
         try {
             res = post(body, Duration.ofSeconds(10));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("SUNAT no respondió (interrumpido)");
         } catch (Exception e) {
             throw new IllegalStateException("SUNAT no respondió (" + reason(e) + ")");
         }
@@ -146,6 +154,9 @@ public class SunatSoapGateway implements SunatGateway {
             return Optional.of(json.readValue(res.body(), Map.class));
         } catch (IllegalStateException e) {
             throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("La consulta RUC de SUNAT no respondió (" + reason(e) + ")");
         } catch (Exception e) {
             throw new IllegalStateException("La consulta RUC de SUNAT no respondió (" + reason(e) + ")");
         }
@@ -153,7 +164,7 @@ public class SunatSoapGateway implements SunatGateway {
 
     // ------------------------------------------------------------------ utilidades
 
-    private HttpResponse<String> post(String operation, Duration timeout) throws Exception {
+    private HttpResponse<String> post(String operation, Duration timeout) throws java.io.IOException, InterruptedException {
         String envelope = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
                 + "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ser=\"http://service.sunat.gob.pe\""
                 + " xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\">"
@@ -190,7 +201,7 @@ public class SunatSoapGateway implements SunatGateway {
             if (n == 0) status = notes.isEmpty() ? "ACEPTADO" : "OBSERVADO";
             else if (n >= 4000) status = "OBSERVADO";
             else if (n >= 2000) status = "RECHAZADO";
-            else status = "ERROR";
+            else status = ERROR_2;
             if (!notes.isEmpty()) desc = desc + " · Observaciones: " + String.join("; ", notes);
             return new Response(status, code, desc, cdr, environment);
         } catch (Exception e) {
@@ -200,7 +211,7 @@ public class SunatSoapGateway implements SunatGateway {
 
     private Response error(String code, String msg) {
         log.warn("SUNAT: {}", msg);
-        return new Response("ERROR", code, msg, null, environment);
+        return new Response(ERROR_2, code, msg, null, environment);
     }
 
     String fileName(Invoice inv) {
@@ -219,7 +230,7 @@ public class SunatSoapGateway implements SunatGateway {
         }
     }
 
-    static byte[] unzipFirstXml(byte[] zip) throws Exception {
+    static byte[] unzipFirstXml(byte[] zip) throws java.io.IOException {
         try (ZipInputStream z = new ZipInputStream(new ByteArrayInputStream(zip))) {
             ZipEntry e;
             while ((e = z.getNextEntry()) != null) {

@@ -12,7 +12,9 @@ import java.util.List;
 public final class SimplePdf {
 
     private static final Charset WIN = Charset.forName("windows-1252");
-    private static final float W = 595, H = 842, MARGIN = 56;
+    private static final float W = 595;
+    private static final float H = 842;
+    private static final float MARGIN = 56;
 
     private final List<StringBuilder> pages = new ArrayList<>();
     private final List<byte[]> images = new ArrayList<>();
@@ -141,7 +143,7 @@ public final class SimplePdf {
             for (int i = 0; i < r.length && i < widths.length; i++) {
                 float w = widths[i] * scale;
                 int max = (int) (w / (size * 0.5f)) - 1;
-                String t = r[i] == null ? "" : r[i].length() > max ? r[i].substring(0, Math.max(1, max - 1)) + "…" : r[i];
+                String t = clip(r[i], max);
                 text(t, align[i] == 'R' ? x + w - 4 : x + 4, y, size, false, "0.1 0.1 0.1", align[i] == 'R' ? 'R' : 'L');
                 x += w;
             }
@@ -153,7 +155,8 @@ public final class SimplePdf {
 
     /** v2.8: gráfico de barras verticales simple (una serie). */
     public SimplePdf bars(String[] labels, double[] values, String rgb, String unitPrefix) {
-        float h = 120, top;
+        float h = 120;
+        float top;
         ensure(h + 40);
         top = y - 10;
         double max = 0;
@@ -188,7 +191,9 @@ public final class SimplePdf {
     public SimplePdf text(String t, float x, float yy, float size, boolean bold, String rgb, char align) {
         String s = t == null ? "" : t;
         float w = s.length() * size * (bold ? 0.55f : 0.5f);
-        float xx = align == 'C' ? x - w / 2 : align == 'R' ? x - w : x;
+        float xx = x;
+        if (align == 'C') xx = x - w / 2;
+        else if (align == 'R') xx = x - w;
         textAt(s, xx, yy, size, bold, rgb);
         return this;
     }
@@ -198,7 +203,7 @@ public final class SimplePdf {
         if (fillRgb != null) page.append(fillRgb).append(" rg ");
         if (strokeRgb != null) page.append(strokeRgb).append(" RG ").append(lineWidth).append(" w ");
         page.append(x).append(' ').append(yy).append(' ').append(w).append(' ').append(h).append(" re ")
-                .append(fillRgb != null && strokeRgb != null ? "B" : fillRgb != null ? "f" : "S").append(" Q\n");
+                .append(paintOp(fillRgb, strokeRgb)).append(" Q\n");
         return this;
     }
 
@@ -274,7 +279,8 @@ public final class SimplePdf {
             write(out, "\nendstream\nendobj\n");
         }
         for (int p = 0; p < pages.size(); p++) {
-            int pageObj = firstPage + p * 2, contentObj = pageObj + 1;
+            int pageObj = firstPage + p * 2;
+            int contentObj = pageObj + 1;
             obj(out, offsets, pageObj, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + (int) W + " " + (int) H + "] "
                     + "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << " + xobjects + ">> >> /Contents "
                     + contentObj + " 0 R >>");
@@ -286,7 +292,7 @@ public final class SimplePdf {
         }
         int xref = out.size();
         StringBuilder x = new StringBuilder("xref\n0 " + (total + 1) + "\n0000000000 65535 f \n");
-        for (int off : offsets) x.append(String.format("%010d 00000 n \n", off));
+        for (int off : offsets) x.append(String.format("%010d", off)).append(" 00000 n \n");
         x.append("trailer\n<< /Size ").append(total + 1).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF\n");
         write(out, x.toString());
         return out.toByteArray();
@@ -299,5 +305,15 @@ public final class SimplePdf {
 
     private static void write(ByteArrayOutputStream out, String s) {
         out.writeBytes(s.getBytes(WIN));
+    }
+
+    private static String clip(String s, int max) {
+        if (s == null) return "";
+        return s.length() > max ? s.substring(0, Math.max(1, max - 1)) + "…" : s;
+    }
+
+    private static String paintOp(String fillRgb, String strokeRgb) {
+        if (fillRgb == null) return "S";
+        return strokeRgb != null ? "B" : "f";
     }
 }

@@ -19,6 +19,8 @@ import java.util.*;
 
 @Service
 public class AgendaService {
+    private static final String STARTAT = "startAt";
+
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DMY_HM = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -43,7 +45,8 @@ public class AgendaService {
 
     public AgendaService(AppointmentRepository appointments, DentistRepository dentists,
                          DentistScheduleRepository schedules, PatientRepository patients, AuditService audit,
-                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events) {
+                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.notifications = notifications;
         this.events = events;
         this.appointments = appointments;
@@ -53,8 +56,7 @@ public class AgendaService {
         this.audit = audit;
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public record AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
                                      String reason, String notes, String changeReason, String category) {
@@ -82,7 +84,11 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
-        return slots(dentistId, date, durationMin, excludeId, null);
+        return slotsInternal(dentistId, date, durationMin, excludeId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, null);
     }
 
     /**
@@ -91,6 +97,10 @@ public class AgendaService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, patientId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
         Dentist d = dentists.findById(dentistId).orElseThrow(() -> ApiException.notFound("El odontólogo"));
         checkDuration(durationMin);
         List<SlotCalculator.Busy> busy = new ArrayList<>();
@@ -162,7 +172,7 @@ public class AgendaService {
         Map<String, String> errors = new LinkedHashMap<>();
         if (r.patientId() == null) errors.put("patientId", "Selecciona un paciente.");
         if (r.dentistId() == null) errors.put("dentistId", "Selecciona un odontólogo.");
-        if (r.startAt() == null) errors.put("startAt", "Selecciona fecha y hora.");
+        if (r.startAt() == null) errors.put(STARTAT, "Selecciona fecha y hora.");
         if (r.reason() == null || r.reason().isBlank()) errors.put("reason", "Indica el motivo de la cita.");
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
@@ -180,10 +190,10 @@ public class AgendaService {
         LocalDateTime start = r.startAt().withSecond(0).withNano(0);
         LocalDateTime end = start.plusMinutes(duration);
         if (start.isBefore(Dates.now())) {
-            throw ApiException.field("startAt", "No se pueden programar citas en horas pasadas.");
+            throw ApiException.field(STARTAT, "No se pueden programar citas en horas pasadas.");
         }
         if (start.getMinute() % 15 != 0) {
-            throw ApiException.field("startAt", "La hora de inicio debe ser en bloques de 15 minutos.");
+            throw ApiException.field(STARTAT, "La hora de inicio debe ser en bloques de 15 minutos.");
         }
         List<SlotCalculator.Block> blocks = blocksFor(d.id, start.toLocalDate());
         if (!SlotCalculator.fitsInBlocks(blocks, start.toLocalTime(), end.toLocalTime())) {
@@ -253,7 +263,7 @@ public class AgendaService {
         a.createdAt = Dates.now();
         a.createdBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
+        audit.register("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
                 + " el " + a.startAt.format(DMY_HM));
         notifications.appointmentCreated(a);   // HU-23: recordatorio programado
         events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.CREATED));
@@ -283,7 +293,7 @@ public class AgendaService {
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
+        audit.register("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
                 + " · " + r.changeReason().trim());
         if (!previousStart.equals(a.startAt) || !previousDentist.equals(a.dentist.getFullName())) {
             notifications.appointmentRescheduled(a, previousStart, previousDentist);   // HU-24
@@ -315,7 +325,7 @@ public class AgendaService {
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
+        audit.register("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
                 + (r.reason() == null || r.reason().isBlank() ? "" : " · " + r.reason().trim()));
         if (a.status == AppointmentStatus.CANCELADA) {
             notifications.appointmentCancelled(a, r.reason());   // HU-24
@@ -348,7 +358,7 @@ public class AgendaService {
                     throw ApiException.conflict("CITA_PASADA", "La cita ya pasó: no se puede confirmar.");
                 }
             }
-            default -> { }
+            default -> { /* los demás casos no requieren acción */ }
         }
     }
 

@@ -24,6 +24,11 @@ import java.util.*;
  */
 @Component
 public class LanguageModel {
+    private static final String CLAUDE = "claude";
+    private static final String CONTENT = "content";
+    private static final String LOCAL = "local";
+    private static final String OPENAI = "openai";
+
 
     private static final Logger log = LoggerFactory.getLogger(LanguageModel.class);
 
@@ -45,23 +50,25 @@ public class LanguageModel {
                          @Value("${app.assistant.timeout-ms:6000}") int timeoutMs) {
         this.json = json;
         String p = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
-        if (p.isEmpty()) p = !anthropicKey.isBlank() ? "claude" : !url.isBlank() ? "openai" : "local";
+        if (p.isEmpty() && !anthropicKey.isBlank()) p = CLAUDE;
+        else if (p.isEmpty()) p = url.isBlank() ? LOCAL : OPENAI;
         this.provider = p;
-        this.apiKey = "claude".equals(p) ? (anthropicKey.isBlank() ? apiKey : anthropicKey) : apiKey;
-        this.model = !model.isBlank() ? model.trim() : "claude".equals(p) ? "claude-haiku-5-5" : "openai".equals(p) ? "llama3.2" : "local";
-        this.url = url.isBlank() ? ("claude".equals(p) ? "https://api.anthropic.com/v1/messages" : "") : url.trim().replaceAll("/+$", "");
+        this.apiKey = CLAUDE.equals(p) && !anthropicKey.isBlank() ? anthropicKey : apiKey;
+        this.model = model.isBlank() ? defaultModel(p) : model.trim();
+        String claudeUrl = CLAUDE.equals(p) ? "https://api.anthropic.com/v1/messages" : "";
+        this.url = url.isBlank() ? claudeUrl : stripTrailingSlashes(url.trim());
         this.timeoutMs = timeoutMs;
     }
 
     public boolean enabled() {
-        return ("claude".equals(provider) && !apiKey.isBlank()) || ("openai".equals(provider) && !url.isBlank());
+        return (CLAUDE.equals(provider) && !apiKey.isBlank()) || (OPENAI.equals(provider) && !url.isBlank());
     }
 
-    public String engineName() { return enabled() ? provider + ":" + model : "local"; }
+    public String engineName() { return enabled() ? provider + ":" + model : LOCAL; }
 
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("proveedor", enabled() ? provider : "local");
+        m.put("proveedor", enabled() ? provider : LOCAL);
         m.put("modelo", enabled() ? model : "Modelo local de intenciones + búsqueda BM25");
         m.put("externo", enabled());
         m.put("ultimoError", lastError);
@@ -72,9 +79,13 @@ public class LanguageModel {
     public String complete(String system, List<Map<String, String>> messages) {
         if (!enabled()) return null;
         try {
-            String text = "claude".equals(provider) ? claude(system, messages) : openai(system, messages);
+            String text = CLAUDE.equals(provider) ? claude(system, messages) : openai(system, messages);
             lastError = null;
             return text == null || text.isBlank() ? null : text.trim();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            lastError = "Interrumpido";
+            return null;
         } catch (Exception e) {
             lastError = e.getClass().getSimpleName() + ": " + e.getMessage();
             log.warn("Asistente: el modelo {} no respondió ({}); se usa la respuesta local", engineName(), lastError);
@@ -82,7 +93,7 @@ public class LanguageModel {
         }
     }
 
-    private String claude(String system, List<Map<String, String>> messages) throws Exception {
+    private String claude(String system, List<Map<String, String>> messages) throws java.io.IOException, InterruptedException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("max_tokens", 450);
@@ -96,15 +107,15 @@ public class LanguageModel {
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
         HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() / 100 != 2) throw new IllegalStateException("HTTP " + res.statusCode() + " " + res.body().substring(0, Math.min(200, res.body().length())));
-        JsonNode content = json.readTree(res.body()).path("content");
+        JsonNode content = json.readTree(res.body()).path(CONTENT);
         StringBuilder sb = new StringBuilder();
         for (JsonNode c : content) if ("text".equals(c.path("type").asText())) sb.append(c.path("text").asText());
         return sb.toString();
     }
 
-    private String openai(String system, List<Map<String, String>> messages) throws Exception {
+    private String openai(String system, List<Map<String, String>> messages) throws java.io.IOException, InterruptedException {
         List<Map<String, String>> all = new ArrayList<>();
-        all.add(Map.of("role", "system", "content", system));
+        all.add(Map.of("role", "system", CONTENT, system));
         all.addAll(messages);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
@@ -118,6 +129,17 @@ public class LanguageModel {
         if (!apiKey.isBlank()) b.header("Authorization", "Bearer " + apiKey);
         HttpResponse<String> res = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() / 100 != 2) throw new IllegalStateException("HTTP " + res.statusCode() + " " + res.body().substring(0, Math.min(200, res.body().length())));
-        return json.readTree(res.body()).path("choices").path(0).path("message").path("content").asText();
+        return json.readTree(res.body()).path("choices").path(0).path("message").path(CONTENT).asText();
+    }
+
+    private static String defaultModel(String provider) {
+        if (CLAUDE.equals(provider)) return "claude-haiku-5-5";
+        return OPENAI.equals(provider) ? "llama3.2" : LOCAL;
+    }
+
+    private static String stripTrailingSlashes(String u) {
+        int end = u.length();
+        while (end > 0 && u.charAt(end - 1) == '/') end--;
+        return u.substring(0, end);
     }
 }

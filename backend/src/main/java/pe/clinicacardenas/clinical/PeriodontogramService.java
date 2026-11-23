@@ -96,7 +96,7 @@ public class PeriodontogramService {
                       teeth_present, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?)""",
                     patientId, date, dentist, payload, ix.plaque, ix.bleeding, ix.meanDepth, ix.deepSites, ix.teeth, notes, Dates.now(), user);
             id = jdbc.queryForObject("select max(id) from periodontograms where patient_id = ?", Long.class, patientId);
-            audit.record("HISTORIA", patientId, "PERIODONTOGRAMA", "Examen del " + date + " · IP " + ix.plaque + "% · SAS " + ix.bleeding + "%");
+            audit.register("HISTORIA", patientId, "PERIODONTOGRAMA", "Examen del " + date + " · IP " + ix.plaque + "% · SAS " + ix.bleeding + "%");
         } else {
             List<Map<String, Object>> old = jdbc.queryForList("select created_at from periodontograms where id = ? and patient_id = ?", id, patientId);
             if (old.isEmpty()) throw ApiException.notFound("El periodontograma");
@@ -107,7 +107,7 @@ public class PeriodontogramService {
                     update periodontograms set exam_date=?, data=?, plaque_index=?, bleeding_index=?, mean_depth=?, deep_sites=?, teeth_present=?,
                       notes=?, updated_at=? where id=?""",
                     date, payload, ix.plaque, ix.bleeding, ix.meanDepth, ix.deepSites, ix.teeth, notes, Dates.now(), id);
-            audit.record("HISTORIA", patientId, "PERIODONTOGRAMA", "Corrigió el examen del " + date);
+            audit.register("HISTORIA", patientId, "PERIODONTOGRAMA", "Corrigió el examen del " + date);
         }
         return get(patientId, id);
     }
@@ -155,7 +155,12 @@ public class PeriodontogramService {
     record Indices(int teeth, int sites, BigDecimal plaque, BigDecimal bleeding, BigDecimal meanDepth, int deepSites) {}
 
     static Indices indices(Map<String, Tooth> data) {
-        int teeth = 0, sites = 0, plaque = 0, bleed = 0, deep = 0, depthSum = 0;
+        int teeth = 0;
+        int sites = 0;
+        int plaque = 0;
+        int bleed = 0;
+        int deep = 0;
+        int depthSum = 0;
         for (Tooth t : data.values()) {
             if (t.missing) continue;
             teeth++;

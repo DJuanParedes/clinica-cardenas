@@ -17,6 +17,12 @@ import java.util.*;
 /** v2.6: reglas de automatización (cuándo se envía cada aviso) editables por la clínica. */
 @Service
 public class AutomationService {
+    private static final String ANTES = "ANTES";
+    private static final String DESPUES = "DESPUES";
+    private static final String HORAS = "HORAS";
+    private static final String AMOUNT = "amount";
+    private static final String SENDTIME = "sendTime";
+
 
     private final JdbcTemplate jdbc;
     private final AuditService audit;
@@ -43,9 +49,9 @@ public class AutomationService {
             m.put("code", r.code());
             m.put("name", r.name());
             m.put("kind", r.kind());
-            m.put("amount", r.amount());
+            m.put(AMOUNT, r.amount());
             m.put("unit", r.unit());
-            m.put("sendTime", r.sendTime() == null ? null : r.sendTime().toString());
+            m.put(SENDTIME, r.sendTime() == null ? null : r.sendTime().toString());
             m.put("templateCode", r.templateCode());
             m.put("active", r.active());
             m.put("summary", summary(r));
@@ -62,24 +68,24 @@ public class AutomationService {
         Map<String, String> e = new LinkedHashMap<>();
         int amount = r.amount() == null ? old.amount() : r.amount();
         String unit = r.unit() == null ? old.unit() : r.unit().trim().toUpperCase();
-        if (!Set.of("HORAS", "DIAS").contains(unit)) e.put("unit", "Elige horas o días.");
-        if ("ANTES".equals(old.kind()) && "HORAS".equals(unit) && (amount < 2 || amount > 72)) e.put("amount", "Entre 2 y 72 horas antes.");
-        if ("ANTES".equals(old.kind()) && "DIAS".equals(unit) && (amount < 1 || amount > 15)) e.put("amount", "Entre 1 y 15 días antes.");
-        if ("DESPUES".equals(old.kind()) && "HORAS".equals(unit) && (amount < 0 || amount > 72)) e.put("amount", "Entre 0 y 72 horas después.");
-        if ("DESPUES".equals(old.kind()) && "DIAS".equals(unit) && (amount < 1 || amount > 30)) e.put("amount", "Entre 1 y 30 días después.");
+        if (!Set.of(HORAS, "DIAS").contains(unit)) e.put("unit", "Elige horas o días.");
+        if (ANTES.equals(old.kind()) && HORAS.equals(unit) && (amount < 2 || amount > 72)) e.put(AMOUNT, "Entre 2 y 72 horas antes.");
+        if (ANTES.equals(old.kind()) && "DIAS".equals(unit) && (amount < 1 || amount > 15)) e.put(AMOUNT, "Entre 1 y 15 días antes.");
+        if (DESPUES.equals(old.kind()) && HORAS.equals(unit) && (amount < 0 || amount > 72)) e.put(AMOUNT, "Entre 0 y 72 horas después.");
+        if (DESPUES.equals(old.kind()) && "DIAS".equals(unit) && (amount < 1 || amount > 30)) e.put(AMOUNT, "Entre 1 y 30 días después.");
         LocalTime time = old.sendTime();
         if (r.sendTime() != null && !r.sendTime().isBlank()) {
             try { time = LocalTime.parse(r.sendTime().length() == 5 ? r.sendTime() + ":00" : r.sendTime()); }
-            catch (Exception ex) { e.put("sendTime", "Hora no válida."); }
-            if (time != null && (time.isBefore(LocalTime.of(7, 0)) || time.isAfter(LocalTime.of(21, 0)))) e.put("sendTime", "Envía entre las 07:00 y las 21:00 para no molestar al paciente.");
+            catch (Exception ex) { e.put(SENDTIME, "Hora no válida."); }
+            if (time != null && (time.isBefore(LocalTime.of(7, 0)) || time.isAfter(LocalTime.of(21, 0)))) e.put(SENDTIME, "Envía entre las 07:00 y las 21:00 para no molestar al paciente.");
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la automatización.", e);
         boolean active = r.active() == null ? old.active() : r.active();
         jdbc.update("update automation_rules set active=?, amount=?, unit=?, send_time=?, updated_at=?, updated_by=? where code=?",
-                active, "DIA".equals(old.kind()) ? 0 : amount, "DIA".equals(old.kind()) ? "HORAS" : unit, time, Dates.now(), CurrentUser.usernameOrSystem(), code);
+                active, "DIA".equals(old.kind()) ? 0 : amount, "DIA".equals(old.kind()) ? HORAS : unit, time, Dates.now(), CurrentUser.usernameOrSystem(), code);
         AutomationRule now = rules().stream().filter(x -> x.code().equals(code)).findFirst().orElseThrow();
-        audit.record("AUTOMATIZACION", null, "EDITAR", now.name() + ": " + (active ? summary(now) : "desactivada"));
-        int moved = "DESPUES".equals(now.kind()) ? 0 : notifications.rescheduleFuture();
+        audit.register("AUTOMATIZACION", null, "EDITAR", now.name() + ": " + (active ? summary(now) : "desactivada"));
+        int moved = DESPUES.equals(now.kind()) ? 0 : notifications.rescheduleFuture();
         Map<String, Object> m = new LinkedHashMap<>(view().stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow());
         m.put("rescheduled", moved);
         return m;
@@ -87,12 +93,13 @@ public class AutomationService {
 
     static String summary(AutomationRule r) {
         String t = r.sendTime() == null ? "" : " a las " + r.sendTime().toString().substring(0, 5);
+        String days = r.amount() + (r.amount() == 1 ? " día" : " días");
+        String hoursAfter = r.amount() == 0 ? "de inmediato" : r.amount() + " horas después";
         return switch (r.kind()) {
-            case "ANTES" -> "DIAS".equals(r.unit()) ? r.amount() + (r.amount() == 1 ? " día" : " días") + " antes" + t
+            case ANTES -> "DIAS".equals(r.unit()) ? days + " antes" + t
                     : r.amount() + " horas antes (si la cita es antes, 2 horas antes)";
             case "DIA" -> "El día de la cita" + t;
-            case "DESPUES" -> "Al quedar atendida, " + ("DIAS".equals(r.unit()) ? r.amount() + (r.amount() == 1 ? " día" : " días") + " después" + t
-                    : r.amount() == 0 ? "de inmediato" : r.amount() + " horas después");
+            case DESPUES -> "Al quedar atendida, " + ("DIAS".equals(r.unit()) ? days + " después" + t : hoursAfter);
             default -> r.kind();
         };
     }

@@ -8,7 +8,8 @@ public final class PasswordPolicy {
     /** Mínimo 8 caracteres, con al menos una letra y un número. */
     public static boolean isValid(String pwd) {
         if (pwd == null || pwd.length() < 8 || pwd.length() > 72) return false;
-        boolean letter = false, digit = false;
+        boolean letter = false;
+        boolean digit = false;
         for (char c : pwd.toCharArray()) {
             if (Character.isLetter(c)) letter = true;
             if (Character.isDigit(c)) digit = true;

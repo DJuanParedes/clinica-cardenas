@@ -27,6 +27,10 @@ import java.util.*;
  */
 @Service
 public class InventoryPurchaseService {
+    private static final String FILA = "Fila ";
+    private static final String DOCNUMBER = "docNumber";
+    private static final String LINES = "lines";
+
 
     public static final List<String> DOC_TYPES = List.of("FACTURA", "BOLETA", "GUIA", "SIN_COMPROBANTE");
 
@@ -60,28 +64,28 @@ public class InventoryPurchaseService {
         if (!DOC_TYPES.contains(docType)) e.put("docType", "Selecciona el comprobante del proveedor.");
         String docNumber = r.docNumber() == null ? null : r.docNumber().trim().toUpperCase();
         if (("FACTURA".equals(docType) || "BOLETA".equals(docType)) && (docNumber == null || !docNumber.matches("[A-Z0-9]{1,4}-\\d{1,8}"))) {
-            e.put("docNumber", "Escribe la serie y número, por ejemplo F001-00012345.");
+            e.put(DOCNUMBER, "Escribe la serie y número, por ejemplo F001-00012345.");
         }
         boolean paid = r.paid() == null || r.paid();
         String method = r.method() == null ? null : r.method().trim().toUpperCase();
         if (paid && (method == null || !CashService.METHODS.contains(method))) e.put("method", "Selecciona cómo se pagó.");
         if (!paid && (r.dueDate() == null || r.dueDate().isBefore(date))) e.put("dueDate", "Indica hasta cuándo hay que pagarle al proveedor.");
-        if (r.lines() == null || r.lines().isEmpty()) e.put("lines", "Agrega al menos un producto.");
+        if (r.lines() == null || r.lines().isEmpty()) e.put(LINES, "Agrega al menos un producto.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos de la compra.", e);
 
         BigDecimal total = BigDecimal.ZERO;
         for (int k = 0; k < r.lines().size(); k++) {
             Line l = r.lines().get(k);
-            if (l.itemId() == null) throw ApiException.field("lines", "Fila " + (k + 1) + ": elige el producto.");
-            if (l.quantity() == null || l.quantity().signum() <= 0) throw ApiException.field("lines", "Fila " + (k + 1) + ": cantidad mayor a cero.");
-            if (l.unitCost() == null || l.unitCost().signum() < 0) throw ApiException.field("lines", "Fila " + (k + 1) + ": ingresa el costo unitario.");
-            if (l.expiresOn() != null && !l.expiresOn().isAfter(date)) throw ApiException.field("lines", "Fila " + (k + 1) + ": el lote ya está vencido; no lo recibas.");
+            if (l.itemId() == null) throw ApiException.field(LINES, FILA + (k + 1) + ": elige el producto.");
+            if (l.quantity() == null || l.quantity().signum() <= 0) throw ApiException.field(LINES, FILA + (k + 1) + ": cantidad mayor a cero.");
+            if (l.unitCost() == null || l.unitCost().signum() < 0) throw ApiException.field(LINES, FILA + (k + 1) + ": ingresa el costo unitario.");
+            if (l.expiresOn() != null && !l.expiresOn().isAfter(date)) throw ApiException.field(LINES, FILA + (k + 1) + ": el lote ya está vencido; no lo recibas.");
             total = total.add(l.quantity().multiply(l.unitCost()));
         }
         total = total.setScale(2, RoundingMode.HALF_UP);
         if (docNumber != null && Boolean.TRUE.equals(jdbc.queryForObject(
                 "select count(*) > 0 from inventory_purchases where supplier = ? and doc_number = ? and status <> 'ANULADA'", Boolean.class, supplier, docNumber))) {
-            throw ApiException.field("docNumber", "Esa factura/boleta de ese proveedor ya fue registrada.");
+            throw ApiException.field(DOCNUMBER, "Esa factura/boleta de ese proveedor ya fue registrada.");
         }
 
         final BigDecimal fTotal = total;
@@ -105,7 +109,7 @@ public class InventoryPurchaseService {
             ps.setString(11, CurrentUser.usernameOrSystem());
             return ps;
         }, kh);
-        long id = kh.getKey().longValue();
+        long id = java.util.Objects.requireNonNull(kh.getKey()).longValue();
 
         for (Line l : r.lines()) {
             InventoryItem i = items.lockById(l.itemId()).orElseThrow(() -> ApiException.notFound("El material"));
@@ -116,8 +120,8 @@ public class InventoryPurchaseService {
             items.save(i);
         }
         if (paid) createExpense(id, date, supplier, docType, docNumber, total, method);
-        audit.record("COMPRA", id, "REGISTRAR", supplier + " · S/ " + total.toPlainString() + (paid ? "" : " · al crédito"));
-        return get(id);
+        audit.register("COMPRA", id, "REGISTRAR", supplier + " · S/ " + total.toPlainString() + (paid ? "" : " · al crédito"));
+        return getInternal(id);
     }
 
     private void createExpense(long purchaseId, LocalDate date, String supplier, String docType, String docNumber, BigDecimal total, String method) {
@@ -134,25 +138,29 @@ public class InventoryPurchaseService {
     /** Paga una compra al crédito: recién ahí sale el dinero de caja. */
     @Transactional
     public Map<String, Object> pay(Long id, PayRequest r) {
-        Map<String, Object> p = get(id);
+        Map<String, Object> p = getInternal(id);
         if (!"POR_PAGAR".equals(p.get("status"))) throw ApiException.conflict("COMPRA_NO_PENDIENTE", "Esta compra no está pendiente de pago.");
         String method = r.method() == null ? null : r.method().trim().toUpperCase();
         if (method == null || !CashService.METHODS.contains(method)) throw ApiException.field("method", "Selecciona cómo se pagó.");
         createExpense(id, r.paidOn() == null ? Dates.today() : r.paidOn(), (String) p.get("supplier"), (String) p.get("docType"),
-                (String) p.get("docNumber"), (BigDecimal) p.get("total"), method);
-        audit.record("COMPRA", id, "PAGAR", "S/ " + p.get("total"));
-        return get(id);
+                (String) p.get(DOCNUMBER), (BigDecimal) p.get("total"), method);
+        audit.register("COMPRA", id, "PAGAR", "S/ " + p.get("total"));
+        return getInternal(id);
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> get(Long id) {
+        return getInternal(id);
+    }
+
+    private Map<String, Object> getInternal(Long id) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select id, purchase_date as purchaseDate, supplier, doc_type as docType, doc_number as docNumber, total, method,
                        expense_id as expenseId, notes, status, due_date as dueDate, created_at as createdAt, created_by as createdBy
                   from inventory_purchases where id = ?""", id);
         if (rows.isEmpty()) throw ApiException.notFound("La compra");
         Map<String, Object> m = rows.get(0);
-        m.put("lines", jdbc.queryForList("""
+        m.put(LINES, jdbc.queryForList("""
                 select l.id, i.name as item, i.unit, l.lot_code as lotCode, l.expires_on as expiresOn, l.quantity, l.remaining, l.unit_cost as unitCost
                   from inventory_lots l join inventory_items i on i.id = l.item_id where l.purchase_id = ? order by l.id""", id));
         return m;
