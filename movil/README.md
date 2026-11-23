@@ -1,56 +1,71 @@
-# App móvil de pacientes · Kotlin Multiplatform + Compose Multiplatform
+# App móvil · Kotlin Multiplatform + Compose Multiplatform (versión 2.5.0)
 
-App para los pacientes de la Clínica Dental Cárdenas. Un solo código en Kotlin genera la app de **Android** y la de **iOS**. La app consume el API REST del portal del paciente (`/api/portal`) del backend Spring Boot.
+App de la Clínica Dental Cárdenas para **pacientes** y **personal**. Un solo módulo compartido en Kotlin genera la app de **Android** y la de **iOS**. Consume el servicio REST en `/api/v1`.
 
-## Qué hace
+Documentación del proyecto final:
 
-| Función | Historia | Detalle |
-|---|---|---|
-| Ingreso con DNI/CE/Pasaporte y contraseña | Portal del paciente | Token Bearer guardado en SQLite |
-| Primera vez: código + crear contraseña | Portal del paciente | Valida fecha de nacimiento; el código llega por WhatsApp o correo |
-| Próxima cita, próximas y historial | HU-16 | Con colores por odontólogo y estado |
-| Confirmar asistencia | HU-21 | `POST /appointments/{id}/confirm` |
-| Recordatorios en el teléfono 24 h y 2 h antes | HU-22 | AlarmManager + notificación (Android) / UNUserNotificationCenter (iOS) |
-| Elegir canal de avisos (WhatsApp / correo / ambos) | HU-23 | `PATCH /me/notifications` |
-| Estado de cuenta: saldo, cargos y pagos | Caja | `GET /account` |
-| Agregar cita al calendario, WhatsApp, llamar, cómo llegar | Extras nativos | Intents de Android / URLs en iOS |
-| Funciona sin conexión | Persistencia | Muestra las citas guardadas en SQLDelight |
+- [`docs/arquitectura.md`](docs/arquitectura.md): capas, offline-first, seguridad del token y capacidad nativa.
+- [`docs/pruebas-dispositivos.md`](docs/pruebas-dispositivos.md): recorrido de 8 pasos y matriz de dispositivos.
+- [`../docs/c4/`](../docs/c4/): diagramas C4 (contexto, contenedores, componentes y sincronización).
+- [`../docs/contrato-api.md`](../docs/contrato-api.md): las 347 rutas del servicio.
 
-Lo que **no** está en la app, a propósito: agendar citas y pagar en línea. En la clínica las citas las asigna recepción y los pagos se cobran en caja con comprobante SUNAT.
+## Qué hace (modo paciente)
 
-## Arquitectura (lo del curso)
+| Función | Cómo |
+|---|---|
+| Ingreso con documento y contraseña; primera vez con código | `POST /api/v1/portal/auth/login` · token en Keystore / Keychain |
+| Próxima cita, próximas e historial | Lee **solo** de la base local (SQLDelight, `Flow`) |
+| Confirmar asistencia, también sin conexión | Escritura local + cola `operacion_pendiente` |
+| Reservar una cita, también sin conexión | Id provisional negativo + `Idempotency-Key` |
+| Cambiar horario y cancelar | Solo en línea (la clínica valida el horario) |
+| Recordatorios 24 h y 2 h antes | AlarmManager / UNUserNotificationCenter, permiso en 3 estados |
+| Cuenta, documentos, avisos y perfil | Servicio REST con validación del servidor |
 
-- **U1 · KMP y Compose:** `commonMain` contiene toda la interfaz (Material 3), el tema con los colores de la marca y el logo vectorial.
-- **U2 · REST, CRUD y persistencia:** Ktor Client + kotlinx.serialization para el API. SQLDelight guarda en SQLite la sesión, el servidor y la caché de citas. Koin hace la inyección de dependencias.
-- **MVVM:** cada pantalla tiene su `ViewModel` con `StateFlow`. `ClinicRepository` junta el API, la base local y las funciones del teléfono.
-- **Código por plataforma:** la interfaz `PlatformActions` tiene una implementación para Android y otra para iOS.
+El **modo personal** (agenda, ficha, fotos con la cámara, desbloqueo con huella) trabaja en línea.
+
+## Arquitectura
 
 ```
-composeApp/src/
-├─ commonMain/   App.kt, di/, data/(remote, local, repository), ui/(login, home, account, profile, theme, components), sqldelight/
-├─ androidMain/  MainActivity, ClinicaApp (Koin), AndroidPlatformActions, ReminderReceiver, recursos e íconos
-└─ iosMain/      MainViewController, IosPlatformActions, NativeDriverFactory
-iosApp/          Proyecto de Xcode (SwiftUI que muestra la UI de Compose)
+composeApp/src/commonMain/kotlin/pe/clinicacardenas/pacientes/
+├── domain/   modelo, DomainError (sealed), interfaces de repositorio, casos de uso  ← Kotlin puro
+├── data/     local (SQLDelight), remote (Ktor + ErrorMapper), platform, repository
+├── di/       Modules.kt (Koin)
+└── ui/       pantalla + ViewModel (StateFlow) por carpeta
+androidMain/  MainActivity, AndroidTokenStorage (Keystore AES-GCM), AndroidPlatformActions, ReminderReceiver
+iosMain/      MainViewController, IosTokenStorage (Keychain), IosPlatformActions
+commonTest/   ErrorMapperTest, OfflineSyncTest, ApiContractTest, ReminderSchedulerTest
+androidUnitTest/ LocalDataTest (SQLite real en memoria)
 ```
 
-## Compilar
+Sincronización (`SyncAppointmentsUseCase`): **sube primero y baja después**; máximo 5 intentos con espera 30 s · 2^(n-1); la falta de red no gasta intentos; un rechazo del servicio (400/409) queda como operación **fallida y visible** con Reintentar / Descartar.
 
-**Android Studio:** File → Open → carpeta `movil`. Espera el Gradle Sync y ejecuta `composeApp` en un emulador o celular.
+## Compilar y probar
 
-**Sin Android Studio:** en la raíz del repo, doble clic en `construir-apk.bat` (usa Docker). El APK queda en `apk\ClinicaCardenas.apk`.
+Requisitos: JDK 17+, Android SDK 35 (o Android Studio). En la carpeta `movil`:
 
-**iOS:** necesita una Mac con Xcode 15 o superior. Apple no permite compilar apps de iOS en Windows.
 ```bash
-cd movil/iosApp
-brew install xcodegen && xcodegen   # genera iosApp.xcodeproj
-open iosApp.xcodeproj               # Run en el simulador de iPhone
+./gradlew :composeApp:assembleDebug            # APK de desarrollo
+./gradlew :composeApp:testDebugUnitTest        # 27 pruebas (commonTest + JVM)
+./gradlew :composeApp:koverXmlReportDebug      # cobertura (Kover)
+./gradlew :composeApp:iosSimulatorArm64Test    # pruebas en el simulador (solo en macOS)
 ```
 
-## Conectarse al servidor
+## Build firmado de Android
 
-En la pantalla de ingreso toca **Servidor**:
-- **Emulador de Android:** `10.0.2.2:9081` (ya viene por defecto).
-- **Celular real:** la IP de la PC en el mismo Wi-Fi, por ejemplo `192.168.1.20:9081`. Si no conecta, permite el puerto 9081 en el Firewall de Windows.
-- **Simulador de iOS:** `localhost:9081`.
+El almacén de firma **no está en el repositorio** (`*.jks` está en `.gitignore`). Con el archivo y su contraseña:
 
-Paciente de prueba: DNI **45872196**, contraseña **Paciente2026**.
+```bash
+./gradlew :composeApp:assembleRelease :composeApp:bundleRelease
+apksigner sign --ks clinica-cardenas-release.jks --ks-key-alias clinica-release \
+  --out ClinicaCardenas-2.5.0-release.apk composeApp/build/outputs/apk/release/composeApp-release-unsigned.apk
+jarsigner -keystore clinica-cardenas-release.jks composeApp/build/outputs/bundle/release/composeApp-release.aab clinica-release
+apksigner verify --print-certs ClinicaCardenas-2.5.0-release.apk
+```
+
+Huella SHA-256 del certificado: `3A:95:C5:EE:B0:C0:48:BE:82:90:88:B2:FA:08:63:1E:AF:83:44:6D:40:5A:D5:E2:18:83:E7:0B:5F:96:30:4D`.
+
+**Instalar:** desinstalar antes las versiones anteriores (estaban firmadas con la clave de depuración), copiar el APK al teléfono y permitir "Instalar apps desconocidas".
+
+## iOS
+
+Requiere macOS con Xcode 15+: `cd iosApp && xcodegen && open iosApp.xcodeproj`, elegir el equipo en *Signing & Capabilities* y ejecutar en el iPhone. El CI compila el framework de iOS y corre las pruebas en el simulador en cada cambio.
