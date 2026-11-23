@@ -284,6 +284,10 @@ async function revisionE2E(BASE) {
     }
   });
 
+  // Limpieza (v2.11.2): la cuenta y el rol de prueba no se quedan en la base.
+  if (newUser && newUser.id) await api('POST', `/api/admin/records/users/${newUser.id}/delete`, { confirm: 'ELIMINAR', reason: 'Limpieza de prueba automática' }, admin);
+  if (roleCode) await api('DELETE', `/api/permissions/roles/${roleCode}?reassignTo=RECEPCION`, undefined, admin);
+
   const passed = results.filter((r) => r.ok).length;
   return { passed, failed: results.length - passed, total: results.length, results };
 }

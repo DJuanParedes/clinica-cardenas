@@ -118,6 +118,9 @@ Versión 2.11.0 (migración V26): control total del administrador.
   descarga JSON). En la web: `app-delete-button` (solo visible con el permiso) y un diálogo único en la raíz.
   Los borrados que ya existían (archivos, notas, signos vitales, preguntas del asistente, segmentos) también exigen
   `ELIMINAR_REGISTROS`. Prueba: `pruebas/version-2-11-e2e.js`.
+- 2.11.2: al eliminar citas o pacientes se anulan sus avisos pendientes (y se pide anular el recordatorio al
+  microservicio); `FORCE_CASCADE` borra (en vez de dejar en blanco) las reglas de comisión y promociones del
+  procedimiento eliminado, los parentescos y las tareas del paciente. Prueba: `pruebas/casos-limite-e2e.js`.
 
 
 Versión 2.10.1 (migración V25): cuadre y cierre de caja (`CashClosingService`, `/caja/cierre`, permisos `CAJA_CIERRE`
