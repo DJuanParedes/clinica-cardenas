@@ -67,6 +67,16 @@ jobs:
       - name: Compilar APK de prueba
         working-directory: movil
         run: gradle --no-daemon --console=plain :composeApp:assembleDebug
+      - name: Build de entrega sin firmar (APK y AAB release; se firman fuera de CI con el almacén del equipo)
+        working-directory: movil
+        run: gradle --no-daemon --console=plain :composeApp:assembleRelease :composeApp:bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-sin-firmar
+          path: |
+            movil/composeApp/build/outputs/apk/release/*.apk
+            movil/composeApp/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
       - name: Pruebas del código común y cobertura (Kover)
         working-directory: movil
         run: gradle --no-daemon --console=plain :composeApp:testDebugUnitTest :composeApp:koverXmlReportDebug
