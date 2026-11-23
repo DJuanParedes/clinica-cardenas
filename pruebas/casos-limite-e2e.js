@@ -138,6 +138,37 @@ async function casosLimite(BASE) {
     expect((await j('GET', '/api/admin/records/patients/abc/preview', null, ad)).s === 404, 'id inválido');
   });
 
+  await check('App: /api/v1 y reserva con Idempotency-Key — el reintento no duplica la cita', async () => {
+    const p = await newPatient('Idempotencia');
+    const c = await j('POST', '/api/v1/portal/auth/code', { docType: 'DNI', docNumber: p.docNumber, birthDate: '1991-02-03' });
+    expect(c.s === 200 && c.b.demoCode, 'código ' + c.s + ' ' + JSON.stringify(c.b).slice(0, 120));
+    const act = await j('POST', '/api/v1/portal/auth/activate', { docType: 'DNI', docNumber: p.docNumber, code: c.b.demoCode, password: 'MiClave2026', dataConsent: true });
+    const pt = act.b.token;
+    expect(pt, 'activar ' + act.s);
+    const opt = (await j('GET', '/api/v1/portal/booking/options', null, pt)).b;
+    const reason = (opt.reasons || [])[0]?.code || 'EVALUACION';
+    let slot = null, dId = null;
+    for (const d of opt.dentists || []) {
+      for (let k = 3; k < 20 && !slot; k++) {
+        const day = iso(new Date(Date.now() + k * 864e5));
+        const sl = (await j('GET', `/api/v1/portal/booking/slots?dentistId=${d.id}&date=${day}&reasonCode=${reason}`, null, pt)).b;
+        slot = (sl.slots || [])[0] || null; dId = d.id;
+      }
+      if (slot) break;
+    }
+    expect(slot, 'sin horario libre');
+    const key = 'prueba-' + Date.now();
+    const send = () => fetch(BASE + '/api/v1/portal/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + pt, 'Idempotency-Key': key },
+      body: JSON.stringify({ dentistId: dId, startAt: slot, reasonCode: reason }) }).then(async (r) => ({ s: r.status, b: await r.json() }));
+    const r1 = await send(), r2 = await send();
+    expect(r1.s === 201 && r2.s === 201 && r1.b.id === r2.b.id, `reintento ${r1.s}/${r2.s} ids ${r1.b.id}/${r2.b.id}`);
+    const mine = (await j('GET', '/api/v1/portal/appointments', null, pt)).b;
+    const same = (mine.upcoming || []).filter((x) => x.startAt.slice(0, 16) === slot.slice(0, 16));
+    expect(same.length === 1, 'hay ' + same.length + ' citas en ese horario');
+    await del('patients', p.id);
+    return 'cita ' + r1.b.id;
+  });
+
   const passed = results.filter((r) => r.ok).length;
   return { passed, failed: results.length - passed, total: results.length, results };
 }
