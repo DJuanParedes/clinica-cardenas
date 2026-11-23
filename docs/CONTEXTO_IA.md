@@ -12,7 +12,7 @@ publicado en internet:
 - **Web del personal:** recepción, odontólogos, caja, director y administrador (27 historias de usuario + mejoras).
 - **Portal del paciente** en la misma web, ruta `/app` (PWA).
 - **App Android del paciente** (Kotlin Multiplatform + Compose; también compila para iOS). Versión de la app **2.4.0**
-  (código 6); el sistema web va en la **2.9.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
+  (código 6); el sistema web va en la **2.10.0**. El APK se descarga desde el QR del login: `/app/ClinicaCardenas.apk`.
 - **Producción:** https://clinica-cardenas.chilecentral.cloudapp.azure.com (VM de Azure con Docker Compose + Caddy).
 
 Idioma de la interfaz, mensajes de error, commits y documentación: **español de Perú**. Moneda: soles (S/), IGV 18 %.
@@ -101,7 +101,22 @@ en `composeApp/build.gradle.kts` y `iosApp/project.yml` en cada versión, y copi
 - Promociones: precio antes/ahora, vigencia y condiciones visibles (Código de Protección al Consumidor, Ley 29571).
 - Cada cambio de permisos se controla en el servidor (`@PreAuthorize`), no solo ocultando el menú.
 
-## Estado actual (noviembre 2026, versión 2.9.0)
+## Estado actual (noviembre 2026, versión 2.10.0)
+
+Versión 2.10.0: correcciones de uso (migración V24).
+- Categorías únicas (`core/categories.ts`, mismo orden y color): la cita guarda `appointments.category` (se elige en
+  "Categoría y motivo"; el detalle del motivo es opcional) y las reglas de comisión tienen `commission_rules.category`.
+  Prioridad de regla: procedimiento puntual → su categoría → general (`CommissionService.ruleFor`).
+- Agenda semanal con eje de horas: citas posicionadas por hora, carriles cuando se cruzan, canceladas ocultas
+  (casilla "Ver canceladas"), columna de horas fija al desplazar.
+- Consumo exacto por atención: al marcar un procedimiento como realizado (plan o evolución) se abre "Materiales usados",
+  precargado con el kit (`procedure_supplies`) y editable; `TreatmentItemDone.used` manda lo indicado
+  (`GET /api/plan-items/{id}/supplies`). Si no se indica nada se descuenta el kit.
+- Fotos reales de materiales: `MaterialPhotoSeeder` descarga al arrancar fotos libres de Wikimedia Commons para los
+  materiales sin foto (créditos en `docs/CREDITOS_IMAGENES.md`).
+- Responsive: tablas como tarjetas hasta 900 px con el nombre de la columna en cada dato (`AppComponent` pone
+  `data-label`); en pantallas grandes la tabla se desplaza dentro de su tarjeta; gráficos de barras a escala 1:1 con
+  etiquetas que no se enciman. Revisión automática con Playwright en 375/768/1280 px.
 
 Versión 2.9.0: cumplimiento legal y operación real (migración V23).
 - Libro de Reclamaciones virtual (paquete `complaint`, permiso `RECLAMOS`: admin, dirección y recepción): página

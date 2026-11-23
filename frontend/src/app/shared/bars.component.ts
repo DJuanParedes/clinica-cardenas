@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, OnChanges } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, inject } from '@angular/core';
 import { soles } from '../core/format';
 
 export interface BarSeries { name: string; color: string; values: number[]; }
@@ -44,7 +44,23 @@ export interface BarSeries { name: string; color: string; values: number[]; }
     .none { padding: 40px; text-align: center; }
   `],
 })
-export class BarsComponent implements OnChanges {
+export class BarsComponent implements OnChanges, OnInit, OnDestroy {
+  private host = inject(ElementRef<HTMLElement>);
+  private cd = inject(ChangeDetectorRef);
+  private ro?: ResizeObserver;
+  /** v2.10: ancho real del contenedor; el SVG se dibuja a escala 1:1 para que el texto no cambie de tamaño. */
+  private boxW = 0;
+
+  ngOnInit() {
+    this.ro = new ResizeObserver((e) => {
+      const w = Math.round(e[0].contentRect.width);
+      if (w && Math.abs(w - this.boxW) > 4) { this.boxW = w; this.ngOnChanges(); this.cd.markForCheck(); }
+    });
+    this.ro.observe(this.host.nativeElement);
+  }
+
+  ngOnDestroy() { this.ro?.disconnect(); }
+
   @Input() labels: string[] = [];
   @Input() series: BarSeries[] = [];
   @Input() stacked = false;
@@ -68,7 +84,8 @@ export class BarsComponent implements OnChanges {
 
   ngOnChanges() {
     const n = this.labels.length;
-    this.W = Math.max(560, Math.min(1100, 90 + n * 34));
+    this.W = this.boxW ? Math.max(300, this.boxW) : Math.max(560, Math.min(1100, 90 + n * 34));
+    this.padL = this.W < 480 ? 52 : 64;
     const plotW = this.W - this.padL - 8;
     const plotH = this.H - this.padT - this.padB;
     let max = 0;
@@ -104,8 +121,11 @@ export class BarsComponent implements OnChanges {
         acc += v;
       });
     }
-    const every = Math.ceil(n / 14);
-    this.xLabels = this.labels.map((t, i) => ({ i, x: this.padL + i * slot + slot / 2, text: t })).filter((l) => l.i % every === 0);
+    // v2.10: se muestran solo las etiquetas que caben sin encimarse (ancho estimado del texto a 11 px).
+    const texts = this.labels.map((t) => t.replace(/^sem /, ''));
+    const widest = Math.max(...texts.map((t) => t.length * 6.3)) + 10;
+    const every = Math.max(1, Math.ceil(widest / slot));
+    this.xLabels = texts.map((t, i) => ({ i, x: this.padL + i * slot + slot / 2, text: t })).filter((l) => l.i % every === 0);
   }
 }
 
