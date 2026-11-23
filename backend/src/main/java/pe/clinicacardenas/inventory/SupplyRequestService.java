@@ -21,6 +21,8 @@ import java.util.*;
  */
 @Service
 public class SupplyRequestService {
+    private static final String QUANTITY = "quantity";
+
 
     private final JdbcTemplate jdbc;
     private final InventoryItemRepository items;
@@ -41,8 +43,7 @@ public class SupplyRequestService {
     /** Catálogo mínimo para pedir: nombre, unidad y si hay stock (sin costos ni proveedores). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> catalog() {
-        return jdbc.queryForList("""
-                select id, name, unit, category, (stock > 0) as available from inventory_items where active = true order by name""");
+        return jdbc.queryForList("select id, name, unit, category, (stock > 0) as available from inventory_items where active = true order by name");
     }
 
     @Transactional
@@ -51,8 +52,8 @@ public class SupplyRequestService {
         String text = r.itemText() == null ? null : r.itemText().trim();
         if (r.itemId() == null && (text == null || text.length() < 3)) e.put("itemId", "Elige el material o escribe qué necesitas.");
         if (r.itemId() != null && items.findById(r.itemId()).isEmpty()) e.put("itemId", "El material no existe.");
-        if (r.quantity() == null || r.quantity().signum() <= 0) e.put("quantity", "Indica la cantidad.");
-        else if (r.quantity().compareTo(new BigDecimal("1000")) > 0) e.put("quantity", "Cantidad demasiado alta para una solicitud.");
+        if (r.quantity() == null || r.quantity().signum() <= 0) e.put(QUANTITY, "Indica la cantidad.");
+        else if (r.quantity().compareTo(new BigDecimal("1000")) > 0) e.put(QUANTITY, "Cantidad demasiado alta para una solicitud.");
         String urgency = "URGENTE".equalsIgnoreCase(r.urgency()) ? "URGENTE" : "NORMAL";
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la solicitud.", e);
         jdbc.update("""
@@ -61,7 +62,7 @@ public class SupplyRequestService {
                 r.itemId(), r.itemId() == null ? text : null, r.quantity().setScale(2, RoundingMode.HALF_UP), urgency,
                 r.note() == null || r.note().isBlank() ? null : r.note().trim(), CurrentUser.usernameOrSystem(), Dates.now());
         Long id = jdbc.queryForObject("select last_insert_id()", Long.class);
-        audit.record("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).get().name) + " × " + r.quantity());
+        audit.register("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).map(x -> x.name).orElse(text)) + " × " + r.quantity());
         return get(id);
     }
 
@@ -99,8 +100,8 @@ public class SupplyRequestService {
         String text = a.answer() == null || a.answer().isBlank() ? null : a.answer().trim();
         if ("ENTREGAR".equals(action)) {
             if (r.get("item_id") == null) throw ApiException.badRequest("SIN_MATERIAL", "Es un material fuera del catálogo: regístralo primero en inventario o recházalo.");
-            BigDecimal q = a.quantity() == null ? (BigDecimal) r.get("quantity") : a.quantity();
-            if (q.signum() <= 0) throw ApiException.field("quantity", "Cantidad mayor a cero.");
+            BigDecimal q = a.quantity() == null ? (BigDecimal) r.get(QUANTITY) : a.quantity();
+            if (q.signum() <= 0) throw ApiException.field(QUANTITY, "Cantidad mayor a cero.");
             InventoryItem i = items.lockById(((Number) r.get("item_id")).longValue()).orElseThrow(() -> ApiException.notFound("El material"));
             inventory.deliver(i, q.setScale(2, RoundingMode.HALF_UP), id, "Entregado a " + r.get("requested_by") + " (solicitud #" + id + ")");
             jdbc.update("update supply_requests set status = 'ENTREGADA', answered_by = ?, answered_at = ?, answer = ?, quantity = ? where id = ?",
@@ -112,7 +113,7 @@ public class SupplyRequestService {
         } else {
             throw ApiException.field("action", "Elige entregar o rechazar.");
         }
-        audit.record("SOLICITUD_INSUMO", id, action, text == null ? "" : text);
+        audit.register("SOLICITUD_INSUMO", id, action, text == null ? "" : text);
         return get(id);
     }
 

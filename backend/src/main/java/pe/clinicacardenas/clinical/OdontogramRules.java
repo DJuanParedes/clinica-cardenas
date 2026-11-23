@@ -18,7 +18,8 @@ public final class OdontogramRules {
             "ENDODONCIA", "ENDODONCIA_INDICADA", "IMPLANTE", "MOVILIDAD");
 
     public static boolean isValidTooth(int t) {
-        int q = t / 10, n = t % 10;
+        int q = t / 10;
+        int n = t % 10;
         if (q >= 1 && q <= 4) return n >= 1 && n <= 8;   // permanentes
         if (q >= 5 && q <= 8) return n >= 1 && n <= 5;   // deciduas
         return false;

@@ -69,6 +69,8 @@ import pe.clinicacardenas.pacientes.ui.components.SecondaryButton
 import pe.clinicacardenas.pacientes.ui.components.SectionTitle
 import pe.clinicacardenas.pacientes.ui.theme.Brand
 
+private const val MIME_PDF = "application/pdf"
+
 data class RecordState(
     val loading: Boolean = true,
     val detail: PatientDetailDto? = null,
@@ -157,7 +159,7 @@ class PatientRecordViewModel(
 
     fun openFile(f: SFileDto) = act("Abriendo ${f.title}…") {
         val bytes = repo.guarded { fileContent(f.id) }
-        val ext = when (f.contentType) { "application/pdf" -> ".pdf"; "image/png" -> ".png"; else -> ".jpg" }
+        val ext = when (f.contentType) { MIME_PDF -> ".pdf"; "image/png" -> ".png"; else -> ".jpg" }
         platform.openFile(f.title + ext, f.contentType, bytes)
     }
 
@@ -370,7 +372,7 @@ private fun LazyListScope.filesSection(s: RecordState, vm: PatientRecordViewMode
     items(s.files, key = { "f${it.id}" }) { f ->
         Panel(Modifier.clickable { vm.openFile(f) }, padding = PaddingValues(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (f.contentType == "application/pdf") "📄" else "🖼️", fontSize = 24.sp)
+                Text(if (f.contentType == MIME_PDF) "📄" else "🖼️", fontSize = 24.sp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(f.title, fontWeight = FontWeight.SemiBold, color = Brand.Tinta)
@@ -389,7 +391,7 @@ private fun LazyListScope.filesSection(s: RecordState, vm: PatientRecordViewMode
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UploadForm(f: PickedFile, busy: Boolean, onUpload: (String, String, String, Boolean) -> Unit, onDiscard: () -> Unit) {
-    var kind by remember(f) { mutableStateOf(if (f.mimeType == "application/pdf") "DOCUMENTO" else "FOTO") }
+    var kind by remember(f) { mutableStateOf(if (f.mimeType == MIME_PDF) "DOCUMENTO" else "FOTO") }
     var title by remember(f) { mutableStateOf(f.name.substringBeforeLast('.')) }
     var note by remember(f) { mutableStateOf("") }
     var share by remember(f) { mutableStateOf(false) }

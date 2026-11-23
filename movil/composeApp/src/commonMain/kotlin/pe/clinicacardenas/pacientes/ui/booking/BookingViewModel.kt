@@ -39,7 +39,10 @@ data class BookingState(
 )
 
 /** Reserva y reprogramación de citas desde el teléfono (mínimo 2 h de anticipación; cambios hasta 12 h antes). */
-class BookingViewModel(private val repo: ClinicRepository) : ViewModel() {
+class BookingViewModel(
+    private val repo: ClinicRepository,
+    private val requestAppointment: pe.clinicacardenas.pacientes.domain.usecase.RequestAppointmentUseCase,
+) : ViewModel() {
     private val _state = MutableStateFlow(BookingState())
     val state: StateFlow<BookingState> = _state.asStateFlow()
     private var target = BookingTarget()
@@ -105,12 +108,44 @@ class BookingViewModel(private val repo: ClinicRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val msg = if (target.rescheduleId != null) repo.reschedule(target.rescheduleId!!, dentist, slot)
-                else repo.book(dentist, slot, s.reasonCode!!, s.notes)
+                else bookOfflineFirst(s, dentist, slot)
                 _state.update { it.copy(saving = false, done = msg) }
             } catch (e: ApiException) {
                 _state.update { it.copy(saving = false, error = e.message) }
                 loadSlots()
+            } catch (e: pe.clinicacardenas.pacientes.domain.error.DomainError) {
+                // La reserva ya quedó guardada en el teléfono; el error fue al actualizar la lista.
+                _state.update { it.copy(saving = false, done = "Tu reserva quedó guardada. ${e.message}") }
             }
+        }
+    }
+
+    /**
+     * Reserva nueva, offline-first: se guarda primero en el teléfono (id provisional, marcada como pendiente) y se
+     * envía en el acto si hay red; si no, sale en la próxima sincronización sin duplicarse (Idempotency-Key).
+     */
+    private suspend fun bookOfflineFirst(s: BookingState, dentistId: Long, slot: String): String {
+        val o = s.options
+        val d = o?.dentists?.firstOrNull { it.id == dentistId }
+        val r = o?.reasons?.firstOrNull { it.code == s.reasonCode }
+        val (_, result) = requestAppointment(
+            pe.clinicacardenas.pacientes.domain.model.BookingRequest(
+                dentistId = dentistId,
+                dentistName = d?.fullName ?: "Odontólogo",
+                dentistSpecialty = d?.specialty ?: "",
+                dentistColor = d?.color ?: "#00A3D4",
+                startAt = slot,
+                durationMin = r?.durationMin ?: 30,
+                reasonCode = s.reasonCode!!,
+                reasonLabel = r?.label ?: "Cita",
+                notes = s.notes.ifBlank { null },
+            ),
+        )
+        return when {
+            result.offline -> "Tu reserva quedó guardada en el teléfono y se enviará cuando vuelva la conexión."
+            result.failed > 0 -> "No se pudo reservar ese horario. Revisa el aviso en Inicio para reintentar o descartar."
+            result.retried > 0 -> "La clínica no respondió; reintentaremos el envío en unos segundos."
+            else -> "¡Listo! Tu cita quedó reservada."
         }
     }
 }

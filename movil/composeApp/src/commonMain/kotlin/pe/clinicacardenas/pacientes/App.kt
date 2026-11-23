@@ -33,7 +33,6 @@ import pe.clinicacardenas.pacientes.data.remote.PatientDto
 import pe.clinicacardenas.pacientes.data.repository.SessionRepository
 import pe.clinicacardenas.pacientes.data.repository.StaffSession
 import pe.clinicacardenas.pacientes.platform.AppLifecycle
-import pe.clinicacardenas.pacientes.ui.account.AccountScreen
 import pe.clinicacardenas.pacientes.ui.documents.DocumentsScreen
 import pe.clinicacardenas.pacientes.ui.home.HomeScreen
 import pe.clinicacardenas.pacientes.ui.login.LoginScreen

@@ -32,7 +32,7 @@ public class DentistPhotoController {
         d.photoPath = images.save("doctores", file);
         dentists.save(d);
         images.delete(old);
-        audit.record("ODONTOLOGO", d.id, "FOTO", d.getFullName());
+        audit.register("ODONTOLOGO", d.id, "FOTO", d.getFullName());
         return d;
     }
 

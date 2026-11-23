@@ -18,6 +18,11 @@ import java.util.*;
  */
 @Service
 public class PatientProfileService {
+    private static final String FAMILIAR = "FAMILIAR";
+    private static final String PACIENTE = "PACIENTE";
+    private static final String FISCALRUC = "fiscalRuc";
+    private static final String HCNUMBER = "hcNumber";
+
 
     /** De dónde llegan los pacientes: base para segmentar campañas y medir qué canal funciona. */
     public static final List<Map<String, String>> SOURCES = List.of(
@@ -61,13 +66,17 @@ public class PatientProfileService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> profile(Long patientId) {
+        return profileInternal(patientId);
+    }
+
+    private Map<String, Object> profileInternal(Long patientId) {
         Patient p = patients.get(patientId);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("source", p.source);
         m.put("sourceLabel", label(p.source));
         m.put("sourceDetail", p.sourceDetail);
-        m.put("hcNumber", p.hcNumber);
-        m.put("fiscalRuc", p.fiscalRuc);
+        m.put(HCNUMBER, p.hcNumber);
+        m.put(FISCALRUC, p.fiscalRuc);
         m.put("fiscalName", p.fiscalName);
         m.put("fiscalAddress", p.fiscalAddress);
         m.put("tags", tags(patientId));
@@ -111,16 +120,16 @@ public class PatientProfileService {
         if (source != null && SOURCES.stream().noneMatch(x -> x.get("code").equals(source))) e.put("source", "Elige una opción de la lista.");
         String detail = trim(r.sourceDetail(), 120);
         String hc = blank(r.hcNumber()) ? p.hcNumber : r.hcNumber().trim().toUpperCase();
-        if (hc != null && !hc.matches("^[A-Z0-9-]{1,20}$")) e.put("hcNumber", "Usa solo números, letras y guiones (máx. 20).");
+        if (hc != null && !hc.matches("^[A-Z0-9-]{1,20}$")) e.put(HCNUMBER, "Usa solo números, letras y guiones (máx. 20).");
         else if (hc != null && !hc.equals(p.hcNumber)) {
             Integer used = jdbc.queryForObject("select count(*) from patients where hc_number = ? and id <> ?", Integer.class, hc, patientId);
-            if (used != null && used > 0) e.put("hcNumber", "Ese N° de historia ya lo tiene otro paciente.");
+            if (used != null && used > 0) e.put(HCNUMBER, "Ese N° de historia ya lo tiene otro paciente.");
         }
         String ruc = blank(r.fiscalRuc()) ? null : r.fiscalRuc().replaceAll("\\s", "");
         String fiscalName = trim(r.fiscalName(), 200);
-        if (ruc != null && !RucValidator.isValid(ruc)) e.put("fiscalRuc", "El RUC no es válido (11 dígitos y dígito verificador).");
+        if (ruc != null && !RucValidator.isValid(ruc)) e.put(FISCALRUC, "El RUC no es válido (11 dígitos y dígito verificador).");
         if (ruc != null && fiscalName == null) e.put("fiscalName", "Escribe la razón social para la factura.");
-        if (ruc == null && fiscalName != null) e.put("fiscalRuc", "Falta el RUC.");
+        if (ruc == null && fiscalName != null) e.put(FISCALRUC, "Falta el RUC.");
         List<String> tags = new ArrayList<>();
         if (r.tags() != null) {
             for (String t : r.tags()) {
@@ -152,8 +161,8 @@ public class PatientProfileService {
             for (String t : tags) jdbc.update("insert into patient_tags (patient_id, tag) values (?, ?)", patientId, t);
             if (!new HashSet<>(before).equals(new HashSet<>(tags))) changes.add("etiquetas");
         }
-        if (!changes.isEmpty()) audit.record("PACIENTE", patientId, "EDITAR", "Actualizó " + String.join(", ", changes));
-        return profile(patientId);
+        if (!changes.isEmpty()) audit.register(PACIENTE, patientId, "EDITAR", "Actualizó " + String.join(", ", changes));
+        return profileInternal(patientId);
     }
 
     // ------------------------------------------------------------------ familiares
@@ -167,8 +176,8 @@ public class PatientProfileService {
                   is_guardian, pays, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 patientId, v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record("PACIENTE", patientId, "FAMILIAR", "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
-        return profile(patientId);
+        audit.register(PACIENTE, patientId, FAMILIAR, "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
+        return profileInternal(patientId);
     }
 
     @Transactional
@@ -179,16 +188,16 @@ public class PatientProfileService {
                 update patient_relations set related_patient_id=?, full_name=?, doc_type=?, doc_number=?, relationship=?, phone=?, email=?,
                   is_guardian=?, pays=?, notes=? where id = ?""",
                 v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes, relationId);
-        audit.record("PACIENTE", patientId, "FAMILIAR", "Actualizó el familiar " + v.name);
-        return profile(patientId);
+        audit.register(PACIENTE, patientId, FAMILIAR, "Actualizó el familiar " + v.name);
+        return profileInternal(patientId);
     }
 
     @Transactional
     public Map<String, Object> deleteRelation(Long patientId, Long relationId) {
         String name = owned(patientId, relationId);
         jdbc.update("delete from patient_relations where id = ?", relationId);
-        audit.record("PACIENTE", patientId, "FAMILIAR", "Quitó el vínculo con " + name);
-        return profile(patientId);
+        audit.register(PACIENTE, patientId, FAMILIAR, "Quitó el vínculo con " + name);
+        return profileInternal(patientId);
     }
 
     private String owned(Long patientId, Long relationId) {
@@ -227,7 +236,7 @@ public class PatientProfileService {
         if (rel == null || !RELATIONSHIPS.contains(rel)) e.put("relationship", "Elige el parentesco.");
         if ("DNI".equals(docType) && docNumber != null && !docNumber.matches("^\\d{8}$")) e.put("docNumber", "El DNI tiene 8 dígitos.");
         if (phone != null && !phone.matches("^9\\d{8}$")) e.put("phone", "Celular de 9 dígitos que empiece con 9.");
-        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) e.put("email", "Correo no válido.");
+        if (email != null && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del familiar.", e);
         return new Values(relatedId, name, docType, docNumber, rel, phone, email, Boolean.TRUE.equals(r.isGuardian()),
                 Boolean.TRUE.equals(r.pays()), trim(r.notes(), 200));

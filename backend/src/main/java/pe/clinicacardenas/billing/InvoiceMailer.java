@@ -21,8 +21,13 @@ import java.util.regex.Pattern;
  */
 @Service
 public class InvoiceMailer {
+    private static final String TD_TD_STYLE_PADDING_6PX_TEXT_ALIGN_RIGHT = "</td><td style='padding:6px;text-align:right;border-bottom:1px solid #eee'>";
+    private static final String AMOUNTINWORDS = "amountInWords";
+    private static final String COMPANY = "company";
+    private static final String ITEMS = "items";
 
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
+    private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
 
     private final BillingService billing;
     private final MailNotifier mail;
@@ -37,7 +42,7 @@ public class InvoiceMailer {
         Invoice inv = billing.get(id);
         @SuppressWarnings("unchecked")
         Map<String, Object> d = billing.detail(id);
-        return InvoicePdf.render(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"), phone);
+        return InvoicePdf.render(inv, (List<InvoiceItem>) d.get(ITEMS), (UblBuilder.Company) d.get(COMPANY), (String) d.get(AMOUNTINWORDS), phone);
     }
 
     public InvoiceMailer(BillingService billing, MailNotifier mail, PatientRepository patients, AuditService audit) {
@@ -50,24 +55,23 @@ public class InvoiceMailer {
     @Transactional(readOnly = true)
     public Map<String, Object> send(Long id, String to) {
         Invoice inv = billing.get(id);
-        String email = to == null || to.isBlank()
-                ? (inv.patientId == null ? null : patients.findById(inv.patientId).map(p -> p.email).orElse(null))
-                : to.trim();
+        String patientEmail = inv.patientId == null ? null : patients.findById(inv.patientId).map(p -> p.email).orElse(null);
+        String email = to == null || to.isBlank() ? patientEmail : to.trim();
         if (email == null || !EMAIL.matcher(email).matches()) throw ApiException.field("email", "Escribe un correo válido para enviar el comprobante.");
         if ("BORRADOR".equals(inv.status) || "RECHAZADO".equals(inv.status)) {
             throw ApiException.badRequest("NO_ENVIABLE", "Solo se envían comprobantes emitidos (no borradores ni rechazados).");
         }
         @SuppressWarnings("unchecked")
         Map<String, Object> d = billing.detail(id);
-        String html = html(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"));
+        String html = html(inv, (List<InvoiceItem>) d.get(ITEMS), (UblBuilder.Company) d.get(COMPANY), (String) d.get(AMOUNTINWORDS));
         byte[] xml = inv.xmlContent == null ? null : inv.xmlContent.getBytes(StandardCharsets.UTF_8);
-        String fileBase = ((UblBuilder.Company) d.get("company")).ruc() + "-" + inv.docType + "-" + inv.getFullNumber();
-        byte[] pdf = InvoicePdf.render(inv, (List<InvoiceItem>) d.get("items"), (UblBuilder.Company) d.get("company"), (String) d.get("amountInWords"), phone);
+        String fileBase = ((UblBuilder.Company) d.get(COMPANY)).ruc() + "-" + inv.docType + "-" + inv.getFullNumber();
+        byte[] pdf = InvoicePdf.render(inv, (List<InvoiceItem>) d.get(ITEMS), (UblBuilder.Company) d.get(COMPANY), (String) d.get(AMOUNTINWORDS), phone);
         java.util.Map<String, byte[]> files = new java.util.LinkedHashMap<>();
         files.put(fileBase + ".pdf", pdf);
         if (xml != null) files.put(fileBase + ".xml", xml);
         boolean real = mail.sendHtml(email, inv.getDocTypeLabel() + " " + inv.getFullNumber() + " · Clínica Dental Cárdenas", html, files);
-        audit.record("COMPROBANTE", inv.id, "ENVIAR_CORREO", inv.getFullNumber() + " → " + email);
+        audit.register("COMPROBANTE", inv.id, "ENVIAR_CORREO", inv.getFullNumber() + " → " + email);
         return Map.of("message", real ? "Comprobante enviado a " + email + "." : "Correo registrado (el servidor de correo no está configurado: quedó simulado).",
                 "email", email, "simulated", !real);
     }
@@ -84,9 +88,9 @@ public class InvoiceMailer {
         StringBuilder rows = new StringBuilder();
         for (InvoiceItem it : items) {
             rows.append("<tr><td style='padding:6px;border-bottom:1px solid #eee'>").append(esc(it.description))
-                    .append("</td><td style='padding:6px;text-align:right;border-bottom:1px solid #eee'>").append(it.quantity.stripTrailingZeros().toPlainString())
-                    .append("</td><td style='padding:6px;text-align:right;border-bottom:1px solid #eee'>").append(money(it.unitPrice))
-                    .append("</td><td style='padding:6px;text-align:right;border-bottom:1px solid #eee'>").append(money(it.lineTotal)).append("</td></tr>");
+                    .append(TD_TD_STYLE_PADDING_6PX_TEXT_ALIGN_RIGHT).append(it.quantity.stripTrailingZeros().toPlainString())
+                    .append(TD_TD_STYLE_PADDING_6PX_TEXT_ALIGN_RIGHT).append(money(it.unitPrice))
+                    .append(TD_TD_STYLE_PADDING_6PX_TEXT_ALIGN_RIGHT).append(money(it.lineTotal)).append("</td></tr>");
         }
         return "<div style='font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#1d2b33'>"
                 + "<p>Estimado(a) " + esc(inv.customerName) + ":</p><p>Le enviamos su comprobante electrónico. El archivo XML adjunto es el documento con validez tributaria.</p>"

@@ -22,25 +22,29 @@ import java.util.regex.Pattern;
  */
 @Service
 public class MessageTemplateService {
+    private static final String BUTTONS = "buttons";
+    private static final String SUBJECT = "subject";
+
 
     /** Variables que se pueden usar en cualquier plantilla y un ejemplo para la vista previa. */
-    public static final Map<String, String> VARIABLES = new LinkedHashMap<>();
+    private static final Map<String, String> VARIABLES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> VARIABLES = java.util.Collections.unmodifiableMap(VARIABLES_EDIT);
     static {
-        VARIABLES.put("paciente", "María");
-        VARIABLES.put("paciente_completo", "María Fernanda Quispe Huamán");
-        VARIABLES.put("fecha", "Martes 24 de noviembre");
-        VARIABLES.put("hora", "10:30");
-        VARIABLES.put("fecha_hora", "Martes 24 de noviembre a las 10:30");
-        VARIABLES.put("fecha_anterior", "Lunes 23 de noviembre a las 16:00");
-        VARIABLES.put("odontologo", "Dra. Rosa Cárdenas Vílchez (Ortodoncia)");
-        VARIABLES.put("especialidad", "Ortodoncia");
-        VARIABLES.put("motivo", "Control de ortodoncia");
-        VARIABLES.put("motivo_cancelacion", " (el paciente avisó que viaja)");
-        VARIABLES.put("clinica", "Clínica Dental Cárdenas");
-        VARIABLES.put("direccion", "Av. Los Guindos Mz. B lote 18, Chaclacayo");
-        VARIABLES.put("telefono_clinica", "987 654 000");
-        VARIABLES.put("enlace_citas", "https://clinica.pe/reservar");
-        VARIABLES.put("enlace_encuesta", "https://clinica.pe/encuesta/abc123");
+        VARIABLES_EDIT.put("paciente", "María");
+        VARIABLES_EDIT.put("paciente_completo", "María Fernanda Quispe Huamán");
+        VARIABLES_EDIT.put("fecha", "Martes 24 de noviembre");
+        VARIABLES_EDIT.put("hora", "10:30");
+        VARIABLES_EDIT.put("fecha_hora", "Martes 24 de noviembre a las 10:30");
+        VARIABLES_EDIT.put("fecha_anterior", "Lunes 23 de noviembre a las 16:00");
+        VARIABLES_EDIT.put("odontologo", "Dra. Rosa Cárdenas Vílchez (Ortodoncia)");
+        VARIABLES_EDIT.put("especialidad", "Ortodoncia");
+        VARIABLES_EDIT.put("motivo", "Control de ortodoncia");
+        VARIABLES_EDIT.put("motivo_cancelacion", " (el paciente avisó que viaja)");
+        VARIABLES_EDIT.put("clinica", "Clínica Dental Cárdenas");
+        VARIABLES_EDIT.put("direccion", "Av. Los Guindos Mz. B lote 18, Chaclacayo");
+        VARIABLES_EDIT.put("telefono_clinica", "987 654 000");
+        VARIABLES_EDIT.put("enlace_citas", "https://clinica.pe/reservar");
+        VARIABLES_EDIT.put("enlace_encuesta", "https://clinica.pe/encuesta/abc123");
     }
 
     private static final Pattern VAR = Pattern.compile("\\{([a-z_]+)\\}");
@@ -67,7 +71,7 @@ public class MessageTemplateService {
                        (select max(n.created_at) from notifications n where n.template_code = t.code) as lastSent
                   from message_templates t order by t.sort_order, t.code""");
         for (Map<String, Object> r : rows) {
-            r.put("buttons", buttons((String) r.get("buttons")));
+            r.put(BUTTONS, buttons((String) r.get(BUTTONS)));
             r.put("customized", !Objects.equals(r.get("body"), r.get("defaultBody")));
         }
         return rows;
@@ -83,7 +87,7 @@ public class MessageTemplateService {
         Map<String, String> e = new LinkedHashMap<>();
         String subject = r.subject() == null ? "" : r.subject().trim();
         String body = r.body() == null ? "" : r.body().replace("\r\n", "\n").trim();
-        if (subject.length() < 3 || subject.length() > 150) e.put("subject", "El asunto debe tener entre 3 y 150 caracteres.");
+        if (subject.length() < 3 || subject.length() > 150) e.put(SUBJECT, "El asunto debe tener entre 3 y 150 caracteres.");
         if (body.length() < 10) e.put("body", "Escribe el mensaje (mínimo 10 caracteres).");
         else if (body.length() > 1000) e.put("body", "Máximo 1000 caracteres: WhatsApp corta los mensajes con botones más largos.");
         List<String> unknown = unknownVars(subject + " " + body);
@@ -94,15 +98,15 @@ public class MessageTemplateService {
             for (String b : r.buttons()) {
                 if (b == null || b.isBlank()) continue;
                 String t = b.trim();
-                if (t.length() > 20) { e.put("buttons", "Cada botón puede tener hasta 20 caracteres (\"" + t + "\")."); break; }
+                if (t.length() > 20) { e.put(BUTTONS, "Cada botón puede tener hasta 20 caracteres (\"" + t + "\")."); break; }
                 if (!btn.contains(t)) btn.add(t);
             }
-            if (btn.size() > 3) e.put("buttons", "WhatsApp permite hasta 3 botones.");
+            if (btn.size() > 3) e.put(BUTTONS, "WhatsApp permite hasta 3 botones.");
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la plantilla.", e);
         jdbc.update("update message_templates set subject=?, body=?, buttons=?, updated_at=?, updated_by=? where code=?",
                 subject, body, btn.isEmpty() ? null : write(btn), Dates.now(), CurrentUser.usernameOrSystem(), code);
-        audit.record("PLANTILLA", null, "EDITAR", code);
+        audit.register("PLANTILLA", null, "EDITAR", code);
         return get(code);
     }
 
@@ -110,7 +114,7 @@ public class MessageTemplateService {
     public Map<String, Object> restore(String code) {
         Map<String, Object> t = get(code);
         jdbc.update("update message_templates set body = default_body, updated_at=?, updated_by=? where code=?", Dates.now(), CurrentUser.usernameOrSystem(), code);
-        audit.record("PLANTILLA", null, "RESTAURAR", (String) t.get("name"));
+        audit.register("PLANTILLA", null, "RESTAURAR", (String) t.get("name"));
         return get(code);
     }
 
@@ -118,16 +122,16 @@ public class MessageTemplateService {
     public Map<String, Object> preview(String code, String body, String subject) {
         Map<String, Object> t = get(code);
         String b = body == null ? (String) t.get("body") : body;
-        String s = subject == null ? (String) t.get("subject") : subject;
-        return Map.of("subject", fill(s, VARIABLES), "body", fill(b, VARIABLES), "unknown", unknownVars(s + " " + b));
+        String s = subject == null ? (String) t.get(SUBJECT) : subject;
+        return Map.of(SUBJECT, fill(s, VARIABLES), "body", fill(b, VARIABLES), "unknown", unknownVars(s + " " + b));
     }
 
     public Rendered render(String code, Map<String, String> vars) {
         List<Map<String, Object>> r = jdbc.queryForList("select code, subject, body, default_body, buttons from message_templates where code = ?", code);
         if (r.isEmpty()) throw new IllegalStateException("Plantilla inexistente: " + code);
         Map<String, Object> t = r.get(0);
-        return new Rendered(code, fill((String) t.get("subject"), vars), fill((String) t.get("body"), vars),
-                buttons((String) t.get("buttons")), !Objects.equals(t.get("body"), t.get("default_body")));
+        return new Rendered(code, fill((String) t.get(SUBJECT), vars), fill((String) t.get("body"), vars),
+                buttons((String) t.get(BUTTONS)), !Objects.equals(t.get("body"), t.get("default_body")));
     }
 
     /** Envíos de una plantilla (o de todas): base del historial. */
@@ -146,7 +150,7 @@ public class MessageTemplateService {
             String like = "%" + q.trim().toLowerCase() + "%";
             args.add(like); args.add(like);
         }
-        sql.append(" order by n.id desc limit ").append(Math.max(1, Math.min(limit, 300)));
+        sql.append(" order by n.id desc limit ").append(Math.clamp(limit, 1, 300));
         return jdbc.queryForList(sql.toString(), args.toArray());
     }
 
@@ -156,7 +160,8 @@ public class MessageTemplateService {
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             String v = vars.get(m.group(1));
-            m.appendReplacement(sb, Matcher.quoteReplacement(v == null ? (VARIABLES.containsKey(m.group(1)) ? "" : m.group()) : v));
+            String unknown = VARIABLES.containsKey(m.group(1)) ? "" : m.group();
+            m.appendReplacement(sb, Matcher.quoteReplacement(v == null ? unknown : v));
         }
         m.appendTail(sb);
         return sb.toString();

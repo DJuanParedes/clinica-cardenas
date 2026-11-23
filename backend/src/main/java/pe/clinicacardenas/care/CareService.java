@@ -32,6 +32,22 @@ import java.util.*;
  */
 @Service
 public class CareService {
+    private static final String CONTROL = "CONTROL";
+    private static final String LISTA_ESPERA = "LISTA_ESPERA";
+    private static final String PACIENTE = "PACIENTE";
+    private static final String ACCION = "accion";
+    private static final String CITAID = "citaId";
+    private static final String RESPUESTA = "respuesta";
+    private static final String TOTAL = "total";
+
+
+    /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
+    private final org.springframework.beans.factory.ObjectProvider<CareService> selfProvider;
+
+    private CareService self() {
+        return selfProvider.getObject();
+    }
+
 
     private static final Logger log = LoggerFactory.getLogger(CareService.class);
     private static final Locale ES = new Locale("es", "PE");
@@ -53,7 +69,8 @@ public class CareService {
     public CareService(WaitlistRepository waitlist, InstallmentRepository installments, PatientRepository patients,
                        DentistRepository dentists, AppointmentRepository appointments, TreatmentPlanRepository plans,
                        AgendaService agenda, NotificationService notifications, NoticeService notices,
-                       AuditService audit, JdbcTemplate jdbc) {
+                       AuditService audit, JdbcTemplate jdbc, org.springframework.beans.factory.ObjectProvider<CareService> selfProvider) {
+        this.selfProvider = selfProvider;
         this.waitlist = waitlist;
         this.installments = installments;
         this.patients = patients;
@@ -98,7 +115,7 @@ public class CareService {
         if (r.patientId() == null) throw ApiException.field("patientId", "Selecciona el paciente.");
         Patient p = patient(r.patientId());
         if (r.reason() == null || r.reason().isBlank()) throw ApiException.field("reason", "Indica el motivo.");
-        if (r.dentistId() != null) dentists.findById(r.dentistId()).orElseThrow(() -> ApiException.notFound("El odontólogo"));
+        if (r.dentistId() != null && !dentists.existsById(r.dentistId())) throw ApiException.notFound("El odontólogo");
         WaitlistEntry w = new WaitlistEntry();
         w.patientId = p.id;
         w.dentistId = r.dentistId();
@@ -107,7 +124,7 @@ public class CareService {
         w.createdAt = Dates.now();
         w.createdBy = CurrentUser.usernameOrSystem();
         waitlist.save(w);
-        audit.record("PACIENTE", p.id, "LISTA_ESPERA", "Agregado a la lista de espera: " + w.reason);
+        audit.register(PACIENTE, p.id, LISTA_ESPERA, "Agregado a la lista de espera: " + w.reason);
         return w;
     }
 
@@ -133,11 +150,11 @@ public class CareService {
             Patient p = patients.findById(w.patientId).orElse(null);
             if (p == null) continue;
             String when = a.startAt.format(WHEN);
-            notifications.message(p, "LISTA_ESPERA", "Se liberó un espacio",
+            notifications.message(p, LISTA_ESPERA, "Se liberó un espacio",
                     "se liberó un espacio el " + when + " con " + a.dentist.getFullName()
                             + ". Si lo quieres, escríbenos o llámanos pronto para reservarlo.",
                     "espera:" + w.id + ":" + a.id);
-            notices.add(p.id, "LISTA_ESPERA", "Se liberó un espacio", "Hay un horario libre el " + when
+            notices.add(p.id, LISTA_ESPERA, "Se liberó un espacio", "Hay un horario libre el " + when
                     + " con " + a.dentist.getFullName() + ". Resérvalo desde la app o llamando a la clínica.", a.id);
             w.status = "AVISADA";
             w.notifiedAt = Dates.now();
@@ -160,6 +177,10 @@ public class CareService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> installments(Long planId) {
+        return installmentsInternal(planId);
+    }
+
+    private Map<String, Object> installmentsInternal(Long planId) {
         TreatmentPlan p = plan(planId);
         List<Installment> list = installments.findByPlanIdOrderByNumberAsc(planId);
         // Solo cuentan los pagos de procedimientos de ESTE plan y los pagos "a cuenta": un pago de otro
@@ -176,7 +197,8 @@ public class CareService {
         LocalDate today = Dates.today();
         for (Installment i : list) {
             cumulative = cumulative.add(i.amount);
-            String status = paid.compareTo(cumulative) >= 0 ? "PAGADA" : i.dueDate.isBefore(today) ? "VENCIDA" : "PENDIENTE";
+            String overdue = i.dueDate.isBefore(today) ? "VENCIDA" : "PENDIENTE";
+            String status = paid.compareTo(cumulative) >= 0 ? "PAGADA" : overdue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", i.id);
             m.put("number", i.number);
@@ -187,7 +209,7 @@ public class CareService {
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("planId", planId);
-        m.put("total", planTotal(planId));
+        m.put(TOTAL, planTotal(planId));
         m.put("paid", paid);
         m.put("items", rows);
         return m;
@@ -205,19 +227,19 @@ public class CareService {
         if (total.signum() <= 0) throw ApiException.badRequest("PLAN_VACIO", "El plan no tiene procedimientos con precio.");
         installments.deleteByPlanId(planId);
         BigDecimal each = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
-        BigDecimal last = total.subtract(each.multiply(BigDecimal.valueOf(count - 1)));
+        BigDecimal last = total.subtract(each.multiply(BigDecimal.valueOf(count - 1L)));
         for (int n = 1; n <= count; n++) {
             Installment i = new Installment();
             i.planId = planId;
             i.number = n;
-            i.dueDate = first.plusMonths(n - 1);
+            i.dueDate = first.plusMonths(n - 1L);
             i.amount = n == count ? last : each;
             i.createdAt = Dates.now();
             i.createdBy = CurrentUser.usernameOrSystem();
             installments.save(i);
         }
-        audit.record("HISTORIA", p.patientId, "CUOTAS", count + " cuotas para \"" + p.title + "\" (S/ " + total.toPlainString() + ")");
-        return installments(planId);
+        audit.register("HISTORIA", p.patientId, "CUOTAS", count + " cuotas para \"" + p.title + "\" (S/ " + total.toPlainString() + ")");
+        return installmentsInternal(planId);
     }
 
     /** Todos los días a las 9:00 a. m.: recordatorio de las cuotas que vencen en 3 días. */
@@ -228,7 +250,7 @@ public class CareService {
             // No se recuerda una cuota que ya está cubierta por los pagos del paciente.
             boolean alreadyPaid = false;
             try {
-                Object rows = installments(i.planId).get("items");
+                Object rows = installmentsInternal(i.planId).get("items");
                 if (rows instanceof List<?> l) for (Object o : l) {
                     if (o instanceof Map<?, ?> row && i.id.equals(row.get("id")) && "PAGADA".equals(row.get("status"))) alreadyPaid = true;
                 }
@@ -301,26 +323,29 @@ public class CareService {
     @Transactional
     public Map<String, Object> sendRecall(Long patientId, String kind) {
         Patient p = patient(patientId);
-        String k = kind == null || kind.isBlank() ? "CONTROL" : kind.trim().toUpperCase();
-        int queued = notifications.message(p, "CONTROL", "Te toca tu control dental", recallText(k),
+        String k = kind == null || kind.isBlank() ? CONTROL : kind.trim().toUpperCase();
+        int queued = notifications.message(p, CONTROL, "Te toca tu control dental", recallText(k),
                 "control:" + p.id + ":" + k + ":" + Dates.today().withDayOfMonth(1));
-        notices.add(p.id, "CONTROL", "Te toca tu control", recallText(k).substring(0, 1).toUpperCase() + recallText(k).substring(1), null);
+        notices.add(p.id, CONTROL, "Te toca tu control", recallText(k).substring(0, 1).toUpperCase() + recallText(k).substring(1), null);
         jdbc.update("insert into recall_log (patient_id, kind, sent_at, sent_by) values (?, ?, ?, ?)",
                 p.id, k, Dates.now(), CurrentUser.usernameOrSystem());
-        audit.record("PACIENTE", p.id, "RECORDATORIO_CONTROL", k.toLowerCase());
+        audit.register(PACIENTE, p.id, "RECORDATORIO_CONTROL", k.toLowerCase());
         return Map.of("queued", queued, "message", queued > 0 ? "Recordatorio enviado." : "Ya se le envió este recordatorio este mes.");
+    }
+
+    private static boolean recentlyRecalled(Object last) {
+        LocalDateTime at = pe.clinicacardenas.common.Dates.toLocalDateTime(last);
+        return at != null && at.isAfter(Dates.now().minusDays(30));
     }
 
     /** Todos los lunes a las 10:00 a. m. se envían solos los recordatorios de control (máximo uno al mes por paciente). */
     @Scheduled(cron = "0 0 10 * * MON", zone = "America/Lima")
     public void autoRecalls() {
         int n = 0;
-        for (Map<String, Object> r : recalls()) {
-            Object last = r.get("lastRecallAt");
-            if (last instanceof java.sql.Timestamp t && t.toLocalDateTime().isAfter(Dates.now().minusDays(30))) continue;
-            if (last instanceof LocalDateTime t && t.isAfter(Dates.now().minusDays(30))) continue;
+        for (Map<String, Object> r : self().recalls()) {
+            if (recentlyRecalled(r.get("lastRecallAt"))) continue;
             try {
-                sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
+                self().sendRecall(((Number) r.get("patientId")).longValue(), String.valueOf(r.get("kind")));
                 n++;
             } catch (Exception e) {
                 log.warn("Recordatorio de control no enviado: {}", e.getMessage());
@@ -333,11 +358,11 @@ public class CareService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> satisfaction(int days) {
-        LocalDateTime since = Dates.now().minusDays(Math.max(1, Math.min(days, 365)));
+        LocalDateTime since = Dates.now().minusDays(Math.clamp(days, 1, 365));
         Map<String, Object> m = new LinkedHashMap<>();
         Map<String, Object> agg = jdbc.queryForMap("select count(*) as total, coalesce(avg(score), 0) as average from surveys where created_at >= ?", since);
         m.put("days", days);
-        m.put("total", agg.get("total"));
+        m.put(TOTAL, agg.get(TOTAL));
         m.put("average", new BigDecimal(String.valueOf(agg.get("average"))).setScale(2, RoundingMode.HALF_UP));
         m.put("distribution", jdbc.queryForList("select score, count(*) as count from surveys where created_at >= ? group by score order by score desc", since));
         m.put("byDentist", jdbc.queryForList("""
@@ -365,22 +390,23 @@ public class CareService {
         if (phone.startsWith("51") && phone.length() == 11) phone = phone.substring(2);
         String text = r.texto() == null ? "" : r.texto().trim().toLowerCase();
         // v2.6: también los botones "Confirmar" / "No podré asistir" de los recordatorios
-        String option = text.matches("^1\\b.*|^s[ií]\\b.*|^confirm(o|ar|ado)\\b.*") ? "1"
-                : text.matches("^2\\b.*|^reprogram.*|^no podr[eé] asistir.*|^no puedo.*") ? "2" : null;
+        String option = null;
+        if (text.matches("^1\\b.*|^s[ií]\\b.*|^confirm(o|ar|ado)\\b.*")) option = "1";
+        else if (text.matches("^2\\b.*|^reprogram.*|^no podr[eé] asistir.*|^no puedo.*")) option = "2";
         Map<String, Object> out = new LinkedHashMap<>();
-        if (phone.length() != 9) return Map.of("accion", "IGNORADO");
+        if (phone.length() != 9) return Map.of(ACCION, "IGNORADO");
         List<Long> ids = jdbc.queryForList("select id from patients where replace(replace(phone, ' ', ''), '-', '') = ? and active = true",
                 Long.class, phone);
-        if (ids.isEmpty()) return Map.of("accion", "DESCONOCIDO");
+        if (ids.isEmpty()) return Map.of(ACCION, "DESCONOCIDO");
         // v2.7: "BAJA" retira el consentimiento de publicidad (Ley 29733; Código de Protección al Consumidor, art. 58)
         if (text.matches("^(baja|stop|dar de baja|no (quiero|deseo) (recibir )?(m[aá]s )?(promociones|publicidad|mensajes)).*")) {
             for (Long id : ids) {
                 if (Boolean.FALSE.equals(jdbc.queryForObject("select marketing_consent from patients where id = ?", Boolean.class, id))) continue;
                 jdbc.update("update patients set marketing_consent = false, marketing_consent_at = ? where id = ?", Dates.now(), id);
-                audit.record("PACIENTE", id, "PUBLICIDAD_BAJA", "Pidió la baja de promociones por WhatsApp");
+                audit.register(PACIENTE, id, "PUBLICIDAD_BAJA", "Pidió la baja de promociones por WhatsApp");
             }
-            out.put("accion", "BAJA_PUBLICIDAD");
-            out.put("respuesta", "Listo, ya no te enviaremos promociones. Seguirás recibiendo los avisos de tus citas. Si cambias de opinión, avísanos en recepción.");
+            out.put(ACCION, "BAJA_PUBLICIDAD");
+            out.put(RESPUESTA, "Listo, ya no te enviaremos promociones. Seguirás recibiendo los avisos de tus citas. Si cambias de opinión, avísanos en recepción.");
             return out;
         }
         Appointment next = null;
@@ -392,35 +418,35 @@ public class CareService {
             }
         }
         if (next == null) {
-            out.put("accion", "SIN_CITA");
-            if (option != null) out.put("respuesta", "No encontramos una cita próxima a tu nombre. Si necesitas ayuda, llámanos o escríbenos aquí mismo.");
+            out.put(ACCION, "SIN_CITA");
+            if (option != null) out.put(RESPUESTA, "No encontramos una cita próxima a tu nombre. Si necesitas ayuda, llámanos o escríbenos aquí mismo.");
             return out;
         }
         String when = next.startAt.format(WHEN);
         if ("1".equals(option) && next.status == AppointmentStatus.PROGRAMADA
                 && !next.startAt.isAfter(Dates.now().plusHours(pe.clinicacardenas.portal.PortalService.CONFIRM_HOURS))) {
-            out.put("accion", "PLAZO_VENCIDO");
-            out.put("citaId", next.id);
-            out.put("respuesta", "Tu cita del " + when + " ya no se puede confirmar por aquí (se confirma hasta 2 horas antes). Recepción te llamará en breve.");
+            out.put(ACCION, "PLAZO_VENCIDO");
+            out.put(CITAID, next.id);
+            out.put(RESPUESTA, "Tu cita del " + when + " ya no se puede confirmar por aquí (se confirma hasta 2 horas antes). Recepción te llamará en breve.");
         } else if ("1".equals(option)) {
             if (next.status == AppointmentStatus.PROGRAMADA) {
                 agenda.changeStatus(next.id, new AgendaService.StatusRequest(AppointmentStatus.CONFIRMADA, "Confirmada por WhatsApp"));
             }
-            out.put("accion", "CONFIRMADA");
-            out.put("citaId", next.id);
-            out.put("respuesta", "¡Gracias! Tu cita del " + when + " quedó confirmada. Te esperamos 😊");
+            out.put(ACCION, "CONFIRMADA");
+            out.put(CITAID, next.id);
+            out.put(RESPUESTA, "¡Gracias! Tu cita del " + when + " quedó confirmada. Te esperamos 😊");
         } else if ("2".equals(option)) {
             next.rescheduleRequestedAt = Dates.now();
             appointments.save(next);
-            audit.record("CITA", next.id, "SOLICITA_REPROGRAMAR", "El paciente respondió 2 por WhatsApp");
+            audit.register("CITA", next.id, "SOLICITA_REPROGRAMAR", "El paciente respondió 2 por WhatsApp");
             notices.add(next.patient.id, "CITA_REPROGRAMAR", "Recibimos tu pedido",
                     "Recepción te contactará para elegir un nuevo horario. También puedes reprogramar desde la app.", next.id);
-            out.put("accion", "REPROGRAMAR");
-            out.put("citaId", next.id);
-            out.put("respuesta", "Entendido. Recepción te escribirá para elegir un nuevo horario. También puedes reprogramar desde la app de la clínica.");
+            out.put(ACCION, "REPROGRAMAR");
+            out.put(CITAID, next.id);
+            out.put(RESPUESTA, "Entendido. Recepción te escribirá para elegir un nuevo horario. También puedes reprogramar desde la app de la clínica.");
         } else {
-            out.put("accion", "MENSAJE");
-            out.put("citaId", next.id);
+            out.put(ACCION, "MENSAJE");
+            out.put(CITAID, next.id);
         }
         return out;
     }

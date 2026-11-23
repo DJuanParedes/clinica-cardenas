@@ -27,10 +27,17 @@ import java.util.*;
  */
 @Service
 public class FileService {
+    private static final String ARCHIVO = "ARCHIVO";
+    private static final String CONSENTIMIENTO = "CONSENTIMIENTO";
+    private static final String PRESUPUESTO = "PRESUPUESTO";
+    private static final String RECETA = "RECETA";
+    private static final String APPLICATION_PDF = "application/pdf";
+    private static final String SIGNATUREJPEG = "signatureJpeg";
 
-    public static final List<String> KINDS = List.of("FOTO", "RADIOGRAFIA", "DOCUMENTO", "CONSENTIMIENTO", "RECETA", "PRESUPUESTO");
+
+    public static final List<String> KINDS = List.of("FOTO", "RADIOGRAFIA", "DOCUMENTO", CONSENTIMIENTO, RECETA, PRESUPUESTO);
     private static final Map<String, String> TYPES = Map.of(
-            "image/jpeg", ".jpg", "image/png", ".png", "image/webp", ".webp", "application/pdf", ".pdf");
+            "image/jpeg", ".jpg", "image/png", ".png", "image/webp", ".webp", APPLICATION_PDF, ".pdf");
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final PatientFileRepository files;
@@ -39,7 +46,8 @@ public class FileService {
     private final Path dir;
     private final long maxBytes;
     private final byte[] linkKey;
-    private final String clinicName, clinicAddress;
+    private final String clinicName;
+    private final String clinicAddress;
 
     public FileService(PatientFileRepository files, PatientRepository patients, AuditService audit,
                        @Value("${app.files.dir}") String dir, @Value("${app.files.max-mb:10}") long maxMb,
@@ -86,7 +94,8 @@ public class FileService {
                               boolean share) {
         Patient p = patient(patientId);
         if (file == null || file.isEmpty()) throw ApiException.field("file", "Selecciona un archivo.");
-        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        String contentType = file.getContentType();
+        String type = contentType == null ? "" : contentType.toLowerCase();
         if ("image/jpg".equals(type)) type = "image/jpeg";
         if (!TYPES.containsKey(type)) throw ApiException.field("file", "Solo se aceptan fotos (JPG, PNG, WEBP) o PDF.");
         if (file.getSize() > maxBytes) throw ApiException.field("file", "El archivo supera " + (maxBytes / 1024 / 1024) + " MB.");
@@ -97,7 +106,7 @@ public class FileService {
         try {
             return store(p, file.getBytes(), type, k, t, clean(note), tooth, share, null);
         } catch (IOException e) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVO", "No se pudo guardar el archivo.");
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, ARCHIVO, "No se pudo guardar el archivo.");
         }
     }
 
@@ -106,7 +115,7 @@ public class FileService {
     public PatientFile document(Long patientId, DocumentRequest r) {
         Patient p = patient(patientId);
         String kind = r.kind() == null ? "" : r.kind().trim().toUpperCase();
-        if (!List.of("CONSENTIMIENTO", "RECETA", "PRESUPUESTO").contains(kind)) {
+        if (!List.of(CONSENTIMIENTO, RECETA, PRESUPUESTO).contains(kind)) {
             throw ApiException.field("kind", "Elige consentimiento, receta o presupuesto.");
         }
         if (r.body() == null || r.body().isBlank()) throw ApiException.field("body", "Escribe el contenido del documento.");
@@ -117,12 +126,12 @@ public class FileService {
             try {
                 signature = Base64.getDecoder().decode(b64);
             } catch (IllegalArgumentException e) {
-                throw ApiException.field("signatureJpeg", "La firma no es válida.");
+                throw ApiException.field(SIGNATUREJPEG, "La firma no es válida.");
             }
-            if (SimplePdf.jpegSize(signature) == null) throw ApiException.field("signatureJpeg", "La firma debe ser una imagen JPEG.");
+            if (SimplePdf.jpegSize(signature) == null) throw ApiException.field(SIGNATUREJPEG, "La firma debe ser una imagen JPEG.");
         }
-        if ("CONSENTIMIENTO".equals(kind) && signature == null) {
-            throw ApiException.field("signatureJpeg", "El consentimiento necesita la firma del paciente.");
+        if (CONSENTIMIENTO.equals(kind) && signature == null) {
+            throw ApiException.field(SIGNATUREJPEG, "El consentimiento necesita la firma del paciente.");
         }
         String now = Dates.now().format(DMY);
         SimplePdf pdf = new SimplePdf()
@@ -135,16 +144,15 @@ public class FileService {
                 .space(24);
         if (signature != null) pdf.jpeg(signature, 200);
         pdf.signatureLine("Firma: " + (r.signerName() == null || r.signerName().isBlank() ? p.getFullName() : r.signerName().trim()));
-        if ("RECETA".equals(kind)) pdf.space(30).signatureLine("Firma y sello del odontólogo");
-        PatientFile f = store(p, pdf.build(), "application/pdf", kind, title, null, null,
+        if (RECETA.equals(kind)) pdf.space(30).signatureLine("Firma y sello del odontólogo");
+        return store(p, pdf.build(), APPLICATION_PDF, kind, title, null, null,
                 r.shareWithPatient() == null || r.shareWithPatient(), signature == null ? null : Dates.now());
-        return f;
     }
 
     /** v2.8: guarda un PDF ya generado (consentimiento firmado a distancia). */
     @Transactional
     public PatientFile storeSigned(Long patientId, byte[] pdf, String kind, String title, java.time.LocalDateTime signedAt) {
-        return store(patient(patientId), pdf, "application/pdf", kind, title, null, null, true, signedAt);
+        return store(patient(patientId), pdf, APPLICATION_PDF, kind, title, null, null, true, signedAt);
     }
 
     private PatientFile store(Patient p, byte[] bytes, String type, String kind, String title, String note, Integer tooth,
@@ -153,7 +161,7 @@ public class FileService {
         try {
             Files.write(dir.resolve(name), bytes);
         } catch (IOException e) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVO", "No se pudo guardar el archivo en el servidor.");
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, ARCHIVO, "No se pudo guardar el archivo en el servidor.");
         }
         PatientFile f = new PatientFile();
         f.patientId = p.id;
@@ -169,7 +177,7 @@ public class FileService {
         f.createdAt = Dates.now();
         f.createdBy = CurrentUser.usernameOrSystem();
         files.save(f);
-        audit.record("HISTORIA", p.id, "ARCHIVO", "Agregó " + kind.toLowerCase() + ": " + title);
+        audit.register("HISTORIA", p.id, ARCHIVO, "Agregó " + kind.toLowerCase() + ": " + title);
         return f;
     }
 
@@ -187,7 +195,7 @@ public class FileService {
         f.deletedAt = Dates.now();
         f.deletedBy = CurrentUser.usernameOrSystem();
         files.save(f);
-        audit.record("HISTORIA", f.patientId, "ARCHIVO_ELIMINADO", f.title);
+        audit.register("HISTORIA", f.patientId, "ARCHIVO_ELIMINADO", f.title);
     }
 
     @Transactional
@@ -224,7 +232,7 @@ public class FileService {
         String[] p = token.split("\\.");
         if (p.length != 3) throw ApiException.notFound("El enlace");
         String payload = p[0] + "." + p[1];
-        if (!MessageDigestEquals(sign(prefix + payload), p[2])) throw ApiException.notFound("El enlace");
+        if (!digestEquals(sign(prefix + payload), p[2])) throw ApiException.notFound("El enlace");
         if (Long.parseLong(p[1]) < System.currentTimeMillis() / 1000) {
             throw new ApiException(HttpStatus.GONE, "ENLACE_VENCIDO", "El enlace venció. Vuelve a abrirlo desde la app.");
         }
@@ -241,7 +249,7 @@ public class FileService {
         }
     }
 
-    private static boolean MessageDigestEquals(String a, String b) {
+    private static boolean digestEquals(String a, String b) {
         return java.security.MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -257,19 +265,22 @@ public class FileService {
         return switch (kind) {
             case "FOTO" -> "Foto intraoral";
             case "RADIOGRAFIA" -> "Radiografía";
-            case "CONSENTIMIENTO" -> "Consentimiento informado";
-            case "RECETA" -> "Receta";
-            case "PRESUPUESTO" -> "Presupuesto";
+            case CONSENTIMIENTO -> "Consentimiento informado";
+            case RECETA -> "Receta";
+            case PRESUPUESTO -> "Presupuesto";
             default -> original == null || original.isBlank() ? "Documento" : original;
         };
     }
 
     static boolean validTooth(int t) {
-        int q = t / 10, n = t % 10;
+        int q = t / 10;
+        int n = t % 10;
         return (q >= 1 && q <= 4 && n >= 1 && n <= 8) || (q >= 5 && q <= 8 && n >= 1 && n <= 5);
     }
 
     private static String clean(String s) {
-        return s == null || s.isBlank() ? null : (s.trim().length() > 500 ? s.trim().substring(0, 500) : s.trim());
+        if (s == null || s.isBlank()) return null;
+        String t = s.trim();
+        return t.length() > 500 ? t.substring(0, 500) : t;
     }
 }

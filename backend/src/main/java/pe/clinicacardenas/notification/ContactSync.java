@@ -88,6 +88,8 @@ public class ContactSync {
                     .build();
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (res.statusCode() >= 300) log.warn("Agenda de WhatsApp: el microservicio respondió {}", res.statusCode());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
         } catch (Exception ex) {
             log.debug("Agenda de WhatsApp no sincronizada: {}", ex.getMessage());
         }

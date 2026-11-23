@@ -66,7 +66,7 @@ async function v211(BASE) {
     expect((await j('POST', `/api/admin/records/patients/${p.id}/delete`, { confirm: 'ELIMINAR' }, rc)).s === 403, 'recepción eliminó');
     const pv = (await j('GET', `/api/admin/records/patients/${p.id}/preview`, null, ad)).b;
     expect(pv.canDelete, 'no deja eliminar: ' + JSON.stringify(pv.blockers));
-    if (t.b && t.b.id) expect(pv.unlinked['tareas'] === 1, 'no avisa de la tarea: ' + JSON.stringify(pv));
+    if (t.b && t.b.id) expect(pv.alsoDeleted['tareas'] === 1, 'no avisa de la tarea (se borra con el paciente desde 2.11.2): ' + JSON.stringify(pv));
     expect((await j('POST', `/api/admin/records/patients/${p.id}/delete`, { confirm: 'si' }, ad)).s === 400, 'borró sin escribir ELIMINAR');
     const d = await j('POST', `/api/admin/records/patients/${p.id}/delete`, { confirm: 'ELIMINAR', reason: 'prueba 2.11' }, ad);
     expect(d.s === 200, 'eliminar ' + d.s);

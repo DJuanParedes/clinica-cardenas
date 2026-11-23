@@ -33,9 +33,8 @@ public record AutomationRule(String code, String name, String kind, int amount, 
             }
             case "DESPUES" -> {
                 LocalDateTime base = end == null ? now : end;
-                at = "DIAS".equals(unit)
-                        ? base.toLocalDate().plusDays(amount).atTime(sendTime == null ? LocalTime.of(18, 0) : sendTime)
-                        : base.plusHours(amount);
+                LocalTime hour = sendTime == null ? LocalTime.of(18, 0) : sendTime;
+                at = "DIAS".equals(unit) ? base.toLocalDate().plusDays(amount).atTime(hour) : base.plusHours(amount);
                 if (at.isBefore(now)) at = now; // se marcó atendida tarde: se envía ya
                 return at;
             }

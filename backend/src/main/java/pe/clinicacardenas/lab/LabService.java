@@ -25,32 +25,48 @@ import java.util.*;
  */
 @Service
 public class LabService {
+    private static final String ANULADA = "ANULADA";
+    private static final String ENTREGADA_2 = "ENTREGADA";
+    private static final String ENVIADA_2 = "ENVIADA";
+    private static final String EN_PRUEBA_2 = "EN_PRUEBA";
+    private static final String LABORATORIO_2 = "LABORATORIO";
+    private static final String POR_ENVIAR_2 = "POR_ENVIAR";
+    private static final String RECIBIDA_2 = "RECIBIDA";
+    private static final String BALANCE = "balance";
+    private static final String LABORATORYID = "laboratoryId";
+    private static final String PATIENTID = "patientId";
+    private static final String STATUS = "status";
+    private static final String TEETH = "teeth";
+    private static final String TREATMENTITEMID = "treatmentItemId";
+    private static final String WORKTYPE = "workType";
 
-    public static final Map<String, String> WORK_TYPES = new LinkedHashMap<>();
+
+    private static final Map<String, String> WORK_TYPES_EDIT = new LinkedHashMap<>();
+    public static final Map<String, String> WORK_TYPES = java.util.Collections.unmodifiableMap(WORK_TYPES_EDIT);
     static {
-        WORK_TYPES.put("CORONA", "Corona");
-        WORK_TYPES.put("PUENTE", "Puente fijo");
-        WORK_TYPES.put("INCRUSTACION", "Incrustación (inlay / onlay)");
-        WORK_TYPES.put("CARILLA", "Carillas");
-        WORK_TYPES.put("PERNO", "Perno muñón colado");
-        WORK_TYPES.put("PROTESIS_TOTAL", "Prótesis total");
-        WORK_TYPES.put("PROTESIS_PARCIAL", "Prótesis parcial removible");
-        WORK_TYPES.put("PROTESIS_IMPLANTE", "Prótesis sobre implante");
-        WORK_TYPES.put("PLACA", "Placa miorrelajante / de bruxismo");
-        WORK_TYPES.put("ORTODONCIA", "Aparato de ortodoncia / retenedor");
-        WORK_TYPES.put("ALINEADORES", "Alineadores");
-        WORK_TYPES.put("MODELOS", "Modelos de estudio / encerado");
-        WORK_TYPES.put("OTRO", "Otro trabajo");
+        WORK_TYPES_EDIT.put("CORONA", "Corona");
+        WORK_TYPES_EDIT.put("PUENTE", "Puente fijo");
+        WORK_TYPES_EDIT.put("INCRUSTACION", "Incrustación (inlay / onlay)");
+        WORK_TYPES_EDIT.put("CARILLA", "Carillas");
+        WORK_TYPES_EDIT.put("PERNO", "Perno muñón colado");
+        WORK_TYPES_EDIT.put("PROTESIS_TOTAL", "Prótesis total");
+        WORK_TYPES_EDIT.put("PROTESIS_PARCIAL", "Prótesis parcial removible");
+        WORK_TYPES_EDIT.put("PROTESIS_IMPLANTE", "Prótesis sobre implante");
+        WORK_TYPES_EDIT.put("PLACA", "Placa miorrelajante / de bruxismo");
+        WORK_TYPES_EDIT.put("ORTODONCIA", "Aparato de ortodoncia / retenedor");
+        WORK_TYPES_EDIT.put("ALINEADORES", "Alineadores");
+        WORK_TYPES_EDIT.put("MODELOS", "Modelos de estudio / encerado");
+        WORK_TYPES_EDIT.put("OTRO", "Otro trabajo");
     }
 
-    public static final List<String> STATUSES = List.of("POR_ENVIAR", "ENVIADA", "EN_PRUEBA", "RECIBIDA", "ENTREGADA", "ANULADA");
+    public static final List<String> STATUSES = List.of(POR_ENVIAR_2, ENVIADA_2, EN_PRUEBA_2, RECIBIDA_2, ENTREGADA_2, ANULADA);
     private static final Map<String, Set<String>> NEXT = Map.of(
-            "POR_ENVIAR", Set.of("ENVIADA", "ANULADA"),
-            "ENVIADA", Set.of("EN_PRUEBA", "RECIBIDA", "ANULADA"),
-            "EN_PRUEBA", Set.of("ENVIADA", "RECIBIDA", "ANULADA"),
-            "RECIBIDA", Set.of("ENTREGADA", "EN_PRUEBA", "ANULADA"),
-            "ENTREGADA", Set.of(),
-            "ANULADA", Set.of());
+            POR_ENVIAR_2, Set.of(ENVIADA_2, ANULADA),
+            ENVIADA_2, Set.of(EN_PRUEBA_2, RECIBIDA_2, ANULADA),
+            EN_PRUEBA_2, Set.of(ENVIADA_2, RECIBIDA_2, ANULADA),
+            RECIBIDA_2, Set.of(ENTREGADA_2, EN_PRUEBA_2, ANULADA),
+            ENTREGADA_2, Set.of(),
+            ANULADA, Set.of());
 
     private final JdbcTemplate jdbc;
     private final CashService cash;
@@ -92,9 +108,9 @@ public class LabService {
         String ruc = clean(r.ruc(), 11);
         if (ruc != null && !RucValidator.isValid(ruc)) e.put("ruc", "El RUC no es válido.");
         String phone = clean(r.phone(), 15);
-        if (phone != null && !phone.replaceAll("[^0-9]", "").matches("^\\d{6,9}$")) e.put("phone", "Teléfono no válido.");
+        if (phone != null && !phone.replaceAll("\\D", "").matches("^\\d{6,9}$")) e.put("phone", "Teléfono no válido.");
         String email = clean(r.email(), 120);
-        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) e.put("email", "Correo no válido.");
+        if (email != null && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (name != null) {
             Integer dup = jdbc.queryForObject("select count(*) from laboratories where lower(name) = lower(?) and id <> ?", Integer.class, name, id == null ? -1L : id);
             if (dup != null && dup > 0) e.put("name", "Ya existe un laboratorio con ese nombre.");
@@ -105,12 +121,12 @@ public class LabService {
             jdbc.update("insert into laboratories (name, ruc, phone, email, contact, address, notes, active, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?)",
                     name, ruc, phone, email, clean(r.contact(), 120), clean(r.address(), 200), clean(r.notes(), 300), active, Dates.now(), CurrentUser.usernameOrSystem());
             id = jdbc.queryForObject("select id from laboratories where name = ?", Long.class, name);
-            audit.record("LABORATORIO", id, "CREAR", name);
+            audit.register(LABORATORIO_2, id, "CREAR", name);
         } else {
             int n = jdbc.update("update laboratories set name=?, ruc=?, phone=?, email=?, contact=?, address=?, notes=?, active=? where id=?",
                     name, ruc, phone, email, clean(r.contact(), 120), clean(r.address(), 200), clean(r.notes(), 300), active, id);
             if (n == 0) throw ApiException.notFound("El laboratorio");
-            audit.record("LABORATORIO", id, "EDITAR", name + (active ? "" : " (inactivo)"));
+            audit.register(LABORATORIO_2, id, "EDITAR", name + (active ? "" : " (inactivo)"));
         }
         Long fid = id;
         return labs(true).stream().filter(l -> fid.equals(((Number) l.get("id")).longValue())).findFirst().orElseThrow();
@@ -150,7 +166,7 @@ public class LabService {
         }
         List<Map<String, Object>> rows = jdbc.queryForList(ORDER_SELECT + where + " order by field(o.status,'ENVIADA','EN_PRUEBA','RECIBIDA','POR_ENVIAR','ENTREGADA','ANULADA'), o.due_date is null, o.due_date, o.id desc limit 300", args.toArray());
         rows.forEach(this::decorate);
-        if (unpaid) rows = rows.stream().filter(r -> ((BigDecimal) r.get("balance")).signum() > 0).toList();
+        if (unpaid) rows = rows.stream().filter(r -> ((BigDecimal) r.get(BALANCE)).signum() > 0).toList();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("items", rows);
         m.put("summary", summary(patientId));
@@ -158,21 +174,24 @@ public class LabService {
     }
 
     public Map<String, Object> summary(Long patientId) {
-        String pf = patientId == null ? "" : " and o.patient_id = " + patientId;
+        // Filtro por paciente siempre como parámetro enlazado (nunca concatenado en el SQL).
+        String pf = patientId == null ? "" : " and o.patient_id = ?";
+        Object[] pa = patientId == null ? new Object[0] : new Object[]{patientId};
         Map<String, Object> s = new LinkedHashMap<>();
-        s.put("porEnviar", count("o.status = 'POR_ENVIAR'" + pf));
-        s.put("enLaboratorio", count("o.status in ('ENVIADA','EN_PRUEBA')" + pf));
-        s.put("vencidas", jdbc.queryForObject("select count(*) from lab_orders o where o.status in ('ENVIADA','EN_PRUEBA') and o.due_date < ?" + pf, Integer.class, Dates.today()));
-        s.put("porEntregar", count("o.status = 'RECIBIDA'" + pf));
-        BigDecimal cost = jdbc.queryForObject("select coalesce(sum(o.cost),0) from lab_orders o where o.status <> 'ANULADA'" + pf, BigDecimal.class);
+        s.put("porEnviar", count("o.status = 'POR_ENVIAR'" + pf, pa));
+        s.put("enLaboratorio", count("o.status in ('ENVIADA','EN_PRUEBA')" + pf, pa));
+        Object[] va = patientId == null ? new Object[]{Dates.today()} : new Object[]{Dates.today(), patientId};
+        s.put("vencidas", jdbc.queryForObject("select count(*) from lab_orders o where o.status in ('ENVIADA','EN_PRUEBA') and o.due_date < ?" + pf, Integer.class, va));
+        s.put("porEntregar", count("o.status = 'RECIBIDA'" + pf, pa));
+        BigDecimal cost = jdbc.queryForObject("select coalesce(sum(o.cost),0) from lab_orders o where o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
         BigDecimal paid = jdbc.queryForObject("select coalesce(sum(pp.amount),0) from lab_order_payments pp join expenses x on x.id = pp.expense_id"
-                + " join lab_orders o on o.id = pp.order_id where x.status = 'VALIDO' and o.status <> 'ANULADA'" + pf, BigDecimal.class);
-        s.put("porPagar", cost.subtract(paid).max(BigDecimal.ZERO));
+                + " join lab_orders o on o.id = pp.order_id where x.status = 'VALIDO' and o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
+        s.put("porPagar", nz(cost).subtract(nz(paid)).max(BigDecimal.ZERO));
         return s;
     }
 
-    private Integer count(String cond) {
-        return jdbc.queryForObject("select count(*) from lab_orders o where " + cond, Integer.class);
+    private Integer count(String cond, Object... args) {
+        return jdbc.queryForObject("select count(*) from lab_orders o where " + cond, Integer.class, args);
     }
 
     public Map<String, Object> get(Long id) {
@@ -183,9 +202,9 @@ public class LabService {
         m.put("payments", jdbc.queryForList("""
                 select pp.id, pp.amount, x.id as expenseId, x.expense_date as date, x.method, x.reference, x.status, x.created_by as createdBy
                   from lab_order_payments pp join expenses x on x.id = pp.expense_id where pp.order_id = ? order by pp.id""", id));
-        if (m.get("treatmentItemId") != null) {
+        if (m.get(TREATMENTITEMID) != null) {
             m.put("treatmentItem", jdbc.queryForList("select ti.id, pr.name as `procedure`, ti.tooth, ti.status from treatment_items ti join procedures pr on pr.id = ti.procedure_id where ti.id = ?",
-                    m.get("treatmentItemId")).stream().findFirst().orElse(null));
+                    m.get(TREATMENTITEMID)).stream().findFirst().orElse(null));
         }
         return m;
     }
@@ -193,12 +212,14 @@ public class LabService {
     private Map<String, Object> decorate(Map<String, Object> r) {
         BigDecimal cost = (BigDecimal) r.get("cost");
         BigDecimal paid = (BigDecimal) r.get("paid");
-        r.put("balance", "ANULADA".equals(r.get("status")) ? BigDecimal.ZERO : cost.subtract(paid).max(BigDecimal.ZERO));
-        r.put("workTypeLabel", WORK_TYPES.getOrDefault((String) r.get("workType"), (String) r.get("workType")));
+        r.put(BALANCE, ANULADA.equals(r.get(STATUS)) ? BigDecimal.ZERO : cost.subtract(paid).max(BigDecimal.ZERO));
+        r.put("workTypeLabel", WORK_TYPES.getOrDefault((String) r.get(WORKTYPE), (String) r.get(WORKTYPE)));
         Object due = r.get("dueDate");
-        LocalDate d = due instanceof java.sql.Date sd ? sd.toLocalDate() : due instanceof LocalDate ld ? ld : null;
-        String st = (String) r.get("status");
-        boolean inLab = "ENVIADA".equals(st) || "EN_PRUEBA".equals(st);
+        LocalDate d = null;
+        if (due instanceof java.sql.Date sd) d = sd.toLocalDate();
+        else if (due instanceof LocalDate ld) d = ld;
+        String st = (String) r.get(STATUS);
+        boolean inLab = ENVIADA_2.equals(st) || EN_PRUEBA_2.equals(st);
         r.put("overdue", inLab && d != null && d.isBefore(Dates.today()));
         r.put("daysLeft", inLab && d != null ? java.time.temporal.ChronoUnit.DAYS.between(Dates.today(), d) : null);
         r.put("next", NEXT.getOrDefault(st, Set.of()).stream().sorted(Comparator.comparingInt(STATUSES::indexOf)).toList());
@@ -214,19 +235,19 @@ public class LabService {
                 insert into lab_orders (patient_id, laboratory_id, dentist_id, plan_id, treatment_item_id, work_type, description, teeth, shade, material,
                   status, sent_at, due_date, cost, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 r.patientId(), r.laboratoryId(), v.dentistId, v.planId, v.itemId, v.workType, v.description, v.teeth, v.shade, v.material,
-                send ? "ENVIADA" : "POR_ENVIAR", send ? Dates.today() : null, r.dueDate(), v.cost, v.notes, Dates.now(), user);
+                send ? ENVIADA_2 : POR_ENVIAR_2, send ? Dates.today() : null, r.dueDate(), v.cost, v.notes, Dates.now(), user);
         Long id = jdbc.queryForObject("select max(id) from lab_orders where created_by = ?", Long.class, user);
-        event(id, send ? "ENVIADA" : "POR_ENVIAR", send ? "Orden creada y enviada al laboratorio" : "Orden creada");
-        audit.record("LABORATORIO", id, "ORDEN", WORK_TYPES.get(v.workType) + " · " + v.description + " · S/ " + v.cost);
+        event(id, send ? ENVIADA_2 : POR_ENVIAR_2, send ? "Orden creada y enviada al laboratorio" : "Orden creada");
+        audit.register(LABORATORIO_2, id, "ORDEN", WORK_TYPES.get(v.workType) + " · " + v.description + " · S/ " + v.cost);
         return get(id);
     }
 
     @Transactional
     public Map<String, Object> update(Long id, OrderRequest r) {
         Map<String, Object> o = get(id);
-        String st = (String) o.get("status");
-        if ("ENTREGADA".equals(st) || "ANULADA".equals(st)) throw ApiException.badRequest("ORDEN_CERRADA", "La orden ya está " + st.toLowerCase() + ".");
-        Values v = validate(new OrderRequest(((Number) o.get("patientId")).longValue(), r.laboratoryId(), r.dentistId(), r.planId(), r.treatmentItemId(),
+        String st = (String) o.get(STATUS);
+        if (ENTREGADA_2.equals(st) || ANULADA.equals(st)) throw ApiException.badRequest("ORDEN_CERRADA", "La orden ya está " + st.toLowerCase() + ".");
+        Values v = validate(new OrderRequest(((Number) o.get(PATIENTID)).longValue(), r.laboratoryId(), r.dentistId(), r.planId(), r.treatmentItemId(),
                 r.workType(), r.description(), r.teeth(), r.shade(), r.material(), r.dueDate(), r.cost(), r.notes(), null), id);
         BigDecimal paid = (BigDecimal) o.get("paid");
         if (v.cost.compareTo(paid) < 0) throw ApiException.field("cost", "Ya se pagó S/ " + paid + ": el costo no puede ser menor.");
@@ -235,14 +256,14 @@ public class LabService {
                   material=?, due_date=?, cost=?, notes=?, updated_at=?, updated_by=? where id=?""",
                 r.laboratoryId(), v.dentistId, v.planId, v.itemId, v.workType, v.description, v.teeth, v.shade, v.material, r.dueDate(), v.cost, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem(), id);
-        audit.record("LABORATORIO", id, "EDITAR", v.description);
+        audit.register(LABORATORIO_2, id, "EDITAR", v.description);
         return get(id);
     }
 
     @Transactional
     public Map<String, Object> changeStatus(Long id, StatusRequest r) {
         Map<String, Object> o = get(id);
-        String from = (String) o.get("status");
+        String from = (String) o.get(STATUS);
         String to = r.status() == null ? "" : r.status().trim().toUpperCase();
         if (!NEXT.getOrDefault(from, Set.of()).contains(to)) {
             throw ApiException.badRequest("TRANSICION_INVALIDA", "No se puede pasar de " + label(from) + " a " + label(to) + ".");
@@ -251,10 +272,10 @@ public class LabService {
         LocalDate date = r.date() == null ? Dates.today() : r.date();
         if (date.isAfter(Dates.today())) throw ApiException.field("date", "La fecha no puede ser futura.");
         switch (to) {
-            case "ENVIADA" -> jdbc.update("update lab_orders set status=?, sent_at=coalesce(sent_at, ?) where id=?", to, date, id);
-            case "RECIBIDA" -> jdbc.update("update lab_orders set status=?, received_at=? where id=?", to, date, id);
-            case "ENTREGADA" -> jdbc.update("update lab_orders set status=?, delivered_at=? where id=?", to, date, id);
-            case "ANULADA" -> {
+            case ENVIADA_2 -> jdbc.update("update lab_orders set status=?, sent_at=coalesce(sent_at, ?) where id=?", to, date, id);
+            case RECIBIDA_2 -> jdbc.update("update lab_orders set status=?, received_at=? where id=?", to, date, id);
+            case ENTREGADA_2 -> jdbc.update("update lab_orders set status=?, delivered_at=? where id=?", to, date, id);
+            case ANULADA -> {
                 if (note == null) throw ApiException.field("note", "Indica el motivo de la anulación.");
                 jdbc.update("update lab_orders set status=?, void_reason=? where id=?", to, note, id);
             }
@@ -262,7 +283,7 @@ public class LabService {
         }
         jdbc.update("update lab_orders set updated_at=?, updated_by=? where id=?", Dates.now(), CurrentUser.usernameOrSystem(), id);
         event(id, to, note);
-        audit.record("LABORATORIO", id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
+        audit.register(LABORATORIO_2, id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
         return get(id);
     }
 
@@ -270,17 +291,17 @@ public class LabService {
     @Transactional
     public Map<String, Object> pay(Long id, PaymentRequest r) {
         Map<String, Object> o = get(id);
-        if ("ANULADA".equals(o.get("status"))) throw ApiException.badRequest("ORDEN_ANULADA", "La orden está anulada.");
-        BigDecimal balance = (BigDecimal) o.get("balance");
+        if (ANULADA.equals(o.get(STATUS))) throw ApiException.badRequest("ORDEN_ANULADA", "La orden está anulada.");
+        BigDecimal balance = (BigDecimal) o.get(BALANCE);
         if (r.amount() == null || r.amount().signum() <= 0) throw ApiException.field("amount", "Ingresa el importe pagado.");
         BigDecimal amount = r.amount().setScale(2, RoundingMode.HALF_UP);
         if (amount.compareTo(balance) > 0) throw ApiException.field("amount", "El saldo por pagar es S/ " + balance + ".");
-        String concept = "Laboratorio " + o.get("code") + " · " + o.get("workTypeLabel") + (o.get("teeth") == null ? "" : " " + o.get("teeth"))
+        String concept = "Laboratorio " + o.get("code") + " · " + o.get("workTypeLabel") + (o.get(TEETH) == null ? "" : " " + o.get(TEETH))
                 + " · " + o.get("patientName");
-        var expense = cash.registerExpense(new CashService.ExpenseRequest(r.date(), "LABORATORIO", concept.length() > 200 ? concept.substring(0, 200) : concept,
+        var expense = cash.registerExpense(new CashService.ExpenseRequest(r.date(), LABORATORIO_2, concept.length() > 200 ? concept.substring(0, 200) : concept,
                 amount, r.method(), r.reference(), (String) o.get("laboratoryName")));
         jdbc.update("insert into lab_order_payments (order_id, expense_id, amount) values (?,?,?)", id, expense.id, amount);
-        event(id, (String) o.get("status"), "Pago al laboratorio S/ " + amount + " (" + r.method() + ")");
+        event(id, (String) o.get(STATUS), "Pago al laboratorio S/ " + amount + " (" + r.method() + ")");
         return get(id);
     }
 
@@ -291,23 +312,23 @@ public class LabService {
 
     private Values validate(OrderRequest r, Long id) {
         Map<String, String> e = new LinkedHashMap<>();
-        if (r.patientId() == null) e.put("patientId", "Elige al paciente.");
+        if (r.patientId() == null) e.put(PATIENTID, "Elige al paciente.");
         else {
             Integer c = jdbc.queryForObject("select count(*) from patients where id = ?", Integer.class, r.patientId());
-            if (c == null || c == 0) e.put("patientId", "Paciente no encontrado.");
+            if (c == null || c == 0) e.put(PATIENTID, "Paciente no encontrado.");
         }
-        if (r.laboratoryId() == null) e.put("laboratoryId", "Elige el laboratorio.");
+        if (r.laboratoryId() == null) e.put(LABORATORYID, "Elige el laboratorio.");
         else {
             List<Boolean> act = jdbc.queryForList("select active from laboratories where id = ?", Boolean.class, r.laboratoryId());
-            if (act.isEmpty()) e.put("laboratoryId", "Laboratorio no encontrado.");
-            else if (id == null && !act.get(0)) e.put("laboratoryId", "Ese laboratorio está inactivo.");
+            if (act.isEmpty()) e.put(LABORATORYID, "Laboratorio no encontrado.");
+            else if (id == null && !act.get(0)) e.put(LABORATORYID, "Ese laboratorio está inactivo.");
         }
         String type = r.workType() == null ? null : r.workType().trim().toUpperCase();
-        if (type == null || !WORK_TYPES.containsKey(type)) e.put("workType", "Elige el tipo de trabajo.");
+        if (type == null || !WORK_TYPES.containsKey(type)) e.put(WORKTYPE, "Elige el tipo de trabajo.");
         String desc = clean(r.description(), 300);
         if (desc == null || desc.length() < 3) e.put("description", "Describe el trabajo (ej.: corona de zirconio pieza 16).");
         String teeth = clean(r.teeth(), 60);
-        if (teeth != null && !teeth.matches("^[0-9 ,\\-a-zA-ZáéíóúÁÉÍÓÚ]+$")) e.put("teeth", "Escribe las piezas FDI separadas por coma (ej.: 16, 17).");
+        if (teeth != null && !teeth.matches("^[0-9 ,\\-a-zA-ZáéíóúÁÉÍÓÚ]+$")) e.put(TEETH, "Escribe las piezas FDI separadas por coma (ej.: 16, 17).");
         BigDecimal cost = r.cost() == null ? BigDecimal.ZERO : r.cost().setScale(2, RoundingMode.HALF_UP);
         if (cost.signum() < 0 || cost.compareTo(new BigDecimal("50000")) > 0) e.put("cost", "Costo entre S/ 0 y S/ 50 000.");
         if (r.dueDate() != null && id == null && r.dueDate().isBefore(Dates.today())) e.put("dueDate", "La fecha de entrega no puede ser pasada.");
@@ -316,11 +337,12 @@ public class LabService {
             dentist = jdbc.queryForList("select d.id from dentists d join users u on u.id = d.user_id where lower(u.username) = lower(?)", Long.class,
                     CurrentUser.usernameOrSystem()).stream().findFirst().orElse(null);
         }
-        Long plan = r.planId(), item = r.treatmentItemId();
+        Long plan = r.planId();
+        Long item = r.treatmentItemId();
         if (item != null && r.patientId() != null) {
             List<Long> p = jdbc.queryForList("select tp.id from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id where ti.id = ? and tp.patient_id = ?",
                     Long.class, item, r.patientId());
-            if (p.isEmpty()) e.put("treatmentItemId", "Ese procedimiento no es del paciente.");
+            if (p.isEmpty()) e.put(TREATMENTITEMID, "Ese procedimiento no es del paciente.");
             else plan = p.get(0);
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos de la orden.", e);
@@ -334,12 +356,12 @@ public class LabService {
 
     public static String label(String s) {
         return switch (s == null ? "" : s) {
-            case "POR_ENVIAR" -> "Por enviar";
-            case "ENVIADA" -> "En laboratorio";
-            case "EN_PRUEBA" -> "En prueba";
-            case "RECIBIDA" -> "Recibida";
-            case "ENTREGADA" -> "Entregada";
-            case "ANULADA" -> "Anulada";
+            case POR_ENVIAR_2 -> "Por enviar";
+            case ENVIADA_2 -> "En laboratorio";
+            case EN_PRUEBA_2 -> "En prueba";
+            case RECIBIDA_2 -> "Recibida";
+            case ENTREGADA_2 -> "Entregada";
+            case ANULADA -> "Anulada";
             default -> s;
         };
     }
@@ -349,4 +371,5 @@ public class LabService {
         String t = s.trim().replaceAll("\\s+", " ");
         return t.length() > max ? t.substring(0, max) : t;
     }
+    private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 }

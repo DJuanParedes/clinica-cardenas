@@ -35,6 +35,17 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component
 public class NotificationDispatcher {
+    private static final String PATH_MESSAGES = "/v1/mensajes";
+    private static final String PATH_REMINDERS = "/v1/recordatorios";
+    private static final String ANULADO = "ANULADO";
+    private static final String ANULAR = "ANULAR";
+    private static final String ENTREGADO_2 = "ENTREGADO";
+    private static final String ENVIADO = "ENVIADO";
+    private static final String FALLIDO = "FALLIDO";
+    private static final String PENDIENTE = "PENDIENTE";
+    private static final String PROGRAMAR = "PROGRAMAR";
+    private static final String ERROR = "error";
+
 
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatcher.class);
     private static final int MAX_ATTEMPTS = 5;
@@ -91,7 +102,7 @@ public class NotificationDispatcher {
 
     private void deliver(Long id) {
         Notification n = tx.execute(s -> repo.findById(id).orElse(null));
-        if (n == null || !"PENDIENTE".equals(n.status)) return;
+        if (n == null || !PENDIENTE.equals(n.status)) return;
         String status;
         String error = null;
         String providerId = null;
@@ -105,55 +116,58 @@ public class NotificationDispatcher {
             if (code >= 200 && code < 300) {
                 providerId = body.get("id") == null ? null : String.valueOf(body.get("id"));
                 String state = body.get("estado") == null ? "" : String.valueOf(body.get("estado"));
-                if ("ANULAR".equals(n.operation)) {
-                    status = "ANULADO";
+                if (ANULAR.equals(n.operation)) {
+                    status = ANULADO;
                 } else if (Boolean.TRUE.equals(body.get("duplicado"))) {
                     status = "DUPLICADO";
                     error = "El microservicio ya había procesado este mensaje: no se reenvió.";
-                } else if ("PROGRAMAR".equals(n.operation)) {
+                } else if (PROGRAMAR.equals(n.operation)) {
                     status = "PROGRAMADO";
-                } else if ("FALLIDO".equals(state)) {
-                    status = "FALLIDO";
-                    error = body.get("error") == null ? "El proveedor rechazó el mensaje." : String.valueOf(body.get("error"));
+                } else if (FALLIDO.equals(state)) {
+                    status = FALLIDO;
+                    error = body.get(ERROR) == null ? "El proveedor rechazó el mensaje." : String.valueOf(body.get(ERROR));
                 } else {
-                    status = "ENVIADO";
+                    status = ENVIADO;
                     sentAt = Dates.now();
                 }
-            } else if (code == 404 && "ANULAR".equals(n.operation)) {
-                status = "ANULADO"; // ya no existía en el microservicio
+            } else if (code == 404 && ANULAR.equals(n.operation)) {
+                status = ANULADO; // ya no existía en el microservicio
             } else if (code >= 400 && code < 500) {
-                status = "FALLIDO";
-                error = body.get("error") == null ? "Solicitud rechazada (HTTP " + code + ")" : String.valueOf(body.get("error"));
+                status = FALLIDO;
+                error = body.get(ERROR) == null ? "Solicitud rechazada (HTTP " + code + ")" : String.valueOf(body.get(ERROR));
             } else {
-                status = "PENDIENTE";
+                status = PENDIENTE;
                 retry = true;
                 error = "Microservicio no disponible (HTTP " + code + ")";
             }
         } catch (Exception e) {
-            status = "PENDIENTE";
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            status = PENDIENTE;
             retry = true;
             error = "Sin conexión con el microservicio de notificaciones";
         }
-        final String fStatus = status, fError = error, fProvider = providerId;
+        final String fStatus = status;
+        final String fError = error;
+        final String fProvider = providerId;
         final LocalDateTime fSent = sentAt;
         final boolean fRetry = retry;
         tx.executeWithoutResult(s -> repo.lockById(id).ifPresent(x -> {
-            if (!"PENDIENTE".equals(x.status)) {
+            if (!PENDIENTE.equals(x.status)) {
                 // Anulada mientras se enviaba: si el microservicio alcanzó a programarla, se pide anularla allá también.
-                if ("ANULADO".equals(x.status) && "PROGRAMAR".equals(x.operation) && "PROGRAMADO".equals(fStatus)) {
+                if (ANULADO.equals(x.status) && PROGRAMAR.equals(x.operation) && "PROGRAMADO".equals(fStatus)) {
                     String key = "anular:" + x.idempotencyKey;
                     if (!repo.existsByIdempotencyKey(key)) {
                         Notification c = new Notification();
                         c.patientId = x.patientId;
                         c.appointmentId = x.appointmentId;
                         c.type = "RECORDATORIO";
-                        c.operation = "ANULAR";
+                        c.operation = ANULAR;
                         c.channel = x.channel;
                         c.destination = x.destination;
                         c.subject = "Anular recordatorio";
                         c.body = "Se anula el recordatorio " + x.idempotencyKey;
                         c.idempotencyKey = key;
-                        c.status = "PENDIENTE";
+                        c.status = PENDIENTE;
                         c.createdAt = Dates.now();
                         repo.save(c);
                         again.set(true);
@@ -167,7 +181,7 @@ public class NotificationDispatcher {
             if (fProvider != null) x.providerId = fProvider;
             if (fRetry) {
                 if (x.attempts >= MAX_ATTEMPTS) {
-                    x.status = "FALLIDO";
+                    x.status = FALLIDO;
                 } else {
                     x.nextAttemptAt = Dates.now().plusSeconds(30L * (1L << (x.attempts - 1)));
                 }
@@ -181,9 +195,9 @@ public class NotificationDispatcher {
         if (retry) log.debug("Notificación {} pendiente: {}", id, error);
     }
 
-    private HttpResponse<String> call(Notification n) throws Exception {
+    private HttpResponse<String> call(Notification n) throws java.io.IOException, InterruptedException {
         HttpRequest.Builder b;
-        if ("ANULAR".equals(n.operation)) {
+        if (ANULAR.equals(n.operation)) {
             String target = n.idempotencyKey.substring("anular:".length());
             b = HttpRequest.newBuilder(URI.create(baseUrl + "/v1/recordatorios/" + URLEncoder.encode(target, StandardCharsets.UTF_8))).DELETE();
         } else {
@@ -211,9 +225,9 @@ public class NotificationDispatcher {
                     payload.put("paciente", pac);
                 });
             }
-            String path = "/v1/mensajes";
-            if ("PROGRAMAR".equals(n.operation)) {
-                path = "/v1/recordatorios";
+            String path = PATH_MESSAGES;
+            if (PROGRAMAR.equals(n.operation)) {
+                path = PATH_REMINDERS;
                 payload.put("enviarEn", n.scheduledFor == null ? null : n.scheduledFor.atZone(Dates.ZONE).toOffsetDateTime().toString());
             }
             b = HttpRequest.newBuilder(URI.create(baseUrl + path))
@@ -226,19 +240,19 @@ public class NotificationDispatcher {
     /** Resultado que informa el microservicio cuando envía un recordatorio programado (webhook). */
     public boolean applyCallback(String key, String state, String error, String providerId) {
         Boolean ok = tx.execute(s -> repo.findByIdempotencyKey(key).map(n -> {
-            if ("ANULADO".equals(n.status)) return true;
+            if (ANULADO.equals(n.status)) return true;
             // Estados de entrega de WhatsApp (webhook de Meta): ENTREGADO y LEIDO solo avanzan, nunca retroceden
-            if ("ENTREGADO".equals(state) || "LEIDO".equals(state)) {
-                if ("LEIDO".equals(n.status) || ("ENTREGADO".equals(n.status) && "ENTREGADO".equals(state))) return true;
+            if (ENTREGADO_2.equals(state) || "LEIDO".equals(state)) {
+                if ("LEIDO".equals(n.status) || (ENTREGADO_2.equals(n.status) && ENTREGADO_2.equals(state))) return true;
                 n.status = state;
                 n.updatedAt = Dates.now();
                 repo.save(n);
                 return true;
             }
-            n.status = "ENVIADO".equals(state) ? "ENVIADO" : "FALLIDO";
+            n.status = ENVIADO.equals(state) ? ENVIADO : FALLIDO;
             n.lastError = error;
             if (providerId != null) n.providerId = providerId;
-            if ("ENVIADO".equals(n.status)) n.sentAt = Dates.now();
+            if (ENVIADO.equals(n.status)) n.sentAt = Dates.now();
             n.updatedAt = Dates.now();
             repo.save(n);
             return true;

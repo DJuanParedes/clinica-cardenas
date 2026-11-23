@@ -23,6 +23,13 @@ import java.util.Optional;
 
 @Service
 public class AuthService {
+    private static final String CORREO_2 = "CORREO";
+    private static final String USUARIO = "USUARIO";
+    private static final String EMAIL = "email";
+    private static final String ENABLED = "enabled";
+    private static final String MESSAGE = "message";
+    private static final String METHOD = "method";
+
 
     private static final String GENERIC_RECOVER_MSG =
             "Si los datos corresponden a una cuenta activa, enviamos un código de 6 dígitos a su correo.";
@@ -62,11 +69,19 @@ public class AuthService {
 
     @Transactional(noRollbackFor = ApiException.class)
     public LoginResult login(String username, String password) {
-        return login(username, password, null);
+        return loginInternal(username, password);
+    }
+
+    private LoginResult loginInternal(String username, String password) {
+        return loginInternal(username, password, null);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
     public LoginResult login(String username, String password, String code) {
+        return loginInternal(username, password, code);
+    }
+
+    private LoginResult loginInternal(String username, String password, String code) {
         LocalDateTime now = Dates.now();
         User u = users.findByUsernameIgnoreCase(username.trim()).orElse(null);
         if (u == null) {
@@ -87,7 +102,7 @@ public class AuthService {
                 u.failedAttempts = 0;
                 u.lockedUntil = now.plusMinutes(lockMinutes);
                 users.save(u);
-                audit.record("USUARIO", u.id, "BLOQUEO", "Bloqueo por " + maxAttempts + " intentos fallidos");
+                audit.register(USUARIO, u.id, "BLOQUEO", "Bloqueo por " + maxAttempts + " intentos fallidos");
                 throw new ApiException(HttpStatus.LOCKED, "CUENTA_BLOQUEADA",
                         "Superaste " + maxAttempts + " intentos. La cuenta quedó bloqueada " + lockMinutes + " minutos.");
             }
@@ -99,34 +114,35 @@ public class AuthService {
         // Verificación en 2 pasos: además de la contraseña, un código de 6 dígitos.
         //   APP    → el de Google Authenticator / Microsoft Authenticator (cambia cada 30 s)
         //   CORREO → uno de un solo uso que se envía al correo de la cuenta (vence en 10 min); no hay que instalar nada
-        String method = u.twoFactorMethod != null ? u.twoFactorMethod : (u.totpEnabled ? "APP" : null);
+        String method = u.twoFactorMethod;
+        if (method == null && u.totpEnabled) method = "APP";
         if ("APP".equals(method)) {
             if (code == null || code.isBlank()) {
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.", Map.of("method", "APP"));
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA", "Ingresa el código de 6 dígitos de tu app de autenticación.", Map.of(METHOD, "APP"));
             }
             if (!Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000)) {
                 u.failedAttempts++;
                 users.save(u);
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Usa el código actual de tu app.", Map.of("method", "APP"));
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Usa el código actual de tu app.", Map.of(METHOD, "APP"));
             }
-        } else if ("CORREO".equals(method)) {
+        } else if (CORREO_2.equals(method)) {
             if (code == null || code.isBlank()) {
                 sendEmailCode(u, "Tu código para ingresar");
                 throw new ApiException(HttpStatus.UNAUTHORIZED, "REQUIERE_2FA",
                         "Te enviamos un código de 6 dígitos a " + mask(u.email) + ". Escríbelo para ingresar.",
-                        Map.of("method", "CORREO", "email", mask(u.email)));
+                        Map.of(METHOD, CORREO_2, EMAIL, mask(u.email)));
             }
             if (!checkEmailCode(u, code)) {
                 u.failedAttempts++;
                 users.save(u);
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Pide uno nuevo.", Map.of("method", "CORREO"));
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CODIGO_2FA_INVALIDO", "El código no es correcto o ya venció. Pide uno nuevo.", Map.of(METHOD, CORREO_2));
             }
         }
         u.failedAttempts = 0;
         u.lockedUntil = null;
         u.lastLoginAt = now;
         users.save(u);
-        audit.record("USUARIO", u.id, "LOGIN", "Inicio de sesión");
+        audit.register(USUARIO, u.id, "LOGIN", "Inicio de sesión");
         return new LoginResult(jwt.generate(u.username, u.role.name()), jwt.getExpirationMinutes(), profile(u));
     }
 
@@ -166,8 +182,8 @@ public class AuthService {
         User u = user(username);
         String c = sendEmailCode(u, "Confirma la verificación por correo");
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("email", mask(u.email));
-        m.put("message", "Enviamos un código a " + mask(u.email) + ".");
+        m.put(EMAIL, mask(u.email));
+        m.put(MESSAGE, "Enviamos un código a " + mask(u.email) + ".");
         if (demoMode) m.put("demoCode", c);
         return m;
     }
@@ -177,10 +193,10 @@ public class AuthService {
         User u = user(username);
         if (u.twoFactorMethod != null) throw ApiException.conflict("2FA_ACTIVA", "Ya tienes la verificación en 2 pasos activa. Desactívala primero para cambiar de método.");
         if (code == null || !checkEmailCode(u, code)) throw ApiException.field("code", "El código no coincide o venció. Pide uno nuevo.");
-        u.twoFactorMethod = "CORREO";
+        u.twoFactorMethod = CORREO_2;
         users.save(u);
-        audit.record("USUARIO", u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos por correo");
-        return Map.of("enabled", true, "method", "CORREO", "message", "Listo: cada vez que ingreses te enviaremos un código al correo.");
+        audit.register(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos por correo");
+        return Map.of(ENABLED, true, METHOD, CORREO_2, MESSAGE, "Listo: cada vez que ingreses te enviaremos un código al correo.");
     }
 
     @Transactional
@@ -206,15 +222,15 @@ public class AuthService {
         u.totpEnabled = true;
         u.twoFactorMethod = "APP";
         users.save(u);
-        audit.record("USUARIO", u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
-        return Map.of("enabled", true, "message", "Verificación en 2 pasos activada.");
+        audit.register(USUARIO, u.id, "2FA_ACTIVADA", "Activó la verificación en 2 pasos");
+        return Map.of(ENABLED, true, MESSAGE, "Verificación en 2 pasos activada.");
     }
 
     @Transactional
     public Map<String, Object> disableTotp(String username, String code) {
         User u = user(username);
-        if (u.twoFactorMethod == null && !u.totpEnabled) return Map.of("enabled", false);
-        boolean ok = "CORREO".equals(u.twoFactorMethod) ? code != null && checkEmailCode(u, code)
+        if (u.twoFactorMethod == null && !u.totpEnabled) return Map.of(ENABLED, false);
+        boolean ok = CORREO_2.equals(u.twoFactorMethod) ? code != null && checkEmailCode(u, code)
                 : Totp.verify(u.totpSecret, code, System.currentTimeMillis() / 1000);
         if (!ok) {
             throw ApiException.field("code", "El código no es correcto.");
@@ -223,8 +239,8 @@ public class AuthService {
         u.totpSecret = null;
         u.twoFactorMethod = null;
         users.save(u);
-        audit.record("USUARIO", u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
-        return Map.of("enabled", false, "message", "Verificación en 2 pasos desactivada.");
+        audit.register(USUARIO, u.id, "2FA_DESACTIVADA", "Desactivó la verificación en 2 pasos");
+        return Map.of(ENABLED, false, MESSAGE, "Verificación en 2 pasos desactivada.");
     }
 
     public Map<String, Object> profile(User u) {
@@ -232,7 +248,7 @@ public class AuthService {
         m.put("id", u.id);
         m.put("username", u.username);
         m.put("fullName", u.fullName);
-        m.put("email", u.email);
+        m.put(EMAIL, u.email);
         m.put("role", u.role.name());
         m.put("roleLabel", u.role.label);
         m.put("phone", u.phone);
@@ -252,7 +268,7 @@ public class AuthService {
 
     public void logout(String token, String username) {
         jwt.revoke(token);
-        users.findByUsernameIgnoreCase(username).ifPresent(u -> audit.record("USUARIO", u.id, "LOGOUT", "Cierre de sesión"));
+        users.findByUsernameIgnoreCase(username).ifPresent(u -> audit.register(USUARIO, u.id, "LOGOUT", "Cierre de sesión"));
     }
 
     private Optional<User> findByLogin(String login) {
@@ -263,7 +279,7 @@ public class AuthService {
     @Transactional
     public Map<String, Object> requestRecovery(String login) {
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("message", GENERIC_RECOVER_MSG);
+        res.put(MESSAGE, GENERIC_RECOVER_MSG);
         Optional<User> found = findByLogin(login);
         if (found.isEmpty() || !found.get().active) {
             return res; // misma respuesta: no se revela si la cuenta existe
@@ -282,7 +298,7 @@ public class AuthService {
         codes.save(prc);
         mail.send(u.email, "Código para restablecer tu contraseña",
                 "Hola " + u.fullName + ",\n\nTu código es: " + code + "\nVence en 15 minutos.\n\nClínica Dental Cárdenas");
-        audit.record("USUARIO", u.id, "RECUPERACION_SOLICITADA", "Código de recuperación emitido");
+        audit.register(USUARIO, u.id, "RECUPERACION_SOLICITADA", "Código de recuperación emitido");
         res.put("maskedEmail", mask(u.email));
         if (demoMode) {
             res.put("demoCode", code);
@@ -316,7 +332,7 @@ public class AuthService {
         u.updatedAt = now;
         u.updatedBy = u.username;
         users.save(u);
-        audit.record("USUARIO", u.id, "CONTRASENA_RESTABLECIDA", "Contraseña restablecida con código");
+        audit.register(USUARIO, u.id, "CONTRASENA_RESTABLECIDA", "Contraseña restablecida con código");
     }
 
     static String mask(String email) {

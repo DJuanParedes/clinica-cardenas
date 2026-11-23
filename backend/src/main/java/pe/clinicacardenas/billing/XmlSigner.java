@@ -46,7 +46,7 @@ public class XmlSigner {
     private final X509Certificate cert;
 
     public XmlSigner(@Value("${app.sunat.certificado:classpath:sunat/certificado-demo.p12}") String location,
-                     @Value("${app.sunat.certificado-clave:clinica-demo}") String password) throws Exception {
+                     @Value("${app.sunat.certificado-clave:clinica-demo}") String password) throws java.security.GeneralSecurityException, java.io.IOException {
         KeyStore ks = KeyStore.getInstance("PKCS12");
         try (InputStream in = new DefaultResourceLoader().getResource(location).getInputStream()) {
             ks.load(in, password.toCharArray());
@@ -91,7 +91,11 @@ public class XmlSigner {
 
             String digest = ((Element) doc.getElementsByTagNameNS(XMLSignature.XMLNS, "DigestValue").item(0)).getTextContent();
 
-            var t = TransformerFactory.newInstance().newTransformer();
+            // Sin acceso a DTD ni hojas de estilo externas (evita XXE al serializar el XML firmado).
+            TransformerFactory tf = TransformerFactory.newInstance();
+            tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+            var t = tf.newTransformer();
             t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
             StringWriter out = new StringWriter();
             t.transform(new DOMSource(doc), new StreamResult(out));

@@ -15,7 +15,8 @@ public class ReportController {
 
     private final ReportService service;
 
-    public ReportController(ReportService service) {
+    public ReportController(ReportService service, AnnualReportService annual) {
+        this.annual = annual;
         this.service = service;
     }
 
@@ -42,8 +43,7 @@ public class ReportController {
     }
 
     // ---------- v2.8: reporte anual descargable
-    @org.springframework.beans.factory.annotation.Autowired
-    private AnnualReportService annual;
+    private final AnnualReportService annual;
 
     @GetMapping("/annual")
     public Map<String, Object> annual(@RequestParam int year) { return annual.report(year); }

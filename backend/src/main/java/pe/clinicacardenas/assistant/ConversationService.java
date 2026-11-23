@@ -29,12 +29,23 @@ import java.util.*;
  */
 @Service
 public class ConversationService {
+    private static final String ASISTENTE = "ASISTENTE";
+    private static final String AUTOMATICO = "AUTOMATICO";
+    private static final String ENVIADO = "ENVIADO";
+    private static final String PERSONAL = "PERSONAL";
+    private static final String ACCION = "accion";
+    private static final String ASISTENTE_MODO = "asistente.modo";
+    private static final String ASISTENTE_PAUSA_MINUTOS = "asistente.pausa_minutos";
+    private static final String DISPLAY_NAME = "display_name";
+    private static final String PATIENT_ID = "patient_id";
+    private static final String RESPUESTA = "respuesta";
+    private static final String UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR = "update wa_threads set needs_attention = true where phone = ?";
+
 
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
-    public static final List<String> MODES = List.of("AUTOMATICO", "FUERA_HORARIO", "APAGADO");
+    public static final List<String> MODES = List.of(AUTOMATICO, "FUERA_HORARIO", "APAGADO");
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false) @org.springframework.context.annotation.Lazy
-    private pe.clinicacardenas.crm.LeadService leads;
+    private final org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.LeadService> leadsProvider;
     private final JdbcTemplate jdbc;
     private final CareService care;
     private final AssistantService assistant;
@@ -46,7 +57,8 @@ public class ConversationService {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
     public ConversationService(JdbcTemplate jdbc, CareService care, AssistantService assistant, KnowledgeBase kb, LanguageModel llm,
-                               AuditService audit, ObjectMapper json, @Value("${app.notifications.url}") String notifUrl) {
+                               AuditService audit, ObjectMapper json, @Value("${app.notifications.url}") String notifUrl, org.springframework.beans.factory.ObjectProvider<pe.clinicacardenas.crm.LeadService> leadsProvider) {
+        this.leadsProvider = leadsProvider;
         this.jdbc = jdbc;
         this.care = care;
         this.assistant = assistant;
@@ -83,8 +95,8 @@ public class ConversationService {
 
     public Map<String, Object> settings() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("mode", setting("asistente.modo", "AUTOMATICO"));
-        m.put("pauseMinutes", Integer.parseInt(setting("asistente.pausa_minutos", "120")));
+        m.put("mode", setting(ASISTENTE_MODO, AUTOMATICO));
+        m.put("pauseMinutes", Integer.parseInt(setting(ASISTENTE_PAUSA_MINUTOS, "120")));
         m.put("openNow", kb.openNow(Dates.now()));
         m.put("schedule", kb.horarioTexto());
         m.put("model", llm.status());
@@ -95,13 +107,13 @@ public class ConversationService {
     public Map<String, Object> updateSettings(SettingsRequest r) {
         if (r.mode() != null) {
             if (!MODES.contains(r.mode())) throw ApiException.field("mode", "Elige automático, fuera de horario o apagado.");
-            putSetting("asistente.modo", r.mode());
+            putSetting(ASISTENTE_MODO, r.mode());
         }
         if (r.pauseMinutes() != null) {
             if (r.pauseMinutes() < 5 || r.pauseMinutes() > 1440) throw ApiException.field("pauseMinutes", "Entre 5 minutos y 24 horas.");
-            putSetting("asistente.pausa_minutos", String.valueOf(r.pauseMinutes()));
+            putSetting(ASISTENTE_PAUSA_MINUTOS, String.valueOf(r.pauseMinutes()));
         }
-        audit.record("ASISTENTE", 0L, "CONFIGURAR", "Modo " + setting("asistente.modo", "") + " · pausa " + setting("asistente.pausa_minutos", "") + " min");
+        audit.register(ASISTENTE, 0L, "CONFIGURAR", "Modo " + setting(ASISTENTE_MODO, "") + " · pausa " + setting(ASISTENTE_PAUSA_MINUTOS, "") + " min");
         return settings();
     }
 
@@ -125,13 +137,14 @@ public class ConversationService {
         String name = pid == null ? null : jdbc.queryForObject("select concat(first_name, ' ', last_name) from patients where id = ?", String.class, pid);
         if (t == null) {
             jdbc.update("insert into wa_threads (phone, patient_id, display_name, last_message_at) values (?, ?, ?, ?)", phone, pid, name, Dates.now());
-        } else if (!Objects.equals(t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue(), pid)) {
+        } else if (!Objects.equals(t.get(PATIENT_ID) == null ? null : ((Number) t.get(PATIENT_ID)).longValue(), pid)) {
             jdbc.update("update wa_threads set patient_id = ?, display_name = ? where phone = ?", pid, name, phone);
         }
-        return thread(phone);
+        Map<String, Object> created = thread(phone);
+        return created == null ? Map.of() : created;
     }
 
-    private long record(String phone, String direction, String source, String body, String intent, String engine, String status, String author) {
+    private long storeMessage(String phone, String direction, String source, String body, String intent, String engine, String status, String author) {
         LocalDateTime now = Dates.now();
         jdbc.update("""
                 insert into wa_messages (phone, direction, source, body, intent, engine, status, author, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -147,7 +160,7 @@ public class ConversationService {
     private static String prefix(String source) {
         return switch (source) {
             case "IA" -> "🤖 ";
-            case "PERSONAL" -> "Tú: ";
+            case PERSONAL -> "Tú: ";
             case "SISTEMA" -> "🔔 ";
             default -> "";
         };
@@ -162,7 +175,7 @@ public class ConversationService {
 
     /** ¿Responde el asistente en esta conversación ahora? */
     private String silenceReason(Map<String, Object> t) {
-        String mode = setting("asistente.modo", "AUTOMATICO");
+        String mode = setting(ASISTENTE_MODO, AUTOMATICO);
         if ("APAGADO".equals(mode)) return "El asistente está apagado: responde el personal.";
         if ("FUERA_HORARIO".equals(mode) && kb.openNow(Dates.now())) return "En horario de atención responde el personal.";
         if (!Boolean.TRUE.equals(t.get("ai_enabled"))) return "El asistente está desactivado en esta conversación.";
@@ -183,70 +196,70 @@ public class ConversationService {
     public Map<String, Object> inbound(CareService.ReplyRequest r) {
         String phone = phone(r.telefono());
         String text = r.texto() == null ? "" : r.texto().trim();
-        if (phone == null || text.isEmpty()) return Map.of("accion", "IGNORADO");
+        if (phone == null || text.isEmpty()) return Map.of(ACCION, "IGNORADO");
         Map<String, Object> t = ensureThread(phone);
-        record(phone, "IN", "PACIENTE", text, null, null, null, null);
+        storeMessage(phone, "IN", "PACIENTE", text, null, null, null, null);
         // v2.7: quien escribe sin ser paciente entra al embudo de ventas como lead nuevo
-        if (t.get("patient_id") == null && leads != null) leads.fromWhatsApp(phone, text);
+        if (t.get(PATIENT_ID) == null) leadsProvider.ifAvailable(l -> l.fromWhatsApp(phone, text));
 
         // Reserva por WhatsApp en curso: los números que escribe son opciones de fecha/hora, no "1 confirma / 2 reprograma".
-        Long bookingPid = t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue();
+        Long bookingPid = t.get(PATIENT_ID) == null ? null : ((Number) t.get(PATIENT_ID)).longValue();
         if (booking != null && silenceReason(t) == null && booking.active(bookingPid)) {
             String reply;
             try {
                 reply = booking.handle(bookingPid, text);
             } catch (RuntimeException e) {
                 log.warn("Reserva por WhatsApp falló para {}: {}", phone, e.toString());
-                jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
+                jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
                 reply = "Tuve un problema al revisar la agenda. Recepción te escribirá para terminar tu reserva.";
             }
-            record(phone, "OUT", "IA", reply, "RESERVA", "agenda", "ENVIADO", null);
+            storeMessage(phone, "OUT", "IA", reply, "RESERVA", "agenda", ENVIADO, null);
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("accion", "ASISTENTE");
+            out.put(ACCION, ASISTENTE);
             out.put("intencion", "RESERVA");
-            out.put("respuesta", reply);
+            out.put(RESPUESTA, reply);
             return out;
         }
 
         // "1" confirma y "2" pide reprogramar: lo resuelve la agenda como siempre.
         Map<String, Object> agendaReply = care.whatsappReply(r);
-        Object respuesta = agendaReply.get("respuesta");
+        Object respuesta = agendaReply.get(RESPUESTA);
         if (respuesta != null) {
-            record(phone, "OUT", "SISTEMA", String.valueOf(respuesta), String.valueOf(agendaReply.get("accion")), "agenda", "ENVIADO", null);
-            if ("REPROGRAMAR".equals(agendaReply.get("accion"))) jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
+            storeMessage(phone, "OUT", "SISTEMA", String.valueOf(respuesta), String.valueOf(agendaReply.get(ACCION)), "agenda", ENVIADO, null);
+            if ("REPROGRAMAR".equals(agendaReply.get(ACCION))) jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
             return agendaReply;
         }
 
         String silence = silenceReason(t);
         if (silence != null) {
-            jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
+            jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
             Map<String, Object> out = new LinkedHashMap<>(agendaReply);
-            out.put("accion", "PERSONAL");
+            out.put(ACCION, PERSONAL);
             out.put("motivo", silence);
-            out.remove("respuesta");
+            out.remove(RESPUESTA);
             return out;
         }
-        Long pid = t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue();
+        Long pid = t.get(PATIENT_ID) == null ? null : ((Number) t.get(PATIENT_ID)).longValue();
         AssistantService.Reply rep;
         try {
             rep = assistant.answer(text, pid, recent(phone, 8), false);
         } catch (RuntimeException e) {
             log.warn("El asistente falló con el mensaje de {}: {}", phone, e.toString());
-            jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
-            return Map.of("accion", "PERSONAL", "motivo", "Error del asistente");
+            jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
+            return Map.of(ACCION, PERSONAL, "motivo", "Error del asistente");
         }
-        record(phone, "OUT", "IA", rep.text(), rep.intent(), rep.engine(), "ENVIADO", null);
-        if (rep.needsHuman()) jdbc.update("update wa_threads set needs_attention = true where phone = ?", phone);
+        storeMessage(phone, "OUT", "IA", rep.text(), rep.intent(), rep.engine(), ENVIADO, null);
+        if (rep.needsHuman()) jdbc.update(UPDATE_WA_THREADS_SET_NEEDS_ATTENTION_TR, phone);
         if (rep.pauseAi()) jdbc.update("update wa_threads set manual_until = ? where phone = ?", Dates.now().plusMinutes(pause()), phone);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("accion", "ASISTENTE");
+        out.put(ACCION, ASISTENTE);
         out.put("intencion", rep.intent());
-        out.put("respuesta", rep.text());
+        out.put(RESPUESTA, rep.text());
         return out;
     }
 
     private int pause() {
-        try { return Integer.parseInt(setting("asistente.pausa_minutos", "120")); } catch (NumberFormatException e) { return 120; }
+        try { return Integer.parseInt(setting(ASISTENTE_PAUSA_MINUTOS, "120")); } catch (NumberFormatException e) { return 120; }
     }
 
     /** El personal escribe al paciente desde la web. */
@@ -263,7 +276,7 @@ public class ConversationService {
         body.put("destino", phone);
         body.put("cuerpo", text);
         body.put("tipo", "MENSAJE");
-        if (t.get("display_name") != null) body.put("paciente", Map.of("id", t.get("patient_id"), "nombre", t.get("display_name"), "demo", false));
+        if (t.get(DISPLAY_NAME) != null) body.put("paciente", Map.of("id", t.get(PATIENT_ID), "nombre", t.get(DISPLAY_NAME), "demo", false));
         String status = "FALLIDO";
         String error = null;
         try {
@@ -271,15 +284,18 @@ public class ConversationService {
                     .timeout(Duration.ofSeconds(12)).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(), HttpResponse.BodyHandlers.ofString());
             Map<?, ?> m = res.body() == null || res.body().isBlank() ? Map.of() : json.readValue(res.body(), Map.class);
-            if (res.statusCode() / 100 == 2 && !"FALLIDO".equals(m.get("estado"))) status = "ENVIADO";
+            if (res.statusCode() / 100 == 2 && !"FALLIDO".equals(m.get("estado"))) status = ENVIADO;
             else error = m.get("error") == null ? "HTTP " + res.statusCode() : String.valueOf(m.get("error"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            error = "El servicio de mensajes no respondió";
         } catch (Exception e) {
             error = "El servicio de mensajes no respondió";
         }
-        long id = record(phone, "OUT", "PERSONAL", text, null, null, status, CurrentUser.usernameOrSystem());
+        long id = storeMessage(phone, "OUT", PERSONAL, text, null, null, status, CurrentUser.usernameOrSystem());
         jdbc.update("update wa_threads set unread = 0, needs_attention = false, manual_until = ? where phone = ?",
                 Dates.now().plusMinutes(pause()), phone);
-        if (!"ENVIADO".equals(status)) throw new ApiException(HttpStatus.BAD_GATEWAY, "ENVIO_FALLIDO", "No se pudo enviar: " + error);
+        if (!ENVIADO.equals(status)) throw new ApiException(HttpStatus.BAD_GATEWAY, "ENVIO_FALLIDO", "No se pudo enviar: " + error);
         return Map.of("id", id, "status", status);
     }
 
@@ -305,7 +321,7 @@ public class ConversationService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("unread", jdbc.queryForObject("select coalesce(sum(unread), 0) from wa_threads", Long.class));
         m.put("attention", jdbc.queryForObject("select count(*) from wa_threads where needs_attention = true", Long.class));
-        m.put("mode", setting("asistente.modo", "AUTOMATICO"));
+        m.put("mode", setting(ASISTENTE_MODO, AUTOMATICO));
         return m;
     }
 
@@ -319,7 +335,7 @@ public class ConversationService {
                   from wa_messages where phone = ? order by id desc limit 300
                 """, phone));
         // Avisos automáticos que el sistema envió por WhatsApp a ese paciente (recordatorios, cambios de cita...).
-        if (t.get("patient_id") != null) {
+        if (t.get(PATIENT_ID) != null) {
             msgs.addAll(jdbc.queryForList("""
                     select concat('n', id) as id, 'OUT' as direction, 'SISTEMA' as source, body, type as intent, null as engine,
                            status, null as author, coalesce(sent_at, created_at) as at
@@ -327,22 +343,22 @@ public class ConversationService {
                      where patient_id = ? and channel = 'WHATSAPP' and type <> 'CODIGO_ACCESO' and operation <> 'ANULAR'
                        and sent_at is not null and status in ('ENVIADO', 'ENTREGADO', 'LEIDO', 'FALLIDO')
                      order by id desc limit 100
-                    """, t.get("patient_id")));
+                    """, t.get(PATIENT_ID)));
         }
         msgs.sort(Comparator.comparing(x -> Dates.toLocalDateTime(x.get("at"))));
         Map<String, Object> m = new LinkedHashMap<>();
         Map<String, Object> th = new LinkedHashMap<>();
         th.put("phone", phone);
-        th.put("patientId", t.get("patient_id"));
-        th.put("name", t.get("display_name"));
+        th.put("patientId", t.get(PATIENT_ID));
+        th.put("name", t.get(DISPLAY_NAME));
         th.put("aiEnabled", t.get("ai_enabled"));
         th.put("manualUntil", t.get("manual_until"));
         th.put("needsAttention", t.get("needs_attention"));
         th.put("silence", silenceReason(t));
         m.put("thread", th);
         m.put("messages", msgs);
-        if (t.get("patient_id") != null) {
-            Long pid = ((Number) t.get("patient_id")).longValue();
+        if (t.get(PATIENT_ID) != null) {
+            Long pid = ((Number) t.get(PATIENT_ID)).longValue();
             m.put("upcoming", assistant.upcoming(pid).stream().map(a -> Map.of("id", a.id, "startAt", a.startAt, "dentist", a.dentist.getFullName(),
                     "reason", a.reason, "status", a.status.name())).toList());
         }
@@ -353,7 +369,7 @@ public class ConversationService {
         String phone = phone(rawPhone);
         if (phone == null || thread(phone) == null) throw ApiException.notFound("La conversación");
         if (r.aiEnabled() != null) {
-            jdbc.update("update wa_threads set ai_enabled = ?" + (r.aiEnabled() ? ", manual_until = null" : "") + " where phone = ?", r.aiEnabled(), phone);
+            jdbc.update("update wa_threads set ai_enabled = ?" + (Boolean.TRUE.equals(r.aiEnabled()) ? ", manual_until = null" : "") + " where phone = ?", r.aiEnabled(), phone);
         }
         if (Boolean.TRUE.equals(r.attended())) jdbc.update("update wa_threads set needs_attention = false where phone = ?", phone);
         return conversation(phone);

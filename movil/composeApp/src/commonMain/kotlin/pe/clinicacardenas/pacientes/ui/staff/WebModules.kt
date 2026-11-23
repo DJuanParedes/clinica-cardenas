@@ -28,10 +28,13 @@ import pe.clinicacardenas.pacientes.ui.components.BackHeader
 import pe.clinicacardenas.pacientes.ui.components.Panel
 import pe.clinicacardenas.pacientes.ui.theme.Brand
 
+private const val GESTION = "Gestión"
+
 /** Módulo del sistema web (mismas rutas y permisos que el menú de la web). */
+
 data class WebModule(val group: String, val icon: String, val label: String, val detail: String, val path: String, val perms: List<String>)
 
-/** Todo lo que el personal puede hacer en la web, según los permisos de su rol. */
+/** Lo que el personal puede hacer en la web, según los permisos de su rol. */
 val WEB_MODULES = listOf(
     WebModule("General", "🏠", "Inicio", "Resumen del día y alertas", "/inicio", emptyList()),
     WebModule("General", "🗓️", "Agenda completa", "Todas las vistas y acciones de la agenda", "/agenda", listOf("AGENDA_VER")),
@@ -46,9 +49,9 @@ val WEB_MODULES = listOf(
     WebModule("Caja", "📄", "Comprobantes", "Boletas y facturas electrónicas", "/comprobantes", listOf("COMPROBANTES")),
     WebModule("Caja", "🆕", "Nuevo comprobante", "Emitir boleta o factura", "/comprobantes/nuevo", listOf("COMPROBANTES")),
     WebModule("Caja", "💰", "Flujo de caja", "Ingresos y egresos por período", "/caja/reporte", listOf("CAJA_REPORTE")),
-    WebModule("Gestión", "📊", "Indicadores", "Reportes de la clínica", "/reportes", listOf("REPORTES")),
-    WebModule("Gestión", "％", "Comisiones", "Liquidación de odontólogos", "/comisiones", listOf("COMISIONES")),
-    WebModule("Gestión", "🔔", "Notificaciones", "WhatsApp, correo y recordatorios", "/notificaciones", listOf("NOTIFICACIONES")),
+    WebModule(GESTION, "📊", "Indicadores", "Reportes de la clínica", "/reportes", listOf("REPORTES")),
+    WebModule(GESTION, "％", "Comisiones", "Liquidación de odontólogos", "/comisiones", listOf("COMISIONES")),
+    WebModule(GESTION, "🔔", "Notificaciones", "WhatsApp, correo y recordatorios", "/notificaciones", listOf("NOTIFICACIONES")),
     WebModule("Seguridad", "🛡️", "Usuarios y accesos", "Crear y administrar cuentas", "/usuarios", listOf("USUARIOS")),
     WebModule("Seguridad", "🔑", "Roles y permisos", "Qué puede hacer cada rol", "/roles", listOf("ROLES")),
     WebModule("Seguridad", "🔐", "Mi seguridad (2 pasos)", "Activar la verificación en 2 pasos", "/seguridad", emptyList()),

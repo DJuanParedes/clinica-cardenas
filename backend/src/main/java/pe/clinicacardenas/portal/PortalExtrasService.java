@@ -2,13 +2,11 @@ package pe.clinicacardenas.portal;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.clinicacardenas.agenda.*;
 import pe.clinicacardenas.billing.BillingService;
 import pe.clinicacardenas.billing.Invoice;
-import pe.clinicacardenas.billing.InvoiceItem;
 import pe.clinicacardenas.billing.InvoiceItemRepository;
 import pe.clinicacardenas.cash.CashService;
 import pe.clinicacardenas.common.ApiException;
@@ -16,7 +14,6 @@ import pe.clinicacardenas.common.AuditService;
 import pe.clinicacardenas.common.Dates;
 import pe.clinicacardenas.files.FileService;
 import pe.clinicacardenas.files.PatientFile;
-import pe.clinicacardenas.files.SimplePdf;
 import pe.clinicacardenas.patient.Patient;
 import pe.clinicacardenas.patient.PatientRepository;
 
@@ -24,7 +21,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -33,19 +29,29 @@ import java.util.*;
  */
 @Service
 public class PortalExtrasService {
+    private static final String AMOUNT = "amount";
+    private static final String DURATIONMIN = "durationMin";
+    private static final String LABEL = "label";
+    private static final String MESSAGE = "message";
+    private static final String SLOTS = "slots";
+    private static final String STARTAT = "startAt";
+
 
     private static final Logger log = LoggerFactory.getLogger(PortalExtrasService.class);
 
     /** Motivos que el paciente puede elegir al reservar, con su duración. */
     public static final List<Map<String, Object>> REASONS = List.of(
-            Map.of("code", "EVALUACION", "label", "Evaluación general", "durationMin", 30),
-            Map.of("code", "LIMPIEZA", "label", "Limpieza dental", "durationMin", 45),
-            Map.of("code", "DOLOR", "label", "Dolor o molestia", "durationMin", 30),
-            Map.of("code", "ORTODONCIA", "label", "Control de ortodoncia", "durationMin", 30),
-            Map.of("code", "BLANQUEAMIENTO", "label", "Blanqueamiento", "durationMin", 60),
-            Map.of("code", "CONTROL", "label", "Control de tratamiento", "durationMin", 30));
+            Map.of("code", "EVALUACION", LABEL, "Evaluación general", DURATIONMIN, 30),
+            Map.of("code", "LIMPIEZA", LABEL, "Limpieza dental", DURATIONMIN, 45),
+            Map.of("code", "DOLOR", LABEL, "Dolor o molestia", DURATIONMIN, 30),
+            Map.of("code", "ORTODONCIA", LABEL, "Control de ortodoncia", DURATIONMIN, 30),
+            Map.of("code", "BLANQUEAMIENTO", LABEL, "Blanqueamiento", DURATIONMIN, 60),
+            Map.of("code", "CONTROL", LABEL, "Control de tratamiento", DURATIONMIN, 30));
 
-    static final int MIN_HOURS_TO_BOOK = 2, MIN_HOURS_TO_CHANGE = 12, MAX_DAYS_AHEAD = 60, MAX_OPEN = 2;
+    static final int MIN_HOURS_TO_BOOK = 2;
+    static final int MIN_HOURS_TO_CHANGE = 12;
+    static final int MAX_DAYS_AHEAD = 60;
+    static final int MAX_OPEN = 2;
 
     private final PatientRepository patients;
     private final AppointmentRepository appointments;
@@ -58,14 +64,11 @@ public class PortalExtrasService {
     private final InvoiceItemRepository invoiceItems;
     private final FileService files;
     private final AuditService audit;
-    private final String clinicName, clinicAddress;
 
     public PortalExtrasService(PatientRepository patients, AppointmentRepository appointments, AgendaService agenda,
                                PatientNoticeRepository notices, SurveyRepository surveys, SimulatedPaymentGateway gateway,
                                CashService cash, BillingService billing, InvoiceItemRepository invoiceItems,
-                               FileService files, AuditService audit,
-                               @Value("${app.company.trade-name}") String clinicName,
-                               @Value("${app.company.address}") String clinicAddress) {
+                               FileService files, AuditService audit) {
         this.patients = patients;
         this.appointments = appointments;
         this.agenda = agenda;
@@ -77,8 +80,6 @@ public class PortalExtrasService {
         this.invoiceItems = invoiceItems;
         this.files = files;
         this.audit = audit;
-        this.clinicName = clinicName;
-        this.clinicAddress = clinicAddress;
     }
 
     public record BookRequest(Long dentistId, LocalDateTime startAt, String reasonCode, String notes) {}
@@ -130,13 +131,13 @@ public class PortalExtrasService {
         Patient p = me(subject);
         int duration = durationOf(reasonCode);
         if (date.isBefore(Dates.today()) || date.isAfter(Dates.today().plusDays(MAX_DAYS_AHEAD))) {
-            return Map.of("date", date, "durationMin", duration, "slots", List.of());
+            return Map.of("date", date, DURATIONMIN, duration, SLOTS, List.of());
         }
         // Se ocultan también las horas en que el paciente ya tiene cita con otro odontólogo.
         Map<String, Object> raw = agenda.slots(dentistId, date, duration, excludeId, p.id);
         LocalDateTime minStart = Dates.now().plusHours(MIN_HOURS_TO_BOOK);
         List<String> free = new ArrayList<>();
-        Object list = raw.get("slots");
+        Object list = raw.get(SLOTS);
         if (list instanceof List<?> l) {
             for (Object o : l) {
                 if (o instanceof SlotCalculator.Slot s && s.available()) {
@@ -147,19 +148,19 @@ public class PortalExtrasService {
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("date", date);
-        m.put("durationMin", duration);
+        m.put(DURATIONMIN, duration);
         m.put("works", raw.get("works"));
-        m.put("slots", free);
+        m.put(SLOTS, free);
         return m;
     }
 
     private static int durationOf(String code) {
-        for (Map<String, Object> r : REASONS) if (r.get("code").equals(code)) return (Integer) r.get("durationMin");
+        for (Map<String, Object> r : REASONS) if (r.get("code").equals(code)) return (Integer) r.get(DURATIONMIN);
         return 30;
     }
 
     private static String labelOf(String code) {
-        for (Map<String, Object> r : REASONS) if (r.get("code").equals(code)) return (String) r.get("label");
+        for (Map<String, Object> r : REASONS) if (r.get("code").equals(code)) return (String) r.get(LABEL);
         return null;
     }
 
@@ -170,12 +171,12 @@ public class PortalExtrasService {
         Patient p = me(subject);
         String label = labelOf(r.reasonCode());
         if (label == null) throw ApiException.field("reasonCode", "Elige el motivo de tu cita.");
-        if (r.startAt() == null) throw ApiException.field("startAt", "Elige un horario.");
+        if (r.startAt() == null) throw ApiException.field(STARTAT, "Elige un horario.");
         if (r.startAt().isBefore(Dates.now().plusHours(MIN_HOURS_TO_BOOK))) {
-            throw ApiException.field("startAt", "Las citas se reservan con al menos " + MIN_HOURS_TO_BOOK + " horas de anticipación.");
+            throw ApiException.field(STARTAT, "Las citas se reservan con al menos " + MIN_HOURS_TO_BOOK + " horas de anticipación.");
         }
         if (r.startAt().toLocalDate().isAfter(Dates.today().plusDays(MAX_DAYS_AHEAD))) {
-            throw ApiException.field("startAt", "Puedes reservar hasta " + MAX_DAYS_AHEAD + " días antes.");
+            throw ApiException.field(STARTAT, "Puedes reservar hasta " + MAX_DAYS_AHEAD + " días antes.");
         }
         long open = appointments.findByPatientIdOrderByStartAtDesc(p.id).stream()
                 .filter(a -> !a.status.isFinal() && a.endAt.isAfter(Dates.now())).count();
@@ -187,8 +188,8 @@ public class PortalExtrasService {
                 durationOf(r.reasonCode()), label, notes.length() > 480 ? notes.substring(0, 480) : notes, null));
         a.bookedVia = "APP";
         appointments.save(a);
-        audit.record("CITA", a.id, "RESERVA_APP", "Reservada por " + p.getFullName() + " desde la app");
-        return Map.of("id", a.id, "startAt", a.startAt, "message", "¡Listo! Tu cita quedó reservada.");
+        audit.register("CITA", a.id, "RESERVA_APP", "Reservada por " + p.getFullName() + " desde la app");
+        return Map.of("id", a.id, STARTAT, a.startAt, MESSAGE, "¡Listo! Tu cita quedó reservada.");
     }
 
     private void checkChangeable(Appointment a) {
@@ -206,14 +207,14 @@ public class PortalExtrasService {
         Patient p = me(subject);
         Appointment a = mine(p, id);
         checkChangeable(a);
-        if (r.startAt() == null) throw ApiException.field("startAt", "Elige el nuevo horario.");
+        if (r.startAt() == null) throw ApiException.field(STARTAT, "Elige el nuevo horario.");
         if (r.startAt().isBefore(Dates.now().plusHours(MIN_HOURS_TO_BOOK))) {
-            throw ApiException.field("startAt", "Elige un horario con al menos " + MIN_HOURS_TO_BOOK + " horas de anticipación.");
+            throw ApiException.field(STARTAT, "Elige un horario con al menos " + MIN_HOURS_TO_BOOK + " horas de anticipación.");
         }
         Appointment updated = agenda.reschedule(a.id, new AgendaService.AppointmentRequest(p.id,
                 r.dentistId() == null ? a.dentist.id : r.dentistId(), r.startAt(), a.durationMin, a.reason, a.notes,
                 "Reprogramada por el paciente desde la app"));
-        return Map.of("id", updated.id, "startAt", updated.startAt, "message", "Tu cita fue reprogramada.");
+        return Map.of("id", updated.id, STARTAT, updated.startAt, MESSAGE, "Tu cita fue reprogramada.");
     }
 
     @Transactional
@@ -224,7 +225,7 @@ public class PortalExtrasService {
         String reason = r == null || r.reason() == null || r.reason().isBlank() ? "Cancelada por el paciente desde la app"
                 : "Paciente (app): " + r.reason().trim();
         agenda.changeStatus(a.id, new AgendaService.StatusRequest(AppointmentStatus.CANCELADA, reason));
-        return Map.of("message", "Tu cita fue cancelada.");
+        return Map.of(MESSAGE, "Tu cita fue cancelada.");
     }
 
     // ------------------------------------------------------------------ avisos (push simulado)
@@ -251,19 +252,19 @@ public class PortalExtrasService {
     public Map<String, Object> pay(String subject, PayRequest r) {
         Patient p = me(subject);
         BigDecimal amount = r.amount() == null ? null : r.amount().setScale(2, RoundingMode.HALF_UP);
-        if (amount == null || amount.signum() <= 0) throw ApiException.field("amount", "Ingresa el monto a pagar.");
+        if (amount == null || amount.signum() <= 0) throw ApiException.field(AMOUNT, "Ingresa el monto a pagar.");
         Object bal = cash.balance(p.id).get("balance");
         BigDecimal balance = bal instanceof BigDecimal b ? b : new BigDecimal(String.valueOf(bal));
         if (balance.signum() <= 0) throw ApiException.conflict("SIN_DEUDA", "No tienes saldo pendiente.");
-        if (amount.compareTo(balance) > 0) throw ApiException.field("amount", "El monto supera tu saldo pendiente (S/ " + balance.toPlainString() + ").");
+        if (amount.compareTo(balance) > 0) throw ApiException.field(AMOUNT, "El monto supera tu saldo pendiente (S/ " + balance.toPlainString() + ").");
         String method = r.method() == null ? "" : r.method().trim().toUpperCase();
         SimulatedPaymentGateway.Result res = gateway.charge(new SimulatedPaymentGateway.Charge(method, r.approvalCode(),
-                r.cardNumber(), r.cardExpiry(), r.cardCvv()), amount);
+                r.cardNumber(), r.cardExpiry(), r.cardCvv()));
         Map<String, Object> paid = cash.registerPayment(new CashService.PaymentRequest(p.id, null, amount, method,
                 res.operationId(), "Pago en línea desde la app · " + res.reference()));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("operationId", res.operationId());
-        out.put("amount", amount);
+        out.put(AMOUNT, amount);
         out.put("payment", paid.get("payment"));
         // Boleta electrónica automática (si falla, el pago igual queda registrado y caja puede emitirla)
         try {
@@ -272,14 +273,14 @@ public class PortalExtrasService {
                     p.getFullName(), null, List.of(new BillingService.LineRequest("Pago de tratamiento dental (app)",
                     BigDecimal.ONE, amount, null))));
             if (inv.get("invoice") instanceof Invoice created) {
-                try { billing.send(created.id); } catch (Exception e) { log.warn("Boleta del pago en línea no enviada a SUNAT: {}", e.getMessage()); }
+                sendToSunat(created.id);
                 out.put("invoiceId", created.id);
                 out.put("invoice", created.getFullNumber());
             }
         } catch (Exception e) {
             log.warn("No se pudo emitir la boleta del pago en línea: {}", e.getMessage());
         }
-        out.put("message", "Pago aprobado. ¡Gracias!");
+        out.put(MESSAGE, "Pago aprobado. ¡Gracias!");
         return out;
     }
 
@@ -350,7 +351,7 @@ public class PortalExtrasService {
             if (a.status == AppointmentStatus.ATENDIDA && !surveys.existsByAppointmentId(a.id)) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("appointmentId", a.id);
-                m.put("startAt", a.startAt);
+                m.put(STARTAT, a.startAt);
                 m.put("reason", a.reason);
                 m.put("dentist", a.dentist.getFullName());
                 return Map.of("pending", m);
@@ -375,6 +376,10 @@ public class PortalExtrasService {
         s.comment = r.comment() == null || r.comment().isBlank() ? null : r.comment().trim().substring(0, Math.min(500, r.comment().trim().length()));
         s.createdAt = Dates.now();
         surveys.save(s);
-        return Map.of("message", "¡Gracias por tu calificación!");
+        return Map.of(MESSAGE, "¡Gracias por tu calificación!");
+    }
+
+    private void sendToSunat(Long invoiceId) {
+        try { billing.send(invoiceId); } catch (Exception e) { log.warn("Boleta del pago en línea no enviada a SUNAT: {}", e.getMessage()); }
     }
 }

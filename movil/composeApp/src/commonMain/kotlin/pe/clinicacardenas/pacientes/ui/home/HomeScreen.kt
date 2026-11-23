@@ -39,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
-import pe.clinicacardenas.pacientes.data.remote.AppointmentDto
+import pe.clinicacardenas.pacientes.domain.model.Appointment
+import pe.clinicacardenas.pacientes.domain.model.SyncStatus
+import pe.clinicacardenas.pacientes.domain.repository.PermissionStatus
 import pe.clinicacardenas.pacientes.data.remote.PatientDto
 import pe.clinicacardenas.pacientes.data.repository.ClinicRepository
 import pe.clinicacardenas.pacientes.platform.PlatformActions
@@ -58,7 +60,7 @@ import pe.clinicacardenas.pacientes.ui.theme.Brand
 fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platform: PlatformActions = koinInject()) {
     val s by vm.state.collectAsState()
     var booking by remember { mutableStateOf<BookingTarget?>(null) }
-    var cancelling by remember { mutableStateOf<AppointmentDto?>(null) }
+    var cancelling by remember { mutableStateOf<Appointment?>(null) }
     booking?.let { t ->
         BookingScreen(t) { changed ->
             booking = null
@@ -72,23 +74,25 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
             vm.cancel(a.id, reason)
         }
     }
-    val change: (AppointmentDto) -> Unit = { a -> booking = BookingTarget(a.id, a.dentistId, a.durationMin, a.reason) }
+    val change: (Appointment) -> Unit = { a -> booking = BookingTarget(a.id, a.dentistId, a.durationMin, a.reason) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshPermission() }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { Greeting(patient, onRefresh = vm::load) }
-        if (s.offline) item { Banner("Sin conexión: mostramos las citas guardadas en tu teléfono.", Brand.NaranjaSuave, Color(0xFF7A4600)) }
+        if (s.offline) item { Banner("Sin conexión: trabajas con los datos guardados en tu teléfono. Lo que hagas se enviará al volver la red.", Brand.NaranjaSuave, Color(0xFF7A4600)) }
+        item { SyncPanel(s.sync, s.offline, onSync = vm::load, onRetry = vm::retryFailed, onDiscard = vm::discardFailed) }
+        if (s.permission != PermissionStatus.CONCEDIDO) item { PermissionCard(s.permission, vm::enableReminders) }
         s.message?.let { m -> item { Banner(m, Brand.VerdeSuave, Brand.Verde) } }
         s.survey?.let { p -> item { SurveyCard(p, s.busy, vm::sendSurvey) } }
         if (s.surveySent) item { Banner("¡Gracias por tu calificación! Nos ayuda a mejorar.", Brand.VerdeSuave, Brand.Verde) }
         when {
             s.loading -> item { Loading() }
-            s.data == null -> item { ErrorState(s.error ?: "No se pudieron cargar tus citas.", vm::load) }
+            s.empty && s.error != null -> item { ErrorState(s.error ?: "No se pudieron cargar tus citas.", vm::load) }
             else -> {
-                val data = s.data!!
-                val next = data.next
+                val next = s.next
                 item {
                     if (next != null) NextCard(next, patient, s.confirming == next.id, vm::confirm, platform, change) { cancelling = it }
                     else EmptyNext(patient, platform)
@@ -103,14 +107,14 @@ fun HomeScreen(patient: PatientDto, vm: HomeViewModel = koinViewModel(), platfor
                         fontSize = 13.sp,
                     )
                 }
-                val others = data.upcoming.filter { it.id != next?.id }
+                val others = s.upcoming.filter { it.id != next?.id }
                 if (others.isNotEmpty()) {
                     item { SectionTitle("Próximas citas") }
                     items(others, key = { it.id }) { a -> AppointmentRow(a, s.confirming == a.id, vm::confirm, change) { cancelling = it } }
                 }
-                if (data.past.isNotEmpty()) {
+                if (s.past.isNotEmpty()) {
                     item { SectionTitle("Historial") }
-                    items(data.past.take(15), key = { "p${it.id}" }) { a -> AppointmentRow(a, false, null) }
+                    items(s.past.take(15), key = { "p${it.id}" }) { a -> AppointmentRow(a, false, null) }
                 }
             }
         }
@@ -131,13 +135,13 @@ private fun Greeting(patient: PatientDto, onRefresh: () -> Unit) {
 
 @Composable
 private fun NextCard(
-    a: AppointmentDto,
+    a: Appointment,
     patient: PatientDto,
     confirming: Boolean,
     onConfirm: (Long) -> Unit,
     platform: PlatformActions,
-    onChange: (AppointmentDto) -> Unit,
-    onCancel: (AppointmentDto) -> Unit,
+    onChange: (Appointment) -> Unit,
+    onCancel: (Appointment) -> Unit,
 ) {
     Column(
         Modifier
@@ -151,10 +155,14 @@ private fun NextCard(
         Text("${Fmt.hour(a.startAt)} · ${a.durationMin} min", color = Color.White, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
         Text(a.reason, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Text("${a.dentist.fullName} · ${a.dentist.specialty}", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
+        Text("${a.dentistName} · ${a.dentistSpecialty}", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
         Spacer(Modifier.height(10.dp))
         val (bg, fg) = Fmt.statusColors(a.status)
-        Chip(Fmt.statusLabel[a.status] ?: a.status, bg, fg)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(Fmt.statusLabel[a.status] ?: a.status, bg, fg)
+            if (a.pending) Chip("⏳ Pendiente de envío", Color.White, Brand.AzulOscuro)
+        }
+        a.syncError?.let { Text("No se pudo enviar: $it", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
         Spacer(Modifier.height(16.dp))
         if (a.canConfirm) {
             PrimaryButton("Confirmar asistencia", { onConfirm(a.id) }, loading = confirming, color = Brand.Naranja)
@@ -167,7 +175,7 @@ private fun NextCard(
                     startEpochMillis = ClinicRepository.epochMillis(a.startAt),
                     endEpochMillis = ClinicRepository.epochMillis(a.endAt),
                     location = "${patient.clinic.name}, ${patient.clinic.address}",
-                    details = "Con ${a.dentist.fullName}. Tel. ${patient.clinic.phone}",
+                    details = "Con ${a.dentistName}. Tel. ${patient.clinic.phone}",
                 )
             }
             WhiteButton("💬 Escribir", Modifier.weight(1f)) {
@@ -210,11 +218,11 @@ private fun EmptyNext(patient: PatientDto, platform: PlatformActions) {
 
 @Composable
 private fun AppointmentRow(
-    a: AppointmentDto,
+    a: Appointment,
     confirming: Boolean,
     onConfirm: ((Long) -> Unit)?,
-    onChange: ((AppointmentDto) -> Unit)? = null,
-    onCancel: ((AppointmentDto) -> Unit)? = null,
+    onChange: ((Appointment) -> Unit)? = null,
+    onCancel: ((Appointment) -> Unit)? = null,
 ) {
     Panel(padding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -229,14 +237,18 @@ private fun AppointmentRow(
             Column(Modifier.weight(1f)) {
                 Text(a.reason, fontWeight = FontWeight.SemiBold, color = Brand.Tinta)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).background(Fmt.color(a.dentist.color), RoundedCornerShape(50)))
+                    Box(Modifier.size(8.dp).background(Fmt.color(a.dentistColor), RoundedCornerShape(50)))
                     Spacer(Modifier.width(6.dp))
-                    Text("${Fmt.hour(a.startAt)} · ${a.dentist.fullName}", color = Brand.Tinta2, fontSize = 13.sp)
+                    Text("${Fmt.hour(a.startAt)} · ${a.dentistName}", color = Brand.Tinta2, fontSize = 13.sp)
                 }
             }
             val (bg, fg) = Fmt.statusColors(a.status)
-            Chip(Fmt.statusLabel[a.status] ?: a.status, bg, fg)
+            Column(horizontalAlignment = Alignment.End) {
+                Chip(Fmt.statusLabel[a.status] ?: a.status, bg, fg)
+                if (a.pending) Text("⏳ por enviar", color = Brand.Gris, fontSize = 11.sp)
+            }
         }
+        a.syncError?.let { Text("No se pudo enviar: $it", color = Brand.Rojo, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
         if (onConfirm != null && a.canConfirm) {
             Spacer(Modifier.height(10.dp))
             PrimaryButton("Confirmar asistencia", { onConfirm(a.id) }, loading = confirming)
@@ -252,14 +264,14 @@ private fun AppointmentRow(
 }
 
 @Composable
-private fun CancelDialog(a: AppointmentDto, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+private fun CancelDialog(a: Appointment, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var reason by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("¿Cancelar tu cita?") },
         text = {
             Column {
-                Text("${a.reason} · ${Fmt.dayLabel(a.startAt)} ${Fmt.hour(a.startAt)} con ${a.dentist.fullName}.", color = Brand.Tinta2)
+                Text("${a.reason} · ${Fmt.dayLabel(a.startAt)} ${Fmt.hour(a.startAt)} con ${a.dentistName}.", color = Brand.Tinta2)
                 Spacer(Modifier.height(8.dp))
                 Field(reason, { reason = it.take(200) }, "Motivo (opcional)")
             }
@@ -306,5 +318,75 @@ private fun encode(s: String): String = buildString {
         val c = b.toInt() and 0xFF
         if ((c in 'a'.code..'z'.code) || (c in 'A'.code..'Z'.code) || (c in '0'.code..'9'.code) || c == '-'.code || c == '.'.code || c == '_'.code) append(c.toChar())
         else append('%').append(c.toString(16).uppercase().padStart(2, '0'))
+    }
+}
+
+/** Estado de la sincronización: pendientes por enviar, antigüedad de los datos y lo que no se pudo enviar. */
+@Composable
+private fun SyncPanel(sync: SyncStatus, offline: Boolean, onSync: () -> Unit, onRetry: (Long) -> Unit, onDiscard: (Long) -> Unit) {
+    val age = sync.lastSyncAt?.let { ageText(it) } ?: "todavía no se sincronizó"
+    Panel(padding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        sync.running -> "Sincronizando…"
+                        sync.pending > 0 -> "⏳ ${sync.pending} cambio${if (sync.pending == 1) "" else "s"} por enviar"
+                        offline -> "Sin conexión"
+                        else -> "✓ Todo enviado"
+                    },
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (sync.pending > 0 || offline) Color(0xFF9A5B00) else Brand.Verde,
+                )
+                Text("Datos actualizados $age", color = Brand.Gris, fontSize = 12.sp)
+            }
+            TextButton(onClick = onSync, enabled = !sync.running) { Text("Sincronizar") }
+        }
+        sync.failed.forEach { op ->
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.fillMaxWidth().background(Brand.RojoSuave, RoundedCornerShape(10.dp)).padding(10.dp)) {
+                Text(
+                    (if (op.type.name == "RESERVAR") "Reserva" else "Confirmación") + " no enviada (${op.attempts} intento${if (op.attempts == 1) "" else "s"})",
+                    color = Brand.Rojo,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                )
+                op.error?.let { Text(it, color = Brand.Rojo, fontSize = 12.sp) }
+                Row {
+                    TextButton(onClick = { onRetry(op.id) }) { Text("Reintentar") }
+                    TextButton(onClick = { onDiscard(op.id) }) { Text("Descartar") }
+                }
+            }
+        }
+    }
+}
+
+private fun ageText(at: Long): String {
+    val min = ((kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - at) / 60_000).coerceAtLeast(0)
+    return when {
+        min < 1 -> "hace un momento"
+        min < 60 -> "hace $min min"
+        min < 1440 -> "hace ${min / 60} h"
+        else -> "hace ${min / 1440} día${if (min / 1440 == 1L) "" else "s"}"
+    }
+}
+
+/** Permiso de notificaciones en sus estados: sin preguntar, denegado y denegado para siempre. */
+@Composable
+private fun PermissionCard(p: PermissionStatus, onEnable: () -> Unit) {
+    Panel(padding = PaddingValues(12.dp)) {
+        Text("🔔 Recordatorios de tus citas", fontWeight = FontWeight.SemiBold, color = Brand.Tinta)
+        Text(
+            when (p) {
+                PermissionStatus.DENEGADO_PARA_SIEMPRE -> "Las notificaciones están bloqueadas. Actívalas en los ajustes del teléfono para recibir los avisos 24 h y 2 h antes."
+                PermissionStatus.DENEGADO -> "No diste permiso para avisarte. Sin él no te llegarán los recordatorios de tus citas."
+                else -> "Te avisamos 24 h y 2 h antes de cada cita. Necesitamos tu permiso para enviar notificaciones."
+            },
+            color = Brand.Tinta2,
+            fontSize = 13.sp,
+        )
+        TextButton(onClick = onEnable) {
+            Text(if (p == PermissionStatus.DENEGADO_PARA_SIEMPRE) "Abrir ajustes" else "Permitir notificaciones")
+        }
     }
 }

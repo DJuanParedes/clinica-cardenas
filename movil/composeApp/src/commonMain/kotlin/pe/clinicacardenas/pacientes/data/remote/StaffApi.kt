@@ -26,7 +26,7 @@ class StaffApi(
     private val server: () -> String,
     private val token: () -> String?,
 ) {
-    private fun url(path: String) = server().trimEnd('/') + path
+    private fun url(path: String) = server().trimEnd('/') + versioned(path)
 
     private fun HttpRequestBuilder.auth() {
         token()?.let { header(HttpHeaders.Authorization, "Bearer $it") }

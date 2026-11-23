@@ -25,8 +25,9 @@ public class PublicImageController {
     public ResponseEntity<FileSystemResource> image(@PathVariable String kind, @PathVariable String name) {
         Path p = images.file(kind, name);
         if (p == null) return ResponseEntity.notFound().build();
-        MediaType type = name.endsWith(".png") ? MediaType.IMAGE_PNG
-                : name.endsWith(".webp") ? MediaType.parseMediaType("image/webp") : MediaType.IMAGE_JPEG;
+        MediaType type = MediaType.IMAGE_JPEG;
+        if (name.endsWith(".png")) type = MediaType.IMAGE_PNG;
+        else if (name.endsWith(".webp")) type = MediaType.parseMediaType("image/webp");
         return ResponseEntity.ok().contentType(type)
                 .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
                 .header("X-Content-Type-Options", "nosniff")
