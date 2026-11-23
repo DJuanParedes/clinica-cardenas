@@ -291,6 +291,8 @@ export class Api {
   // ---------- usuarios (HU-25, HU-27)
   users(): Observable<any[]> { return this.http.get<any[]>('/api/users'); }
   roles(): Observable<{ code: string; label: string }[]> { return this.http.get<any[]>('/api/roles'); }
+  /** v2.10: roles asignables (sistema + creados por la clínica) con su resumen de permisos. */
+  assignableRoles(): Observable<any[]> { return this.http.get<any[]>('/api/roles/assignable'); }
   createUser(body: any): Observable<any> { return this.http.post('/api/users', body); }
   updateUser(id: number, body: any): Observable<any> { return this.http.put(`/api/users/${id}`, body); }
   setUserActive(id: number, active: boolean): Observable<any> { return this.http.patch(`/api/users/${id}/active`, { active }); }
