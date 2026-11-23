@@ -42,6 +42,14 @@ public class DeletionService {
             "treatment_items", new Keep("invoice_id is not null", "tratamientos ya facturados")
     );
 
+    /**
+     * Referencias opcionales donde dejar el valor en blanco cambiaría su sentido (una regla de comisión o promoción
+     * sin procedimiento pasaría a valer para todos) o dejaría basura (un parentesco sin familiar, una tarea de un
+     * paciente que ya no existe): esas filas se eliminan junto con el registro.
+     */
+    private static final Set<String> FORCE_CASCADE = Set.of(
+            "commission_rules.procedure_id", "promotions.procedure_id", "patient_relations.related_patient_id", "tasks.patient_id");
+
     /** Registro que el administrador puede eliminar. */
     record Entity(String key, String title, String table, String pk, String labelSql, Set<String> blockedBy,
                   BiConsumer<Object, Plan> check) {}
@@ -57,7 +65,10 @@ public class DeletionService {
     private volatile Map<String, List<Ref>> refs;
     private volatile Set<String> tablesWithId;
 
-    public DeletionService(JdbcTemplate jdbc, AuditService audit, ObjectMapper json) {
+    private final org.springframework.context.ApplicationEventPublisher events;
+
+    public DeletionService(JdbcTemplate jdbc, AuditService audit, ObjectMapper json, org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.jdbc = jdbc;
         this.audit = audit;
         this.json = json;
@@ -182,7 +193,7 @@ public class DeletionService {
                 extra = " and not (" + keep.where() + ")";
             }
             String where = r.column() + " in (" + in(ids) + ")" + extra;
-            if (r.nullable()) {
+            if (r.nullable() && !FORCE_CASCADE.contains(r.table() + "." + r.column())) {
                 long m = count("select count(*) from " + r.table() + " where " + where, args);
                 if (m == 0) continue;
                 p.nulls.add(new String[]{r.table(), r.column(), where, join(ids)});
@@ -270,6 +281,11 @@ public class DeletionService {
         Object id = idValue(x, rawId);
         String label = labelOf(x, id);
         Plan p = plan(x, id);
+        Object[] q = pendingMessages(p, x.table(), id);
+        if (q != null) {
+            long n = count("select count(*) from notifications where " + q[0], (Object[]) q[1]);
+            if (n > 0) p.warn("Tiene " + n + " aviso(s) por enviar (recordatorios, confirmaciones): se anularán para que no le lleguen.");
+        }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("entity", x.key());
         m.put("title", x.title());
@@ -308,7 +324,9 @@ public class DeletionService {
             nulled.put(n[0] + "." + n[1], n[3]);
             jdbc.update("update " + n[0] + " set " + n[1] + " = null where " + n[2], params(n[3]));
         }
+        int cancelled = cancelPendingMessages(p, x.table(), id);
         for (String[] d : p.deletes) jdbc.update("delete from " + d[0] + " where " + d[1], params(d[2]));
+        if (cancelled > 0) events.publishEvent(new pe.clinicacardenas.notification.NotificationService.Queued());
 
         String summary = p.counts.isEmpty() ? "Solo el registro" : "Con él: " + p.counts.entrySet().stream()
                 .map(en -> en.getValue() + " " + en.getKey()).reduce((a, b) -> a + ", " + b).orElse("");
@@ -324,6 +342,47 @@ public class DeletionService {
         audit.record(x.title().toUpperCase(Locale.ROOT).replace(' ', '_'), "id".equals(x.pk()) ? (Long) id : null, "ELIMINAR",
                 label + " · " + summary + (reason == null ? "" : " · motivo: " + reason));
         return Map.of("ok", true, "label", label, "summary", summary);
+    }
+
+    /**
+     * Las citas y pacientes eliminados no deben seguir recibiendo recordatorios: se anulan los avisos pendientes y,
+     * si el microservicio ya tenía uno programado, se le pide anularlo (igual que al cancelar una cita).
+     */
+    /** Condición y parámetros de los avisos pendientes de las citas/pacientes que se eliminarían; null si no hay. */
+    private Object[] pendingMessages(Plan p, String rootTable, Object rootId) {
+        List<Object> appts = new ArrayList<>(), patients = new ArrayList<>();
+        for (String[] d : p.deletes) {
+            if (d[0].equals("appointments")) appts.addAll(jdbc.queryForList("select id from appointments where " + d[1], Long.class, params(d[2])));
+        }
+        if ("patients".equals(rootTable)) patients.add(rootId);
+        if (appts.isEmpty() && patients.isEmpty()) return null;
+        String where = "status in ('PENDIENTE','PROGRAMADO','FALLIDO') and operation <> 'ANULAR' and ("
+                + (appts.isEmpty() ? "1=0" : "appointment_id in (" + in(appts) + ")") + " or "
+                + (patients.isEmpty() ? "1=0" : "patient_id in (" + in(patients) + ")") + ")";
+        List<Object> args = new ArrayList<>(appts);
+        args.addAll(patients);
+        return new Object[]{where, args.toArray()};
+    }
+
+    private int cancelPendingMessages(Plan p, String rootTable, Object rootId) {
+        Object[] q = pendingMessages(p, rootTable, rootId);
+        if (q == null) return 0;
+        String where = (String) q[0];
+        Object[] args = (Object[]) q[1];
+        List<Map<String, Object>> rows = jdbc.queryForList("select id, appointment_id, channel, destination, idempotency_key, operation, status from notifications where " + where, args);
+        for (Map<String, Object> n : rows) {
+            jdbc.update("update notifications set status = 'ANULADO', updated_at = ? where id = ?", Dates.now(), n.get("id"));
+            if ("PROGRAMADO".equals(n.get("status")) && "PROGRAMAR".equals(n.get("operation"))) {
+                String key = "anular:" + n.get("idempotency_key");
+                if (count("select count(*) from notifications where idempotency_key = ?", key) == 0) {
+                    jdbc.update("""
+                            insert into notifications (patient_id, appointment_id, type, operation, channel, destination, subject, body, idempotency_key, status, attempts, created_at)
+                            values (null, ?, 'RECORDATORIO', 'ANULAR', ?, ?, 'Anular recordatorio', ?, ?, 'PENDIENTE', 0, ?)
+                            """, n.get("appointment_id"), n.get("channel"), n.get("destination"), "Se anula el recordatorio " + n.get("idempotency_key") + " (registro eliminado)", key, Dates.now());
+                }
+            }
+        }
+        return rows.size();
     }
 
     private static String cut(String s, int n) {
