@@ -69,11 +69,19 @@ public class AuthService {
 
     @Transactional(noRollbackFor = ApiException.class)
     public LoginResult login(String username, String password) {
-        return login(username, password, null);
+        return loginInternal(username, password);
+    }
+
+    private LoginResult loginInternal(String username, String password) {
+        return loginInternal(username, password, null);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
     public LoginResult login(String username, String password, String code) {
+        return loginInternal(username, password, code);
+    }
+
+    private LoginResult loginInternal(String username, String password, String code) {
         LocalDateTime now = Dates.now();
         User u = users.findByUsernameIgnoreCase(username.trim()).orElse(null);
         if (u == null) {

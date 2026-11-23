@@ -121,7 +121,7 @@ public class InventoryPurchaseService {
         }
         if (paid) createExpense(id, date, supplier, docType, docNumber, total, method);
         audit.register("COMPRA", id, "REGISTRAR", supplier + " · S/ " + total.toPlainString() + (paid ? "" : " · al crédito"));
-        return get(id);
+        return getInternal(id);
     }
 
     private void createExpense(long purchaseId, LocalDate date, String supplier, String docType, String docNumber, BigDecimal total, String method) {
@@ -138,18 +138,22 @@ public class InventoryPurchaseService {
     /** Paga una compra al crédito: recién ahí sale el dinero de caja. */
     @Transactional
     public Map<String, Object> pay(Long id, PayRequest r) {
-        Map<String, Object> p = get(id);
+        Map<String, Object> p = getInternal(id);
         if (!"POR_PAGAR".equals(p.get("status"))) throw ApiException.conflict("COMPRA_NO_PENDIENTE", "Esta compra no está pendiente de pago.");
         String method = r.method() == null ? null : r.method().trim().toUpperCase();
         if (method == null || !CashService.METHODS.contains(method)) throw ApiException.field("method", "Selecciona cómo se pagó.");
         createExpense(id, r.paidOn() == null ? Dates.today() : r.paidOn(), (String) p.get("supplier"), (String) p.get("docType"),
                 (String) p.get(DOCNUMBER), (BigDecimal) p.get("total"), method);
         audit.register("COMPRA", id, "PAGAR", "S/ " + p.get("total"));
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> get(Long id) {
+        return getInternal(id);
+    }
+
+    private Map<String, Object> getInternal(Long id) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select id, purchase_date as purchaseDate, supplier, doc_type as docType, doc_number as docNumber, total, method,
                        expense_id as expenseId, notes, status, due_date as dueDate, created_at as createdAt, created_by as createdBy

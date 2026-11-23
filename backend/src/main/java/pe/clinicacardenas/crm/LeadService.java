@@ -196,6 +196,10 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> get(Long id) {
+        return getInternal(id);
+    }
+
+    private Map<String, Object> getInternal(Long id) {
         List<Map<String, Object>> l = jdbc.query(SELECT + " where l.id = ?", (rs, i) -> card(rs), Dates.now(), id);
         if (l.isEmpty()) throw ApiException.notFound("El lead");
         Map<String, Object> m = l.get(0);
@@ -287,24 +291,24 @@ public class LeadService {
             event(id, "TAREA", "Tarea: " + t.title() + " para el " + t.dueDate(), by);
         }
         audit.register("LEAD", id, "CREAR", c.name + " · " + c.source);
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> update(Long id, LeadRequest r) {
-        get(id);
+        getInternal(id);
         Clean c = validate(r, id);
         jdbc.update("""
                 update leads set full_name = ?, phone = ?, email = ?, source = ?, interest = ?, procedure_id = ?, estimated_value = ?,
                        assignee_id = ?, notes = ?, updated_at = ? where id = ?
                 """, c.name, c.phone, c.email, c.source, c.interest, c.procedureId, c.value, c.assigneeId, c.notes, Dates.now(), id);
         audit.register("LEAD", id, "EDITAR", c.name);
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> stage(Long id, StageRequest r) {
-        Map<String, Object> l = get(id);
+        Map<String, Object> l = getInternal(id);
         String st = r.stage() == null ? "" : r.stage().trim().toUpperCase();
         if (!STAGES.containsKey(st)) throw ApiException.field(STAGE, "Etapa no válida.");
         if (st.equals(l.get(STAGE))) return l;
@@ -317,22 +321,22 @@ public class LeadService {
         if (GANADO_2.equals(st) && l.get(PATIENT) == null)
             throw ApiException.badRequest("SIN_PACIENTE", "Primero registra o vincula al paciente: así el tratamiento queda en su ficha.");
         move(id, st, reason, null, CurrentUser.usernameOrSystem());
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> note(Long id, NoteRequest r) {
-        get(id);
+        getInternal(id);
         String t = r.text() == null ? "" : r.text().trim();
         if (t.length() < 2 || t.length() > 500) throw ApiException.field("text", "Escribe una nota de 2 a 500 caracteres.");
         event(id, "NOTA", t, CurrentUser.usernameOrSystem());
         jdbc.update("update leads set updated_at = ? where id = ?", Dates.now(), id);
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> linkPatient(Long id, LinkRequest r) {
-        Map<String, Object> l = get(id);
+        Map<String, Object> l = getInternal(id);
         if (r.patientId() == null || jdbc.queryForObject("select count(*) from patients where id = ? and active = true", Long.class, r.patientId()) == 0)
             throw ApiException.field("patientId", "El paciente no existe.");
         jdbc.update("update leads set patient_id = ?, updated_at = ? where id = ?", r.patientId(), Dates.now(), id);
@@ -341,7 +345,7 @@ public class LeadService {
         if (List.of(NUEVO_2, CONTACTADO_2).contains(l.get(STAGE)) && hasFutureAppointment(r.patientId()))
             move(id, CITA_AGENDADA_2, null, "Ya tiene una cita agendada", by);
         audit.register("LEAD", id, "VINCULAR", "Paciente #" + r.patientId());
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional

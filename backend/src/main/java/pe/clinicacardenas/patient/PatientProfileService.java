@@ -66,6 +66,10 @@ public class PatientProfileService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> profile(Long patientId) {
+        return profileInternal(patientId);
+    }
+
+    private Map<String, Object> profileInternal(Long patientId) {
         Patient p = patients.get(patientId);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("source", p.source);
@@ -158,7 +162,7 @@ public class PatientProfileService {
             if (!new HashSet<>(before).equals(new HashSet<>(tags))) changes.add("etiquetas");
         }
         if (!changes.isEmpty()) audit.register(PACIENTE, patientId, "EDITAR", "Actualizó " + String.join(", ", changes));
-        return profile(patientId);
+        return profileInternal(patientId);
     }
 
     // ------------------------------------------------------------------ familiares
@@ -173,7 +177,7 @@ public class PatientProfileService {
                 patientId, v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem());
         audit.register(PACIENTE, patientId, FAMILIAR, "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
-        return profile(patientId);
+        return profileInternal(patientId);
     }
 
     @Transactional
@@ -185,7 +189,7 @@ public class PatientProfileService {
                   is_guardian=?, pays=?, notes=? where id = ?""",
                 v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes, relationId);
         audit.register(PACIENTE, patientId, FAMILIAR, "Actualizó el familiar " + v.name);
-        return profile(patientId);
+        return profileInternal(patientId);
     }
 
     @Transactional
@@ -193,7 +197,7 @@ public class PatientProfileService {
         String name = owned(patientId, relationId);
         jdbc.update("delete from patient_relations where id = ?", relationId);
         audit.register(PACIENTE, patientId, FAMILIAR, "Quitó el vínculo con " + name);
-        return profile(patientId);
+        return profileInternal(patientId);
     }
 
     private String owned(Long patientId, Long relationId) {

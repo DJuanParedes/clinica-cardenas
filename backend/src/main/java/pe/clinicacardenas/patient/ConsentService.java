@@ -65,11 +65,15 @@ public class ConsentService {
     /** Aceptación registrada por el personal en recepción (presencial). */
     @Transactional
     public void recordInitial(Patient p) {
-        register(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
+        registerInternal(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
     }
 
     @Transactional
     public void register(Patient p, String code, String channel, String registeredBy, String ip) {
+        registerInternal(p, code, channel, registeredBy, ip);
+    }
+
+    private void registerInternal(Patient p, String code, String channel, String registeredBy, String ip) {
         String version = currentVersion(code);
         jdbc.update("""
                 insert into consent_records (patient_id, doc_code, doc_version, channel, accepted_by, registered_by, ip, accepted_at)

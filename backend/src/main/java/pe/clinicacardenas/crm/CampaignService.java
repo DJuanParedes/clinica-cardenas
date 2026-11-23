@@ -191,7 +191,7 @@ public class CampaignService {
         int h = now.getHour();
         if (h < 8 || h >= 20) throw ApiException.badRequest("FUERA_DE_HORARIO", "Las campañas se envían entre las 08:00 y las 20:00. Prográmala para mañana.");
         jdbc.update("update campaigns set status = 'PROGRAMADA', scheduled_at = ? where id = ?", now, id);
-        send(id);
+        sendInternal(id);
         return get(id);
     }
 
@@ -214,6 +214,10 @@ public class CampaignService {
     /** Envía una campaña PROGRAMADA. El cambio de estado condicionado evita que dos procesos la envíen a la vez. */
     @Transactional
     public synchronized int send(Long id) {
+        return sendInternal(id);
+    }
+
+    private synchronized int sendInternal(Long id) {
         if (jdbc.update("update campaigns set status = 'ENVIANDO' where id = ? and status = 'PROGRAMADA'", id) == 0) return 0;
         Map<String, Object> c = jdbc.queryForMap("select name, filters, channel, subject, body from campaigns where id = ?", id);
         SegmentFilter f = marketing.parse(c.get(FILTERS));

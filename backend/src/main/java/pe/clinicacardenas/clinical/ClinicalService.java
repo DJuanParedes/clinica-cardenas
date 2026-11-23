@@ -191,6 +191,10 @@ public class ClinicalService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> odontogram(Long patientId) {
+        return odontogramInternal(patientId);
+    }
+
+    private Map<String, Object> odontogramInternal(Long patientId) {
         patient(patientId);
         List<OdontogramEntry> list = odontogram.findByPatientIdOrderByToothAscFaceAsc(patientId);
         LocalDateTime last = null;
@@ -244,7 +248,7 @@ public class ClinicalService {
         odontogram.flush();
         odontogram.saveAll(toSave);
         audit.register(HISTORIA, patientId, "ODONTOGRAMA", toSave.size() + " marcas registradas");
-        return odontogram(patientId);
+        return odontogramInternal(patientId);
     }
 
     // ------------------------------------------------------------------ HU-06 plan y evolución
@@ -360,11 +364,19 @@ public class ClinicalService {
 
     @Transactional
     public Map<String, Object> setItemStatus(Long itemId, String status) {
-        return setItemStatus(itemId, status, null);
+        return setItemStatusInternal(itemId, status);
+    }
+
+    private Map<String, Object> setItemStatusInternal(Long itemId, String status) {
+        return setItemStatusInternal(itemId, status, null);
     }
 
     @Transactional
     public Map<String, Object> setItemStatus(Long itemId, String status, List<TreatmentItemDone.Used> used) {
+        return setItemStatusInternal(itemId, status, used);
+    }
+
+    private Map<String, Object> setItemStatusInternal(Long itemId, String status, List<TreatmentItemDone.Used> used) {
         TreatmentItem i = items.findById(itemId).orElseThrow(() -> ApiException.notFound("El procedimiento del plan"));
         if (!Set.of(PENDIENTE, "EN_PROCESO", REALIZADO).contains(status)) {
             throw ApiException.field("status", "Estado inválido.");

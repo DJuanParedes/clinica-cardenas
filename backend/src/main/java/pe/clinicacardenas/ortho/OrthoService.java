@@ -95,12 +95,16 @@ public class OrthoService {
     public List<Map<String, Object>> forPatient(Long patientId) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Long id : jdbc.queryForList("select id from ortho_cases where patient_id = ? order by status in ('ACTIVO', 'RETENCION') desc, start_date desc", Long.class, patientId))
-            out.add(get(id));
+            out.add(getInternal(id));
         return out;
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> get(Long id) {
+        return getInternal(id);
+    }
+
+    private Map<String, Object> getInternal(Long id) {
         List<Map<String, Object>> l = jdbc.queryForList("""
                 select c.*, concat(p.first_name, ' ', p.last_name) as patient_name, du.full_name as dentist_name
                   from ortho_cases c join patients p on p.id = c.patient_id left join dentists d on d.id = c.dentist_id left join users du on du.id = d.user_id where c.id = ?
@@ -210,12 +214,12 @@ public class OrthoService {
         }, kh);
         Long id = Objects.requireNonNull(kh.getKey()).longValue();
         audit.register(HISTORIA, patientId, ORTODONCIA, "Inició caso de ortodoncia: " + APPLIANCES.get(c.appliance));
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> update(Long id, CaseRequest r) {
-        Map<String, Object> cur = get(id);
+        Map<String, Object> cur = getInternal(id);
         Long patientId = ((Number) cur.get(PATIENTID)).longValue();
         Clean c = validate(r, patientId);
         String status = r.status() == null || r.status().isBlank() ? (String) cur.get(STATUS) : r.status().trim().toUpperCase();
@@ -228,12 +232,12 @@ public class OrthoService {
                 closing ? endDateOr(cur.get(ENDDATE)) : null, Dates.now(), id);
         if (!status.equals(cur.get(STATUS)) || !c.stage.equals(cur.get(CURRENTSTAGE)))
             audit.register(HISTORIA, patientId, ORTODONCIA, "Caso de ortodoncia: " + STATUSES.get(status) + " · etapa " + STAGES.get(c.stage));
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> addControl(Long id, ControlRequest r) {
-        Map<String, Object> cur = get(id);
+        Map<String, Object> cur = getInternal(id);
         if (!Set.of("ACTIVO", RETENCION).contains(cur.get(STATUS))) throw ApiException.conflict("CASO_CERRADO", "El caso está cerrado.");
         Map<String, String> e = new LinkedHashMap<>();
         if (r.controlDate() == null) e.put(CONTROLDATE, "Indica la fecha del control.");
@@ -256,7 +260,7 @@ public class OrthoService {
         if (!stage.equals(cur.get(CURRENTSTAGE))) jdbc.update("update ortho_cases set current_stage = ?, updated_at = ? where id = ?", stage, Dates.now(), id);
         audit.register(HISTORIA, ((Number) cur.get(PATIENTID)).longValue(), ORTODONCIA, "Control de ortodoncia del " + r.controlDate()
                 + (blank(r.upperWire()) != null ? " · arco sup. " + r.upperWire().trim() : ""));
-        return get(id);
+        return getInternal(id);
     }
 
     // ------------------------------------------------------------------ fotos
@@ -264,7 +268,7 @@ public class OrthoService {
     /** Sube una foto o radiografía como archivo del paciente y la ubica en el álbum de la etapa. */
     @Transactional
     public Map<String, Object> upload(Long id, MultipartFile file, String stage, String view, LocalDate takenOn) {
-        Map<String, Object> cur = get(id);
+        Map<String, Object> cur = getInternal(id);
         String st = code(stage, STAGES, STAGE, ETAPA_NO_VALIDA);
         String vw = code(view, VIEWS, "view", VISTA_NO_VALIDA);
         String kind = Set.of("PANORAMICA", "CEFALOMETRIA").contains(vw) ? "RADIOGRAFIA" : "FOTO";
@@ -274,13 +278,13 @@ public class OrthoService {
         if (!type.startsWith("image/")) throw ApiException.field("file", "Sube una foto (JPG, PNG o WEBP).");
         PatientFile f = files.upload(patientId, file, kind, "Ortodoncia · " + STAGES.get(st) + " · " + VIEWS.get(vw), null, null, false);
         link(id, f.id, st, vw, takenOn == null ? Dates.today() : takenOn);
-        return get(id);
+        return getInternal(id);
     }
 
     /** Agrega al álbum una foto que el paciente ya tenía en sus archivos. */
     @Transactional
     public Map<String, Object> linkExisting(Long id, LinkRequest r) {
-        Map<String, Object> cur = get(id);
+        Map<String, Object> cur = getInternal(id);
         String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA);
         String vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
         if (r.fileId() == null) throw ApiException.field(FILEID, "Elige la foto.");
@@ -290,25 +294,25 @@ public class OrthoService {
         if (jdbc.queryForObject("select count(*) from ortho_photos where case_id = ? and file_id = ?", Long.class, id, f.id) > 0)
             throw ApiException.conflict("YA_EN_ALBUM", "Esa foto ya está en el álbum.");
         link(id, f.id, st, vw, r.takenOn() == null ? f.createdAt.toLocalDate() : r.takenOn());
-        return get(id);
+        return getInternal(id);
     }
 
     @Transactional
     public Map<String, Object> movePhoto(Long id, Long photoId, LinkRequest r) {
-        get(id);
+        getInternal(id);
         String st = code(r.stage(), STAGES, STAGE, ETAPA_NO_VALIDA);
         String vw = code(r.view(), VIEWS, "view", VISTA_NO_VALIDA);
         if (jdbc.update("update ortho_photos set stage = ?, view_code = ?, taken_on = coalesce(?, taken_on) where id = ? and case_id = ?", st, vw, r.takenOn(), photoId, id) == 0)
             throw ApiException.notFound("La foto");
-        return get(id);
+        return getInternal(id);
     }
 
     /** Quita la foto del álbum (el archivo sigue en la ficha del paciente). */
     @Transactional
     public Map<String, Object> unlink(Long id, Long photoId) {
-        get(id);
+        getInternal(id);
         if (jdbc.update("delete from ortho_photos where id = ? and case_id = ?", photoId, id) == 0) throw ApiException.notFound("La foto");
-        return get(id);
+        return getInternal(id);
     }
 
     private void link(Long caseId, Long fileId, String stage, String view, LocalDate takenOn) {

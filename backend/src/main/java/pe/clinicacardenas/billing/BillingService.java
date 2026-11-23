@@ -238,7 +238,7 @@ public class BillingService {
         inv.hash = signed.digestValue();
         invoices.save(inv);
         audit.register("COMPROBANTE", inv.id, "GENERAR", inv.getFullNumber() + " · S/ " + inv.totalAmount.toPlainString());
-        return detail(inv.id);
+        return detailInternal(inv.id);
     }
 
     // ------------------------------------------------------------------ HU-11 envío a SUNAT
@@ -260,7 +260,7 @@ public class BillingService {
             res = new SunatGateway.Response("ERROR", null, "Sin respuesta del servicio: " + e.getMessage(), null, "SUNAT");
         }
         apply(inv, res, (int) (System.currentTimeMillis() - t0), "ENVIO_SUNAT");
-        return detail(inv.id);
+        return detailInternal(inv.id);
     }
 
     /**
@@ -283,12 +283,12 @@ public class BillingService {
         if (res.isPresent()) {
             String before = inv.status;
             apply(inv, res.get(), (int) (System.currentTimeMillis() - t0), "CONSULTA_SUNAT");
-            m = detail(inv.id);
+            m = detailInternal(inv.id);
             m.put("statusMessage", before.equals(inv.status)
                     ? "SUNAT confirma el estado " + inv.status + "."
                     : "SUNAT tiene registrado el comprobante como " + inv.status + ". Se actualizó el estado y se guardó la constancia.");
         } else {
-            m = detail(inv.id);
+            m = detailInternal(inv.id);
             m.put("statusMessage", "SUNAT no tiene registrado este comprobante. "
                     + ("GENERADO".equals(inv.status) || "ERROR".equals(inv.status) ? "Envíalo para obtener la constancia." : ""));
         }
@@ -350,6 +350,10 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> detail(Long id) {
+        return detailInternal(id);
+    }
+
+    private Map<String, Object> detailInternal(Long id) {
         Invoice inv = get(id);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("invoice", inv);

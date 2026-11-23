@@ -82,7 +82,7 @@ public class InventoryService {
         m.put("items", all);
         m.put("lowCount", all.stream().filter(InventoryItem::isLow).count());
         m.put("recent", recentMoves());
-        List<Map<String, Object>> exp = expiring();
+        List<Map<String, Object>> exp = expiringInternal();
         m.put("expiring", exp);
         m.put("expiredCount", exp.stream().filter(x -> Boolean.TRUE.equals(x.get("expired"))).count());
         m.put("nextExpiry", nextExpiryByItem());
@@ -103,6 +103,10 @@ public class InventoryService {
     /** Lotes con saldo que ya vencieron o vencen en los próximos 60 días. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> expiring() {
+        return expiringInternal();
+    }
+
+    private List<Map<String, Object>> expiringInternal() {
         java.time.LocalDate today = Dates.today();
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select l.id, l.item_id as itemId, i.name as item, i.unit, i.brand, l.lot_code as lotCode, l.expires_on as expiresOn,
@@ -389,6 +393,10 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> supplies() {
+        return suppliesInternal();
+    }
+
+    private List<Map<String, Object>> suppliesInternal() {
         return jdbc.queryForList("""
                 select p.id as procedureId, p.code, p.name as procedureName, i.id as itemId, i.name as itemName, i.unit,
                        s.quantity
@@ -426,7 +434,7 @@ public class InventoryService {
                         procedureId, s.itemId(), s.quantity());
             }
         }
-        return supplies();
+        return suppliesInternal();
     }
 
     /** Al marcar un procedimiento como realizado se descuentan sus materiales (una sola vez). */

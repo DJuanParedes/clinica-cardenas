@@ -37,6 +37,10 @@ public class PatientNoteService {
     @PreAuthorize("hasAuthority('PACIENTES_VER')")
     @Transactional(readOnly = true)
     public Map<String, Object> flags(@PathVariable Long patientId) {
+        return flagsInternal(patientId);
+    }
+
+    private Map<String, Object> flagsInternal(@PathVariable Long patientId) {
         exists(patientId);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("notes", jdbc.queryForList("""
@@ -67,7 +71,7 @@ public class PatientNoteService {
         jdbc.update("insert into patient_notes (patient_id, text, tone, pinned, created_by, created_at) values (?, ?, ?, ?, ?, ?)",
                 patientId, c.text, c.tone, c.pinned, CurrentUser.usernameOrSystem(), Dates.now());
         audit.register(PACIENTE, patientId, "NOTA", "Agregó una nota: " + c.text);
-        return flags(patientId);
+        return flagsInternal(patientId);
     }
 
     @PutMapping("/notes/{id}")
@@ -78,7 +82,7 @@ public class PatientNoteService {
         if (jdbc.update("update patient_notes set text = ?, tone = ?, pinned = ?, updated_by = ?, updated_at = ? where id = ? and patient_id = ? and deleted_at is null",
                 c.text, c.tone, c.pinned, CurrentUser.usernameOrSystem(), Dates.now(), id, patientId) == 0) throw ApiException.notFound("La nota");
         audit.register(PACIENTE, patientId, "NOTA", "Editó una nota: " + c.text);
-        return flags(patientId);
+        return flagsInternal(patientId);
     }
 
     @DeleteMapping("/notes/{id}")
@@ -88,7 +92,7 @@ public class PatientNoteService {
         if (jdbc.update("update patient_notes set deleted_at = ?, deleted_by = ? where id = ? and patient_id = ? and deleted_at is null",
                 Dates.now(), CurrentUser.usernameOrSystem(), id, patientId) == 0) throw ApiException.notFound("La nota");
         audit.register(PACIENTE, patientId, "NOTA", "Borró una nota");
-        return flags(patientId);
+        return flagsInternal(patientId);
     }
 
     private record Clean(String text, String tone, boolean pinned) {}

@@ -200,6 +200,10 @@ public class CommissionService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> calculate(Long dentistId, LocalDate from, LocalDate to) {
+        return calculateInternal(dentistId, from, to);
+    }
+
+    private Map<String, Object> calculateInternal(Long dentistId, LocalDate from, LocalDate to) {
         Dentist d = dentist(dentistId);
         checkPeriod(from, to);
         List<CommissionRule> rs = rules.findByDentistIdOrderByValidFromDesc(d.id);
@@ -290,7 +294,7 @@ public class CommissionService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> settle(SettleRequest r) {
         Dentist d = dentists.lockById(dentist(r.dentistId()).id).orElseThrow();
-        Map<String, Object> calc = calculate(d.id, r.from(), r.to());
+        Map<String, Object> calc = calculateInternal(d.id, r.from(), r.to());
         List<Map<String, Object>> eligible = (List<Map<String, Object>>) calc.get(KEY_LINES);
         Set<Long> chosen = r.itemIds() == null || r.itemIds().isEmpty() ? null : new HashSet<>(r.itemIds());
         List<Map<String, Object>> selected = eligible.stream()

@@ -84,7 +84,11 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
-        return slots(dentistId, date, durationMin, excludeId, null);
+        return slotsInternal(dentistId, date, durationMin, excludeId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, null);
     }
 
     /**
@@ -93,6 +97,10 @@ public class AgendaService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, patientId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
         Dentist d = dentists.findById(dentistId).orElseThrow(() -> ApiException.notFound("El odontólogo"));
         checkDuration(durationMin);
         List<SlotCalculator.Busy> busy = new ArrayList<>();

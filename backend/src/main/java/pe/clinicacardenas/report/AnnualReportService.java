@@ -62,6 +62,10 @@ public class AnnualReportService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> report(int year) {
+        return reportInternal(year);
+    }
+
+    private Map<String, Object> reportInternal(int year) {
         int now = Dates.today().getYear();
         if (year < 2020 || year > now) throw ApiException.field("year", "Elige un año entre 2020 y " + now + ".");
         Map<String, Object> r = new LinkedHashMap<>();
@@ -161,7 +165,7 @@ public class AnnualReportService {
     @SuppressWarnings("unchecked")
     @Transactional(readOnly = true)
     public byte[] pdf(int year) {
-        Map<String, Object> r = report(year);
+        Map<String, Object> r = reportInternal(year);
         Map<String, Object> s = (Map<String, Object>) r.get("summary");
         Map<String, Object> p = (Map<String, Object>) r.get("previous");
         SimplePdf pdf = new SimplePdf().header(clinic, address + (ruc.isBlank() ? "" : " · RUC " + ruc))
@@ -215,7 +219,7 @@ public class AnnualReportService {
     @SuppressWarnings("unchecked")
     @Transactional(readOnly = true)
     public String csv(int year) {
-        Map<String, Object> r = report(year);
+        Map<String, Object> r = reportInternal(year);
         StringBuilder b = new StringBuilder("\uFEFF");
         b.append("Reporte anual ").append(year).append(';').append(clinic).append('\n');
         b.append("Mes;Citas atendidas;Pacientes nuevos;Ingresos;Egresos;Resultado\n");

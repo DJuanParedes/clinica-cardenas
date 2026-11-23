@@ -99,6 +99,10 @@ public class CashClosingService {
     /** Lo que debería haber hoy en cada medio de pago y, si ya se cerró, lo que se contó. */
     @Transactional(readOnly = true)
     public Map<String, Object> summary(LocalDate day) {
+        return summaryInternal(day);
+    }
+
+    private Map<String, Object> summaryInternal(LocalDate day) {
         if (day == null) day = Dates.today();
         if (day.isAfter(Dates.today())) throw ApiException.field("date", "La fecha no puede ser futura.");
         Map<String, Object> rep = cash.report(day, day);
@@ -225,7 +229,7 @@ public class CashClosingService {
                     """, append(args, day));
         }
         audit.register("CAJA", null, "CIERRE", "Caja del " + day.format(DMY) + " · contado S/ " + money(counted) + " · diferencia S/ " + money(diff));
-        return summary(day);
+        return summaryInternal(day);
     }
 
     @Transactional
@@ -237,7 +241,7 @@ public class CashClosingService {
         jdbc.update("update cash_closings set status = 'REABIERTA', reopened_at = ?, reopened_by = ?, reopen_reason = ? where day = ?",
                 Dates.now(), CurrentUser.usernameOrSystem(), reason.substring(0, Math.min(300, reason.length())), day);
         audit.register("CAJA", null, "REAPERTURA", "Caja del " + day.format(DMY) + " · " + reason);
-        return summary(day);
+        return summaryInternal(day);
     }
 
     public List<Map<String, Object>> history(int limit) {
@@ -260,7 +264,7 @@ public class CashClosingService {
 
     @Transactional(readOnly = true)
     public byte[] pdf(LocalDate day) {
-        Map<String, Object> s = summary(day);
+        Map<String, Object> s = summaryInternal(day);
         @SuppressWarnings("unchecked")
         Map<String, Object> c = (Map<String, Object>) s.get("closing");
         if (c == null) throw ApiException.notFound("El cierre de ese día");

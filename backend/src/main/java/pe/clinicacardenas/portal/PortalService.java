@@ -304,6 +304,10 @@ public class PortalService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> appointments(String subject) {
+        return appointmentsInternal(subject);
+    }
+
+    private Map<String, Object> appointmentsInternal(String subject) {
         Patient p = me(subject);
         LocalDateTime now = Dates.now();
         List<Map<String, Object>> upcoming = new ArrayList<>();
@@ -333,7 +337,7 @@ public class PortalService {
             throw ApiException.conflict("PLAZO_VENCIDO", "La confirmación se hace hasta 2 horas antes de la cita. Recepción te llamará; también puedes escribirnos al " + clinicPhone + ".");
         }
         agenda.changeStatus(a.id, new AgendaService.StatusRequest(AppointmentStatus.CONFIRMADA, "Confirmada por el paciente desde la app"));
-        return appointments(subject);
+        return appointmentsInternal(subject);
     }
 
     @Transactional

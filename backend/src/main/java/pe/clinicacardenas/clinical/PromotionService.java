@@ -104,6 +104,10 @@ public class PromotionService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> promotions() {
+        return promotionsInternal();
+    }
+
+    private List<Map<String, Object>> promotionsInternal() {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select pr.id, pr.name, pr.procedure_id as procedureId, p.name as procedureName, pr.family, pr.discount_type as discountType,
                        pr.value, pr.valid_from as validFrom, pr.valid_to as validTo, pr.conditions, pr.active, p.price as listPrice,
@@ -144,7 +148,7 @@ public class PromotionService {
         String fam = r.procedureId() != null ? null : r.family().trim();
         if (id == null) {
             jdbc.update("""
-                    insert into promotions (name, procedure_id, family, discount_type, value, valid_from, valid_to, conditions, active, created_at, created_by)
+                    insert into promotionsInternal(name, procedure_id, family, discount_type, value, valid_from, valid_to, conditions, active, created_at, created_by)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", name, r.procedureId(), fam, type, r.value(), r.validFrom(), r.validTo(),
                     blank(r.conditions()), r.active() == null || r.active(), Dates.now(), CurrentUser.usernameOrSystem());
             audit.register("PROMOCION", null, "CREAR", name);
@@ -156,7 +160,7 @@ public class PromotionService {
             if (n == 0) throw ApiException.notFound("La promoción");
             audit.register("PROMOCION", id, "EDITAR", name);
         }
-        return promotions();
+        return promotionsInternal();
     }
 
     @Transactional

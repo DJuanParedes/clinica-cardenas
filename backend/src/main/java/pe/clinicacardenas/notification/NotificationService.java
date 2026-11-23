@@ -283,12 +283,21 @@ public class NotificationService {
      */
     @Transactional
     public List<Sent> direct(Patient p, String type, String channel, String destination, String subject, String body, String key) {
-        return direct(p, type, channel, destination, subject, body, key, null);
+        return directInternal(p, type, channel, destination, subject, body, key);
+    }
+
+    private List<Sent> directInternal(Patient p, String type, String channel, String destination, String subject, String body, String key) {
+        return directInternal(p, type, channel, destination, subject, body, key, null);
     }
 
     /** Igual que {@link #direct}, con la plantilla de WhatsApp aprobada y sus parámetros (nombre, p1, p2, ...). */
     @Transactional
     public List<Sent> direct(Patient p, String type, String channel, String destination, String subject, String body, String key,
+                             List<String> waTemplate) {
+        return directInternal(p, type, channel, destination, subject, body, key, waTemplate);
+    }
+
+    private List<Sent> directInternal(Patient p, String type, String channel, String destination, String subject, String body, String key,
                              List<String> waTemplate) {
         List<Sent> out = new ArrayList<>();
         Target t = new Target(channel, destination);

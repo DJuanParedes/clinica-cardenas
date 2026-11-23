@@ -96,6 +96,10 @@ public class CashService {
     /** Procedimientos del paciente con lo cobrado y lo pendiente de cada uno. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> obligations(Long patientId) {
+        return obligationsInternal(patientId);
+    }
+
+    private List<Map<String, Object>> obligationsInternal(Long patientId) {
         return jdbc.query("""
                 select ti.id, ti.status, ti.price, ti.tooth, ti.done_at, pr.name, pr.category, tp.title, tp.id as plan_id,
                        coalesce((select sum(py.amount) from payments py
@@ -127,8 +131,12 @@ public class CashService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> balance(Long patientId) {
+        return balanceInternal(patientId);
+    }
+
+    private Map<String, Object> balanceInternal(Long patientId) {
         Patient p = patient(patientId);
-        List<Map<String, Object>> obligations = obligations(patientId);
+        List<Map<String, Object>> obligations = obligationsInternal(patientId);
         List<Payment> ps = payments.findByPatientIdOrderByPaidAtDesc(patientId);
         Map<Long, String> itemNames = new HashMap<>();
         for (Map<String, Object> o : obligations) itemNames.put((Long) o.get("treatmentItemId"), (String) o.get(PROCEDURE));
@@ -253,7 +261,7 @@ public class CashService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("payment", pay);
         m.put(CONCEPT, concept);
-        m.put("account", balance(p.id));
+        m.put("account", balanceInternal(p.id));
         return m;
     }
 

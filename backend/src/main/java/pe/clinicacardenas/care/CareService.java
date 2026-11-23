@@ -177,6 +177,10 @@ public class CareService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> installments(Long planId) {
+        return installmentsInternal(planId);
+    }
+
+    private Map<String, Object> installmentsInternal(Long planId) {
         TreatmentPlan p = plan(planId);
         List<Installment> list = installments.findByPlanIdOrderByNumberAsc(planId);
         // Solo cuentan los pagos de procedimientos de ESTE plan y los pagos "a cuenta": un pago de otro
@@ -235,7 +239,7 @@ public class CareService {
             installments.save(i);
         }
         audit.register("HISTORIA", p.patientId, "CUOTAS", count + " cuotas para \"" + p.title + "\" (S/ " + total.toPlainString() + ")");
-        return installments(planId);
+        return installmentsInternal(planId);
     }
 
     /** Todos los días a las 9:00 a. m.: recordatorio de las cuotas que vencen en 3 días. */
@@ -246,7 +250,7 @@ public class CareService {
             // No se recuerda una cuota que ya está cubierta por los pagos del paciente.
             boolean alreadyPaid = false;
             try {
-                Object rows = installments(i.planId).get("items");
+                Object rows = installmentsInternal(i.planId).get("items");
                 if (rows instanceof List<?> l) for (Object o : l) {
                     if (o instanceof Map<?, ?> row && i.id.equals(row.get("id")) && "PAGADA".equals(row.get("status"))) alreadyPaid = true;
                 }

@@ -90,8 +90,8 @@ public class OnlineChargeService {
         m.put("enabled", enabled());
         m.put("testMode", enabled() && mp.testMode());
         m.put("methods", List.of("TARJETA", "YAPE"));
-        String mode = mp.testMode() ? "Mercado Pago en modo de pruebas: usa tarjetas de prueba, no se cobra dinero real." : "Mercado Pago activo: los cobros son reales.";
-        m.put("message", enabled() ? mode : "Para cobrar en línea configura PAGOS_MODO=mercadopago y MP_ACCESS_TOKEN en el servidor.");
+        String modeMessage = mp.testMode() ? "Mercado Pago en modo de pruebas: usa tarjetas de prueba, no se cobra dinero real." : "Mercado Pago activo: los cobros son reales.";
+        m.put("message", enabled() ? modeMessage : "Para cobrar en línea configura PAGOS_MODO=mercadopago y MP_ACCESS_TOKEN en el servidor.");
         return m;
     }
 
