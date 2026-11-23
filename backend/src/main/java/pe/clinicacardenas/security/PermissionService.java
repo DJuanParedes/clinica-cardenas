@@ -79,6 +79,36 @@ public class PermissionService {
         return a != null && a.getAuthorities().stream().anyMatch(g -> g.getAuthority().equals(permission));
     }
 
+    /**
+     * v2.10: roles que se pueden asignar a un usuario (los del sistema y los creados por la clínica), con lo que puede
+     * hacer cada uno. Lo usa el formulario de usuarios, aunque quien lo llene no administre roles.
+     */
+    public List<Map<String, Object>> assignable() {
+        if (byRole.isEmpty()) load();
+        Map<String, String> labels = new HashMap<>();
+        Map<String, String> groups = new HashMap<>();
+        catalog.forEach(c -> { labels.put((String) c.get("code"), (String) c.get("label")); groups.put((String) c.get("code"), (String) c.get("group")); });
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : roleRows) {
+            String code = (String) r.get("code");
+            boolean custom = asBool(r.get("custom"));
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", code);
+            m.put("label", r.get("name"));
+            m.put("description", r.get("description"));
+            m.put("custom", custom);
+            m.put("baseRole", custom ? r.get("baseRole") : code);
+            m.put("baseRoleLabel", label(custom ? (String) r.get("baseRole") : code));
+            Set<String> perms = forRole(code);
+            m.put("permissionCount", perms.size());
+            Map<String, List<String>> byGroup = new TreeMap<>();
+            for (String p : perms) byGroup.computeIfAbsent(groups.getOrDefault(p, "Otros"), k -> new ArrayList<>()).add(labels.getOrDefault(p, p));
+            m.put("permissionsByGroup", byGroup);
+            out.add(m);
+        }
+        return out;
+    }
+
     public Map<String, Object> matrix() {
         if (byRole.isEmpty()) load();
         List<Map<String, Object>> roles = new ArrayList<>();

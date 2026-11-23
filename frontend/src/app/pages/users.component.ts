@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -23,7 +24,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, RouterLink],
   template: `
     <div class="page">
       <div class="page-head">
@@ -41,7 +42,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
             <span class="muted small">{{ shown.length }} de {{ users.length }}</span>
           </div>
           <table class="table">
-            <thead><tr><th>Persona</th><th>Puesto / rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+            <thead><tr><th>Persona</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
             <tbody>
               @for (u of shown; track u.id) {
                 <tr [class.off]="!u.active">
@@ -53,8 +54,8 @@ const PERMISSIONS: { role: string; can: string }[] = [
                     </div>
                   </td>
                   <td>
-                    <span class="tag plain" [class]="'tag plain ' + roleTone(u.role)">{{ u.roleLabel }}</span>
-                    @if (u.accessRole) { <div class="small"><span class="tag teal">{{ u.accessRoleLabel }}</span></div> }
+                    <span class="tag plain" [class]="'tag plain ' + roleTone(u.role)">{{ u.accessRole ? u.accessRoleLabel : u.roleLabel }}</span>
+                    @if (u.accessRole) { <div class="muted small">basado en {{ u.roleLabel }}</div> }
                     @if (u.dentist) { <div class="muted small">{{ u.dentist.specialty }}</div> }
                   </td>
                   <td>
@@ -90,8 +91,8 @@ const PERMISSIONS: { role: string; can: string }[] = [
     <app-modal [open]="!!viewing" [title]="viewing?.fullName || ''" [subtitle]="viewing ? viewing.username : ''" (close)="viewing = null">
       @if (viewing) {
         <dl class="kv small">
-          <dt>Puesto</dt><dd>{{ viewing.roleLabel }}</dd>
-          <dt>Rol de acceso</dt><dd>{{ viewing.accessRoleLabel }}</dd>
+          <dt>Rol</dt><dd>{{ viewing.accessRole ? viewing.accessRoleLabel : viewing.roleLabel }}</dd>
+          @if (viewing.accessRole) { <dt>Basado en</dt><dd>{{ viewing.roleLabel }}</dd> }
           <dt>Correo</dt><dd>{{ viewing.email }}</dd>
           <dt>Celular</dt><dd>{{ viewing.phone || '—' }}</dd>
           @if (viewing.dentist) { <dt>Especialidad</dt><dd>{{ viewing.dentist.specialty }}{{ viewing.dentist.cop ? ' · ' + viewing.dentist.cop : '' }}</dd> }
@@ -125,21 +126,28 @@ const PERMISSIONS: { role: string; can: string }[] = [
           <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" />
           @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
         </div>
-        <div class="field">
-          <label class="req" for="rl">Puesto</label>
-          <select id="rl" name="rl" class="input" [class.invalid]="e['role']" [(ngModel)]="f.role" (ngModelChange)="f.accessRole = ''">
+        <div class="field span-2">
+          <label class="req" for="rl">Rol</label>
+          <select id="rl" name="rl" class="input" [class.invalid]="e['role'] || e['accessRole']" [(ngModel)]="roleChoice" (ngModelChange)="pickRole($event)">
             <option value="">Seleccionar…</option>
-            @for (r of roles; track r.code) { <option [value]="r.code">{{ r.label }}</option> }
+            @for (g of roleGroups; track g.base) {
+              <optgroup [label]="g.label">
+                @for (r of g.roles; track r.code) { <option [value]="r.code">{{ r.custom ? r.label : r.label + ' (estándar)' }}</option> }
+              </optgroup>
+            }
           </select>
-          @if (e['role']) { <span class="err">{{ e['role'] }}</span> }
-        </div>
-        <div class="field">
-          <label for="ar">Rol de acceso</label>
-          <select id="ar" name="ar" class="input" [class.invalid]="e['accessRole']" [(ngModel)]="f.accessRole" [disabled]="!f.role">
-            <option value="">Permisos del puesto</option>
-            @for (r of customFor(f.role); track r.code) { <option [value]="r.code">{{ r.label }}</option> }
-          </select>
-          @if (e['accessRole']) { <span class="err">{{ e['accessRole'] }}</span> } @else { <span class="hint">Opcional: un rol personalizado basado en este puesto.</span> }
+          @if (e['role'] || e['accessRole']) { <span class="err">{{ e['role'] || e['accessRole'] }}</span> }
+          @else { <span class="hint">Si dos personas del mismo puesto necesitan accesos distintos, crea un rol para cada una
+            @if (auth.can('ROLES')) { en <a routerLink="/roles">Roles y permisos</a> } y elígelo aquí.</span> }
+          @if (chosen) {
+            <details class="role-preview">
+              <summary>{{ chosen.label }}: {{ chosen.permissionCount }} permisos{{ chosen.custom ? ' · basado en ' + chosen.baseRoleLabel : '' }}</summary>
+              @if (chosen.description) { <p class="muted small">{{ chosen.description }}</p> }
+              <dl>
+                @for (g of groupsOf(chosen); track g[0]) { <dt>{{ g[0] }}</dt><dd>{{ g[1].join(' · ') }}</dd> }
+              </dl>
+            </details>
+          }
         </div>
         <div class="field">
           <label for="ph">Celular</label>
@@ -242,6 +250,12 @@ const PERMISSIONS: { role: string; can: string }[] = [
     </app-modal>
   `,
   styles: [`
+    .role-preview { margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; background: #f8fbfc; }
+    .role-preview summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+    .role-preview dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 10px; margin: 8px 0 0; font-size: 12.5px; }
+    .role-preview dt { color: var(--muted); font-weight: 600; }
+    .role-preview dd { margin: 0; }
+    @media (max-width: 600px) { .role-preview dl { grid-template-columns: 1fr; } }
     .avatar.ph { object-fit: cover; padding: 0; }
     .avatar.lg { width: 52px; height: 52px; font-size: 16px; flex: none; }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
@@ -296,9 +310,27 @@ export class UsersComponent implements OnInit {
   }
   customFor(role: string) { return this.customRoles.filter((r) => r.baseRole === role); }
 
+  /** v2.10: un solo campo "Rol": los del sistema y los creados, agrupados por puesto. */
+  assignable: any[] = [];
+  roleChoice = '';
+  get roleGroups() {
+    const order = ['RECEPCION', 'CAJA', 'ODONTOLOGO', 'DIRECTOR', 'ADMIN'];
+    const bases = [...new Set(this.assignable.map((r) => r.baseRole))].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+    return bases.map((b) => ({ base: b, label: this.assignable.find((r) => r.baseRole === b)?.baseRoleLabel || b,
+      roles: this.assignable.filter((r) => r.baseRole === b).sort((x, y) => Number(x.custom) - Number(y.custom) || x.label.localeCompare(y.label)) }));
+  }
+  get chosen() { return this.assignable.find((r) => r.code === this.roleChoice) || null; }
+  groupsOf(r: any): [string, string[]][] { return Object.entries(r.permissionsByGroup || {}) as [string, string[]][]; }
+  pickRole(code: string) {
+    const r = this.assignable.find((x) => x.code === code);
+    this.f.role = r ? r.baseRole : '';
+    this.f.accessRole = r && r.custom ? r.code : '';
+  }
+
   ngOnInit() {
     this.load();
     this.api.roles().subscribe((r) => (this.roles = r));
+    this.api.assignableRoles().subscribe((r) => (this.assignable = r));
     if (this.auth.can('ROLES')) this.api.permissions().subscribe((m) => (this.customRoles = m.roles.filter((r: any) => r.custom)));
   }
 
@@ -307,6 +339,7 @@ export class UsersComponent implements OnInit {
   openNew() {
     this.editing = null;
     this.f = { fullName: '', username: '', email: '', role: '', accessRole: '', phone: '', password: '', specialty: '', cop: '' };
+    this.roleChoice = '';
     this.e = {};
     this.modal = true;
   }
@@ -314,6 +347,7 @@ export class UsersComponent implements OnInit {
   openEdit(u: any) {
     this.editing = u;
     this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, accessRole: u.accessRole || '', phone: u.phone || '', specialty: u.dentist?.specialty || '', cop: u.dentist?.cop || '' };
+    this.roleChoice = u.accessRole || u.role;
     this.e = {};
     this.tempPassword = '';
     this.audit = [];
