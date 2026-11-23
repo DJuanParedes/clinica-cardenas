@@ -27,7 +27,7 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
     <div class="spread head">
       <p class="muted small">{{ files.length }} {{ files.length === 1 ? 'archivo' : 'archivos' }} · los marcados como compartidos aparecen en la app del paciente.</p>
       @if (canUpload) {
-        <div class="row">
+        <div class="row wrap">
           <button class="btn" type="button" (click)="openDoc('CONSENTIMIENTO')"><app-icon name="edit" [size]="16" /> Documento con firma</button>
           <button class="btn primary" type="button" (click)="picker.click()"><app-icon name="plus" [size]="16" /> Subir archivo</button>
           <input #picker type="file" hidden accept="image/*,application/pdf" (change)="picked($event)" />
@@ -127,7 +127,7 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
     </app-modal>
   `,
   styles: [`
-    .head { margin-bottom: 12px; }
+    .head { margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .filters { flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
     .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
     .chip.on { background: var(--brand-soft); border-color: var(--brand); color: var(--teal-strong); font-weight: 700; }
