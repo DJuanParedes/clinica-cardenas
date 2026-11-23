@@ -181,7 +181,7 @@ class ReglasDeNegocioTest {
         r.validTo = LocalDate.of(2026, 6, 30);
         assertTrue(r.appliesOn(LocalDate.of(2026, 3, 15)));
         assertFalse(r.appliesOn(LocalDate.of(2026, 7, 1)));
-        assertEquals("40 % del precio · todos los procedimientos", r.getLabel());
+        assertEquals("40 % del precio · todas las categorías", r.getLabel());
         r.active = false;
         assertFalse(r.appliesOn(LocalDate.of(2026, 3, 15)));
     }
