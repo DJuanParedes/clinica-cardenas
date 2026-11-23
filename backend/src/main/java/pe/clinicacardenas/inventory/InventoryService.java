@@ -22,9 +22,17 @@ import java.util.*;
  */
 @Service
 public class InventoryService {
+    private static final String AJUSTE_2 = "AJUSTE";
+    private static final String ENTRADA = "ENTRADA";
+    private static final String EL_MATERIAL = "El material";
+    private static final String MEDICAMENTO = "MEDICAMENTO";
+    private static final String SALIDA = "SALIDA";
+    private static final String EXPIRESON = "expiresOn";
+    private static final String QUANTITY = "quantity";
 
-    public static final List<String> MOVE_KINDS = List.of("ENTRADA", "SALIDA", "AJUSTE");
-    public static final List<String> CATEGORIES = List.of("INSUMO", "INSTRUMENTAL", "MEDICAMENTO");
+
+    public static final List<String> MOVE_KINDS = List.of(ENTRADA, SALIDA, AJUSTE_2);
+    public static final List<String> CATEGORIES = List.of("INSUMO", "INSTRUMENTAL", MEDICAMENTO);
     /** Días de anticipación para avisar que un lote está por vencer. */
     public static final int EXPIRY_WARNING_DAYS = 60;
 
@@ -104,7 +112,7 @@ public class InventoryService {
                  order by l.expires_on
                 """, today.plusDays(EXPIRY_WARNING_DAYS));
         for (Map<String, Object> r : rows) {
-            java.time.LocalDate d = ((java.sql.Date) r.get("expiresOn")).toLocalDate();
+            java.time.LocalDate d = ((java.sql.Date) r.get(EXPIRESON)).toLocalDate();
             long days = java.time.temporal.ChronoUnit.DAYS.between(today, d);
             r.put("days", days);
             r.put("expired", days < 0);
@@ -150,7 +158,7 @@ public class InventoryService {
         if (initial.signum() > 0) {
             checkExpiry(i, r.expiresOn());
             Long lot = newLot(i, null, r.lotCode(), r.expiresOn(), initial, i.unitCost);
-            move(i, "ENTRADA", initial, "Stock inicial", null, lot, null, null);
+            move(i, ENTRADA, initial, "Stock inicial", null, lot, null, null);
         }
         audit.record("INVENTARIO", i.id, "CREAR", name);
         return i;
@@ -158,7 +166,7 @@ public class InventoryService {
 
     @Transactional
     public InventoryItem update(Long id, ItemRequest r) {
-        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound(EL_MATERIAL));
         if (r.name() != null && !r.name().isBlank() && !r.name().trim().equalsIgnoreCase(i.name)) {
             if (items.existsByNameIgnoreCase(r.name().trim())) throw ApiException.field("name", "Ya existe un material con ese nombre.");
             i.name = r.name().trim();
@@ -193,10 +201,10 @@ public class InventoryService {
 
     private void checkExpiry(InventoryItem i, java.time.LocalDate expiresOn) {
         if (expiresOn != null && expiresOn.isBefore(Dates.today())) {
-            throw ApiException.field("expiresOn", "Ese lote ya está vencido: no debe ingresar al inventario (DIGEMID).");
+            throw ApiException.field(EXPIRESON, "Ese lote ya está vencido: no debe ingresar al inventario (DIGEMID).");
         }
-        if (i.tracksExpiry && "MEDICAMENTO".equals(i.category) && expiresOn == null) {
-            throw ApiException.field("expiresOn", "Los medicamentos deben registrarse con su fecha de vencimiento.");
+        if (i.tracksExpiry && MEDICAMENTO.equals(i.category) && expiresOn == null) {
+            throw ApiException.field(EXPIRESON, "Los medicamentos deben registrarse con su fecha de vencimiento.");
         }
     }
 
@@ -261,25 +269,25 @@ public class InventoryService {
 
     /** Ingreso de un lote comprado (lo usa la compra a proveedor). El material ya viene bloqueado. */
     void receive(InventoryItem i, Long purchaseId, BigDecimal q, BigDecimal unitCost, String lotCode, java.time.LocalDate expiresOn, String reason) {
-        if (i.tracksExpiry && "MEDICAMENTO".equals(i.category) && expiresOn == null) {
+        if (i.tracksExpiry && MEDICAMENTO.equals(i.category) && expiresOn == null) {
             throw ApiException.field("lines", i.name + ": los medicamentos se registran con su fecha de vencimiento.");
         }
         Long lot = newLot(i, purchaseId, lotCode, expiresOn, q, unitCost);
-        move(i, "ENTRADA", q, reason, null, lot, purchaseId, null, q.multiply(unitCost == null ? BigDecimal.ZERO : unitCost).setScale(2, RoundingMode.HALF_UP), null, null);
+        move(i, ENTRADA, q, reason, null, lot, purchaseId, null, q.multiply(unitCost == null ? BigDecimal.ZERO : unitCost).setScale(2, RoundingMode.HALF_UP), null, null);
     }
 
     /** Entrega de una solicitud del odontólogo: salida FEFO sin usar lotes vencidos. */
     void deliver(InventoryItem i, BigDecimal q, Long requestId, String reason) {
         if (i.stock.compareTo(q) < 0) {
-            throw ApiException.field("quantity", "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
+            throw ApiException.field(QUANTITY, "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
         }
         Take t = consumeLots(i, q, false);
-        move(i, "SALIDA", q.negate(), reason, null, t.lot(), null, requestId, t.cost().negate(), null, null);
+        move(i, SALIDA, q.negate(), reason, null, t.lot(), null, requestId, t.cost().negate(), null, null);
     }
 
     @Transactional
     public InventoryItem setImage(Long id, org.springframework.web.multipart.MultipartFile file) {
-        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound(EL_MATERIAL));
         String old = i.imagePath;
         i.imagePath = images.save("productos", file);
         i.updatedAt = Dates.now();
@@ -291,7 +299,7 @@ public class InventoryService {
 
     @Transactional
     public InventoryItem removeImage(Long id) {
-        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        InventoryItem i = items.findById(id).orElseThrow(() -> ApiException.notFound(EL_MATERIAL));
         images.delete(i.imagePath);
         i.imagePath = null;
         i.updatedAt = Dates.now();
@@ -301,27 +309,27 @@ public class InventoryService {
 
     @Transactional
     public Map<String, Object> registerMove(Long id, MoveRequest r) {
-        InventoryItem i = items.lockById(id).orElseThrow(() -> ApiException.notFound("El material"));
+        InventoryItem i = items.lockById(id).orElseThrow(() -> ApiException.notFound(EL_MATERIAL));
         String kind = r.kind() == null ? "" : r.kind().trim().toUpperCase();
         if (!MOVE_KINDS.contains(kind)) throw ApiException.field("kind", "Elige entrada, salida o ajuste.");
-        if (r.quantity() == null || r.quantity().signum() == 0) throw ApiException.field("quantity", "Ingresa la cantidad.");
+        if (r.quantity() == null || r.quantity().signum() == 0) throw ApiException.field(QUANTITY, "Ingresa la cantidad.");
         BigDecimal q = r.quantity().setScale(2, RoundingMode.HALF_UP);
         BigDecimal delta = switch (kind) {
-            case "ENTRADA" -> q.abs();
-            case "SALIDA" -> q.abs().negate();
+            case ENTRADA -> q.abs();
+            case SALIDA -> q.abs().negate();
             default -> q.subtract(i.stock);   // AJUSTE: la cantidad es el stock contado
         };
-        if (!"AJUSTE".equals(kind) && q.signum() < 0) throw ApiException.field("quantity", "La cantidad debe ser positiva.");
-        if ("AJUSTE".equals(kind) && q.signum() < 0) throw ApiException.field("quantity", "El stock contado no puede ser negativo.");
-        if ("SALIDA".equals(kind) && i.stock.add(delta).signum() < 0) {
-            throw ApiException.field("quantity", "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
+        if (!AJUSTE_2.equals(kind) && q.signum() < 0) throw ApiException.field(QUANTITY, "La cantidad debe ser positiva.");
+        if (AJUSTE_2.equals(kind) && q.signum() < 0) throw ApiException.field(QUANTITY, "El stock contado no puede ser negativo.");
+        if (SALIDA.equals(kind) && i.stock.add(delta).signum() < 0) {
+            throw ApiException.field(QUANTITY, "Solo hay " + i.stock.stripTrailingZeros().toPlainString() + " " + i.unit + " en stock.");
         }
         String reason = r.reason() == null || r.reason().isBlank() ? null : r.reason().trim();
-        if ("SALIDA".equals(kind) && reason == null) throw ApiException.field("reason", "Indica el motivo de la salida (merma, vencido, préstamo…).");
+        if (SALIDA.equals(kind) && reason == null) throw ApiException.field("reason", "Indica el motivo de la salida (merma, vencido, préstamo…).");
         Long lot = null;
         BigDecimal cost = BigDecimal.ZERO;
         if (r.unitCost() != null && r.unitCost().signum() < 0) throw ApiException.field("unitCost", "El costo no puede ser negativo.");
-        if (r.patientId() != null && (!"SALIDA".equals(kind)
+        if (r.patientId() != null && (!SALIDA.equals(kind)
                 || jdbc.queryForObject("select count(*) from patients where id = ?", Integer.class, r.patientId()) == 0))
             throw ApiException.field("patientId", "Solo una salida puede atribuirse a un paciente existente.");
         if (delta.signum() > 0) {
@@ -417,7 +425,7 @@ public class InventoryService {
         if (list != null) {
             for (SupplyRequest s : list) {
                 if (s.itemId() == null || s.quantity() == null || s.quantity().signum() <= 0) continue;
-                if (!items.existsById(s.itemId())) throw ApiException.notFound("El material");
+                if (!items.existsById(s.itemId())) throw ApiException.notFound(EL_MATERIAL);
                 jdbc.update("insert into procedure_supplies (procedure_id, item_id, quantity) values (?, ?, ?)",
                         procedureId, s.itemId(), s.quantity());
             }
@@ -432,14 +440,14 @@ public class InventoryService {
         // v2.10: lo que el odontólogo marcó como usado en esta atención; si no indicó nada, el kit estándar.
         List<Map<String, Object>> rows = e.used() != null
                 ? e.used().stream().filter(u -> u.itemId() != null && u.quantity() != null && u.quantity().signum() > 0)
-                    .map(u -> Map.<String, Object>of("item_id", u.itemId(), "quantity", u.quantity())).toList()
+                    .map(u -> Map.<String, Object>of("item_id", u.itemId(), QUANTITY, u.quantity())).toList()
                 : jdbc.queryForList("select item_id, quantity from procedure_supplies where procedure_id = ?", e.procedureId());
         List<Long> pat = jdbc.queryForList("select tp.patient_id from treatment_items ti join treatment_plans tp on tp.id = ti.plan_id where ti.id = ?",
                 Long.class, e.treatmentItemId());
         Long patientId = pat.isEmpty() ? null : pat.get(0);
         for (Map<String, Object> r : rows) {
             Long itemId = ((Number) r.get("item_id")).longValue();
-            BigDecimal q = new BigDecimal(String.valueOf(r.get("quantity")));
+            BigDecimal q = new BigDecimal(String.valueOf(r.get(QUANTITY)));
             // El stock nunca queda negativo: se descuenta lo que hay y se deja constancia de lo que faltó.
             items.lockById(itemId).ifPresent(i -> {
                 BigDecimal used = q.min(i.stock.max(BigDecimal.ZERO));

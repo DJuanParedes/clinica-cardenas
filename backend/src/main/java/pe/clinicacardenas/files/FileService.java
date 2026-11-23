@@ -27,10 +27,17 @@ import java.util.*;
  */
 @Service
 public class FileService {
+    private static final String ARCHIVO = "ARCHIVO";
+    private static final String CONSENTIMIENTO = "CONSENTIMIENTO";
+    private static final String PRESUPUESTO = "PRESUPUESTO";
+    private static final String RECETA = "RECETA";
+    private static final String APPLICATION_PDF = "application/pdf";
+    private static final String SIGNATUREJPEG = "signatureJpeg";
 
-    public static final List<String> KINDS = List.of("FOTO", "RADIOGRAFIA", "DOCUMENTO", "CONSENTIMIENTO", "RECETA", "PRESUPUESTO");
+
+    public static final List<String> KINDS = List.of("FOTO", "RADIOGRAFIA", "DOCUMENTO", CONSENTIMIENTO, RECETA, PRESUPUESTO);
     private static final Map<String, String> TYPES = Map.of(
-            "image/jpeg", ".jpg", "image/png", ".png", "image/webp", ".webp", "application/pdf", ".pdf");
+            "image/jpeg", ".jpg", "image/png", ".png", "image/webp", ".webp", APPLICATION_PDF, ".pdf");
     private static final DateTimeFormatter DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final PatientFileRepository files;
@@ -98,7 +105,7 @@ public class FileService {
         try {
             return store(p, file.getBytes(), type, k, t, clean(note), tooth, share, null);
         } catch (IOException e) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVO", "No se pudo guardar el archivo.");
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, ARCHIVO, "No se pudo guardar el archivo.");
         }
     }
 
@@ -107,7 +114,7 @@ public class FileService {
     public PatientFile document(Long patientId, DocumentRequest r) {
         Patient p = patient(patientId);
         String kind = r.kind() == null ? "" : r.kind().trim().toUpperCase();
-        if (!List.of("CONSENTIMIENTO", "RECETA", "PRESUPUESTO").contains(kind)) {
+        if (!List.of(CONSENTIMIENTO, RECETA, PRESUPUESTO).contains(kind)) {
             throw ApiException.field("kind", "Elige consentimiento, receta o presupuesto.");
         }
         if (r.body() == null || r.body().isBlank()) throw ApiException.field("body", "Escribe el contenido del documento.");
@@ -118,12 +125,12 @@ public class FileService {
             try {
                 signature = Base64.getDecoder().decode(b64);
             } catch (IllegalArgumentException e) {
-                throw ApiException.field("signatureJpeg", "La firma no es válida.");
+                throw ApiException.field(SIGNATUREJPEG, "La firma no es válida.");
             }
-            if (SimplePdf.jpegSize(signature) == null) throw ApiException.field("signatureJpeg", "La firma debe ser una imagen JPEG.");
+            if (SimplePdf.jpegSize(signature) == null) throw ApiException.field(SIGNATUREJPEG, "La firma debe ser una imagen JPEG.");
         }
-        if ("CONSENTIMIENTO".equals(kind) && signature == null) {
-            throw ApiException.field("signatureJpeg", "El consentimiento necesita la firma del paciente.");
+        if (CONSENTIMIENTO.equals(kind) && signature == null) {
+            throw ApiException.field(SIGNATUREJPEG, "El consentimiento necesita la firma del paciente.");
         }
         String now = Dates.now().format(DMY);
         SimplePdf pdf = new SimplePdf()
@@ -136,8 +143,8 @@ public class FileService {
                 .space(24);
         if (signature != null) pdf.jpeg(signature, 200);
         pdf.signatureLine("Firma: " + (r.signerName() == null || r.signerName().isBlank() ? p.getFullName() : r.signerName().trim()));
-        if ("RECETA".equals(kind)) pdf.space(30).signatureLine("Firma y sello del odontólogo");
-        PatientFile f = store(p, pdf.build(), "application/pdf", kind, title, null, null,
+        if (RECETA.equals(kind)) pdf.space(30).signatureLine("Firma y sello del odontólogo");
+        PatientFile f = store(p, pdf.build(), APPLICATION_PDF, kind, title, null, null,
                 r.shareWithPatient() == null || r.shareWithPatient(), signature == null ? null : Dates.now());
         return f;
     }
@@ -145,7 +152,7 @@ public class FileService {
     /** v2.8: guarda un PDF ya generado (consentimiento firmado a distancia). */
     @Transactional
     public PatientFile storeSigned(Long patientId, byte[] pdf, String kind, String title, java.time.LocalDateTime signedAt) {
-        return store(patient(patientId), pdf, "application/pdf", kind, title, null, null, true, signedAt);
+        return store(patient(patientId), pdf, APPLICATION_PDF, kind, title, null, null, true, signedAt);
     }
 
     private PatientFile store(Patient p, byte[] bytes, String type, String kind, String title, String note, Integer tooth,
@@ -154,7 +161,7 @@ public class FileService {
         try {
             Files.write(dir.resolve(name), bytes);
         } catch (IOException e) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVO", "No se pudo guardar el archivo en el servidor.");
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, ARCHIVO, "No se pudo guardar el archivo en el servidor.");
         }
         PatientFile f = new PatientFile();
         f.patientId = p.id;
@@ -170,7 +177,7 @@ public class FileService {
         f.createdAt = Dates.now();
         f.createdBy = CurrentUser.usernameOrSystem();
         files.save(f);
-        audit.record("HISTORIA", p.id, "ARCHIVO", "Agregó " + kind.toLowerCase() + ": " + title);
+        audit.record("HISTORIA", p.id, ARCHIVO, "Agregó " + kind.toLowerCase() + ": " + title);
         return f;
     }
 
@@ -258,9 +265,9 @@ public class FileService {
         return switch (kind) {
             case "FOTO" -> "Foto intraoral";
             case "RADIOGRAFIA" -> "Radiografía";
-            case "CONSENTIMIENTO" -> "Consentimiento informado";
-            case "RECETA" -> "Receta";
-            case "PRESUPUESTO" -> "Presupuesto";
+            case CONSENTIMIENTO -> "Consentimiento informado";
+            case RECETA -> "Receta";
+            case PRESUPUESTO -> "Presupuesto";
             default -> original == null || original.isBlank() ? "Documento" : original;
         };
     }

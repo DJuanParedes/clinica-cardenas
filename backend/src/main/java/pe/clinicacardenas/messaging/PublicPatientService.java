@@ -32,6 +32,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class PublicPatientService {
+    private static final String CLINIC = "clinic";
+    private static final String FIRSTNAME = "firstName";
+    private static final String MESSAGE = "message";
+    private static final String RESERVA_PUBLICA_ACTIVA = "reserva_publica_activa";
+    private static final String STARTAT = "startAt";
+    private static final String TEMPLATEID = "templateId";
+
 
     static final int MIN_HOURS = 2, MAX_DAYS = 60, MAX_OPEN = 2, IP_PER_HOUR = 8, PHONE_PER_DAY = 2;
 
@@ -87,9 +94,9 @@ public class PublicPatientService {
 
     public Map<String, Object> bookingOptions() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("enabled", setting("reserva_publica_activa"));
-        m.put("clinic", clinic());
-        if (!setting("reserva_publica_activa")) return m;
+        m.put("enabled", setting(RESERVA_PUBLICA_ACTIVA));
+        m.put(CLINIC, clinic());
+        if (!setting(RESERVA_PUBLICA_ACTIVA)) return m;
         List<Map<String, Object>> ds = new ArrayList<>();
         for (Dentist d : agenda.activeDentists()) {
             Map<String, Object> dm = new LinkedHashMap<>();
@@ -106,7 +113,7 @@ public class PublicPatientService {
     }
 
     public Map<String, Object> slots(Long dentistId, LocalDate date, String reasonCode) {
-        enabled("reserva_publica_activa");
+        enabled(RESERVA_PUBLICA_ACTIVA);
         int duration = duration(reasonCode);
         List<String> free = new ArrayList<>();
         if (!date.isBefore(Dates.today()) && !date.isAfter(Dates.today().plusDays(MAX_DAYS))) {
@@ -121,14 +128,14 @@ public class PublicPatientService {
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Map<String, Object> book(BookingRequest r, String ip) {
-        enabled("reserva_publica_activa");
+        enabled(RESERVA_PUBLICA_ACTIVA);
         limit("ip:" + ip, IP_PER_HOUR, 3600_000L, "Hiciste muchas reservas seguidas. Inténtalo en una hora o llámanos al " + clinicPhone + ".");
         String label = label(r.reasonCode());
         if (label == null) throw ApiException.field("reasonCode", "Elige el motivo de tu cita.");
         if (r.dentistId() == null) throw ApiException.field("dentistId", "Elige el odontólogo.");
-        if (r.startAt() == null) throw ApiException.field("startAt", "Elige un horario.");
-        if (r.startAt().isBefore(Dates.now().plusHours(MIN_HOURS))) throw ApiException.field("startAt", "Reserva con al menos " + MIN_HOURS + " horas de anticipación.");
-        if (r.startAt().toLocalDate().isAfter(Dates.today().plusDays(MAX_DAYS))) throw ApiException.field("startAt", "Puedes reservar hasta " + MAX_DAYS + " días antes.");
+        if (r.startAt() == null) throw ApiException.field(STARTAT, "Elige un horario.");
+        if (r.startAt().isBefore(Dates.now().plusHours(MIN_HOURS))) throw ApiException.field(STARTAT, "Reserva con al menos " + MIN_HOURS + " horas de anticipación.");
+        if (r.startAt().toLocalDate().isAfter(Dates.today().plusDays(MAX_DAYS))) throw ApiException.field(STARTAT, "Puedes reservar hasta " + MAX_DAYS + " días antes.");
         Patient p = findOrCreate(r.person(), ip);
         marketingOptIn(p, r.person(), ip);
         limit("tel:" + p.id, PHONE_PER_DAY, 86_400_000L, "Ya hiciste reservas hoy. Si necesitas otra cita, llámanos al " + clinicPhone + ".");
@@ -147,10 +154,10 @@ public class PublicPatientService {
         audit.record("CITA", a.id, "RESERVA_WEB", "Reservada por " + p.getFullName() + " desde el enlace público");
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", a.id);
-        m.put("startAt", a.startAt);
+        m.put(STARTAT, a.startAt);
         m.put("dentist", a.dentist.getFullName());
-        m.put("firstName", p.firstName.split(" ")[0]);
-        m.put("message", "¡Listo! Tu cita quedó reservada. Te enviamos la confirmación por " + (p.phone != null ? "WhatsApp" : "correo") + ".");
+        m.put(FIRSTNAME, p.firstName.split(" ")[0]);
+        m.put(MESSAGE, "¡Listo! Tu cita quedó reservada. Te enviamos la confirmación por " + (p.phone != null ? "WhatsApp" : "correo") + ".");
         return m;
     }
 
@@ -187,14 +194,14 @@ public class PublicPatientService {
     public Map<String, Object> preregisterForm() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("enabled", setting("prerregistro_activo"));
-        m.put("clinic", clinic());
+        m.put(CLINIC, clinic());
         m.put("sources", PatientProfileService.SOURCES);
         // Preguntas de salud de la anamnesis general que la clínica marcó como alerta (Sí / No).
         List<Map<String, Object>> t = anamnesis.templates(false).stream().filter(x -> "ODONTOLOGIA".equals(x.get("code"))).toList();
         if (!t.isEmpty()) {
             @SuppressWarnings("unchecked")
             List<AnamnesisService.Question> qs = (List<AnamnesisService.Question>) t.get(0).get("questions");
-            m.put("templateId", t.get(0).get("id"));
+            m.put(TEMPLATEID, t.get(0).get("id"));
             m.put("questions", qs.stream().filter(q -> "YES_NO".equals(q.type()) && Boolean.TRUE.equals(q.alert())).toList());
         }
         return m;
@@ -213,9 +220,9 @@ public class PublicPatientService {
         Patient p = findOrCreate(d, ip);
         marketingOptIn(p, d, ip);
         Map<String, Object> form = preregisterForm();
-        if (form.get("templateId") != null && r.answers() != null && !r.answers().isEmpty()) {
+        if (form.get(TEMPLATEID) != null && r.answers() != null && !r.answers().isEmpty()) {
             try {
-                anamnesis.saveRecord(p.id, null, new AnamnesisService.RecordRequest(((Number) form.get("templateId")).longValue(), r.answers()));
+                anamnesis.saveRecord(p.id, null, new AnamnesisService.RecordRequest(((Number) form.get(TEMPLATEID)).longValue(), r.answers()));
                 jdbc.update("update anamnesis_records set created_by = 'paciente (web)' where patient_id = ?", p.id);
             } catch (ApiException ignored) { /* sin respuestas válidas: no se guarda la anamnesis */ }
         }
@@ -225,8 +232,8 @@ public class PublicPatientService {
                     p.id, allergies, medication, Dates.now(), Dates.now(), "paciente (web)");
         }
         audit.record("PACIENTE", p.id, "PRERREGISTRO", "Ficha llenada por el paciente desde el enlace web");
-        return Map.of("id", p.id, "firstName", p.firstName.split(" ")[0], "hcNumber", p.hcNumber == null ? "" : p.hcNumber,
-                "message", "¡Gracias! Tu ficha quedó registrada. Ya puedes reservar tu cita.", "bookingUrl", links.bookingUrl());
+        return Map.of("id", p.id, FIRSTNAME, p.firstName.split(" ")[0], "hcNumber", p.hcNumber == null ? "" : p.hcNumber,
+                MESSAGE, "¡Gracias! Tu ficha quedó registrada. Ya puedes reservar tu cita.", "bookingUrl", links.bookingUrl());
     }
 
     // ------------------------------------------------------------------ encuesta
@@ -234,8 +241,8 @@ public class PublicPatientService {
     public Map<String, Object> survey(String token) {
         Appointment a = byToken(token);
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("clinic", clinicName);
-        m.put("firstName", a.patient.firstName.split(" ")[0]);
+        m.put(CLINIC, clinicName);
+        m.put(FIRSTNAME, a.patient.firstName.split(" ")[0]);
         m.put("dentist", a.dentist.getFullName());
         m.put("date", a.startAt.toLocalDate());
         m.put("reason", a.reason);
@@ -257,7 +264,7 @@ public class PublicPatientService {
         s.createdAt = Dates.now();
         surveys.save(s);
         audit.record("CITA", a.id, "ENCUESTA", r.score() + " estrellas desde el enlace del mensaje");
-        return Map.of("message", r.score() >= 4 ? "¡Gracias! Nos alegra que te haya gustado tu atención." : "Gracias por contarnos. Revisaremos tu comentario para mejorar.");
+        return Map.of(MESSAGE, r.score() >= 4 ? "¡Gracias! Nos alegra que te haya gustado tu atención." : "Gracias por contarnos. Revisaremos tu comentario para mejorar.");
     }
 
     private Appointment byToken(String token) {

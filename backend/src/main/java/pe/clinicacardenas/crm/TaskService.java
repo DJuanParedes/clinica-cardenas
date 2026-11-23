@@ -25,6 +25,18 @@ import java.util.*;
  */
 @Service
 public class TaskService {
+    private static final String HECHA = "HECHA";
+    private static final String PENDIENTE = "PENDIENTE";
+    private static final String TAREA = "TAREA";
+    private static final String DUEDATE = "dueDate";
+    private static final String FULLNAME = "fullName";
+    private static final String NOTES = "notes";
+    private static final String PATIENT = "patient";
+    private static final String PRIORITY = "priority";
+    private static final String RESULT = "result";
+    private static final String STATUS = "status";
+    private static final String TITLE = "title";
+
 
     public static final Map<String, String> KINDS = new LinkedHashMap<>();
     static {
@@ -77,7 +89,7 @@ public class TaskService {
         Long me = currentUserId();
         List<String> c = new ArrayList<>();
         List<Object> a = new ArrayList<>();
-        String st = status == null || status.isBlank() ? "PENDIENTE" : status.trim().toUpperCase();
+        String st = status == null || status.isBlank() ? PENDIENTE : status.trim().toUpperCase();
         if (!"TODAS".equals(st)) { c.add("t.status = ?"); a.add(st); }
         if (patientId != null) { c.add("t.patient_id = ?"); a.add(patientId); }
         if (leadId != null) { c.add("t.lead_id = ?"); a.add(leadId); }
@@ -96,7 +108,7 @@ public class TaskService {
             String like = "%" + q.trim().toLowerCase() + "%";
             a.add(like); a.add(like); a.add(like);
         }
-        String order = "PENDIENTE".equals(st) ? " order by t.due_date, t.due_time is null, t.due_time, t.priority = 'ALTA' desc, t.id"
+        String order = PENDIENTE.equals(st) ? " order by t.due_date, t.due_time is null, t.due_time, t.priority = 'ALTA' desc, t.id"
                 : " order by coalesce(t.completed_at, t.created_at) desc";
         String sql = SELECT + (c.isEmpty() ? "" : " where " + String.join(" and ", c)) + order + " limit 500";
         List<Map<String, Object>> items = jdbc.query(sql, (rs, i) -> row(rs), a.toArray());
@@ -126,16 +138,16 @@ public class TaskService {
         m.put("id", rs.getLong("id"));
         m.put("kind", rs.getString("kind"));
         m.put("kindLabel", KINDS.getOrDefault(rs.getString("kind"), rs.getString("kind")));
-        m.put("title", rs.getString("title"));
-        m.put("notes", rs.getString("notes"));
+        m.put(TITLE, rs.getString(TITLE));
+        m.put(NOTES, rs.getString(NOTES));
         LocalDate due = rs.getDate("due_date").toLocalDate();
-        m.put("dueDate", due);
+        m.put(DUEDATE, due);
         m.put("dueTime", rs.getTime("due_time") == null ? null : rs.getTime("due_time").toLocalTime().toString());
-        m.put("priority", rs.getString("priority"));
-        String status = rs.getString("status");
-        m.put("status", status);
-        m.put("overdue", "PENDIENTE".equals(status) && due.isBefore(Dates.today()));
-        m.put("result", rs.getString("result"));
+        m.put(PRIORITY, rs.getString(PRIORITY));
+        String status = rs.getString(STATUS);
+        m.put(STATUS, status);
+        m.put("overdue", PENDIENTE.equals(status) && due.isBefore(Dates.today()));
+        m.put(RESULT, rs.getString(RESULT));
         m.put("origin", rs.getString("origin"));
         m.put("originRef", rs.getString("origin_ref"));
         m.put("createdBy", rs.getString("created_by"));
@@ -143,21 +155,21 @@ public class TaskService {
         m.put("completedAt", rs.getTimestamp("completed_at") == null ? null : rs.getTimestamp("completed_at").toLocalDateTime());
         m.put("completedBy", rs.getString("completed_by"));
         long aid = rs.getLong("assignee_id");
-        m.put("assignee", rs.wasNull() ? null : Map.of("id", aid, "fullName", rs.getString("assignee_name")));
+        m.put("assignee", rs.wasNull() ? null : Map.of("id", aid, FULLNAME, rs.getString("assignee_name")));
         long pid = rs.getLong("patient_id");
         if (!rs.wasNull()) {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("id", pid);
-            p.put("fullName", rs.getString("patient_name"));
+            p.put(FULLNAME, rs.getString("patient_name"));
             p.put("phone", showPhone() ? rs.getString("patient_phone") : mask(rs.getString("patient_phone")));
             p.put("hcNumber", rs.getString("hc_number"));
-            m.put("patient", p);
-        } else m.put("patient", null);
+            m.put(PATIENT, p);
+        } else m.put(PATIENT, null);
         long lid = rs.getLong("lead_id");
         if (!rs.wasNull()) {
             Map<String, Object> l = new LinkedHashMap<>();
             l.put("id", lid);
-            l.put("fullName", rs.getString("lead_name"));
+            l.put(FULLNAME, rs.getString("lead_name"));
             l.put("phone", rs.getString("lead_phone"));
             l.put("stage", rs.getString("lead_stage"));
             m.put("lead", l);
@@ -180,7 +192,7 @@ public class TaskService {
         for (Map<String, Object> u : jdbc.queryForList("select id, full_name, role_code, access_role_code from users where active = true order by full_name")) {
             String role = (String) (u.get("access_role_code") != null ? u.get("access_role_code") : u.get("role_code"));
             if (!permissions.forRole(role).contains("TAREAS")) continue;
-            out.add(Map.of("id", u.get("id"), "fullName", u.get("full_name"), "role", permissions.label((String) u.get("role_code"))));
+            out.add(Map.of("id", u.get("id"), FULLNAME, u.get("full_name"), "role", permissions.label((String) u.get("role_code"))));
         }
         return out;
     }
@@ -191,40 +203,40 @@ public class TaskService {
     public Map<String, Object> create(TaskRequest r) {
         NewTask t = validate(r, true);
         Long id = insert(t, CurrentUser.usernameOrSystem());
-        audit.record("TAREA", id, "CREAR", t.title() + (t.patientId() != null ? " · paciente #" + t.patientId() : "") + (t.leadId() != null ? " · lead #" + t.leadId() : ""));
-        if (t.leadId() != null) leadEvent(t.leadId(), "TAREA", "Tarea: " + t.title() + " para el " + t.dueDate());
+        audit.record(TAREA, id, "CREAR", t.title() + (t.patientId() != null ? " · paciente #" + t.patientId() : "") + (t.leadId() != null ? " · lead #" + t.leadId() : ""));
+        if (t.leadId() != null) leadEvent(t.leadId(), TAREA, "Tarea: " + t.title() + " para el " + t.dueDate());
         return get(id);
     }
 
     @Transactional
     public Map<String, Object> update(Long id, TaskRequest r) {
         Map<String, Object> cur = get(id);
-        if (!"PENDIENTE".equals(cur.get("status"))) throw ApiException.conflict("TAREA_CERRADA", "La tarea ya está cerrada: reábrela para editarla.");
-        NewTask t = validate(new TaskRequest(idOf(cur.get("patient")), idOf(cur.get("lead")), r.kind(), r.title(), r.notes(), r.assigneeId(),
+        if (!PENDIENTE.equals(cur.get(STATUS))) throw ApiException.conflict("TAREA_CERRADA", "La tarea ya está cerrada: reábrela para editarla.");
+        NewTask t = validate(new TaskRequest(idOf(cur.get(PATIENT)), idOf(cur.get("lead")), r.kind(), r.title(), r.notes(), r.assigneeId(),
                 r.dueDate(), r.dueTime(), r.priority()), false);
         jdbc.update("update tasks set kind = ?, title = ?, notes = ?, assignee_id = ?, due_date = ?, due_time = ?, priority = ?, updated_at = ? where id = ?",
                 t.kind(), t.title(), t.notes(), t.assigneeId(), t.dueDate(), t.dueTime(), t.priority(), Dates.now(), id);
-        audit.record("TAREA", id, "EDITAR", t.title() + " · para el " + t.dueDate());
+        audit.record(TAREA, id, "EDITAR", t.title() + " · para el " + t.dueDate());
         return get(id);
     }
 
     @Transactional
-    public Map<String, Object> complete(Long id, CloseRequest r) { return close(id, "HECHA", r); }
+    public Map<String, Object> complete(Long id, CloseRequest r) { return close(id, HECHA, r); }
 
     @Transactional
     public Map<String, Object> cancel(Long id, CloseRequest r) { return close(id, "CANCELADA", r); }
 
     private Map<String, Object> close(Long id, String status, CloseRequest r) {
         Map<String, Object> cur = get(id);
-        if (!"PENDIENTE".equals(cur.get("status"))) throw ApiException.conflict("TAREA_CERRADA", "La tarea ya está cerrada.");
+        if (!PENDIENTE.equals(cur.get(STATUS))) throw ApiException.conflict("TAREA_CERRADA", "La tarea ya está cerrada.");
         String result = r == null || r.result() == null ? null : r.result().trim();
-        if (result != null && result.length() > 500) throw ApiException.field("result", "Máximo 500 caracteres.");
-        if ("CANCELADA".equals(status) && (result == null || result.isBlank())) throw ApiException.field("result", "Indica por qué se cancela.");
+        if (result != null && result.length() > 500) throw ApiException.field(RESULT, "Máximo 500 caracteres.");
+        if ("CANCELADA".equals(status) && (result == null || result.isBlank())) throw ApiException.field(RESULT, "Indica por qué se cancela.");
         jdbc.update("update tasks set status = ?, result = ?, completed_at = ?, completed_by = ?, updated_at = ? where id = ?",
                 status, result == null || result.isBlank() ? null : result, Dates.now(), CurrentUser.usernameOrSystem(), Dates.now(), id);
-        audit.record("TAREA", id, "HECHA".equals(status) ? "COMPLETAR" : "CANCELAR", cur.get("title") + (result == null || result.isBlank() ? "" : " · " + result));
+        audit.record(TAREA, id, HECHA.equals(status) ? "COMPLETAR" : "CANCELAR", cur.get(TITLE) + (result == null || result.isBlank() ? "" : " · " + result));
         Long lead = idOf(cur.get("lead"));
-        if (lead != null) leadEvent(lead, "TAREA", ("HECHA".equals(status) ? "Tarea hecha: " : "Tarea cancelada: ") + cur.get("title")
+        if (lead != null) leadEvent(lead, TAREA, (HECHA.equals(status) ? "Tarea hecha: " : "Tarea cancelada: ") + cur.get(TITLE)
                 + (result == null || result.isBlank() ? "" : " — " + result));
         return get(id);
     }
@@ -232,9 +244,9 @@ public class TaskService {
     @Transactional
     public Map<String, Object> reopen(Long id) {
         Map<String, Object> cur = get(id);
-        if ("PENDIENTE".equals(cur.get("status"))) return cur;
+        if (PENDIENTE.equals(cur.get(STATUS))) return cur;
         jdbc.update("update tasks set status = 'PENDIENTE', completed_at = null, completed_by = null, updated_at = ? where id = ?", Dates.now(), id);
-        audit.record("TAREA", id, "REABRIR", String.valueOf(cur.get("title")));
+        audit.record(TAREA, id, "REABRIR", String.valueOf(cur.get(TITLE)));
         return get(id);
     }
 
@@ -277,20 +289,20 @@ public class TaskService {
         String kind = r.kind() == null ? "" : r.kind().trim().toUpperCase();
         if (!KINDS.containsKey(kind)) e.put("kind", "Elige el tipo de tarea.");
         String title = r.title() == null ? "" : r.title().trim().replaceAll("\\s+", " ");
-        if (title.length() < 3) e.put("title", "Describe la tarea (mínimo 3 caracteres).");
-        else if (title.length() > 150) e.put("title", "Máximo 150 caracteres.");
+        if (title.length() < 3) e.put(TITLE, "Describe la tarea (mínimo 3 caracteres).");
+        else if (title.length() > 150) e.put(TITLE, "Máximo 150 caracteres.");
         String notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().trim();
-        if (notes != null && notes.length() > 1000) e.put("notes", "Máximo 1000 caracteres.");
-        if (r.dueDate() == null) e.put("dueDate", "Indica para cuándo es.");
-        else if (fresh && r.dueDate().isBefore(Dates.today())) e.put("dueDate", "La fecha no puede ser pasada.");
-        else if (r.dueDate().isAfter(Dates.today().plusYears(2))) e.put("dueDate", "Máximo 2 años hacia adelante.");
+        if (notes != null && notes.length() > 1000) e.put(NOTES, "Máximo 1000 caracteres.");
+        if (r.dueDate() == null) e.put(DUEDATE, "Indica para cuándo es.");
+        else if (fresh && r.dueDate().isBefore(Dates.today())) e.put(DUEDATE, "La fecha no puede ser pasada.");
+        else if (r.dueDate().isAfter(Dates.today().plusYears(2))) e.put(DUEDATE, "Máximo 2 años hacia adelante.");
         LocalTime time = null;
         if (r.dueTime() != null && !r.dueTime().isBlank()) {
             try { time = LocalTime.parse(r.dueTime().trim().length() == 5 ? r.dueTime().trim() : r.dueTime().trim().substring(0, 5)); }
             catch (Exception ex) { e.put("dueTime", "Hora no válida."); }
         }
         String priority = r.priority() == null || r.priority().isBlank() ? "NORMAL" : r.priority().trim().toUpperCase();
-        if (!Set.of("NORMAL", "ALTA").contains(priority)) e.put("priority", "Prioridad no válida.");
+        if (!Set.of("NORMAL", "ALTA").contains(priority)) e.put(PRIORITY, "Prioridad no válida.");
         if (r.assigneeId() != null && assignees().stream().noneMatch(u -> r.assigneeId().equals(((Number) u.get("id")).longValue())))
             e.put("assigneeId", "El responsable no existe, está inactivo o no puede tener tareas.");
         if (r.patientId() != null && jdbc.queryForObject("select count(*) from patients where id = ? and active = true", Long.class, r.patientId()) == 0)

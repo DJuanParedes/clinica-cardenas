@@ -19,6 +19,8 @@ import java.util.*;
 
 @Service
 public class AgendaService {
+    private static final String STARTAT = "startAt";
+
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DMY_HM = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -162,7 +164,7 @@ public class AgendaService {
         Map<String, String> errors = new LinkedHashMap<>();
         if (r.patientId() == null) errors.put("patientId", "Selecciona un paciente.");
         if (r.dentistId() == null) errors.put("dentistId", "Selecciona un odontólogo.");
-        if (r.startAt() == null) errors.put("startAt", "Selecciona fecha y hora.");
+        if (r.startAt() == null) errors.put(STARTAT, "Selecciona fecha y hora.");
         if (r.reason() == null || r.reason().isBlank()) errors.put("reason", "Indica el motivo de la cita.");
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
@@ -180,10 +182,10 @@ public class AgendaService {
         LocalDateTime start = r.startAt().withSecond(0).withNano(0);
         LocalDateTime end = start.plusMinutes(duration);
         if (start.isBefore(Dates.now())) {
-            throw ApiException.field("startAt", "No se pueden programar citas en horas pasadas.");
+            throw ApiException.field(STARTAT, "No se pueden programar citas en horas pasadas.");
         }
         if (start.getMinute() % 15 != 0) {
-            throw ApiException.field("startAt", "La hora de inicio debe ser en bloques de 15 minutos.");
+            throw ApiException.field(STARTAT, "La hora de inicio debe ser en bloques de 15 minutos.");
         }
         List<SlotCalculator.Block> blocks = blocksFor(d.id, start.toLocalDate());
         if (!SlotCalculator.fitsInBlocks(blocks, start.toLocalTime(), end.toLocalTime())) {

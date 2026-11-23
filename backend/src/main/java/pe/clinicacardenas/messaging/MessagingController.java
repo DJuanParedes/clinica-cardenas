@@ -16,6 +16,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/messaging")
 public class MessagingController {
+    private static final String PRERREGISTRO_ACTIVO = "prerregistro_activo";
+    private static final String RESERVA_PUBLICA_ACTIVA = "reserva_publica_activa";
+
 
     private static final String ADMIN = "hasAuthority('AUTOMATIZACIONES')";
     private final MessageTemplateService templates;
@@ -91,8 +94,8 @@ public class MessagingController {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("bookingUrl", links.bookingUrl());
         m.put("registerUrl", links.base() + "/registro");
-        m.put("bookingEnabled", setting("reserva_publica_activa"));
-        m.put("registerEnabled", setting("prerregistro_activo"));
+        m.put("bookingEnabled", setting(RESERVA_PUBLICA_ACTIVA));
+        m.put("registerEnabled", setting(PRERREGISTRO_ACTIVO));
         m.put("webBookings30d", jdbc.queryForObject("select count(*) from appointments where booked_via = 'WEB' and created_at >= ?", Integer.class, Dates.now().minusDays(30)));
         m.put("webPatients30d", jdbc.queryForObject("select count(*) from consent_records where channel = 'WEB' and accepted_at >= ?", Integer.class, Dates.now().minusDays(30)));
         return m;
@@ -103,10 +106,10 @@ public class MessagingController {
     @PutMapping("/public-links")
     @PreAuthorize(ADMIN)
     public Map<String, Object> updateLinks(@RequestBody LinksRequest r) {
-        if (r.bookingEnabled() != null) put("reserva_publica_activa", r.bookingEnabled());
-        if (r.registerEnabled() != null) put("prerregistro_activo", r.registerEnabled());
-        audit.record("CONFIGURACION", null, "ENLACES", "Reserva web " + (setting("reserva_publica_activa") ? "activa" : "pausada")
-                + " · prerregistro " + (setting("prerregistro_activo") ? "activo" : "pausado"));
+        if (r.bookingEnabled() != null) put(RESERVA_PUBLICA_ACTIVA, r.bookingEnabled());
+        if (r.registerEnabled() != null) put(PRERREGISTRO_ACTIVO, r.registerEnabled());
+        audit.record("CONFIGURACION", null, "ENLACES", "Reserva web " + (setting(RESERVA_PUBLICA_ACTIVA) ? "activa" : "pausada")
+                + " · prerregistro " + (setting(PRERREGISTRO_ACTIVO) ? "activo" : "pausado"));
         return publicLinks();
     }
 

@@ -29,6 +29,16 @@ import java.util.*;
  */
 @Service
 public class MarketingService {
+    private static final String CUMPLEANOS = "CUMPLEANOS";
+    private static final String EL_SEGMENTO = "El segmento";
+    private static final String SEGMENTO = "SEGMENTO";
+    private static final String ACTIVE = "active";
+    private static final String CUMPLEANOS_ACTIVO = "cumpleanos_activo";
+    private static final String CUMPLEANOS_HORA = "cumpleanos_hora";
+    private static final String CUMPLEANOS_TAREA = "cumpleanos_tarea";
+    private static final String DESCRIPTION = "description";
+    private static final String PHONE = "phone";
+
 
     /** Proxy de Spring de esta misma clase: las llamadas internas por aquí sí respetan @Transactional. */
     private final org.springframework.beans.factory.ObjectProvider<MarketingService> selfProvider;
@@ -88,7 +98,7 @@ public class MarketingService {
         SegmentFilter f = (raw == null ? SegmentFilter.empty() : raw).clean();
         List<Long> ids = ids(f);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("description", f.describe());
+        out.put(DESCRIPTION, f.describe());
         out.put("count", ids.size());
         out.put("reachable", reachable(ids).size());
         List<Long> sample = ids.subList(0, Math.min(20, ids.size()));
@@ -101,7 +111,7 @@ public class MarketingService {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", rs.getLong(1));
                 m.put("fullName", rs.getString(2) + " " + rs.getString(3));
-                m.put("phone", rs.getString(4));
+                m.put(PHONE, rs.getString(4));
                 m.put("email", rs.getString(5));
                 m.put("birthDate", rs.getDate(6) == null ? null : rs.getDate(6).toLocalDate());
                 m.put("source", rs.getString(7));
@@ -140,7 +150,7 @@ public class MarketingService {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", r.get("id"));
             m.put("name", r.get("name"));
-            m.put("description", r.get("description"));
+            m.put(DESCRIPTION, r.get(DESCRIPTION));
             SegmentFilter f = parse(r.get("filters"));
             m.put("filters", f);
             m.put("summary", f.describe());
@@ -157,7 +167,7 @@ public class MarketingService {
 
     public SegmentFilter segmentFilter(Long id) {
         List<Object> l = jdbc.queryForList("select filters from segments where id = ?", Object.class, id);
-        if (l.isEmpty()) throw ApiException.notFound("El segmento");
+        if (l.isEmpty()) throw ApiException.notFound(EL_SEGMENTO);
         return parse(l.get(0));
     }
 
@@ -174,7 +184,7 @@ public class MarketingService {
         else if (jdbc.queryForObject("select count(*) from segments where lower(name) = lower(?) and id <> ?", Long.class, name, id == null ? -1L : id) > 0)
             e.put("name", "Ya existe un segmento con ese nombre.");
         String desc = r.description() == null || r.description().isBlank() ? null : r.description().trim();
-        if (desc != null && desc.length() > 300) e.put("description", "Máximo 300 caracteres.");
+        if (desc != null && desc.length() > 300) e.put(DESCRIPTION, "Máximo 300 caracteres.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del segmento.", e);
         SegmentFilter f = (r.filters() == null ? SegmentFilter.empty() : r.filters()).clean();
         String js = write(f);
@@ -182,11 +192,11 @@ public class MarketingService {
         if (id == null) {
             jdbc.update("insert into segments (name, description, filters, created_by, created_at) values (?, ?, ?, ?, ?)", name, desc, js, by, Dates.now());
             id = jdbc.queryForObject("select id from segments where name = ?", Long.class, name);
-            audit.record("SEGMENTO", id, "CREAR", name + " · " + f.describe());
+            audit.record(SEGMENTO, id, "CREAR", name + " · " + f.describe());
         } else {
             if (jdbc.update("update segments set name = ?, description = ?, filters = ?, updated_by = ?, updated_at = ? where id = ?", name, desc, js, by, Dates.now(), id) == 0)
-                throw ApiException.notFound("El segmento");
-            audit.record("SEGMENTO", id, "EDITAR", name + " · " + f.describe());
+                throw ApiException.notFound(EL_SEGMENTO);
+            audit.record(SEGMENTO, id, "EDITAR", name + " · " + f.describe());
         }
         final Long sid = id;
         return segments().stream().filter(s -> sid.equals(((Number) s.get("id")).longValue())).findFirst().orElseThrow();
@@ -195,9 +205,9 @@ public class MarketingService {
     @Transactional
     public void deleteSegment(Long id) {
         String name = segmentName(id);
-        if (name == null) throw ApiException.notFound("El segmento");
+        if (name == null) throw ApiException.notFound(EL_SEGMENTO);
         jdbc.update("delete from segments where id = ?", id);
-        audit.record("SEGMENTO", id, "ELIMINAR", name);
+        audit.record(SEGMENTO, id, "ELIMINAR", name);
     }
 
     /** Crea la misma tarea para cada paciente del segmento (sin repetirla a quien ya la tiene pendiente). */
@@ -218,10 +228,10 @@ public class MarketingService {
                 continue;
             }
             tasks.insert(new TaskService.NewTask(pid, null, base.kind(), base.title(), base.notes(), base.assigneeId(), base.dueDate(), base.dueTime(),
-                    base.priority(), "SEGMENTO", ref == null ? null : ref.substring(0, Math.min(150, ref.length()))), by);
+                    base.priority(), SEGMENTO, ref == null ? null : ref.substring(0, Math.min(150, ref.length()))), by);
             created++;
         }
-        audit.record("SEGMENTO", r.segmentId(), "TAREAS", created + " tareas \"" + base.title() + "\" · " + ref);
+        audit.record(SEGMENTO, r.segmentId(), "TAREAS", created + " tareas \"" + base.title() + "\" · " + ref);
         return Map.of("created", created, "skipped", skipped);
     }
 
@@ -250,10 +260,10 @@ public class MarketingService {
 
     public Map<String, Object> birthdaySettings() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("active", "true".equals(setting("cumpleanos_activo")));
-        m.put("time", Optional.ofNullable(setting("cumpleanos_hora")).orElse("09:00"));
-        m.put("createTask", "true".equals(setting("cumpleanos_tarea")));
-        m.put("template", templates.get("CUMPLEANOS"));
+        m.put(ACTIVE, "true".equals(setting(CUMPLEANOS_ACTIVO)));
+        m.put("time", Optional.ofNullable(setting(CUMPLEANOS_HORA)).orElse("09:00"));
+        m.put("createTask", "true".equals(setting(CUMPLEANOS_TAREA)));
+        m.put("template", templates.get(CUMPLEANOS));
         return m;
     }
 
@@ -264,11 +274,11 @@ public class MarketingService {
             try { t = LocalTime.parse(s.time().substring(0, Math.min(5, s.time().length()))); }
             catch (Exception e) { throw ApiException.field("time", "Hora no válida."); }
             if (t.isBefore(LocalTime.of(7, 0)) || t.isAfter(LocalTime.of(20, 0))) throw ApiException.field("time", "Elige una hora entre 07:00 y 20:00.");
-            put("cumpleanos_hora", t.toString());
+            put(CUMPLEANOS_HORA, t.toString());
         }
-        if (s.active() != null) put("cumpleanos_activo", String.valueOf(s.active()));
-        if (s.createTask() != null) put("cumpleanos_tarea", String.valueOf(s.createTask()));
-        audit.record("MARKETING", null, "CUMPLEANOS", "Saludo " + (Boolean.TRUE.equals(s.active()) ? "activo" : "inactivo") + " · " + setting("cumpleanos_hora")
+        if (s.active() != null) put(CUMPLEANOS_ACTIVO, String.valueOf(s.active()));
+        if (s.createTask() != null) put(CUMPLEANOS_TAREA, String.valueOf(s.createTask()));
+        audit.record("MARKETING", null, CUMPLEANOS, "Saludo " + (Boolean.TRUE.equals(s.active()) ? "activo" : "inactivo") + " · " + setting(CUMPLEANOS_HORA)
                 + (Boolean.TRUE.equals(s.createTask()) ? " · con tarea de llamada" : ""));
         return birthdaySettings();
     }
@@ -293,7 +303,7 @@ public class MarketingService {
             m.put("birthDate", bd);
             m.put("day", bd.getDayOfMonth());
             m.put("turns", year - bd.getYear());
-            m.put("phone", r.get("phone"));
+            m.put(PHONE, r.get(PHONE));
             Object mc = r.get("marketing_consent");
             m.put("marketingConsent", mc == null ? null : (mc instanceof Boolean b ? b : ((Number) mc).intValue() != 0));
             m.put("greeted", ((Number) r.get("greeted")).longValue() > 0);
@@ -307,7 +317,7 @@ public class MarketingService {
     @Scheduled(cron = "0 */15 7-21 * * *", zone = "America/Lima")
     public void birthdayTick() {
         try {
-            LocalTime at = LocalTime.parse(Optional.ofNullable(setting("cumpleanos_hora")).orElse("09:00"));
+            LocalTime at = LocalTime.parse(Optional.ofNullable(setting(CUMPLEANOS_HORA)).orElse("09:00"));
             if (Dates.now().toLocalTime().isBefore(at)) return;
             self().runBirthdays(false);
         } catch (Exception e) {
@@ -318,33 +328,33 @@ public class MarketingService {
     /** Envía los saludos y crea las tareas de hoy según la configuración. {@code manual}: lo pidió administración. */
     @Transactional
     public Map<String, Object> runBirthdays(boolean manual) {
-        boolean send = "true".equals(setting("cumpleanos_activo"));
-        boolean task = "true".equals(setting("cumpleanos_tarea"));
+        boolean send = "true".equals(setting(CUMPLEANOS_ACTIVO));
+        boolean task = "true".equals(setting(CUMPLEANOS_TAREA));
         int sent = 0, created = 0;
-        if (!send && !task) return Map.of("sent", 0, "tasks", 0, "active", false);
+        if (!send && !task) return Map.of("sent", 0, "tasks", 0, ACTIVE, false);
         LocalDate today = Dates.today();
         int year = today.getYear();
         // los nacidos un 29 de febrero se saludan el 28 cuando el año no es bisiesto
         boolean feb28 = today.getMonthValue() == 2 && today.getDayOfMonth() == 28 && !today.isLeapYear();
         List<Long> ids = jdbc.queryForList("select id from patients where active = true and demo = false and ((month(birth_date) = ? and day(birth_date) = ?)"
                 + (feb28 ? " or (month(birth_date) = 2 and day(birth_date) = 29)" : "") + ")", Long.class, today.getMonthValue(), today.getDayOfMonth());
-        var tpl = templates.get("CUMPLEANOS");
+        var tpl = templates.get(CUMPLEANOS);
         for (Long id : ids) {
             Patient p = patients.findById(id).orElse(null);
             if (p == null) continue;
             if (send && !Boolean.FALSE.equals(p.marketingConsent)) {
-                sent += notifications.marketing(p, "CUMPLEANOS", "CUMPLEANOS", (String) tpl.get("subject"), (String) tpl.get("body"),
+                sent += notifications.marketing(p, CUMPLEANOS, CUMPLEANOS, (String) tpl.get("subject"), (String) tpl.get("body"),
                         "PREFERIDO", "cumple:" + p.id + ":" + year).size();
             }
             if (task && jdbc.queryForObject("select count(*) from tasks where patient_id = ? and origin = 'CUMPLEANOS' and origin_ref = ?",
                     Long.class, p.id, String.valueOf(year)) == 0) {
                 tasks.insert(new TaskService.NewTask(p.id, null, "LLAMAR", "Saludar por su cumpleaños", null, null, today, null, "NORMAL",
-                        "CUMPLEANOS", String.valueOf(year)), "sistema");
+                        CUMPLEANOS, String.valueOf(year)), "sistema");
                 created++;
             }
         }
         if (sent + created > 0 || manual) log.info("Cumpleaños de hoy: {} saludos en cola, {} tareas", sent, created);
-        return Map.of("sent", sent, "tasks", created, "active", send, "birthdays", ids.size());
+        return Map.of("sent", sent, "tasks", created, ACTIVE, send, "birthdays", ids.size());
     }
 
     // ------------------------------------------------------------------ utilidades

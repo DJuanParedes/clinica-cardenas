@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class BookingFlow {
+    private static final String FECHA = "FECHA";
+
 
     private static final Locale ES = new Locale("es", "PE");
     private static final DateTimeFormatter DIA = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", ES);
@@ -54,7 +56,7 @@ public class BookingFlow {
         StringBuilder sb = new StringBuilder("¡Claro! Te ayudo a reservar 🗓️\n*¿Para qué día quieres tu cita?* Estos días tienen horarios libres:\n");
         for (int i = 0; i < days.size(); i++) sb.append("\n").append(i + 1).append(". ").append(cap(days.get(i).format(DIA)));
         sb.append("\n\nResponde con el número, o escribe otra fecha (por ejemplo *mañana*, *lunes* o *28/11*). Escribe *salir* para cancelar.");
-        if (!simulate) save(patientId, "FECHA", null, days.stream().map(LocalDate::toString).toList(), null, null);
+        if (!simulate) save(patientId, FECHA, null, days.stream().map(LocalDate::toString).toList(), null, null);
         return sb.toString();
     }
 
@@ -69,7 +71,7 @@ public class BookingFlow {
         String step = (String) s.get("step");
         List<String> opts = s.get("options") == null ? List.of() : Arrays.asList(((String) s.get("options")).split("\\|"));
         return switch (step) {
-            case "FECHA" -> pickDay(patientId, n, opts);
+            case FECHA -> pickDay(patientId, n, opts);
             case "HORA" -> pickSlot(patientId, n, opts, ((java.sql.Date) s.get("day")).toLocalDate());
             default -> confirm(patientId, n, s);
         };
@@ -85,7 +87,7 @@ public class BookingFlow {
         List<Option> options = options(pid, day, 9);
         if (options.isEmpty()) {
             List<LocalDate> alt = openDays(pid, 3);
-            save(pid, "FECHA", null, alt.stream().map(LocalDate::toString).toList(), null, null);
+            save(pid, FECHA, null, alt.stream().map(LocalDate::toString).toList(), null, null);
             StringBuilder sb = new StringBuilder("El *" + day.format(DIA) + "* no hay horarios libres (o la clínica no atiende). Días con cupo:\n");
             for (int i = 0; i < alt.size(); i++) sb.append("\n").append(i + 1).append(". ").append(cap(alt.get(i).format(DIA)));
             return sb.append("\n\nResponde con el número u otra fecha.").toString();

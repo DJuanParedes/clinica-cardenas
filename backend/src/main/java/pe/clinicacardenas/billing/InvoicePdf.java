@@ -17,6 +17,8 @@ import java.util.List;
  * letras; código QR con RUC|tipo|serie|número|IGV|total|fecha|tipo doc.|n.° doc.|hash; y la leyenda de consulta.
  */
 public final class InvoicePdf {
+    private static final String V_1_1_1 = "1 1 1";
+
 
     private static final String INK = "0.11 0.17 0.2", MUTED = "0.42 0.48 0.52", BRAND = "0.02 0.37 0.53",
             LINE = "0.75 0.8 0.83", SOFT = "0.93 0.96 0.97";
@@ -72,7 +74,7 @@ public final class InvoicePdf {
         pdf.rect(bx, by, bw, bh, null, BRAND, 1.4f);
         pdf.text("R.U.C. N.° " + c.ruc(), bx + bw / 2, by + bh - 20, 11, true, INK, 'C');
         pdf.rect(bx, by + 24, bw, 22, BRAND, null, 0);
-        pdf.text(factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", bx + bw / 2, by + 31, 9.5f, true, "1 1 1", 'C');
+        pdf.text(factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", bx + bw / 2, by + 31, 9.5f, true, V_1_1_1, 'C');
         pdf.text(i.series + " - " + String.format("%08d", i.number), bx + bw / 2, by + 8, 12, true, INK, 'C');
 
         // Adquiriente
@@ -98,11 +100,11 @@ public final class InvoicePdf {
         float ty = cy - 30;
         float cQty = L + 8, cUnit = L + 52, cDesc = L + 110, cPu = R - 92, cTot = R - 8;
         pdf.rect(L, ty, R - L, 20, BRAND, null, 0);
-        pdf.text("CANT.", cQty, ty + 6.5f, 8.5f, true, "1 1 1", 'L');
-        pdf.text("UNIDAD", cUnit, ty + 6.5f, 8.5f, true, "1 1 1", 'L');
-        pdf.text("DESCRIPCIÓN", cDesc, ty + 6.5f, 8.5f, true, "1 1 1", 'L');
-        pdf.text("P. UNIT.", cPu, ty + 6.5f, 8.5f, true, "1 1 1", 'R');
-        pdf.text("IMPORTE", cTot, ty + 6.5f, 8.5f, true, "1 1 1", 'R');
+        pdf.text("CANT.", cQty, ty + 6.5f, 8.5f, true, V_1_1_1, 'L');
+        pdf.text("UNIDAD", cUnit, ty + 6.5f, 8.5f, true, V_1_1_1, 'L');
+        pdf.text("DESCRIPCIÓN", cDesc, ty + 6.5f, 8.5f, true, V_1_1_1, 'L');
+        pdf.text("P. UNIT.", cPu, ty + 6.5f, 8.5f, true, V_1_1_1, 'R');
+        pdf.text("IMPORTE", cTot, ty + 6.5f, 8.5f, true, V_1_1_1, 'R');
         float row = ty;
         for (InvoiceItem it : items) {
             String desc = it.description == null ? "" : it.description;

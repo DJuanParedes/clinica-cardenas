@@ -33,6 +33,11 @@ import java.util.regex.Pattern;
  */
 @Service
 public class PortalRecordsService {
+    private static final String PACIENTE = "PACIENTE";
+    private static final String BALANCE = "balance";
+    private static final String EMAIL_2 = "email";
+    private static final String TITLE = "title";
+
 
     private static final Pattern PHONE = Pattern.compile("^9\\d{8}$");
     private static final Pattern EMAIL = pe.clinicacardenas.common.Emails.PATTERN;
@@ -65,8 +70,8 @@ public class PortalRecordsService {
         String phone = r.phone() == null ? "" : r.phone().replaceAll("\\s", "");
         String email = r.email() == null ? "" : r.email().trim().toLowerCase();
         if (!PHONE.matcher(phone).matches()) e.put("phone", "Celular de 9 dígitos que empiece con 9.");
-        if (!email.isEmpty() && !EMAIL.matcher(email).matches()) e.put("email", "Correo no válido.");
-        if (email.isEmpty() && "EMAIL".equals(p.notifyChannel)) e.put("email", "Recibes avisos por correo: no lo dejes vacío.");
+        if (!email.isEmpty() && !EMAIL.matcher(email).matches()) e.put(EMAIL_2, "Correo no válido.");
+        if (email.isEmpty() && "EMAIL".equals(p.notifyChannel)) e.put(EMAIL_2, "Recibes avisos por correo: no lo dejes vacío.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa tus datos.", e);
         List<String> changes = new ArrayList<>();
         if (!Objects.equals(p.phone, phone)) changes.add("celular");
@@ -76,8 +81,8 @@ public class PortalRecordsService {
         p.updatedAt = Dates.now();
         p.updatedBy = "paciente (app)";
         patients.save(p);
-        if (!changes.isEmpty()) audit.record("PACIENTE", p.id, "EDITAR", "El paciente actualizó su " + String.join(" y ", changes) + " desde la app");
-        return Map.of("phone", p.phone, "email", p.email == null ? "" : p.email, "message", "Datos de contacto actualizados.");
+        if (!changes.isEmpty()) audit.record(PACIENTE, p.id, "EDITAR", "El paciente actualizó su " + String.join(" y ", changes) + " desde la app");
+        return Map.of("phone", p.phone, EMAIL_2, p.email == null ? "" : p.email, "message", "Datos de contacto actualizados.");
     }
 
     // ------------------------------------------------------------------ tratamientos, ficha y pagos
@@ -106,12 +111,12 @@ public class PortalRecordsService {
                 total = total.add(price);
                 paid = paid.add((BigDecimal) it.get("paid"));
                 if ("REALIZADO".equals(it.get("status"))) done++;
-                it.put("balance", price.subtract((BigDecimal) it.get("paid")).max(BigDecimal.ZERO));
+                it.put(BALANCE, price.subtract((BigDecimal) it.get("paid")).max(BigDecimal.ZERO));
             }
             plan.put("items", items);
             plan.put("total", total);
             plan.put("paid", paid);
-            plan.put("balance", total.subtract(paid).max(BigDecimal.ZERO));
+            plan.put(BALANCE, total.subtract(paid).max(BigDecimal.ZERO));
             plan.put("doneCount", done);
             plan.put("itemCount", items.size());
             plan.put("sessions", jdbc.queryForList("""
@@ -128,7 +133,7 @@ public class PortalRecordsService {
         out.put("plans", plans);
         out.put("total", totalAll);
         out.put("paid", paidAll);
-        out.put("balance", totalAll.subtract(paidAll).max(BigDecimal.ZERO));
+        out.put(BALANCE, totalAll.subtract(paidAll).max(BigDecimal.ZERO));
         out.put("payments", jdbc.queryForList("""
                 select py.id, py.paid_at as paidAt, py.amount, py.method, py.status, pr.name as `procedure`
                   from payments py left join treatment_items ti on ti.id = py.treatment_item_id left join procedures pr on pr.id = ti.procedure_id
@@ -179,7 +184,7 @@ public class PortalRecordsService {
         };
         SimplePdf pdf = new SimplePdf()
                 .header("Clínica Dental Cárdenas", "Constancia de consentimiento · Ley N.° 29733")
-                .title(String.valueOf(r.get("title") == null ? r.get("code") : r.get("title")))
+                .title(String.valueOf(r.get(TITLE) == null ? r.get("code") : r.get(TITLE)))
                 .paragraph("Paciente: " + p.getFullName() + "  ·  " + p.docType + " " + p.docNumber, 10, false)
                 .paragraph("Aceptado por: " + r.get("acceptedBy"), 10, false)
                 .paragraph("Fecha y hora: " + (at == null ? "-" : at.format(DMY)) + "  ·  Canal: " + canal + "  ·  Versión " + r.get("version"), 10, false)
@@ -218,7 +223,7 @@ public class PortalRecordsService {
     public List<Map<String, Object>> createRequest(Long patientId, NewFileRequest r) {
         if (!patients.existsById(patientId)) throw ApiException.notFound("El paciente");
         String title = r.title() == null ? "" : r.title().trim();
-        if (title.length() < 3) throw ApiException.field("title", "Indica qué archivo necesitas (por ejemplo, radiografía panorámica).");
+        if (title.length() < 3) throw ApiException.field(TITLE, "Indica qué archivo necesitas (por ejemplo, radiografía panorámica).");
         String kind = r.kind() == null || r.kind().isBlank() ? "RADIOGRAFIA" : r.kind().trim().toUpperCase();
         if (!FileService.KINDS.contains(kind)) kind = "DOCUMENTO";
         if (r.planId() != null) {
@@ -230,7 +235,7 @@ public class PortalRecordsService {
                 values (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)""", patientId, r.planId(), title.length() > 150 ? title.substring(0, 150) : title,
                 r.description() == null || r.description().isBlank() ? null : r.description().trim(), kind, r.dueDate(),
                 CurrentUser.usernameOrSystem(), Dates.now());
-        audit.record("PACIENTE", patientId, "ARCHIVO_SOLICITADO", title);
+        audit.record(PACIENTE, patientId, "ARCHIVO_SOLICITADO", title);
         return fileRequests(patientId);
     }
 
@@ -247,11 +252,11 @@ public class PortalRecordsService {
         Map<String, Object> fr = rows.get(0);
         if ("ANULADO".equals(fr.get("status"))) throw ApiException.conflict("ANULADO", "Ese pedido fue anulado.");
         // Lo que sube el paciente queda compartido con él (es suyo) y visible para el odontólogo en la ficha.
-        PatientFile f = files.upload(patientId, file, (String) fr.get("kind"), (String) fr.get("title"),
+        PatientFile f = files.upload(patientId, file, (String) fr.get("kind"), (String) fr.get(TITLE),
                 "Subido por " + by + " para el pedido #" + requestId, null, true);
         jdbc.update("update file_requests set status = 'RECIBIDO', file_id = ?, fulfilled_by = ?, fulfilled_at = ? where id = ?",
                 f.id, by, Dates.now(), requestId);
-        audit.record("PACIENTE", patientId, "ARCHIVO_RECIBIDO", fr.get("title") + " · por " + by);
+        audit.record(PACIENTE, patientId, "ARCHIVO_RECIBIDO", fr.get(TITLE) + " · por " + by);
         return fileRequests(patientId);
     }
 

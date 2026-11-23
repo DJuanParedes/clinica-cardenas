@@ -36,6 +36,16 @@ import java.util.*;
  */
 @Component
 public class HistorySeeder {
+    private static final String CHACLACAYO = "Chaclacayo";
+    private static final String EFECTIVO = "EFECTIVO";
+    private static final String ORT_001 = "ORT-001";
+    private static final String PORCENTAJE = "PORCENTAJE";
+    private static final String PRE_001 = "PRE-001";
+    private static final String REALIZADO = "REALIZADO";
+    private static final String TARJETA = "TARJETA";
+    private static final String TRANSFERENCIA = "TRANSFERENCIA";
+    private static final String ORTODON = "ortodon";
+
 
     private static final Logger log = LoggerFactory.getLogger(HistorySeeder.class);
     /** Contraseña de la cuenta de prueba del portal: viene de la configuración (APP_SEED_PATIENT_PASSWORD), no del código. */
@@ -99,15 +109,15 @@ public class HistorySeeder {
     }
 
     private void run() {
-        addPatient("43215678", "Miguel Ángel", "Huamaní Castro", "1983-04-18", "M", "945112233", "mhuamani@gmail.com", "Chaclacayo");
-        addPatient("71548236", "Lucero", "Pariona Quispe", "1996-08-25", "F", "951223344", null, "Chaclacayo");
+        addPatient("43215678", "Miguel Ángel", "Huamaní Castro", "1983-04-18", "M", "945112233", "mhuamani@gmail.com", CHACLACAYO);
+        addPatient("71548236", "Lucero", "Pariona Quispe", "1996-08-25", "F", "951223344", null, CHACLACAYO);
         addPatient("44875123", "Jorge Luis", "Espinoza Ramos", "1979-12-02", "M", "962334455", "jespinoza@outlook.com", "Lurigancho-Chosica");
         addPatient("76321458", "Daniela", "Vargas Ccahuana", "2003-06-11", "F", "973445566", "dani.vargas@gmail.com", "Ate");
-        addPatient("42563987", "Patricia", "Mendoza Llanos", "1975-01-29", "F", "984556677", null, "Chaclacayo");
+        addPatient("42563987", "Patricia", "Mendoza Llanos", "1975-01-29", "F", "984556677", null, CHACLACAYO);
         addPatient("70985632", "Renzo", "Salazar Ticona", "1993-10-07", "M", "995667788", "renzo.salazar@gmail.com", "Santa Eulalia");
-        addPatient("45698712", "Gladys", "Cóndor Yupanqui", "1968-03-15", "F", "916778899", null, "Chaclacayo");
+        addPatient("45698712", "Gladys", "Cóndor Yupanqui", "1968-03-15", "F", "916778899", null, CHACLACAYO);
         addPatient("72145896", "Fernando", "Aguilar Paucar", "1999-09-23", "M", "927889900", "faguilar@gmail.com", "Ricardo Palma");
-        addPatient("48523691", "Silvia", "Rojas Palomino", "1988-05-05", "F", "938990011", "srojas@hotmail.com", "Chaclacayo");
+        addPatient("48523691", "Silvia", "Rojas Palomino", "1988-05-05", "F", "938990011", "srojas@hotmail.com", CHACLACAYO);
         addPatient("74123659", "Kevin", "Inga Mallqui", "2007-02-14", "M", "949001122", null, "Lurigancho-Chosica");
 
         List<Patient> ps = patients.findAll();
@@ -119,15 +129,15 @@ public class HistorySeeder {
         // Procedimientos más frecuentes por especialidad (con repetición para dar peso).
         Map<Long, List<String>> menu = new HashMap<>();
         for (Dentist d : ds) {
-            boolean ortho = d.specialty.toLowerCase().contains("ortodon");
+            boolean ortho = d.specialty.toLowerCase().contains(ORTODON);
             menu.put(d.id, ortho
-                    ? List.of("ORT-001", "ORT-001", "ORT-001", "CON-001", "PRE-001", "PRE-001", "OPE-001", "PRE-002", "EST-001", "RAD-002")
-                    : List.of("CON-001", "RAD-001", "RAD-001", "END-001", "END-002", "OPE-002", "OPE-001", "CIR-001", "CIR-002", "PRE-001", "PER-001"));
+                    ? List.of(ORT_001, ORT_001, ORT_001, "CON-001", PRE_001, PRE_001, "OPE-001", "PRE-002", "EST-001", "RAD-002")
+                    : List.of("CON-001", "RAD-001", "RAD-001", "END-001", "END-002", "OPE-002", "OPE-001", "CIR-001", "CIR-002", PRE_001, "PER-001"));
         }
         String[] reasonsByCode = {"Control", "Evaluación", "Tratamiento programado", "Seguimiento"};
         List<String> cancelReasons = List.of("Viaje del paciente", "Motivos de trabajo", "Paciente enfermo", "Problema de transporte",
                 "Reprogramará por teléfono", "Odontólogo en congreso");
-        List<String> methods = List.of("EFECTIVO", "EFECTIVO", "EFECTIVO", "YAPE", "YAPE", "YAPE", "TARJETA", "TARJETA", "PLIN", "TRANSFERENCIA");
+        List<String> methods = List.of(EFECTIVO, EFECTIVO, EFECTIVO, "YAPE", "YAPE", "YAPE", TARJETA, TARJETA, "PLIN", TRANSFERENCIA);
 
         // Un plan histórico por paciente y odontólogo.
         Map<String, TreatmentPlan> planOf = new HashMap<>();
@@ -171,7 +181,7 @@ public class HistorySeeder {
                     TreatmentPlan tp = new TreatmentPlan();
                     tp.patientId = p.id;
                     tp.dentist = d;
-                    tp.title = d.specialty.toLowerCase().contains("ortodon") ? "Tratamiento de ortodoncia y prevención" : "Tratamiento integral";
+                    tp.title = d.specialty.toLowerCase().contains(ORTODON) ? "Tratamiento de ortodoncia y prevención" : "Tratamiento integral";
                     tp.status = "ACTIVO";
                     tp.createdAt = at.minusDays(1);
                     tp.createdBy = d.user.username;
@@ -181,7 +191,7 @@ public class HistorySeeder {
                 it.planId = plan.id;
                 it.procedure = pr;
                 it.price = pr.price;
-                it.status = "REALIZADO";
+                it.status = REALIZADO;
                 it.doneAt = at.plusMinutes(a.durationMin - 5L);
                 it.doneByDentistId = d.id;
                 it.sortOrder = 100 + created;
@@ -211,7 +221,7 @@ public class HistorySeeder {
         }
         // Un par de pagos a cuenta.
         addPayment(ps.get(1).id, null, m(200), "YAPE", today.minusDays(9).atTime(12, 10));
-        addPayment(ps.get(3).id, null, m(150), "EFECTIVO", today.minusDays(3).atTime(16, 40));
+        addPayment(ps.get(3).id, null, m(150), EFECTIVO, today.minusDays(3).atTime(16, 40));
 
         seedExpenses(today);
         seedCommissions(ds, today);
@@ -237,7 +247,7 @@ public class HistorySeeder {
         p.treatmentItemId = itemId;
         p.amount = amount;
         p.method = method;
-        p.reference = "EFECTIVO".equals(method) ? null : String.valueOf(100000 + rnd.nextInt(899999));
+        p.reference = EFECTIVO.equals(method) ? null : String.valueOf(100000 + rnd.nextInt(899999));
         p.paidAt = at;
         p.cashier = "caja";
         p.status = "VALIDO";
@@ -252,7 +262,7 @@ public class HistorySeeder {
         x.concept = concept;
         x.amount = m(amount);
         x.method = method;
-        x.reference = "EFECTIVO".equals(method) ? null : String.valueOf(200000 + rnd.nextInt(799999));
+        x.reference = EFECTIVO.equals(method) ? null : String.valueOf(200000 + rnd.nextInt(799999));
         x.supplier = supplier;
         x.status = "VALIDO";
         x.createdAt = date.atTime(18, 0);
@@ -263,14 +273,14 @@ public class HistorySeeder {
     private void seedExpenses(LocalDate today) {
         for (int k = 4; k >= 0; k--) {
             LocalDate month = today.minusMonths(k).withDayOfMonth(1);
-            addExpense(month.plusDays(1), "ALQUILER", "Alquiler del local · Urb. La Floresta", 2500, "TRANSFERENCIA", "Inmobiliaria Los Cóndores S.A.C.");
-            addExpense(month.plusDays(9), "SERVICIOS", "Luz, agua e internet", 380.0 + rnd.nextInt(90), "TRANSFERENCIA", "Luz del Sur / Sedapal / Movistar");
-            addExpense(month.plusDays(4), "INSUMOS", "Resinas, anestésicos y descartables", 650.0 + rnd.nextInt(500), "TARJETA", "Dental Perú Import");
-            addExpense(month.plusDays(18), "INSUMOS", "Guantes, mascarillas y material de esterilización", 280.0 + rnd.nextInt(200), "EFECTIVO", "Distribuidora Médica Chosica");
-            addExpense(month.plusDays(12), "LABORATORIO", "Coronas y prótesis", 420.0 + rnd.nextInt(700), "TRANSFERENCIA", "Laboratorio Dental Sonrisa");
-            addExpense(month.plusDays(27), "PLANILLA", "Remuneración de asistente dental", 1300, "TRANSFERENCIA", null);
-            if (k % 2 == 0) addExpense(month.plusDays(15), "MANTENIMIENTO", "Mantenimiento de autoclave y compresor", 220.0 + rnd.nextInt(150), "EFECTIVO", "Servitec Dental");
-            if (k == 1) addExpense(month.plusDays(20), "MARKETING", "Publicidad en Facebook e Instagram", 300, "TARJETA", "Meta Platforms");
+            addExpense(month.plusDays(1), "ALQUILER", "Alquiler del local · Urb. La Floresta", 2500, TRANSFERENCIA, "Inmobiliaria Los Cóndores S.A.C.");
+            addExpense(month.plusDays(9), "SERVICIOS", "Luz, agua e internet", 380.0 + rnd.nextInt(90), TRANSFERENCIA, "Luz del Sur / Sedapal / Movistar");
+            addExpense(month.plusDays(4), "INSUMOS", "Resinas, anestésicos y descartables", 650.0 + rnd.nextInt(500), TARJETA, "Dental Perú Import");
+            addExpense(month.plusDays(18), "INSUMOS", "Guantes, mascarillas y material de esterilización", 280.0 + rnd.nextInt(200), EFECTIVO, "Distribuidora Médica Chosica");
+            addExpense(month.plusDays(12), "LABORATORIO", "Coronas y prótesis", 420.0 + rnd.nextInt(700), TRANSFERENCIA, "Laboratorio Dental Sonrisa");
+            addExpense(month.plusDays(27), "PLANILLA", "Remuneración de asistente dental", 1300, TRANSFERENCIA, null);
+            if (k % 2 == 0) addExpense(month.plusDays(15), "MANTENIMIENTO", "Mantenimiento de autoclave y compresor", 220.0 + rnd.nextInt(150), EFECTIVO, "Servitec Dental");
+            if (k == 1) addExpense(month.plusDays(20), "MARKETING", "Publicidad en Facebook e Instagram", 300, TARJETA, "Meta Platforms");
         }
     }
 
@@ -282,18 +292,18 @@ public class HistorySeeder {
     private void seedCommissions(List<Dentist> ds, LocalDate today) {
         LocalDate since = today.minusDays(180);
         for (Dentist d : ds) {
-            boolean ortho = d.specialty.toLowerCase().contains("ortodon");
+            boolean ortho = d.specialty.toLowerCase().contains(ORTODON);
             if (ortho) {
-                commissions.saveRule(null, new CommissionService.RuleRequest(d.id, null, "PORCENTAJE", m(40), "REALIZADO", since, null, true,
+                commissions.saveRule(null, new CommissionService.RuleRequest(d.id, null, PORCENTAJE, m(40), REALIZADO, since, null, true,
                         "Acuerdo general 2026"));
-                procedures.findAll().stream().filter(p -> "ORT-001".equals(p.code)).findFirst().ifPresent(p ->
-                        commissions.saveRule(null, new CommissionService.RuleRequest(d.id, p.id, "MONTO_FIJO", m(65), "REALIZADO", since, null, true,
+                procedures.findAll().stream().filter(p -> ORT_001.equals(p.code)).findFirst().ifPresent(p ->
+                        commissions.saveRule(null, new CommissionService.RuleRequest(d.id, p.id, "MONTO_FIJO", m(65), REALIZADO, since, null, true,
                                 "Monto fijo por control de ortodoncia")));
             } else {
-                commissions.saveRule(null, new CommissionService.RuleRequest(d.id, null, "PORCENTAJE", m(35), "COBRADO", since, null, true,
+                commissions.saveRule(null, new CommissionService.RuleRequest(d.id, null, PORCENTAJE, m(35), "COBRADO", since, null, true,
                         "Se paga sobre lo efectivamente cobrado"));
                 procedures.findAll().stream().filter(p -> "END-002".equals(p.code)).findFirst().ifPresent(p ->
-                        commissions.saveRule(null, new CommissionService.RuleRequest(d.id, p.id, "PORCENTAJE", m(45), "COBRADO", since, null, true,
+                        commissions.saveRule(null, new CommissionService.RuleRequest(d.id, p.id, PORCENTAJE, m(45), "COBRADO", since, null, true,
                                 "Endodoncias multirradiculares")));
             }
         }
@@ -308,14 +318,14 @@ public class HistorySeeder {
             if (!hasLines(d.id, prev2, prev2End)) continue;
             Map<String, Object> s2 = commissions.settle(new CommissionService.SettleRequest(d.id, prev2, prev2End, null, "Liquidación mensual"));
             var st2 = (pe.clinicacardenas.commission.CommissionSettlement) s2.get("settlement");
-            commissions.pay(st2.id, new CommissionService.PayoutRequest(st2.totalAmount, null, "TRANSFERENCIA", "OP" + (500000 + rnd.nextInt(99999))));
+            commissions.pay(st2.id, new CommissionService.PayoutRequest(st2.totalAmount, null, TRANSFERENCIA, "OP" + (500000 + rnd.nextInt(99999))));
         }
         Dentist first = ds.get(0);
         if (hasLines(first.id, prev, prevEnd)) {
             Map<String, Object> s1 = commissions.settle(new CommissionService.SettleRequest(first.id, prev, prevEnd, null, "Liquidación mensual"));
             var st1 = (pe.clinicacardenas.commission.CommissionSettlement) s1.get("settlement");
             BigDecimal half = st1.totalAmount.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
-            if (half.signum() > 0) commissions.pay(st1.id, new CommissionService.PayoutRequest(half, null, "EFECTIVO", null));
+            if (half.signum() > 0) commissions.pay(st1.id, new CommissionService.PayoutRequest(half, null, EFECTIVO, null));
         }
     }
 }

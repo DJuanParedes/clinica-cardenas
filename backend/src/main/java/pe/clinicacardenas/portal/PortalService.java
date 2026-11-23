@@ -33,6 +33,11 @@ import java.util.*;
  */
 @Service
 public class PortalService {
+    private static final String EMAIL = "EMAIL";
+    private static final String PACIENTE = "PACIENTE";
+    private static final String DOCNUMBER = "docNumber";
+    private static final String PHONE = "phone";
+
 
     private static final int MAX_ATTEMPTS = 5;
     private static final int LOCK_MINUTES = 15;
@@ -95,7 +100,7 @@ public class PortalService {
     }
 
     private static String mask(String phone, String email, String channel) {
-        if ("EMAIL".equals(channel) && email != null) {
+        if (EMAIL.equals(channel) && email != null) {
             int at = email.indexOf('@');
             return email.charAt(0) + "•••" + (at > 0 ? email.substring(at) : "");
         }
@@ -104,7 +109,7 @@ public class PortalService {
     }
 
     public Map<String, Object> ping() {
-        return Map.of("ok", true, "clinic", Map.of("name", clinicName, "address", clinicAddress, "phone", clinicPhone));
+        return Map.of("ok", true, "clinic", Map.of("name", clinicName, "address", clinicAddress, PHONE, clinicPhone));
     }
 
     // ------------------------------------------------------------------ activación con código
@@ -114,7 +119,7 @@ public class PortalService {
     @Transactional
     public Map<String, Object> requestCode(CodeRequest r) {
         Map<String, Object> res = new LinkedHashMap<>();
-        if (r.docNumber() == null || r.docNumber().isBlank()) throw ApiException.field("docNumber", "Ingresa tu número de documento.");
+        if (r.docNumber() == null || r.docNumber().isBlank()) throw ApiException.field(DOCNUMBER, "Ingresa tu número de documento.");
         if (r.birthDate() == null) throw ApiException.field("birthDate", "Ingresa tu fecha de nacimiento.");
         LocalDateTime now = Dates.now();
         String key = (r.docType() == null ? "DNI" : r.docType().trim().toUpperCase()) + ":" + r.docNumber().trim();
@@ -129,7 +134,7 @@ public class PortalService {
         Optional<Patient> byDoc = find(r.docType(), r.docNumber());
         if (byDoc.isEmpty()) {
             fails.add(now);
-            throw ApiException.field("docNumber", "Ese documento no está registrado en la clínica. Verifica el número o acércate a recepción para registrarte.");
+            throw ApiException.field(DOCNUMBER, "Ese documento no está registrado en la clínica. Verifica el número o acércate a recepción para registrarte.");
         }
         if (!r.birthDate().equals(byDoc.get().birthDate)) {
             fails.add(now);
@@ -155,8 +160,8 @@ public class PortalService {
         pc.createdAt = now;
         codes.save(pc);
         notifications.accessCode(p, code);
-        audit.record("PACIENTE", p.id, "APP_CODIGO", "Código de acceso a la app enviado");
-        String sentTo = mask(p.phone, p.email, p.phone == null ? "EMAIL" : "WHATSAPP");
+        audit.record(PACIENTE, p.id, "APP_CODIGO", "Código de acceso a la app enviado");
+        String sentTo = mask(p.phone, p.email, p.phone == null ? EMAIL : "WHATSAPP");
         res.put("sentTo", sentTo);
         res.put("message", "Listo, " + p.firstName.split(" ")[0] + ": te enviamos un código de 6 dígitos " + (p.phone == null ? "a tu correo " : "por WhatsApp al ") + sentTo + ". Vence en 15 minutos.");
         if (demoMode) res.put("demoCode", code);
@@ -200,7 +205,7 @@ public class PortalService {
         if (!p.dataConsent || !consents.currentVersion("PRIVACIDAD").equals(p.consentVersion)) {
             consents.record(p, "PRIVACIDAD", "APP", "paciente:" + p.id, null);
         }
-        audit.record("PACIENTE", p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
+        audit.record(PACIENTE, p.id, "APP_ACTIVAR", "Cuenta de la app activada o contraseña restablecida");
         return session(p, acc);
     }
 
@@ -238,7 +243,7 @@ public class PortalService {
 
     private Map<String, Object> session(Patient p, PatientAccount acc) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("token", jwt.generate(PatientAccount.SUBJECT_PREFIX + p.id, "PACIENTE"));
+        m.put("token", jwt.generate(PatientAccount.SUBJECT_PREFIX + p.id, PACIENTE));
         m.put("expiresInMinutes", jwt.getExpirationMinutes());
         m.put("patient", profile(p));
         return m;
@@ -264,11 +269,11 @@ public class PortalService {
         m.put("firstName", p.firstName);
         m.put("fullName", p.getFullName());
         m.put("docType", p.docType);
-        m.put("docNumber", p.docNumber.length() > 4 ? "••••" + p.docNumber.substring(p.docNumber.length() - 4) : p.docNumber);
-        m.put("phone", p.phone);
+        m.put(DOCNUMBER, p.docNumber.length() > 4 ? "••••" + p.docNumber.substring(p.docNumber.length() - 4) : p.docNumber);
+        m.put(PHONE, p.phone);
         m.put("email", p.email);
         m.put("notifyChannel", p.notifyChannel);
-        m.put("clinic", Map.of("name", clinicName, "address", clinicAddress, "phone", clinicPhone));
+        m.put("clinic", Map.of("name", clinicName, "address", clinicAddress, PHONE, clinicPhone));
         return m;
     }
 
@@ -335,13 +340,13 @@ public class PortalService {
         Patient p = me(subject);
         String ch = channel == null ? "" : channel.trim().toUpperCase();
         if (!NotificationService.CHANNEL_PREFS.contains(ch)) throw ApiException.field("channel", "Elige cómo quieres recibir los avisos.");
-        if (("EMAIL".equals(ch) || "AMBOS".equals(ch)) && (p.email == null || p.email.isBlank())) {
+        if ((EMAIL.equals(ch) || "AMBOS".equals(ch)) && (p.email == null || p.email.isBlank())) {
             throw ApiException.field("channel", "No tenemos tu correo. Pídelo a recepción para registrarlo.");
         }
         p.notifyChannel = ch;
         p.updatedAt = Dates.now();
         patients.save(p);
-        audit.record("PACIENTE", p.id, "CANAL_AVISOS", "Desde la app: avisos por " + ch.toLowerCase());
+        audit.record(PACIENTE, p.id, "CANAL_AVISOS", "Desde la app: avisos por " + ch.toLowerCase());
         return profile(p);
     }
 

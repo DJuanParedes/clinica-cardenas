@@ -22,6 +22,9 @@ import java.util.regex.Pattern;
  */
 @Service
 public class MessageTemplateService {
+    private static final String BUTTONS = "buttons";
+    private static final String SUBJECT = "subject";
+
 
     /** Variables que se pueden usar en cualquier plantilla y un ejemplo para la vista previa. */
     public static final Map<String, String> VARIABLES = new LinkedHashMap<>();
@@ -67,7 +70,7 @@ public class MessageTemplateService {
                        (select max(n.created_at) from notifications n where n.template_code = t.code) as lastSent
                   from message_templates t order by t.sort_order, t.code""");
         for (Map<String, Object> r : rows) {
-            r.put("buttons", buttons((String) r.get("buttons")));
+            r.put(BUTTONS, buttons((String) r.get(BUTTONS)));
             r.put("customized", !Objects.equals(r.get("body"), r.get("defaultBody")));
         }
         return rows;
@@ -83,7 +86,7 @@ public class MessageTemplateService {
         Map<String, String> e = new LinkedHashMap<>();
         String subject = r.subject() == null ? "" : r.subject().trim();
         String body = r.body() == null ? "" : r.body().replace("\r\n", "\n").trim();
-        if (subject.length() < 3 || subject.length() > 150) e.put("subject", "El asunto debe tener entre 3 y 150 caracteres.");
+        if (subject.length() < 3 || subject.length() > 150) e.put(SUBJECT, "El asunto debe tener entre 3 y 150 caracteres.");
         if (body.length() < 10) e.put("body", "Escribe el mensaje (mínimo 10 caracteres).");
         else if (body.length() > 1000) e.put("body", "Máximo 1000 caracteres: WhatsApp corta los mensajes con botones más largos.");
         List<String> unknown = unknownVars(subject + " " + body);
@@ -94,10 +97,10 @@ public class MessageTemplateService {
             for (String b : r.buttons()) {
                 if (b == null || b.isBlank()) continue;
                 String t = b.trim();
-                if (t.length() > 20) { e.put("buttons", "Cada botón puede tener hasta 20 caracteres (\"" + t + "\")."); break; }
+                if (t.length() > 20) { e.put(BUTTONS, "Cada botón puede tener hasta 20 caracteres (\"" + t + "\")."); break; }
                 if (!btn.contains(t)) btn.add(t);
             }
-            if (btn.size() > 3) e.put("buttons", "WhatsApp permite hasta 3 botones.");
+            if (btn.size() > 3) e.put(BUTTONS, "WhatsApp permite hasta 3 botones.");
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa la plantilla.", e);
         jdbc.update("update message_templates set subject=?, body=?, buttons=?, updated_at=?, updated_by=? where code=?",
@@ -118,16 +121,16 @@ public class MessageTemplateService {
     public Map<String, Object> preview(String code, String body, String subject) {
         Map<String, Object> t = get(code);
         String b = body == null ? (String) t.get("body") : body;
-        String s = subject == null ? (String) t.get("subject") : subject;
-        return Map.of("subject", fill(s, VARIABLES), "body", fill(b, VARIABLES), "unknown", unknownVars(s + " " + b));
+        String s = subject == null ? (String) t.get(SUBJECT) : subject;
+        return Map.of(SUBJECT, fill(s, VARIABLES), "body", fill(b, VARIABLES), "unknown", unknownVars(s + " " + b));
     }
 
     public Rendered render(String code, Map<String, String> vars) {
         List<Map<String, Object>> r = jdbc.queryForList("select code, subject, body, default_body, buttons from message_templates where code = ?", code);
         if (r.isEmpty()) throw new IllegalStateException("Plantilla inexistente: " + code);
         Map<String, Object> t = r.get(0);
-        return new Rendered(code, fill((String) t.get("subject"), vars), fill((String) t.get("body"), vars),
-                buttons((String) t.get("buttons")), !Objects.equals(t.get("body"), t.get("default_body")));
+        return new Rendered(code, fill((String) t.get(SUBJECT), vars), fill((String) t.get("body"), vars),
+                buttons((String) t.get(BUTTONS)), !Objects.equals(t.get("body"), t.get("default_body")));
     }
 
     /** Envíos de una plantilla (o de todas): base del historial. */

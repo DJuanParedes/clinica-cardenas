@@ -18,6 +18,10 @@ import java.util.*;
  */
 @Service
 public class KardexService {
+    private static final String UNIT_COST = "unit_cost";
+    private static final String VALUE = "value";
+    private static final String VALUE_AFTER = "value_after";
+
 
     private final JdbcTemplate jdbc;
 
@@ -40,13 +44,13 @@ public class KardexService {
         BigDecimal qty0, val0;
         if (!open.isEmpty()) {
             qty0 = (BigDecimal) open.get(0).get("stock_after");
-            val0 = open.get(0).get("value_after") == null ? BigDecimal.ZERO : (BigDecimal) open.get(0).get("value_after");
+            val0 = open.get(0).get(VALUE_AFTER) == null ? BigDecimal.ZERO : (BigDecimal) open.get(0).get(VALUE_AFTER);
         } else {
             // sin movimientos antes: el saldo inicial es lo que había antes del primer movimiento (stock cargado al crear el material)
             List<Map<String, Object>> first = jdbc.queryForList(
                     "select stock_after - quantity as q, coalesce(value_after, 0) - coalesce(total_cost, 0) as v from inventory_moves where item_id = ? order by id limit 1", itemId);
             qty0 = first.isEmpty() ? (BigDecimal) it.get(0).get("stock") : ((BigDecimal) first.get(0).get("q"));
-            val0 = first.isEmpty() ? qty0.multiply(it.get(0).get("unit_cost") == null ? BigDecimal.ZERO : (BigDecimal) it.get(0).get("unit_cost"))
+            val0 = first.isEmpty() ? qty0.multiply(it.get(0).get(UNIT_COST) == null ? BigDecimal.ZERO : (BigDecimal) it.get(0).get(UNIT_COST))
                     : ((BigDecimal) first.get(0).get("v")).max(BigDecimal.ZERO);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -76,11 +80,11 @@ public class KardexService {
             r.put("detail", detail);
             r.put("patient", m.get("patient_id") == null ? null : Map.of("id", m.get("patient_id"), "fullName", m.get("patient")));
             r.put("procedure", m.get("procedure_name"));
-            r.put("unitCost", m.get("unit_cost"));
+            r.put("unitCost", m.get(UNIT_COST));
             if (q.signum() >= 0) { r.put("inQty", q); r.put("inValue", tc); inQ = inQ.add(q); inV = inV.add(tc); }
             else { r.put("outQty", q.negate()); r.put("outValue", tc.negate()); outQ = outQ.add(q.negate()); outV = outV.add(tc.negate()); }
             BigDecimal sq = (BigDecimal) m.get("stock_after");
-            BigDecimal sv = m.get("value_after") == null ? BigDecimal.ZERO : (BigDecimal) m.get("value_after");
+            BigDecimal sv = m.get(VALUE_AFTER) == null ? BigDecimal.ZERO : (BigDecimal) m.get(VALUE_AFTER);
             r.put("balanceQty", sq);
             r.put("balanceValue", sv);
             r.put("averageCost", sq.signum() > 0 ? sv.divide(sq, 4, RoundingMode.HALF_UP) : null);
@@ -91,12 +95,12 @@ public class KardexService {
         out.put("item", it.get(0));
         out.put("from", f);
         out.put("to", t);
-        out.put("opening", Map.of("qty", qty0, "value", val0));
+        out.put("opening", Map.of("qty", qty0, VALUE, val0));
         out.put("rows", rows);
         BigDecimal closeQ = rows.isEmpty() ? qty0 : (BigDecimal) rows.get(rows.size() - 1).get("balanceQty");
         BigDecimal closeV = rows.isEmpty() ? val0 : (BigDecimal) rows.get(rows.size() - 1).get("balanceValue");
         out.put("totals", Map.of("inQty", inQ, "inValue", inV, "outQty", outQ, "outValue", outV));
-        out.put("closing", Map.of("qty", closeQ, "value", closeV));
+        out.put("closing", Map.of("qty", closeQ, VALUE, closeV));
         return out;
     }
 
@@ -111,7 +115,7 @@ public class KardexService {
         BigDecimal total = BigDecimal.ZERO;
         Map<String, BigDecimal> byCat = new LinkedHashMap<>();
         for (Map<String, Object> r : items) {
-            BigDecimal v = (BigDecimal) r.get("value");
+            BigDecimal v = (BigDecimal) r.get(VALUE);
             total = total.add(v);
             byCat.merge((String) r.get("category"), v, BigDecimal::add);
         }

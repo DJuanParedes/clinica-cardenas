@@ -31,6 +31,17 @@ import java.util.*;
  */
 @Service
 public class CommissionService {
+    private static final String ANULADA = "ANULADA";
+    private static final String LIQUIDACION = "LIQUIDACION";
+    private static final String LA_LIQUIDACION = "La liquidación";
+    private static final String PORCENTAJE = "PORCENTAJE";
+    private static final String COMMISSION = "commission";
+    private static final String DENTISTID = "dentistId";
+    private static final String LINES = "lines";
+    private static final String TREATMENTITEMID = "treatmentItemId";
+    private static final String VALIDFROM = "validFrom";
+    private static final String VALUE = "value";
+
 
     private final CommissionRuleRepository rules;
     private final CommissionSettlementRepository settlements;
@@ -71,7 +82,7 @@ public class CommissionService {
     }
 
     private Dentist dentist(Long id) {
-        if (id == null) throw ApiException.field("dentistId", "Selecciona al odontólogo.");
+        if (id == null) throw ApiException.field(DENTISTID, "Selecciona al odontólogo.");
         return dentists.findById(id).orElseThrow(() -> ApiException.notFound("El odontólogo"));
     }
 
@@ -94,23 +105,23 @@ public class CommissionService {
 
         if (!used) {
             Dentist d = r.dentistId() == null ? null : dentists.findById(r.dentistId()).orElse(null);
-            if (d == null) e.put("dentistId", "Selecciona al odontólogo.");
+            if (d == null) e.put(DENTISTID, "Selecciona al odontólogo.");
             Procedure p = null;
             if (r.procedureId() != null) {
                 p = procedures.findById(r.procedureId()).orElse(null);
                 if (p == null) e.put("procedureId", "El procedimiento no existe.");
             }
             String type = r.calcType() == null ? "" : r.calcType().trim().toUpperCase();
-            if (!List.of("PORCENTAJE", "MONTO_FIJO").contains(type)) e.put("calcType", "Elige porcentaje o monto fijo.");
+            if (!List.of(PORCENTAJE, "MONTO_FIJO").contains(type)) e.put("calcType", "Elige porcentaje o monto fijo.");
             BigDecimal v = r.value() == null ? null : money(r.value());
-            if (v == null || v.signum() <= 0) e.put("value", "Ingresa un valor mayor a cero.");
-            else if ("PORCENTAJE".equals(type) && v.compareTo(new BigDecimal("100")) > 0) e.put("value", "El porcentaje no puede superar 100 %.");
+            if (v == null || v.signum() <= 0) e.put(VALUE, "Ingresa un valor mayor a cero.");
+            else if (PORCENTAJE.equals(type) && v.compareTo(new BigDecimal("100")) > 0) e.put(VALUE, "El porcentaje no puede superar 100 %.");
             else if ("MONTO_FIJO".equals(type) && p != null && v.compareTo(p.price) > 0) {
-                e.put("value", "El monto fijo no puede superar el precio del procedimiento (S/ " + p.price.toPlainString() + ").");
+                e.put(VALUE, "El monto fijo no puede superar el precio del procedimiento (S/ " + p.price.toPlainString() + ").");
             }
             String base = r.base() == null ? "REALIZADO" : r.base().trim().toUpperCase();
             if (!List.of("REALIZADO", "COBRADO").contains(base)) e.put("base", "Elige la base de cálculo.");
-            if (r.validFrom() == null) e.put("validFrom", "Indica desde cuándo rige la regla.");
+            if (r.validFrom() == null) e.put(VALIDFROM, "Indica desde cuándo rige la regla.");
             String cat = r.category() == null || r.category().isBlank() ? null : r.category().trim();
             if (p != null) cat = p.category;
             else if (cat != null) {
@@ -125,7 +136,7 @@ public class CommissionService {
             rule.base = base;
             rule.validFrom = r.validFrom();
         } else if (r.validFrom() != null && !r.validFrom().equals(rule.validFrom)) {
-            e.put("validFrom", "La regla ya se usó en una liquidación: solo puedes cambiar su fin de vigencia o desactivarla.");
+            e.put(VALIDFROM, "La regla ya se usó en una liquidación: solo puedes cambiar su fin de vigencia o desactivarla.");
         }
         if (r.validTo() != null && rule.validFrom != null && r.validTo().isBefore(rule.validFrom)) {
             e.put("validTo", "El fin de vigencia no puede ser anterior al inicio.");
@@ -148,7 +159,7 @@ public class CommissionService {
                             + rule.getScope() + " de "
                             + rule.dentist.getFullName() + " en esas fechas (" + o.getLabel() + ", desde " + o.validFrom
                             + "). Cierra su vigencia antes de crear otra.",
-                            Map.of("validFrom", "Se cruza con otra regla vigente."));
+                            Map.of(VALIDFROM, "Se cruza con otra regla vigente."));
                 }
             }
         }
@@ -214,7 +225,7 @@ public class CommissionService {
             BigDecimal price = money((BigDecimal) row.get("price"));
             BigDecimal paid = money((BigDecimal) row.get("paid"));
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("treatmentItemId", ((Number) row.get("id")).longValue());
+            m.put(TREATMENTITEMID, ((Number) row.get("id")).longValue());
             m.put("doneAt", doneAt);
             m.put("patientId", ((Number) row.get("patient_id")).longValue());
             m.put("patientName", row.get("patient_name"));
@@ -223,8 +234,8 @@ public class CommissionService {
             m.put("paid", paid);
             if (row.get("settlement_id") != null) {
                 m.put("settlementId", ((Number) row.get("settlement_id")).longValue());
-                m.put("commission", money((BigDecimal) row.get("settled_amount")));
-                settledTotal = settledTotal.add((BigDecimal) m.get("commission"));
+                m.put(COMMISSION, money((BigDecimal) row.get("settled_amount")));
+                settledTotal = settledTotal.add((BigDecimal) m.get(COMMISSION));
                 settled.add(m);
                 continue;
             }
@@ -241,11 +252,11 @@ public class CommissionService {
                 unpaid.add(m);
                 continue;
             }
-            BigDecimal commission = "PORCENTAJE".equals(r.calcType)
+            BigDecimal commission = PORCENTAJE.equals(r.calcType)
                     ? money(price.multiply(r.value).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP))
                     : money(r.value);
             m.put("base", price);
-            m.put("commission", commission);
+            m.put(COMMISSION, commission);
             baseTotal = baseTotal.add(price);
             total = total.add(commission);
             eligible.add(m);
@@ -255,7 +266,7 @@ public class CommissionService {
         out.put("dentist", Map.of("id", d.id, "fullName", d.getFullName(), "specialty", d.specialty));
         out.put("from", from);
         out.put("to", to);
-        out.put("lines", eligible);
+        out.put(LINES, eligible);
         out.put("baseTotal", money(baseTotal));
         out.put("total", money(total));
         out.put("withoutRule", noRule);
@@ -263,7 +274,7 @@ public class CommissionService {
         out.put("alreadySettled", settled);
         out.put("alreadySettledTotal", money(settledTotal));
         out.put("rules", rs.stream().filter(r -> r.active).map(r -> Map.of("id", r.id, "label", r.getLabel(),
-                "validFrom", r.validFrom, "validTo", r.validTo == null ? "" : r.validTo.toString())).toList());
+                VALIDFROM, r.validFrom, "validTo", r.validTo == null ? "" : r.validTo.toString())).toList());
         return out;
     }
 
@@ -274,17 +285,17 @@ public class CommissionService {
     public Map<String, Object> settle(SettleRequest r) {
         Dentist d = dentists.lockById(dentist(r.dentistId()).id).orElseThrow();
         Map<String, Object> calc = calculate(d.id, r.from(), r.to());
-        List<Map<String, Object>> eligible = (List<Map<String, Object>>) calc.get("lines");
+        List<Map<String, Object>> eligible = (List<Map<String, Object>>) calc.get(LINES);
         Set<Long> chosen = r.itemIds() == null || r.itemIds().isEmpty() ? null : new HashSet<>(r.itemIds());
         List<Map<String, Object>> selected = eligible.stream()
-                .filter(m -> chosen == null || chosen.contains((Long) m.get("treatmentItemId"))).toList();
+                .filter(m -> chosen == null || chosen.contains((Long) m.get(TREATMENTITEMID))).toList();
         if (selected.isEmpty()) {
             throw ApiException.badRequest("SIN_COMISIONES", "No hay comisiones por liquidar con la selección y el período indicados.");
         }
         if (chosen != null && selected.size() != chosen.size()) {
             throw ApiException.conflict("SELECCION_INVALIDA", "Algunos procedimientos seleccionados ya no son liquidables (ya liquidados, sin regla o sin cobro). Vuelve a calcular.");
         }
-        BigDecimal total = selected.stream().map(m -> (BigDecimal) m.get("commission")).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = selected.stream().map(m -> (BigDecimal) m.get(COMMISSION)).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         CommissionSettlement s = new CommissionSettlement();
         s.dentist = d;
@@ -301,29 +312,29 @@ public class CommissionService {
             for (Map<String, Object> m : selected) {
                 CommissionLine l = new CommissionLine();
                 l.settlementId = s.id;
-                l.treatmentItemId = (Long) m.get("treatmentItemId");
+                l.treatmentItemId = (Long) m.get(TREATMENTITEMID);
                 l.ruleId = (Long) m.get("ruleId");
                 l.doneAt = (LocalDateTime) m.get("doneAt");
                 l.patientName = (String) m.get("patientName");
                 l.procedureName = (String) m.get("procedure");
                 l.ruleLabel = (String) m.get("rule");
                 l.baseAmount = (BigDecimal) m.get("base");
-                l.commissionAmount = (BigDecimal) m.get("commission");
+                l.commissionAmount = (BigDecimal) m.get(COMMISSION);
                 lines.save(l);
             }
             lines.flush();
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict("YA_LIQUIDADO", "Otro usuario acaba de liquidar alguno de estos procedimientos. Vuelve a calcular.");
         }
-        audit.record("LIQUIDACION", s.id, "CREAR", d.getFullName() + " · " + r.from() + " a " + r.to() + " · "
+        audit.record(LIQUIDACION, s.id, "CREAR", d.getFullName() + " · " + r.from() + " a " + r.to() + " · "
                 + selected.size() + " procedimientos · S/ " + s.totalAmount.toPlainString());
         return detail(s.id);
     }
 
     @Transactional
     public Map<String, Object> pay(Long id, PayoutRequest r) {
-        CommissionSettlement s = settlements.lockById(id).orElseThrow(() -> ApiException.notFound("La liquidación"));
-        if ("ANULADA".equals(s.status)) throw ApiException.conflict("LIQUIDACION_ANULADA", "La liquidación está anulada.");
+        CommissionSettlement s = settlements.lockById(id).orElseThrow(() -> ApiException.notFound(LA_LIQUIDACION));
+        if (ANULADA.equals(s.status)) throw ApiException.conflict("LIQUIDACION_ANULADA", "La liquidación está anulada.");
         if ("PAGADA".equals(s.status)) throw ApiException.conflict("LIQUIDACION_PAGADA", "La liquidación ya está pagada.");
         Map<String, String> e = new LinkedHashMap<>();
         BigDecimal pending = s.getPendingAmount();
@@ -352,24 +363,24 @@ public class CommissionService {
         s.paidAmount = money(s.paidAmount.add(amount));
         s.status = s.paidAmount.compareTo(s.totalAmount) >= 0 ? "PAGADA" : "PARCIAL";
         settlements.save(s);
-        audit.record("LIQUIDACION", s.id, "PAGO", s.dentist.getFullName() + " · S/ " + amount.toPlainString() + " · "
+        audit.record(LIQUIDACION, s.id, "PAGO", s.dentist.getFullName() + " · S/ " + amount.toPlainString() + " · "
                 + CashService.METHOD_LABEL.get(method) + " · estado " + s.status.toLowerCase());
         return detail(s.id);
     }
 
     @Transactional
     public Map<String, Object> annul(Long id, String reason) {
-        CommissionSettlement s = settlements.lockById(id).orElseThrow(() -> ApiException.notFound("La liquidación"));
-        if ("ANULADA".equals(s.status)) throw ApiException.conflict("LIQUIDACION_ANULADA", "La liquidación ya está anulada.");
+        CommissionSettlement s = settlements.lockById(id).orElseThrow(() -> ApiException.notFound(LA_LIQUIDACION));
+        if (ANULADA.equals(s.status)) throw ApiException.conflict("LIQUIDACION_ANULADA", "La liquidación ya está anulada.");
         if (s.paidAmount.signum() > 0) {
             throw ApiException.conflict("LIQUIDACION_CON_PAGOS", "No se puede anular una liquidación con pagos registrados.");
         }
         if (reason == null || reason.trim().length() < 5) throw ApiException.field("reason", "Explica el motivo de la anulación.");
         lines.deleteBySettlementId(s.id);   // libera los procedimientos para una nueva liquidación
-        s.status = "ANULADA";
+        s.status = ANULADA;
         s.notes = (s.notes == null ? "" : s.notes + " · ") + "Anulada: " + reason.trim();
         settlements.save(s);
-        audit.record("LIQUIDACION", s.id, "ANULAR", s.dentist.getFullName() + " · " + reason.trim());
+        audit.record(LIQUIDACION, s.id, "ANULAR", s.dentist.getFullName() + " · " + reason.trim());
         return detail(s.id);
     }
 
@@ -381,10 +392,10 @@ public class CommissionService {
     }
 
     public Map<String, Object> detail(Long id) {
-        CommissionSettlement s = settlements.findById(id).orElseThrow(() -> ApiException.notFound("La liquidación"));
+        CommissionSettlement s = settlements.findById(id).orElseThrow(() -> ApiException.notFound(LA_LIQUIDACION));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("settlement", s);
-        m.put("lines", lines.findBySettlementIdOrderByDoneAtAsc(id));
+        m.put(LINES, lines.findBySettlementIdOrderByDoneAtAsc(id));
         m.put("payouts", payouts.findBySettlementIdOrderByPaidOnAsc(id));
         return m;
     }
@@ -395,12 +406,12 @@ public class CommissionService {
         for (Dentist d : dentists.findAvailable()) {
             BigDecimal pending = BigDecimal.ZERO, paid = BigDecimal.ZERO;
             for (CommissionSettlement s : listSettlements(d.id, null)) {
-                if ("ANULADA".equals(s.status)) continue;
+                if (ANULADA.equals(s.status)) continue;
                 pending = pending.add(s.getPendingAmount());
                 paid = paid.add(s.paidAmount);
             }
             long activeRules = rules.findByDentistIdOrderByValidFromDesc(d.id).stream().filter(r -> r.appliesOn(Dates.today())).count();
-            out.add(Map.of("dentistId", d.id, "fullName", d.getFullName(), "specialty", d.specialty, "color", d.color,
+            out.add(Map.of(DENTISTID, d.id, "fullName", d.getFullName(), "specialty", d.specialty, "color", d.color,
                     "pending", money(pending), "paid", money(paid), "activeRules", activeRules));
         }
         return out;

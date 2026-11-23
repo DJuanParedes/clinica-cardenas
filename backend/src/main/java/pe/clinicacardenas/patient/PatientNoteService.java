@@ -20,6 +20,8 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/patients/{patientId}")
 public class PatientNoteService {
+    private static final String PACIENTE = "PACIENTE";
+
 
     private final JdbcTemplate jdbc;
     private final AuditService audit;
@@ -64,7 +66,7 @@ public class PatientNoteService {
             throw ApiException.badRequest("DEMASIADAS_NOTAS", "Máximo 20 notas por paciente: borra las que ya no sirven.");
         jdbc.update("insert into patient_notes (patient_id, text, tone, pinned, created_by, created_at) values (?, ?, ?, ?, ?, ?)",
                 patientId, c.text, c.tone, c.pinned, CurrentUser.usernameOrSystem(), Dates.now());
-        audit.record("PACIENTE", patientId, "NOTA", "Agregó una nota: " + c.text);
+        audit.record(PACIENTE, patientId, "NOTA", "Agregó una nota: " + c.text);
         return flags(patientId);
     }
 
@@ -75,7 +77,7 @@ public class PatientNoteService {
         Clean c = clean(r);
         if (jdbc.update("update patient_notes set text = ?, tone = ?, pinned = ?, updated_by = ?, updated_at = ? where id = ? and patient_id = ? and deleted_at is null",
                 c.text, c.tone, c.pinned, CurrentUser.usernameOrSystem(), Dates.now(), id, patientId) == 0) throw ApiException.notFound("La nota");
-        audit.record("PACIENTE", patientId, "NOTA", "Editó una nota: " + c.text);
+        audit.record(PACIENTE, patientId, "NOTA", "Editó una nota: " + c.text);
         return flags(patientId);
     }
 
@@ -85,7 +87,7 @@ public class PatientNoteService {
     public Map<String, Object> delete(@PathVariable Long patientId, @PathVariable Long id) {
         if (jdbc.update("update patient_notes set deleted_at = ?, deleted_by = ? where id = ? and patient_id = ? and deleted_at is null",
                 Dates.now(), CurrentUser.usernameOrSystem(), id, patientId) == 0) throw ApiException.notFound("La nota");
-        audit.record("PACIENTE", patientId, "NOTA", "Borró una nota");
+        audit.record(PACIENTE, patientId, "NOTA", "Borró una nota");
         return flags(patientId);
     }
 

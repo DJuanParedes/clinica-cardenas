@@ -14,6 +14,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/patients")
 public class PatientController {
+    private static final String CONTENT = "content";
+
 
     private final PatientService service;
     private final AppointmentRepository appointments;
@@ -45,10 +47,10 @@ public class PatientController {
         var extra = new pe.clinicacardenas.crm.SegmentFilter(null, null, null, null, null, null, visit, next, budget, debt, task, null, null, null).clean();
         Map<String, Object> r = service.search(q, page, size, mine, tag, source, extra);
         // v2.7: última y próxima cita, tarea pendiente, avance del presupuesto y saldo de cada paciente de la página
-        List<Long> ids = ((List<?>) r.get("content")).stream().map(x -> ((Patient) x).id).toList();
+        List<Long> ids = ((List<?>) r.get(CONTENT)).stream().map(x -> ((Patient) x).id).toList();
         r.put("insights", insights.forPatients(ids));
         if (!fullAccess()) {
-            r.put("content", ((List<?>) r.get("content")).stream().map(x -> reduced((Patient) x)).toList());
+            r.put(CONTENT, ((List<?>) r.get(CONTENT)).stream().map(x -> reduced((Patient) x)).toList());
             r.put("restricted", true);
         }
         return r;

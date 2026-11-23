@@ -41,6 +41,8 @@ import java.util.zip.ZipOutputStream;
 @Component
 @ConditionalOnProperty(name = "app.sunat.mode", havingValue = "soap", matchIfMissing = true)
 public class SunatSoapGateway implements SunatGateway {
+    private static final String ERROR_2 = "ERROR";
+
 
     private static final Logger log = LoggerFactory.getLogger(SunatSoapGateway.class);
     private static final String CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
@@ -101,7 +103,7 @@ public class SunatSoapGateway implements SunatGateway {
                 if (st.isPresent()) return st.get();
             }
             int n = Integer.parseInt(code);
-            return new Response(n >= 2000 && n < 4000 ? "RECHAZADO" : "ERROR", code, msg, null, environment);
+            return new Response(n >= 2000 && n < 4000 ? "RECHAZADO" : ERROR_2, code, msg, null, environment);
         }
         return error(null, "SUNAT respondió HTTP " + res.statusCode() + " sin constancia. Reintenta el envío en unos minutos.");
     }
@@ -193,7 +195,7 @@ public class SunatSoapGateway implements SunatGateway {
             if (n == 0) status = notes.isEmpty() ? "ACEPTADO" : "OBSERVADO";
             else if (n >= 4000) status = "OBSERVADO";
             else if (n >= 2000) status = "RECHAZADO";
-            else status = "ERROR";
+            else status = ERROR_2;
             if (!notes.isEmpty()) desc = desc + " · Observaciones: " + String.join("; ", notes);
             return new Response(status, code, desc, cdr, environment);
         } catch (Exception e) {
@@ -203,7 +205,7 @@ public class SunatSoapGateway implements SunatGateway {
 
     private Response error(String code, String msg) {
         log.warn("SUNAT: {}", msg);
-        return new Response("ERROR", code, msg, null, environment);
+        return new Response(ERROR_2, code, msg, null, environment);
     }
 
     String fileName(Invoice inv) {

@@ -23,6 +23,10 @@ import java.util.*;
 
 @Service
 public class PatientService {
+    private static final String DOCNUMBER = "docNumber";
+    private static final String FIRSTNAME = "firstName";
+    private static final String LASTNAME = "lastName";
+
 
     private final PatientRepository repo;
     private final AppointmentRepository appointments;
@@ -108,22 +112,22 @@ public class PatientService {
                 for (String t : query.toLowerCase().split("\\s+")) {
                     if (t.isBlank()) continue;
                     String like = "%" + t.replace("%", "").replace("_", "") + "%";
-                    ps.add(cb.or(cb.like(cb.lower(root.<String>get("firstName")), like), cb.like(cb.lower(root.<String>get("lastName")), like),
-                            cb.like(root.<String>get("docNumber"), like)));
+                    ps.add(cb.or(cb.like(cb.lower(root.<String>get(FIRSTNAME)), like), cb.like(cb.lower(root.<String>get(LASTNAME)), like),
+                            cb.like(root.<String>get(DOCNUMBER), like)));
                 }
                 return cb.and(ps.toArray(new Predicate[0]));
             };
             mode = "mis-pacientes";
-            result = repo.findAll(own.and(text).and(filter), pr.withSort(Sort.by("lastName", "firstName")));
+            result = repo.findAll(own.and(text).and(filter), pr.withSort(Sort.by(LASTNAME, FIRSTNAME)));
         } else if (query.isEmpty()) {
             mode = "recientes";
             result = repo.findAll(filter, pr.withSort(Sort.by(Sort.Direction.DESC, "createdAt")));
         } else if (query.matches("^[0-9A-Za-z]{5,15}$") && query.chars().anyMatch(Character::isDigit)) {
             mode = "documento";
             String doc = PatientValidator.normalizeDoc(query);
-            Specification<Patient> spec = (root, cq, cb) -> cb.or(cb.like(root.<String>get("docNumber"), doc + "%"),
+            Specification<Patient> spec = (root, cq, cb) -> cb.or(cb.like(root.<String>get(DOCNUMBER), doc + "%"),
                     cb.equal(root.<String>get("hcNumber"), query));
-            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by("docNumber")));
+            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by(DOCNUMBER)));
         } else {
             mode = "nombre";
             String[] tokens = query.toLowerCase().split("\\s+");
@@ -132,12 +136,12 @@ public class PatientService {
                 for (String t : tokens) {
                     if (t.isBlank()) continue;
                     String like = "%" + t.replace("%", "").replace("_", "") + "%";
-                    ps.add(cb.or(cb.like(cb.lower(root.<String>get("firstName")), like),
-                                 cb.like(cb.lower(root.<String>get("lastName")), like)));
+                    ps.add(cb.or(cb.like(cb.lower(root.<String>get(FIRSTNAME)), like),
+                                 cb.like(cb.lower(root.<String>get(LASTNAME)), like)));
                 }
                 return cb.and(ps.toArray(new Predicate[0]));
             };
-            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by("lastName", "firstName")));
+            result = repo.findAll(spec.and(filter), pr.withSort(Sort.by(LASTNAME, FIRSTNAME)));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("mode", mode);
@@ -201,7 +205,7 @@ public class PatientService {
         m.put("exists", dup);
         if (dup) {
             Patient p = found.get();
-            m.put("patient", Map.of("id", p.id, "fullName", p.getFullName(), "docNumber", p.docNumber));
+            m.put("patient", Map.of("id", p.id, "fullName", p.getFullName(), DOCNUMBER, p.docNumber));
         }
         return m;
     }
@@ -241,7 +245,7 @@ public class PatientService {
         repo.findByDocTypeAndDocNumber(type, doc).ifPresent(existing -> {
             throw ApiException.conflict("PACIENTE_DUPLICADO",
                     "Ya existe un paciente con " + type + " " + doc + ": " + existing.getFullName() + ".",
-                    Map.of("docNumber", "Documento ya registrado.", "existingId", String.valueOf(existing.id)));
+                    Map.of(DOCNUMBER, "Documento ya registrado.", "existingId", String.valueOf(existing.id)));
         });
         Patient p = new Patient();
         apply(p, in);

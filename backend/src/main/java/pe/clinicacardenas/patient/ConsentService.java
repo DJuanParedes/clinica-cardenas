@@ -22,6 +22,8 @@ import java.util.Map;
  */
 @Service
 public class ConsentService {
+    private static final String PRIVACIDAD = "PRIVACIDAD";
+
 
     private final JdbcTemplate jdbc;
     private final PatientRepository patients;
@@ -63,7 +65,7 @@ public class ConsentService {
     /** Aceptación registrada por el personal en recepción (presencial). */
     @Transactional
     public void recordInitial(Patient p) {
-        record(p, "PRIVACIDAD", "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
+        record(p, PRIVACIDAD, "PRESENCIAL", CurrentUser.usernameOrSystem(), null);
     }
 
     @Transactional
@@ -73,7 +75,7 @@ public class ConsentService {
                 insert into consent_records (patient_id, doc_code, doc_version, channel, accepted_by, registered_by, ip, accepted_at)
                 values (?, ?, ?, ?, ?, ?, ?, ?)
                 """, p.id, code, version, channel, acceptedBy(p), registeredBy, ip, Dates.now());
-        if ("PRIVACIDAD".equals(code)) {
+        if (PRIVACIDAD.equals(code)) {
             p.consentVersion = version;
             p.consentChannel = channel;
             p.consentBy = registeredBy;
@@ -107,7 +109,7 @@ public class ConsentService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("accepted", p.dataConsent);
         m.put("version", p.consentVersion);
-        m.put("currentVersion", currentVersion("PRIVACIDAD"));
+        m.put("currentVersion", currentVersion(PRIVACIDAD));
         m.put("signedFileId", p.consentFileId);
         m.put("acceptedBy", p.dataConsent ? acceptedBy(p) : null);
         m.put("records", jdbc.queryForList("""

@@ -22,6 +22,8 @@ import java.util.Map;
  */
 @RestController
 public class ConfirmationFollowupController {
+    private static final String OVERDUE = "overdue";
+
 
     private final JdbcTemplate jdbc;
     private final AgendaService agenda;
@@ -48,11 +50,11 @@ public class ConfirmationFollowupController {
             LocalDateTime start = Dates.toLocalDateTime(r.get("startAt"));
             boolean late = !start.isAfter(now.plusHours(PortalService.CONFIRM_HOURS));
             r.put("deadline", start.minusHours(PortalService.CONFIRM_HOURS));
-            r.put("overdue", late);
+            r.put(OVERDUE, late);
             if (late) overdue++;
         }
-        rows.sort((x, y) -> Boolean.compare((Boolean) y.get("overdue"), (Boolean) x.get("overdue")));
-        return Map.of("items", rows, "overdue", overdue, "total", rows.size());
+        rows.sort((x, y) -> Boolean.compare((Boolean) y.get(OVERDUE), (Boolean) x.get(OVERDUE)));
+        return Map.of("items", rows, OVERDUE, overdue, "total", rows.size());
     }
 
     public record CallResult(String result, String note) {}

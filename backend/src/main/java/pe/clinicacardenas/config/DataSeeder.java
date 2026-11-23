@@ -30,6 +30,8 @@ import java.util.*;
  */
 @Component
 public class DataSeeder implements ApplicationRunner {
+    private static final String CHACLACAYO = "Chaclacayo";
+
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
     private final String DEMO_PASSWORD;
@@ -96,13 +98,13 @@ public class DataSeeder implements ApplicationRunner {
 
     private void seedDemoData() {
         List<Patient> ps = new ArrayList<>();
-        ps.add(patient("45872196", "María Fernanda", "Quispe Huamán", "1991-03-14", "F", "987654321", "mquispe@gmail.com", "Chaclacayo"));
+        ps.add(patient("45872196", "María Fernanda", "Quispe Huamán", "1991-03-14", "F", "987654321", "mquispe@gmail.com", CHACLACAYO));
         ps.add(patient("70214583", "José Luis", "García Rojas", "1985-07-02", "M", "956123478", "jlgarcia@hotmail.com", "Lurigancho-Chosica"));
-        ps.add(patient("41236985", "Ana Lucía", "Torres Paz", "1978-11-21", "F", "944556677", null, "Chaclacayo"));
+        ps.add(patient("41236985", "Ana Lucía", "Torres Paz", "1978-11-21", "F", "944556677", null, CHACLACAYO));
         ps.add(patient("72589634", "Diego Alonso", "Chávez Medina", "2001-01-09", "M", "923874561", "dchavez@gmail.com", "Ate"));
-        ps.add(patient("46985231", "Rosa Elena", "Sánchez Villegas", "1966-05-30", "F", "961238745", null, "Chaclacayo"));
+        ps.add(patient("46985231", "Rosa Elena", "Sánchez Villegas", "1966-05-30", "F", "961238745", null, CHACLACAYO));
         ps.add(patient("73659812", "Valeria", "Ramírez Silva", "2010-09-17", "F", "912345678", "familia.ramirez@gmail.com", "Santa Eulalia"));
-        ps.add(patient("40125896", "Carlos Alberto", "Zapata Ojeda", "1972-02-11", "M", "978451236", null, "Chaclacayo"));
+        ps.add(patient("40125896", "Carlos Alberto", "Zapata Ojeda", "1972-02-11", "M", "978451236", null, CHACLACAYO));
         ps.add(patient("75896321", "Camila", "Flores Ancajima", "1998-12-03", "F", "934567812", "camila.flores@gmail.com", "Lurigancho-Chosica"));
 
         List<Dentist> ds = dentists.findAvailable();

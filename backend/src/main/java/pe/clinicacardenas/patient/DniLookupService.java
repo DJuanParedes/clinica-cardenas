@@ -28,6 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class DniLookupService {
+    private static final String CONSULTA_DNI = "CONSULTA_DNI";
+
 
     private static final Logger log = LoggerFactory.getLogger(DniLookupService.class);
 
@@ -70,14 +72,14 @@ public class DniLookupService {
             }
             if (res.statusCode() == 401 || res.statusCode() == 403) {
                 log.warn("Consulta DNI: token rechazado ({})", res.statusCode());
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "CONSULTA_DNI", "El token de consulta RENIEC fue rechazado o venció. Escribe los datos a mano y avisa al administrador.");
+                throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "El token de consulta RENIEC fue rechazado o venció. Escribe los datos a mano y avisa al administrador.");
             }
             if (res.statusCode() == 429) {
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "CONSULTA_DNI", "Se alcanzó el límite de consultas RENIEC del plan. Escribe los datos a mano.");
+                throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "Se alcanzó el límite de consultas RENIEC del plan. Escribe los datos a mano.");
             }
             if (res.statusCode() / 100 != 2) {
                 log.warn("Consulta DNI respondió {}", res.statusCode());
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "CONSULTA_DNI", "El servicio de consulta de DNI no respondió. Escribe los nombres a mano.");
+                throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "El servicio de consulta de DNI no respondió. Escribe los nombres a mano.");
             }
             JsonNode root = json.readTree(res.body());
             // Algunos proveedores envuelven la respuesta: { success, data: {...} }
@@ -91,10 +93,10 @@ public class DniLookupService {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "CONSULTA_DNI", "El servicio de consulta de DNI no respondió.");
+            throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "El servicio de consulta de DNI no respondió.");
         } catch (Exception e) {
             log.warn("Consulta DNI falló: {}", e.toString());
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "CONSULTA_DNI", "El servicio de consulta de DNI no respondió. Escribe los nombres a mano.");
+            throw new ApiException(HttpStatus.BAD_GATEWAY, CONSULTA_DNI, "El servicio de consulta de DNI no respondió. Escribe los nombres a mano.");
         }
     }
 

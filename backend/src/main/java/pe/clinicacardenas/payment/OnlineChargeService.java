@@ -39,6 +39,16 @@ import java.util.Map;
  */
 @Service
 public class OnlineChargeService {
+    private static final String COBRO_EN_LINEA = "COBRO_EN_LINEA";
+    private static final String PENDIENTE = "PENDIENTE";
+    private static final String AMOUNT = "amount";
+    private static final String APPROVED = "approved";
+    private static final String DESCRIPTION = "description";
+    private static final String EXPIRES_AT = "expires_at";
+    private static final String PATIENT_ID = "patient_id";
+    private static final String STATUS = "status";
+    private static final String TREATMENT_ITEM_ID = "treatment_item_id";
+
 
     private static final Logger log = LoggerFactory.getLogger(OnlineChargeService.class);
     private static final int MINUTES_VALID = 60;
@@ -94,8 +104,8 @@ public class OnlineChargeService {
         if (!enabled()) throw ApiException.conflict("PAGOS_NO_CONFIGURADOS", (String) config().get("message"));
         Patient p = patients.findById(r.patientId() == null ? -1L : r.patientId()).orElseThrow(() -> ApiException.notFound("El paciente"));
         BigDecimal amount = r.amount() == null ? null : r.amount().setScale(2, RoundingMode.HALF_UP);
-        if (amount == null || amount.signum() <= 0) throw ApiException.field("amount", "Ingresa un importe mayor a cero.");
-        if (amount.compareTo(new BigDecimal("50000")) > 0) throw ApiException.field("amount", "El importe supera el máximo permitido (S/ 50 000).");
+        if (amount == null || amount.signum() <= 0) throw ApiException.field(AMOUNT, "Ingresa un importe mayor a cero.");
+        if (amount.compareTo(new BigDecimal("50000")) > 0) throw ApiException.field(AMOUNT, "El importe supera el máximo permitido (S/ 50 000).");
         String concept = "Pago a cuenta";
         if (r.treatmentItemId() != null) {
             List<Map<String, Object>> rows = jdbc.queryForList("""
@@ -106,12 +116,12 @@ public class OnlineChargeService {
                       join procedures pr on pr.id = ti.procedure_id
                      where ti.id = ?
                     """, r.treatmentItemId());
-            if (rows.isEmpty() || ((Number) rows.get(0).get("patient_id")).longValue() != p.id) {
+            if (rows.isEmpty() || ((Number) rows.get(0).get(PATIENT_ID)).longValue() != p.id) {
                 throw ApiException.badRequest("ITEM_AJENO", "El procedimiento no pertenece al paciente.");
             }
             BigDecimal pending = (BigDecimal) rows.get(0).get("pending");
             if (pending.signum() <= 0) throw ApiException.conflict("ITEM_PAGADO", "Ese procedimiento ya está pagado.");
-            if (amount.compareTo(pending) > 0) throw ApiException.field("amount", "Máximo S/ " + pending.setScale(2, RoundingMode.HALF_UP).toPlainString() + " para este procedimiento.");
+            if (amount.compareTo(pending) > 0) throw ApiException.field(AMOUNT, "Máximo S/ " + pending.setScale(2, RoundingMode.HALF_UP).toPlainString() + " para este procedimiento.");
             concept = (String) rows.get(0).get("name");
         }
         String description = r.description() != null && !r.description().isBlank() ? r.description().trim() : concept;
@@ -164,7 +174,7 @@ public class OnlineChargeService {
             body.put("notification_url", publicUrl + "/api/public/mercadopago/webhook?source_news=webhooks");
             String back = publicUrl + "/pago/resultado?ref=" + reference(id);
             body.put("back_urls", Map.of("success", back, "pending", back, "failure", back));
-            body.put("auto_return", "approved");
+            body.put("auto_return", APPROVED);
         }
         JsonNode pref;
         try {
@@ -176,7 +186,7 @@ public class OnlineChargeService {
         String url = mp.testMode() && pref.hasNonNull("sandbox_init_point") ? pref.get("sandbox_init_point").asText() : pref.path("init_point").asText();
         jdbc.update("update online_charges set preference_id = ?, checkout_url = ?, updated_at = ? where id = ?",
                 pref.path("id").asText(), url, Dates.now(), id);
-        audit.record("COBRO_EN_LINEA", id, "CREAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · " + desc);
+        audit.record(COBRO_EN_LINEA, id, "CREAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · " + desc);
         return view(id);
     }
 
@@ -186,7 +196,7 @@ public class OnlineChargeService {
         BigDecimal balance = bal instanceof BigDecimal b ? b : new BigDecimal(String.valueOf(bal));
         if (balance.signum() <= 0) throw ApiException.conflict("SIN_DEUDA", "No tienes saldo pendiente.");
         if (amount != null && amount.compareTo(balance) > 0) {
-            throw ApiException.field("amount", "El monto supera tu saldo pendiente (S/ " + balance.setScale(2, RoundingMode.HALF_UP).toPlainString() + ").");
+            throw ApiException.field(AMOUNT, "El monto supera tu saldo pendiente (S/ " + balance.setScale(2, RoundingMode.HALF_UP).toPlainString() + ").");
         }
         return create(new CreateRequest(patientId, null, amount == null ? balance : amount, "Pago de tratamiento dental"), "APP");
     }
@@ -196,13 +206,13 @@ public class OnlineChargeService {
     /** Estado del cobro; si sigue pendiente, pregunta a Mercado Pago (funciona aunque el webhook no llegue). */
     public Map<String, Object> status(long id, Long onlyPatientId) {
         Map<String, Object> c = row(id);
-        if (onlyPatientId != null && ((Number) c.get("patient_id")).longValue() != onlyPatientId) throw ApiException.notFound("El cobro");
-        if ("PENDIENTE".equals(c.get("status")) && enabled()) {
+        if (onlyPatientId != null && ((Number) c.get(PATIENT_ID)).longValue() != onlyPatientId) throw ApiException.notFound("El cobro");
+        if (PENDIENTE.equals(c.get(STATUS)) && enabled()) {
             try {
                 JsonNode found = mp.searchByReference(reference(id)).path("results");
                 JsonNode best = null;
                 for (JsonNode pay : found) {
-                    if ("approved".equals(pay.path("status").asText())) { best = pay; break; }
+                    if (APPROVED.equals(pay.path(STATUS).asText())) { best = pay; break; }
                     if (best == null) best = pay;
                 }
                 if (best != null) apply(best);
@@ -210,7 +220,7 @@ public class OnlineChargeService {
                 log.warn("No se pudo consultar el cobro {} en Mercado Pago: {}", id, e.getMessage());
             }
             c = row(id);
-            if ("PENDIENTE".equals(c.get("status")) && ((LocalDateTime) c.get("expires_at")).isBefore(Dates.now())) {
+            if (PENDIENTE.equals(c.get(STATUS)) && ((LocalDateTime) c.get(EXPIRES_AT)).isBefore(Dates.now())) {
                 jdbc.update("update online_charges set status = 'VENCIDO', updated_at = ? where id = ? and status = 'PENDIENTE'", Dates.now(), id);
             }
         }
@@ -219,19 +229,19 @@ public class OnlineChargeService {
 
     public Map<String, Object> cancel(long id) {
         Map<String, Object> c = status(id, null);
-        if (!"PENDIENTE".equals(c.get("status"))) throw ApiException.conflict("COBRO_CERRADO", "Este cobro ya no está pendiente (" + c.get("statusLabel") + ").");
+        if (!PENDIENTE.equals(c.get(STATUS))) throw ApiException.conflict("COBRO_CERRADO", "Este cobro ya no está pendiente (" + c.get("statusLabel") + ").");
         jdbc.update("update online_charges set status = 'CANCELADO', updated_at = ? where id = ? and status = 'PENDIENTE'", Dates.now(), id);
-        audit.record("COBRO_EN_LINEA", id, "CANCELAR", "Link de pago anulado");
+        audit.record(COBRO_EN_LINEA, id, "CANCELAR", "Link de pago anulado");
         return view(id);
     }
 
     /** Envía el link de pago al WhatsApp del paciente. */
     public Map<String, Object> sendWhatsapp(long id) {
         Map<String, Object> c = status(id, null);
-        if (!"PENDIENTE".equals(c.get("status"))) throw ApiException.conflict("COBRO_CERRADO", "Este cobro ya no está pendiente.");
+        if (!PENDIENTE.equals(c.get(STATUS))) throw ApiException.conflict("COBRO_CERRADO", "Este cobro ya no está pendiente.");
         Patient p = patients.findById(((Number) c.get("patientId")).longValue()).orElseThrow(() -> ApiException.notFound("El paciente"));
-        String text = "Hola " + p.firstName + ", te enviamos el link para pagar *S/ " + ((BigDecimal) c.get("amount")).toPlainString()
-                + "* (" + c.get("description") + ") en Clínica Dental Cárdenas.\n\nPuedes pagar con tarjeta o Yape en la página segura de Mercado Pago:\n"
+        String text = "Hola " + p.firstName + ", te enviamos el link para pagar *S/ " + ((BigDecimal) c.get(AMOUNT)).toPlainString()
+                + "* (" + c.get(DESCRIPTION) + ") en Clínica Dental Cárdenas.\n\nPuedes pagar con tarjeta o Yape en la página segura de Mercado Pago:\n"
                 + c.get("checkoutUrl") + "\n\nEl link vence en " + MINUTES_VALID + " minutos.";
         conversations.send(p.phone, new ConversationService.SendRequest(text));
         return Map.of("sent", true, "phone", p.phone);
@@ -263,7 +273,7 @@ public class OnlineChargeService {
         long id;
         try { id = Long.parseLong(ref.substring(3)); } catch (NumberFormatException e) { return; }
         String mpId = pay.path("id").asText();
-        String st = pay.path("status").asText();
+        String st = pay.path(STATUS).asText();
         String detail = pay.path("status_detail").asText(null);
         String methodId = pay.path("payment_method_id").asText("");
         String typeId = pay.path("payment_type_id").asText("");
@@ -274,22 +284,22 @@ public class OnlineChargeService {
             if (rows.isEmpty()) return;
             Map<String, Object> c = rows.get(0);
             if (c.get("payment_id") != null) return;   // ya registrado
-            if ("approved".equals(st)) {
-                if (((BigDecimal) c.get("amount")).compareTo(paidAmount) != 0) {
-                    log.warn("Cobro {}: Mercado Pago aprobó S/ {} y se esperaba S/ {}", id, paidAmount, c.get("amount"));
+            if (APPROVED.equals(st)) {
+                if (((BigDecimal) c.get(AMOUNT)).compareTo(paidAmount) != 0) {
+                    log.warn("Cobro {}: Mercado Pago aprobó S/ {} y se esperaba S/ {}", id, paidAmount, c.get(AMOUNT));
                 }
-                Long itemId = c.get("treatment_item_id") == null ? null : ((Number) c.get("treatment_item_id")).longValue();
+                Long itemId = c.get(TREATMENT_ITEM_ID) == null ? null : ((Number) c.get(TREATMENT_ITEM_ID)).longValue();
                 String method = "yape".equalsIgnoreCase(methodId) ? "YAPE"
                         : "bank_transfer".equals(typeId) || "account_money".equals(typeId) ? "TRANSFERENCIA" : "TARJETA";
                 String reference = "MP-" + mpId;
                 String notes = "Mercado Pago · " + labelMethod(methodId, typeId) + " · operación " + mpId;
                 Map<String, Object> reg;
                 try {
-                    reg = cash.registerPayment(new CashService.PaymentRequest(((Number) c.get("patient_id")).longValue(), itemId,
+                    reg = cash.registerPayment(new CashService.PaymentRequest(((Number) c.get(PATIENT_ID)).longValue(), itemId,
                             paidAmount, method, reference, notes));
                 } catch (ApiException e) {
                     // El dinero ya entró: si el procedimiento se pagó por otro lado mientras tanto, queda como pago a cuenta.
-                    reg = cash.registerPayment(new CashService.PaymentRequest(((Number) c.get("patient_id")).longValue(), null,
+                    reg = cash.registerPayment(new CashService.PaymentRequest(((Number) c.get(PATIENT_ID)).longValue(), null,
                             paidAmount, method, reference, notes + " (a cuenta: " + e.getMessage() + ")"));
                 }
                 Object payment = reg.get("payment");
@@ -298,7 +308,7 @@ public class OnlineChargeService {
                         update online_charges set status = 'APROBADO', mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
                                mp_method = ?, payment_id = ?, updated_at = ? where id = ?
                         """, mpId, st, detail, methodId, paymentId, Dates.now(), id);
-                audit.record("COBRO_EN_LINEA", id, "APROBADO", "Mercado Pago " + mpId + " · S/ " + paidAmount.toPlainString());
+                audit.record(COBRO_EN_LINEA, id, "APROBADO", "Mercado Pago " + mpId + " · S/ " + paidAmount.toPlainString());
             } else if ("rejected".equals(st) || "cancelled".equals(st)) {
                 jdbc.update("update online_charges set mp_status = ?, mp_status_detail = ?, mp_method = ?, updated_at = ? where id = ? and status = 'PENDIENTE'",
                         st, detail, methodId, Dates.now(), id);
@@ -319,22 +329,22 @@ public class OnlineChargeService {
         List<Map<String, Object>> rows = jdbc.queryForList("select * from online_charges where id = ?", id);
         if (rows.isEmpty()) throw ApiException.notFound("El cobro");
         Map<String, Object> c = rows.get(0);
-        Object exp = c.get("expires_at");
-        if (exp instanceof Timestamp t) c.put("expires_at", t.toLocalDateTime());
+        Object exp = c.get(EXPIRES_AT);
+        if (exp instanceof Timestamp t) c.put(EXPIRES_AT, t.toLocalDateTime());
         return c;
     }
 
     private Map<String, Object> view(long id) {
         Map<String, Object> c = row(id);
-        String st = (String) c.get("status");
+        String st = (String) c.get(STATUS);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", id);
         m.put("reference", reference(id));
-        m.put("patientId", c.get("patient_id"));
-        m.put("treatmentItemId", c.get("treatment_item_id"));
-        m.put("amount", c.get("amount"));
-        m.put("description", c.get("description"));
-        m.put("status", st);
+        m.put("patientId", c.get(PATIENT_ID));
+        m.put("treatmentItemId", c.get(TREATMENT_ITEM_ID));
+        m.put(AMOUNT, c.get(AMOUNT));
+        m.put(DESCRIPTION, c.get(DESCRIPTION));
+        m.put(STATUS, st);
         m.put("statusLabel", switch (st) {
             case "APROBADO" -> "Pagado";
             case "CANCELADO" -> "Anulado";
@@ -347,7 +357,7 @@ public class OnlineChargeService {
         m.put("mpStatusDetail", c.get("mp_status_detail"));
         m.put("method", c.get("mp_method"));
         m.put("paymentId", c.get("payment_id"));
-        m.put("expiresAt", c.get("expires_at"));
+        m.put("expiresAt", c.get(EXPIRES_AT));
         m.put("createdAt", c.get("created_at"));
         m.put("source", c.get("source"));
         m.put("testMode", mp.testMode());
