@@ -57,6 +57,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+        }
+        // Pruebas de la capa de datos sobre una base SQLite real (en memoria) en la JVM.
+        val androidUnitTest by getting {
+            dependencies { implementation(libs.sqldelight.sqlite.driver) }
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
