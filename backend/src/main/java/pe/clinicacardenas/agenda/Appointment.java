@@ -28,6 +28,8 @@ public class Appointment {
     public int durationMin;
 
     public String reason;
+    /** v2.10: categoría del procedimiento (Diagnóstico, Prevención, Ortodoncia...). */
+    public String category;
     public String notes;
 
     @Enumerated(EnumType.STRING)
