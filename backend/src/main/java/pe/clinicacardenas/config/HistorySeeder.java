@@ -159,7 +159,7 @@ public class HistorySeeder {
                 }
                 a.reason = (pr == null ? reasonsByCode[rnd.nextInt(reasonsByCode.length)] : pr.name);
                 a.status = st;
-                a.createdAt = at.minusDays(2 + rnd.nextInt(6));
+                a.createdAt = at.minusDays(2L + rnd.nextInt(6));
                 a.createdBy = "recepcion";
                 if (st == AppointmentStatus.CANCELADA) a.statusReason = pick(cancelReasons);
                 if (st == AppointmentStatus.ATENDIDA) a.arrivedAt = at.minusMinutes(rnd.nextInt(12));
@@ -182,7 +182,7 @@ public class HistorySeeder {
                 it.procedure = pr;
                 it.price = pr.price;
                 it.status = "REALIZADO";
-                it.doneAt = at.plusMinutes(a.durationMin - 5);
+                it.doneAt = at.plusMinutes(a.durationMin - 5L);
                 it.doneByDentistId = d.id;
                 it.sortOrder = 100 + created;
                 items.save(it);
@@ -264,12 +264,12 @@ public class HistorySeeder {
         for (int k = 4; k >= 0; k--) {
             LocalDate month = today.minusMonths(k).withDayOfMonth(1);
             addExpense(month.plusDays(1), "ALQUILER", "Alquiler del local · Urb. La Floresta", 2500, "TRANSFERENCIA", "Inmobiliaria Los Cóndores S.A.C.");
-            addExpense(month.plusDays(9), "SERVICIOS", "Luz, agua e internet", 380 + rnd.nextInt(90), "TRANSFERENCIA", "Luz del Sur / Sedapal / Movistar");
-            addExpense(month.plusDays(4), "INSUMOS", "Resinas, anestésicos y descartables", 650 + rnd.nextInt(500), "TARJETA", "Dental Perú Import");
-            addExpense(month.plusDays(18), "INSUMOS", "Guantes, mascarillas y material de esterilización", 280 + rnd.nextInt(200), "EFECTIVO", "Distribuidora Médica Chosica");
-            addExpense(month.plusDays(12), "LABORATORIO", "Coronas y prótesis", 420 + rnd.nextInt(700), "TRANSFERENCIA", "Laboratorio Dental Sonrisa");
+            addExpense(month.plusDays(9), "SERVICIOS", "Luz, agua e internet", 380.0 + rnd.nextInt(90), "TRANSFERENCIA", "Luz del Sur / Sedapal / Movistar");
+            addExpense(month.plusDays(4), "INSUMOS", "Resinas, anestésicos y descartables", 650.0 + rnd.nextInt(500), "TARJETA", "Dental Perú Import");
+            addExpense(month.plusDays(18), "INSUMOS", "Guantes, mascarillas y material de esterilización", 280.0 + rnd.nextInt(200), "EFECTIVO", "Distribuidora Médica Chosica");
+            addExpense(month.plusDays(12), "LABORATORIO", "Coronas y prótesis", 420.0 + rnd.nextInt(700), "TRANSFERENCIA", "Laboratorio Dental Sonrisa");
             addExpense(month.plusDays(27), "PLANILLA", "Remuneración de asistente dental", 1300, "TRANSFERENCIA", null);
-            if (k % 2 == 0) addExpense(month.plusDays(15), "MANTENIMIENTO", "Mantenimiento de autoclave y compresor", 220 + rnd.nextInt(150), "EFECTIVO", "Servitec Dental");
+            if (k % 2 == 0) addExpense(month.plusDays(15), "MANTENIMIENTO", "Mantenimiento de autoclave y compresor", 220.0 + rnd.nextInt(150), "EFECTIVO", "Servitec Dental");
             if (k == 1) addExpense(month.plusDays(20), "MARKETING", "Publicidad en Facebook e Instagram", 300, "TARJETA", "Meta Platforms");
         }
     }

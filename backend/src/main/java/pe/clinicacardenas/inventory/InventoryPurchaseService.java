@@ -105,7 +105,7 @@ public class InventoryPurchaseService {
             ps.setString(11, CurrentUser.usernameOrSystem());
             return ps;
         }, kh);
-        long id = kh.getKey().longValue();
+        long id = java.util.Objects.requireNonNull(kh.getKey()).longValue();
 
         for (Line l : r.lines()) {
             InventoryItem i = items.lockById(l.itemId()).orElseThrow(() -> ApiException.notFound("El material"));

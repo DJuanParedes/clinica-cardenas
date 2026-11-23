@@ -79,6 +79,9 @@ public class MaterialPhotoSeeder {
                 if (path == null) continue;
                 jdbc.update("update inventory_items set image_path = ? where id = ? and image_path is null", path, it.get("id"));
                 done++;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             } catch (Exception e) {
                 log.info("Fotos de materiales: sin conexión con Wikimedia ({}); se intentará en el próximo arranque.", e.getClass().getSimpleName());
                 return;

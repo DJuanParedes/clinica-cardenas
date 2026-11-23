@@ -296,7 +296,7 @@ public class ReportService {
                 pendingDetail.add(x);
             }
         }
-        long total = done.size() + pending.size();
+        long total = (long) done.size() + pending.size();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("from", from);
         m.put("to", to);

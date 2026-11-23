@@ -132,6 +132,7 @@ public class ComplaintService {
         String request = clean(r.request(), 2000);
         if (request == null || request.length() < 5) e.put("request", "Indica qué solicitas.");
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos marcados.", e);
+        java.util.Objects.requireNonNull(name);
 
         LocalDateTime now = Dates.now();
         int year = now.getYear();
@@ -579,6 +580,7 @@ public class ComplaintService {
     }
 
     private static String cut(String s, int max) {
+        if (s == null) return "";
         return s.length() > max ? s.substring(0, max - 1) + "…" : s;
     }
 

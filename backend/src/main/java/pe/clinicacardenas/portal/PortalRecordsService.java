@@ -216,7 +216,7 @@ public class PortalRecordsService {
 
     @Transactional
     public List<Map<String, Object>> createRequest(Long patientId, NewFileRequest r) {
-        patients.findById(patientId).orElseThrow(() -> ApiException.notFound("El paciente"));
+        if (!patients.existsById(patientId)) throw ApiException.notFound("El paciente");
         String title = r.title() == null ? "" : r.title().trim();
         if (title.length() < 3) throw ApiException.field("title", "Indica qué archivo necesitas (por ejemplo, radiografía panorámica).");
         String kind = r.kind() == null || r.kind().isBlank() ? "RADIOGRAFIA" : r.kind().trim().toUpperCase();

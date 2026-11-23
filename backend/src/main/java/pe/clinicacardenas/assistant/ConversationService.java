@@ -128,7 +128,8 @@ public class ConversationService {
         } else if (!Objects.equals(t.get("patient_id") == null ? null : ((Number) t.get("patient_id")).longValue(), pid)) {
             jdbc.update("update wa_threads set patient_id = ?, display_name = ? where phone = ?", pid, name, phone);
         }
-        return thread(phone);
+        Map<String, Object> created = thread(phone);
+        return created == null ? Map.of() : created;
     }
 
     private long record(String phone, String direction, String source, String body, String intent, String engine, String status, String author) {
@@ -273,6 +274,9 @@ public class ConversationService {
             Map<?, ?> m = res.body() == null || res.body().isBlank() ? Map.of() : json.readValue(res.body(), Map.class);
             if (res.statusCode() / 100 == 2 && !"FALLIDO".equals(m.get("estado"))) status = "ENVIADO";
             else error = m.get("error") == null ? "HTTP " + res.statusCode() : String.valueOf(m.get("error"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            error = "El servicio de mensajes no respondió";
         } catch (Exception e) {
             error = "El servicio de mensajes no respondió";
         }

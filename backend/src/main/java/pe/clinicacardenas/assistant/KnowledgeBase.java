@@ -49,7 +49,7 @@ public class KnowledgeBase {
     final String clinic;
     final String address;
     final String phone;
-    private volatile List<TextSearch.Doc> cache = List.of();
+    private final java.util.concurrent.atomic.AtomicReference<List<TextSearch.Doc>> cache = new java.util.concurrent.atomic.AtomicReference<>(List.of());
     private volatile long cachedAt = 0;
 
     public KnowledgeBase(JdbcTemplate jdbc,
@@ -65,7 +65,7 @@ public class KnowledgeBase {
     public void invalidate() { cachedAt = 0; }
 
     public List<TextSearch.Doc> docs() {
-        if (System.currentTimeMillis() - cachedAt < 60_000 && !cache.isEmpty()) return cache;
+        if (System.currentTimeMillis() - cachedAt < 60_000 && !cache.get().isEmpty()) return cache.get();
         List<TextSearch.Doc> d = new ArrayList<>();
         d.add(new TextSearch.Doc("clinica", "CLINICA", "Dirección, ubicación y teléfono de la clínica",
                 clinic + " queda en " + address + ". Teléfono y WhatsApp: " + phone + "."));
@@ -91,9 +91,9 @@ public class KnowledgeBase {
         for (Map<String, Object> r : jdbc.queryForList("select id, question, answer from assistant_faq where active = true")) {
             d.add(new TextSearch.Doc("faq-" + r.get("id"), "FAQ", (String) r.get("question"), (String) r.get("answer")));
         }
-        cache = List.copyOf(d);
+        cache.set(List.copyOf(d));
         cachedAt = System.currentTimeMillis();
-        return cache;
+        return cache.get();
     }
 
     String horarioDe(long dentistId) {

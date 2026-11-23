@@ -61,7 +61,7 @@ public class SupplyRequestService {
                 r.itemId(), r.itemId() == null ? text : null, r.quantity().setScale(2, RoundingMode.HALF_UP), urgency,
                 r.note() == null || r.note().isBlank() ? null : r.note().trim(), CurrentUser.usernameOrSystem(), Dates.now());
         Long id = jdbc.queryForObject("select last_insert_id()", Long.class);
-        audit.record("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).get().name) + " × " + r.quantity());
+        audit.record("SOLICITUD_INSUMO", id, "CREAR", (r.itemId() == null ? text : items.findById(r.itemId()).map(x -> x.name).orElse(text)) + " × " + r.quantity());
         return get(id);
     }
 

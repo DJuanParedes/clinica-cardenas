@@ -187,6 +187,7 @@ public class CashService {
         }
         if (reference != null && reference.length() > 40) e.put("reference", "Máximo 40 caracteres.");
         if (!e.isEmpty()) throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del cobro.", e);
+        java.util.Objects.requireNonNull(amount);
 
         String concept = "A cuenta";
         if (r.treatmentItemId() != null) {
@@ -275,6 +276,7 @@ public class CashService {
         String method = r.method() == null ? null : r.method().trim().toUpperCase();
         if (method == null || !METHODS.contains(method)) e.put("method", "Selecciona cómo se pagó.");
         if (!e.isEmpty()) throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del egreso.", e);
+        java.util.Objects.requireNonNull(amount);
         Expense x = new Expense();
         x.expenseDate = date;
         x.category = category;

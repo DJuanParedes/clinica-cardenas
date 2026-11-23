@@ -62,8 +62,8 @@ public class DeletionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final ObjectMapper json;
-    private volatile Map<String, List<Ref>> refs;
-    private volatile Set<String> tablesWithId;
+    private final java.util.concurrent.atomic.AtomicReference<Map<String, List<Ref>>> refs = new java.util.concurrent.atomic.AtomicReference<>();
+    private final java.util.concurrent.atomic.AtomicReference<Set<String>> tablesWithId = new java.util.concurrent.atomic.AtomicReference<>();
 
     private final org.springframework.context.ApplicationEventPublisher events;
 
@@ -105,7 +105,7 @@ public class DeletionService {
     // ------------------------------------------------------------------ esquema
 
     private void loadSchema() {
-        if (refs != null) return;
+        if (refs.get() != null) return;
         Map<String, List<Ref>> m = new HashMap<>();
         jdbc.query("""
                 select k.referenced_table_name, k.table_name, k.column_name, c.is_nullable
@@ -116,9 +116,9 @@ public class DeletionService {
             m.computeIfAbsent(rs.getString(1), x -> new ArrayList<>())
                     .add(new Ref(rs.getString(2), rs.getString(3), "YES".equals(rs.getString(4))));
         });
-        tablesWithId = new HashSet<>(jdbc.queryForList(
-                "select table_name from information_schema.columns where table_schema = database() and column_name = 'id'", String.class));
-        refs = m;
+        tablesWithId.set(new HashSet<>(jdbc.queryForList(
+                "select table_name from information_schema.columns where table_schema = database() and column_name = 'id'", String.class)));
+        refs.set(m);
     }
 
     // ------------------------------------------------------------------ plan
@@ -171,7 +171,7 @@ public class DeletionService {
 
     private void walk(String table, String pk, List<?> ids, Set<String> blockedBy, Plan p, Set<String> seen, int depth) {
         if (ids.isEmpty() || depth > 6) return;
-        for (Ref r : refs.getOrDefault(table, List.of())) {
+        for (Ref r : refs.get().getOrDefault(table, List.of())) {
             String key = r.table() + "." + r.column() + ":" + ids;
             if (!seen.add(key)) continue;
             Object[] args = ids.toArray();
@@ -200,7 +200,7 @@ public class DeletionService {
                 p.unlinked.merge(name, m, Long::sum);
                 continue;
             }
-            if (tablesWithId.contains(r.table())) {
+            if (tablesWithId.get().contains(r.table())) {
                 List<Long> child = jdbc.queryForList("select id from " + r.table() + " where " + where, Long.class, args);
                 if (child.isEmpty()) continue;
                 walk(r.table(), "id", child, Set.of(), p, seen, depth + 1);

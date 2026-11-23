@@ -86,7 +86,8 @@ public class FileService {
                               boolean share) {
         Patient p = patient(patientId);
         if (file == null || file.isEmpty()) throw ApiException.field("file", "Selecciona un archivo.");
-        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        String contentType = file.getContentType();
+        String type = contentType == null ? "" : contentType.toLowerCase();
         if ("image/jpg".equals(type)) type = "image/jpeg";
         if (!TYPES.containsKey(type)) throw ApiException.field("file", "Solo se aceptan fotos (JPG, PNG, WEBP) o PDF.");
         if (file.getSize() > maxBytes) throw ApiException.field("file", "El archivo supera " + (maxBytes / 1024 / 1024) + " MB.");

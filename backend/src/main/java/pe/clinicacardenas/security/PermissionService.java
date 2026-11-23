@@ -28,8 +28,8 @@ public class PermissionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final Map<String, Set<String>> byRole = new ConcurrentHashMap<>();
-    private volatile List<Map<String, Object>> roleRows = List.of();
-    private volatile List<Map<String, Object>> catalog = List.of();
+    private final java.util.concurrent.atomic.AtomicReference<List<Map<String, Object>>> roleRows = new java.util.concurrent.atomic.AtomicReference<>(List.of());
+    private final java.util.concurrent.atomic.AtomicReference<List<Map<String, Object>>> catalog = new java.util.concurrent.atomic.AtomicReference<>(List.of());
 
     public PermissionService(JdbcTemplate jdbc, AuditService audit) {
         this.jdbc = jdbc;
@@ -37,16 +37,16 @@ public class PermissionService {
     }
 
     private synchronized void load() {
-        catalog = jdbc.queryForList("select code, group_name as `group`, label, description from permissions order by sort_order");
+        catalog.set(jdbc.queryForList("select code, group_name as `group`, label, description from permissions order by sort_order"));
         Map<String, Set<String>> m = new HashMap<>();
         for (Role r : Role.values()) m.put(r.name(), new TreeSet<>());
-        roleRows = jdbc.queryForList("select code, name, description, base_role as baseRole, custom, hidden from roles order by custom, name");
-        for (Map<String, Object> r : roleRows) m.putIfAbsent((String) r.get("code"), new TreeSet<>());
+        roleRows.set(jdbc.queryForList("select code, name, description, base_role as baseRole, custom, hidden from roles order by custom, name"));
+        for (Map<String, Object> r : roleRows.get()) m.putIfAbsent((String) r.get("code"), new TreeSet<>());
         jdbc.query("select role_code, permission_code from role_permissions",
                 rs -> { m.computeIfAbsent(rs.getString(1), k -> new TreeSet<>()).add(rs.getString(2)); });
-        if (!catalog.isEmpty()) {
+        if (!catalog.get().isEmpty()) {
             Set<String> all = new TreeSet<>();
-            catalog.forEach(c -> all.add((String) c.get("code")));
+            catalog.get().forEach(c -> all.add((String) c.get("code")));
             m.put(LOCKED_ROLE.name(), all);
         }
         byRole.clear();
@@ -61,14 +61,14 @@ public class PermissionService {
     /** Nombre visible de un rol (base o personalizado). */
     public String label(String code) {
         if (byRole.isEmpty()) load();
-        for (Map<String, Object> r : roleRows) if (code.equals(r.get("code"))) return (String) r.get("name");
+        for (Map<String, Object> r : roleRows.get()) if (code.equals(r.get("code"))) return (String) r.get("name");
         try { return Role.valueOf(code).label; } catch (Exception e) { return code; }
     }
 
     /** Rol personalizado válido para un usuario de ese puesto (el rol debe derivar del mismo puesto). */
     public boolean isCustomFor(String code, Role base) {
         if (byRole.isEmpty()) load();
-        return roleRows.stream().anyMatch(r -> code.equals(r.get("code")) && Boolean.TRUE.equals(asBool(r.get("custom")))
+        return roleRows.get().stream().anyMatch(r -> code.equals(r.get("code")) && Boolean.TRUE.equals(asBool(r.get("custom")))
                 && base.name().equals(r.get("baseRole")));
     }
 
@@ -89,9 +89,9 @@ public class PermissionService {
         if (byRole.isEmpty()) load();
         Map<String, String> labels = new HashMap<>();
         Map<String, String> groups = new HashMap<>();
-        catalog.forEach(c -> { labels.put((String) c.get("code"), (String) c.get("label")); groups.put((String) c.get("code"), (String) c.get("group")); });
+        catalog.get().forEach(c -> { labels.put((String) c.get("code"), (String) c.get("label")); groups.put((String) c.get("code"), (String) c.get("group")); });
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : roleRows) {
+        for (Map<String, Object> r : roleRows.get()) {
             String code = (String) r.get("code");
             boolean custom = asBool(r.get("custom"));
             if (asBool(r.get("hidden"))) continue;
@@ -115,7 +115,7 @@ public class PermissionService {
     public Map<String, Object> matrix() {
         if (byRole.isEmpty()) load();
         List<Map<String, Object>> roles = new ArrayList<>();
-        for (Map<String, Object> r : roleRows) {
+        for (Map<String, Object> r : roleRows.get()) {
             String code = (String) r.get("code");
             boolean custom = asBool(r.get("custom"));
             Map<String, Object> m = new LinkedHashMap<>();
@@ -133,7 +133,7 @@ public class PermissionService {
                     : jdbc.queryForObject("select count(*) from users where role_code = ? and access_role_code is null and active = true", Long.class, code));
             roles.add(m);
         }
-        return Map.of("permissions", catalog, "roles", roles, "adminOnly", ADMIN_ONLY);
+        return Map.of("permissions", catalog.get(), "roles", roles, "adminOnly", ADMIN_ONLY);
     }
 
     /** copyFrom: código de un rol existente para copiar sus permisos, "VACIO" para empezar sin permisos, o nada para copiar el puesto base. */
@@ -152,7 +152,7 @@ public class PermissionService {
             throw ApiException.field("name", "Ya existe un rol con ese nombre.");
         }
         String slug = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "")
-                .toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("^_|_$", "");
+                .toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("(^_)|(_$)", "");
         String code = ("R_" + slug);
         if (code.length() > 17) code = code.substring(0, 17);
         String unique = code;
@@ -161,7 +161,7 @@ public class PermissionService {
                 unique, name, r.description() == null || r.description().isBlank() ? null : r.description().trim(), base.name());
         String from = r.copyFrom() == null || r.copyFrom().isBlank() ? base.name() : r.copyFrom();
         Set<String> seed = "VACIO".equals(from) ? Set.of() : new TreeSet<>(forRole(from));
-        if (!"VACIO".equals(from) && roleRows.stream().noneMatch(x -> from.equals(x.get("code")))) throw ApiException.field("copyFrom", "El rol a copiar no existe.");
+        if (!"VACIO".equals(from) && roleRows.get().stream().noneMatch(x -> from.equals(x.get("code")))) throw ApiException.field("copyFrom", "El rol a copiar no existe.");
         for (String p : seed) if (!ADMIN_ONLY.contains(p)) jdbc.update("insert into role_permissions (role_code, permission_code) values (?, ?)", unique, p);
         load();
         audit.record("ROL", null, "CREAR", name + " (basado en " + base.label + ")");
@@ -170,7 +170,7 @@ public class PermissionService {
 
     private Map<String, Object> row(String code) {
         if (byRole.isEmpty()) load();
-        return roleRows.stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El rol"));
+        return roleRows.get().stream().filter(x -> code.equals(x.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El rol"));
     }
 
     private long usersWith(String code, boolean custom) {
@@ -238,12 +238,12 @@ public class PermissionService {
     @Transactional
     public Map<String, Object> update(String roleCode, Collection<String> permissions) {
         if (byRole.isEmpty()) load();
-        if (roleRows.stream().noneMatch(x -> roleCode.equals(x.get("code")))) throw ApiException.notFound("El rol");
+        if (roleRows.get().stream().noneMatch(x -> roleCode.equals(x.get("code")))) throw ApiException.notFound("El rol");
         if (LOCKED_ROLE.name().equals(roleCode)) {
             throw ApiException.badRequest("ROL_PROTEGIDO", "El administrador conserva todos los permisos para no perder el acceso al sistema.");
         }
         Set<String> valid = new HashSet<>();
-        catalog.forEach(c -> valid.add((String) c.get("code")));
+        catalog.get().forEach(c -> valid.add((String) c.get("code")));
         Set<String> next = new TreeSet<>(permissions == null ? Set.of() : permissions);
         for (String p : next) {
             if (!valid.contains(p)) throw ApiException.field("permissions", "Permiso desconocido: " + p);
@@ -271,7 +271,7 @@ public class PermissionService {
     @Transactional
     public Map<String, Object> editPermission(String code, PermissionEdit e) {
         if (byRole.isEmpty()) load();
-        Map<String, Object> p = catalog.stream().filter(c -> code.equals(c.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El permiso"));
+        Map<String, Object> p = catalog.get().stream().filter(c -> code.equals(c.get("code"))).findFirst().orElseThrow(() -> ApiException.notFound("El permiso"));
         String label = e.label() == null ? (String) p.get("label") : e.label().trim();
         String group = e.group() == null ? (String) p.get("group") : e.group().trim();
         if (label.length() < 3 || label.length() > 120) throw ApiException.field("label", "El nombre debe tener de 3 a 120 caracteres.");

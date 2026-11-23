@@ -170,7 +170,7 @@ public class LabService {
         BigDecimal cost = jdbc.queryForObject("select coalesce(sum(o.cost),0) from lab_orders o where o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
         BigDecimal paid = jdbc.queryForObject("select coalesce(sum(pp.amount),0) from lab_order_payments pp join expenses x on x.id = pp.expense_id"
                 + " join lab_orders o on o.id = pp.order_id where x.status = 'VALIDO' and o.status <> 'ANULADA'" + pf, BigDecimal.class, pa);
-        s.put("porPagar", cost.subtract(paid).max(BigDecimal.ZERO));
+        s.put("porPagar", nz(cost).subtract(nz(paid)).max(BigDecimal.ZERO));
         return s;
     }
 
@@ -352,4 +352,5 @@ public class LabService {
         String t = s.trim().replaceAll("\\s+", " ");
         return t.length() > max ? t.substring(0, max) : t;
     }
+    private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 }

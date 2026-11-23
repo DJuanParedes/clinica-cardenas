@@ -339,6 +339,7 @@ public class CommissionService {
             e.put("reference", "Ingresa el número de operación.");
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del pago.", e);
+        java.util.Objects.requireNonNull(amount);
         CommissionPayout p = new CommissionPayout();
         p.settlementId = s.id;
         p.paidOn = on;

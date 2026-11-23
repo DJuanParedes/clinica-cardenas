@@ -249,7 +249,8 @@ public class OrthoService {
         String st = code(stage, STAGES, "stage", "Etapa no válida."), vw = code(view, VIEWS, "view", "Vista no válida.");
         String kind = Set.of("PANORAMICA", "CEFALOMETRIA").contains(vw) ? "RADIOGRAFIA" : "FOTO";
         Long patientId = ((Number) cur.get("patientId")).longValue();
-        String type = file == null || file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        String contentType = file == null ? null : file.getContentType();
+        String type = contentType == null ? "" : contentType.toLowerCase();
         if (!type.startsWith("image/")) throw ApiException.field("file", "Sube una foto (JPG, PNG o WEBP).");
         PatientFile f = files.upload(patientId, file, kind, "Ortodoncia · " + STAGES.get(st) + " · " + VIEWS.get(vw), null, null, false);
         link(id, f.id, st, vw, takenOn == null ? Dates.today() : takenOn);

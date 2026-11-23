@@ -216,7 +216,7 @@ public class InventoryService {
             ps.setObject(8, Dates.now());
             return ps;
         }, kh);
-        return kh.getKey().longValue();
+        return java.util.Objects.requireNonNull(kh.getKey()).longValue();
     }
 
     /** Descuenta de los lotes: primero el que vence antes (FEFO); los vencidos no se usan en pacientes. Devuelve el primer lote tocado. */
@@ -417,7 +417,7 @@ public class InventoryService {
         if (list != null) {
             for (SupplyRequest s : list) {
                 if (s.itemId() == null || s.quantity() == null || s.quantity().signum() <= 0) continue;
-                items.findById(s.itemId()).orElseThrow(() -> ApiException.notFound("El material"));
+                if (!items.existsById(s.itemId())) throw ApiException.notFound("El material");
                 jdbc.update("insert into procedure_supplies (procedure_id, item_id, quantity) values (?, ?, ?)",
                         procedureId, s.itemId(), s.quantity());
             }

@@ -146,6 +146,9 @@ public class SunatSoapGateway implements SunatGateway {
             return Optional.of(json.readValue(res.body(), Map.class));
         } catch (IllegalStateException e) {
             throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("La consulta RUC de SUNAT no respondió (" + reason(e) + ")");
         } catch (Exception e) {
             throw new IllegalStateException("La consulta RUC de SUNAT no respondió (" + reason(e) + ")");
         }

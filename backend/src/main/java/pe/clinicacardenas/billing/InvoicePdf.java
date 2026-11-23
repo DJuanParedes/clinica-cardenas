@@ -107,7 +107,7 @@ public final class InvoicePdf {
         for (InvoiceItem it : items) {
             String desc = it.description == null ? "" : it.description;
             List<String> lines = wrap(desc, 58);
-            float h = 8 + 12 * lines.size();
+            float h = 8f + 12f * lines.size();
             row -= h;
             pdf.text(it.quantity.stripTrailingZeros().toPlainString(), cQty, row + h - 14, 9, false, INK, 'L');
             pdf.text("SERVICIO", cUnit, row + h - 14, 8, false, MUTED, 'L');

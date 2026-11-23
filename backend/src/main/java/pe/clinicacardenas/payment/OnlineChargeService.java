@@ -138,7 +138,7 @@ public class OnlineChargeService {
             ps.setString(8, createdBy);
             return ps;
         }, key);
-        long id = key.getKey().longValue();
+        long id = java.util.Objects.requireNonNull(key.getKey()).longValue();
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", "CC-" + id);

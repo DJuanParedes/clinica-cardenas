@@ -426,7 +426,7 @@ public class LeadService {
         if (phone.startsWith("+51")) phone = phone.substring(3);
         if (!phone.isEmpty() && !phone.matches("9\\d{8}")) e.put("phone", "Celular de 9 dígitos que empiece con 9.");
         String email = r.email() == null ? "" : r.email().trim().toLowerCase();
-        if (!email.isEmpty() && !email.matches("^[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+$")) e.put("email", "Correo no válido.");
+        if (!email.isEmpty() && !pe.clinicacardenas.common.Emails.valid(email)) e.put("email", "Correo no válido.");
         if (phone.isEmpty() && email.isEmpty()) e.put("phone", "Indica un celular o un correo para poder contactarlo.");
         String source = r.source() == null ? "" : r.source().trim().toUpperCase();
         if (PatientProfileService.SOURCES.stream().noneMatch(x -> x.get("code").equals(source))) e.put("source", "Elige de dónde llegó.");

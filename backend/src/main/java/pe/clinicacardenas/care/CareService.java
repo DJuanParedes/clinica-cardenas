@@ -107,7 +107,7 @@ public class CareService {
         if (r.patientId() == null) throw ApiException.field("patientId", "Selecciona el paciente.");
         Patient p = patient(r.patientId());
         if (r.reason() == null || r.reason().isBlank()) throw ApiException.field("reason", "Indica el motivo.");
-        if (r.dentistId() != null) dentists.findById(r.dentistId()).orElseThrow(() -> ApiException.notFound("El odontólogo"));
+        if (r.dentistId() != null && !dentists.existsById(r.dentistId())) throw ApiException.notFound("El odontólogo");
         WaitlistEntry w = new WaitlistEntry();
         w.patientId = p.id;
         w.dentistId = r.dentistId();
@@ -214,12 +214,12 @@ public class CareService {
         if (total.signum() <= 0) throw ApiException.badRequest("PLAN_VACIO", "El plan no tiene procedimientos con precio.");
         installments.deleteByPlanId(planId);
         BigDecimal each = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
-        BigDecimal last = total.subtract(each.multiply(BigDecimal.valueOf(count - 1)));
+        BigDecimal last = total.subtract(each.multiply(BigDecimal.valueOf(count - 1L)));
         for (int n = 1; n <= count; n++) {
             Installment i = new Installment();
             i.planId = planId;
             i.number = n;
-            i.dueDate = first.plusMonths(n - 1);
+            i.dueDate = first.plusMonths(n - 1L);
             i.amount = n == count ? last : each;
             i.createdAt = Dates.now();
             i.createdBy = CurrentUser.usernameOrSystem();

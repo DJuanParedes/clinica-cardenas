@@ -332,13 +332,13 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<DentistSchedule> schedules(Long dentistId) {
-        dentists.findById(dentistId).orElseThrow(() -> ApiException.notFound("El odontólogo"));
+        if (!dentists.existsById(dentistId)) throw ApiException.notFound("El odontólogo");
         return schedules.findByDentistIdOrderByWeekdayAscStartTimeAsc(dentistId);
     }
 
     @Transactional
     public List<DentistSchedule> replaceSchedules(Long dentistId, List<ScheduleBlock> blocks) {
-        dentists.findById(dentistId).orElseThrow(() -> ApiException.notFound("El odontólogo"));
+        if (!dentists.existsById(dentistId)) throw ApiException.notFound("El odontólogo");
         List<DentistSchedule> parsed = new ArrayList<>();
         for (ScheduleBlock b : blocks) {
             if (b.weekday() < 1 || b.weekday() > 7) throw ApiException.badRequest("HORARIO_INVALIDO", "Día inválido.");
