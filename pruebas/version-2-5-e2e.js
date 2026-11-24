@@ -71,7 +71,8 @@ async function v25(BASE) {
     expect(o.status === 'ENVIADA' && o.balance === 300, 'orden ' + JSON.stringify(o).slice(0, 120));
     expect((await j('POST', `/api/lab-orders/${o.id}/status`, { status: 'ENTREGADA' }, dr)).s === 400, 'saltó estados');
     expect((await j('POST', `/api/lab-orders/${o.id}/payments`, { amount: 100, method: 'YAPE' }, dr)).s === 403, 'odontólogo pagó');
-    const p = await j('POST', `/api/lab-orders/${o.id}/payments`, { amount: 100, method: 'YAPE' }, cj);
+    expect((await j('POST', `/api/lab-orders/${o.id}/payments`, { amount: 100, method: 'YAPE' }, cj)).s === 400, 'Yape sin número de operación');
+    const p = await j('POST', `/api/lab-orders/${o.id}/payments`, { amount: 100, method: 'YAPE', reference: 'YP-100' }, cj);
     expect(p.s === 200 && p.b.balance === 200 && p.b.payments.length === 1, 'pago ' + p.s);
     expect((await j('POST', `/api/lab-orders/${o.id}/payments`, { amount: 250, method: 'YAPE' }, cj)).s === 400, 'pagó más del saldo');
     for (const s of ['RECIBIDA', 'ENTREGADA']) expect((await j('POST', `/api/lab-orders/${o.id}/status`, { status: s }, rc)).s === 200, s);

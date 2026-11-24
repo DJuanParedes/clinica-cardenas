@@ -14,8 +14,11 @@ public class LabController {
     private static final String VIEW = "hasAnyAuthority('LABORATORIO','CAJA_EGRESOS')";
     private final LabService service;
 
-    public LabController(LabService service) {
+    private final pe.clinicacardenas.cash.CashClosingService closings;
+
+    public LabController(LabService service, pe.clinicacardenas.cash.CashClosingService closings) {
         this.service = service;
+        this.closings = closings;
     }
 
     @GetMapping("/lab-options")
@@ -78,6 +81,8 @@ public class LabController {
     @PostMapping("/lab-orders/{id}/payments")
     @PreAuthorize("hasAuthority('CAJA_EGRESOS')")
     public Map<String, Object> pay(@PathVariable Long id, @RequestBody LabService.PaymentRequest body) {
+        // Como cualquier egreso: no se registra en un día de caja ya cerrado.
+        closings.ensureOpen(body.date() == null ? pe.clinicacardenas.common.Dates.today() : body.date());
         return service.pay(id, body);
     }
 }

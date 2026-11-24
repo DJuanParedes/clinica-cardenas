@@ -52,7 +52,7 @@ public class CashService {
     public static final List<String> METHODS = List.of(EFECTIVO, TARJETA, "YAPE", "PLIN", "TRANSFERENCIA");
     public static final Map<String, String> METHOD_LABEL = Map.of(EFECTIVO, "Efectivo", TARJETA, "Tarjeta",
             "YAPE", "Yape", "PLIN", "Plin", "TRANSFERENCIA", "Transferencia");
-    public static final List<String> EXPENSE_CATEGORIES = List.of("INSUMOS", "LABORATORIO", "ALQUILER", "SERVICIOS",
+    public static final List<String> EXPENSE_CATEGORIES = List.of("INSUMOS", "LABORATORIO", "HONORARIOS", "ALQUILER", "SERVICIOS",
             "PLANILLA", "MANTENIMIENTO", "MARKETING", "IMPUESTOS", "OTROS");
 
     private final PaymentRepository payments;
@@ -330,6 +330,21 @@ public class CashService {
         x.voidReason = reason.trim();
         expenses.save(x);
         audit.register(EGRESO, x.id, "ANULAR", x.concept + " · " + x.voidReason);
+        // Si el egreso era el pago de una liquidación de comisiones, la liquidación vuelve a tener ese saldo pendiente.
+        List<Map<String, Object>> payout = jdbc.queryForList("select id, settlement_id, amount from commission_payouts where expense_id = ?", x.id);
+        if (!payout.isEmpty()) {
+            Map<String, Object> po = payout.get(0);
+            jdbc.update("delete from commission_payouts where id = ?", po.get("id"));
+            jdbc.update("""
+                    update commission_settlements
+                       set status = case when paid_amount - ? <= 0 then 'PENDIENTE' else 'PARCIAL' end,
+                           paid_amount = greatest(paid_amount - ?, 0)
+                     where id = ? and status <> 'ANULADA'
+                    """, po.get("amount"), po.get("amount"), po.get("settlement_id"));
+            // (MySQL asigna de izquierda a derecha: el estado se calcula antes de restar el importe.)
+            audit.register("LIQUIDACION", ((Number) po.get("settlement_id")).longValue(), "PAGO_ANULADO",
+                    "Pago de S/ " + po.get("amount") + " revertido al anular el egreso " + x.id);
+        }
         return x;
     }
 

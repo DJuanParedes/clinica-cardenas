@@ -52,9 +52,15 @@ public class CommissionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
 
+    private final CashService cash;
+    private final pe.clinicacardenas.cash.CashClosingService closings;
+
     public CommissionService(CommissionRuleRepository rules, CommissionSettlementRepository settlements,
                              CommissionLineRepository lines, CommissionPayoutRepository payouts,
-                             DentistRepository dentists, ProcedureRepository procedures, JdbcTemplate jdbc, AuditService audit) {
+                             DentistRepository dentists, ProcedureRepository procedures, JdbcTemplate jdbc, AuditService audit,
+                             CashService cash, pe.clinicacardenas.cash.CashClosingService closings) {
+        this.cash = cash;
+        this.closings = closings;
         this.rules = rules;
         this.settlements = settlements;
         this.lines = lines;
@@ -361,7 +367,14 @@ public class CommissionService {
         }
         if (!e.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los datos del pago.", e);
         java.util.Objects.requireNonNull(amount);
+        // El pago al odontólogo sale de caja: queda como egreso (categoría HONORARIOS) del día del pago.
+        closings.ensureOpen(on);
+        String concept = "Comisiones " + s.dentist.getFullName() + " · liquidación N.° " + s.id;
+        var expense = cash.registerExpense(new CashService.ExpenseRequest(on, "HONORARIOS",
+                concept.length() > 200 ? concept.substring(0, 200) : concept, amount, method,
+                r.reference() == null || r.reference().isBlank() ? null : r.reference().trim(), s.dentist.getFullName()));
         CommissionPayout p = new CommissionPayout();
+        p.expenseId = expense.id;
         p.settlementId = s.id;
         p.paidOn = on;
         p.amount = amount;

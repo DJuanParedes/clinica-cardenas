@@ -296,6 +296,10 @@ public class LabService {
         if (r.amount() == null || r.amount().signum() <= 0) throw ApiException.field("amount", "Ingresa el importe pagado.");
         BigDecimal amount = r.amount().setScale(2, RoundingMode.HALF_UP);
         if (amount.compareTo(balance) > 0) throw ApiException.field("amount", "El saldo por pagar es S/ " + balance + ".");
+        String method = r.method() == null ? null : r.method().trim().toUpperCase();
+        if (method != null && !"EFECTIVO".equals(method) && (r.reference() == null || r.reference().isBlank())) {
+            throw ApiException.field("reference", "Ingresa el número de operación (transferencia, Yape, Plin o tarjeta).");
+        }
         String concept = "Laboratorio " + o.get("code") + " · " + o.get("workTypeLabel") + (o.get(TEETH) == null ? "" : " " + o.get(TEETH))
                 + " · " + o.get("patientName");
         var expense = cash.registerExpense(new CashService.ExpenseRequest(r.date(), LABORATORIO_2, concept.length() > 200 ? concept.substring(0, 200) : concept,
