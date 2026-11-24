@@ -84,6 +84,11 @@ public class MercadoPagoClient {
         }
     }
 
+    /** Llaves de prueba antiguas (TEST-…), las únicas que usan el link sandbox_init_point. */
+    public boolean legacyTestKeys() {
+        return accessToken.startsWith("TEST-");
+    }
+
     public JsonNode createPreference(Map<String, Object> body) {
         return call("POST", "/checkout/preferences", body, UUID.randomUUID().toString());
     }
