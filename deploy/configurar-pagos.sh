@@ -26,14 +26,16 @@ read -r -s -p "Pega el Access Token: " TOKEN; echo
 TOKEN=$(printf '%s' "$TOKEN" | tr -d ' \r\n')
 case "$TOKEN" in
   TEST-*) echo "Token de PRUEBA detectado." ;;
-  APP_USR-*) echo "Token de PRODUCCIÓN detectado: los cobros serán reales." ;;
+  APP_USR-*) echo "Token APP_USR-: puede ser de prueba (credenciales de prueba nuevas) o de producción." ;;
   *) echo "El token debe empezar con TEST- o APP_USR-. No se cambió nada."; exit 1 ;;
 esac
 # Verifica el token contra la API de Mercado Pago antes de guardarlo.
 CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" https://api.mercadopago.com/users/me || true)
 if [ "$CODE" != "200" ]; then echo "Mercado Pago rechazó el token (HTTP $CODE). No se cambió nada."; exit 1; fi
+read -r -p "¿Es la credencial de PRUEBA (pestaña Prueba del panel)? [s/N]: " ESPRUEBA
 read -r -s -p "Clave secreta de las notificaciones (webhook), opcional — Enter para omitir: " SECRETO; echo
 poner PAGOS_MODO mercadopago
+case "$ESPRUEBA" in s|S|si|SI|sí) poner MP_MODO_PRUEBA true ;; *) poner MP_MODO_PRUEBA false ;; esac
 poner MP_ACCESS_TOKEN "$TOKEN"
 [ -n "$SECRETO" ] && poner MP_WEBHOOK_SECRET "$(printf '%s' "$SECRETO" | tr -d ' ')"
 chmod 600 "$ENVF"

@@ -38,12 +38,17 @@ public class MercadoPagoClient {
 
     private final String accessToken;
     private final String webhookSecret;
+    private final String testModeSetting;
+    private volatile Boolean testUser;
+    private volatile long testUserCheckedAt;
     private final ObjectMapper json;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
 
     public MercadoPagoClient(@Value("${app.payments.mercadopago.access-token:}") String accessToken,
                              @Value("${app.payments.mercadopago.webhook-secret:}") String webhookSecret,
+                             @Value("${app.payments.mercadopago.test-mode:auto}") String testModeSetting,
                              ObjectMapper json) {
+        this.testModeSetting = testModeSetting == null ? "auto" : testModeSetting.trim().toLowerCase();
         this.accessToken = accessToken == null ? "" : accessToken.trim();
         this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
         this.json = json;
@@ -53,9 +58,30 @@ public class MercadoPagoClient {
         return !accessToken.isEmpty();
     }
 
-    /** Llaves de prueba (TEST-…): se usa el link de pruebas (sandbox). */
+    /**
+     * Modo de pruebas. MP_MODO_PRUEBA=true|false lo fija; en "auto" se detecta: llaves TEST-… o credenciales de prueba
+     * nuevas (APP_USR-… de un usuario de prueba, etiqueta test_user en /users/me).
+     */
     public boolean testMode() {
-        return accessToken.startsWith("TEST-");
+        if ("true".equals(testModeSetting)) return true;
+        if ("false".equals(testModeSetting)) return false;
+        if (accessToken.startsWith("TEST-")) return true;
+        if (!configured()) return false;
+        Boolean known = testUser;
+        if (known != null) return known;
+        if (System.currentTimeMillis() - testUserCheckedAt < 600_000) return false;
+        testUserCheckedAt = System.currentTimeMillis();
+        try {
+            JsonNode me = call("GET", "/users/me", null, null);
+            boolean test = false;
+            for (JsonNode t : me.path("tags")) if ("test_user".equals(t.asText())) test = true;
+            if (me.path("nickname").asText("").toUpperCase().startsWith("TESTUSER")) test = true;
+            testUser = test;
+            return test;
+        } catch (RuntimeException e) {
+            log.warn("No se pudo saber si las credenciales de Mercado Pago son de prueba: {}", e.getMessage());
+            return false;
+        }
     }
 
     public JsonNode createPreference(Map<String, Object> body) {
