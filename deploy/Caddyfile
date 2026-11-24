@@ -19,6 +19,14 @@
 		respond @api 404
 		reverse_proxy whatsapp-sim:8094
 	}
+	# Panel del microservicio de notificaciones (pide usuario del personal: admin o con permiso Notificaciones).
+	# Solo el panel; la API /v1 del microservicio queda interna.
+	redir /panel-notificaciones /panel-notificaciones/
+	handle_path /panel-notificaciones/* {
+		@api path /v1/* /webhook/*
+		respond @api 404
+		reverse_proxy notificaciones:8093
+	}
 	# Panel del simulador de SUNAT (pide usuario del personal: admin o con permiso Comprobantes).
 	# Se publican el panel y la consulta RUC; el servicio SOAP billService queda interno.
 	redir /sunat-sim /sunat-sim/

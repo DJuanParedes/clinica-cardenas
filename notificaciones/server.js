@@ -31,6 +31,28 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const prov = require('./proveedores');
+// En internet el panel se publica detrás del proxy (https://DOMINIO/panel-notificaciones/) y pide usuario del personal.
+// Las llamadas internas del backend y del simulador (sin proxy) y el webhook de Meta no piden usuario.
+const AUTH_URL = process.env.AUTH_URL || '';
+const sesionesPanel = new Map();
+async function panelAutorizado(req) {
+  if (!AUTH_URL || !req.headers['x-forwarded-for']) return { ok: true };
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Basic ')) return { ok: false };
+  const llave = crypto.createHash('sha256').update(h).digest('hex');
+  if ((sesionesPanel.get(llave) || 0) > Date.now()) return { ok: true };
+  const [username, ...resto] = Buffer.from(h.slice(6), 'base64').toString('utf8').split(':');
+  try {
+    const r = await fetch(AUTH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password: resto.join(':') }), signal: AbortSignal.timeout(8000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, motivo: j.code === 'REQUIERE_2FA' ? 'Tu cuenta usa verificación en 2 pasos: entra con una cuenta del personal sin 2 pasos.' : (j.message || 'Usuario o contraseña incorrectos.') };
+    const u = j.user || {};
+    if (u.role !== 'ADMIN' && !(u.permissions || []).includes('NOTIFICACIONES')) return { ok: false, motivo: 'Tu usuario no tiene el permiso Notificaciones.' };
+    sesionesPanel.set(llave, Date.now() + 15 * 60_000);
+    return { ok: true };
+  } catch (e) { return { ok: false, motivo: 'No se pudo validar el usuario con el sistema (' + e.message + ').' }; }
+}
 
 const PORT = Number(process.env.PORT || 8093);
 const DATA_FILE = process.env.DATA_FILE || '/data/notificaciones.json';
@@ -359,15 +381,15 @@ function drawProv(p){
   document.getElementById('prov').innerHTML=box('WhatsApp',p.whatsapp,'WHATSAPP','987654321','<select name="t"><option value="">Mensaje normal</option><option value="hello_world">Plantilla hello_world</option></select>')
     +box('Correo',p.correo,'EMAIL','tucorreo@gmail.com','')+'<div id="res" style="width:100%"></div>';
   document.querySelectorAll('.pv form').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button');b.disabled=true;
-    const r=await fetch('/admin/prueba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({canal:f.dataset.c,destino:f.elements.d.value,plantilla:f.elements.t?f.elements.t.value:''})});
+    const r=await fetch('admin/prueba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({canal:f.dataset.c,destino:f.elements.d.value,plantilla:f.elements.t?f.elements.t.value:''})});
     const j=await r.json();b.disabled=false;
     document.getElementById('res').innerHTML=r.ok?'<span class="real">✓ Enviado. ID del proveedor: '+esc(j.proveedorId)+'</span>':'<span style="color:#c2410c">✗ '+esc(j.error)+'</span>';load();});
 }
 function drawAlertas(list){
   document.getElementById('alertas').innerHTML=(list||[]).map(a=>'<div class="al '+a.nivel+'"><span>'+(a.nivel==='error'?'⚠️':'⏳')+'</span><div class="sp"><b>'+(a.clave==='wa-token'?'WhatsApp: revisa el token':a.clave==='wa-plantilla'?'WhatsApp: plantilla':'Correo')+'</b>'+esc(a.texto)+'<div class="sub">Desde '+fmt(a.desde)+'</div></div><button class="btn" onclick="recheck(this)">Volver a comprobar</button></div>').join('');
 }
-async function recheck(b){ b.disabled=true; await fetch('/admin/revisar',{method:'POST'}); provDrawn=false; await load(); }
-async function load(){ const r=await fetch('/api/estado'); data=await r.json(); drawAlertas(data.alertas); drawProv(data.proveedores); render(); }
+async function recheck(b){ b.disabled=true; await fetch('admin/revisar',{method:'POST'}); provDrawn=false; await load(); }
+async function load(){ const r=await fetch('api/estado'); data=await r.json(); drawAlertas(data.alertas); drawProv(data.proveedores); render(); }
 function render(){
   document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===data.modo));
   const ms=data.mensajes;
@@ -395,11 +417,11 @@ function render(){
 document.getElementById('who').onchange=e=>{who=e.target.value;render();};
 document.getElementById('compose').onsubmit=async e=>{e.preventDefault();const i=document.getElementById('txt');if(!who||!i.value.trim())return;
   const b=e.target.querySelector('button');b.disabled=true;
-  const r=await fetch('/admin/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destino:who,texto:i.value})});
+  const r=await fetch('admin/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destino:who,texto:i.value})});
   const j=await r.json();b.disabled=false;if(r.ok)i.value='';else alert(j.error||'No se pudo enviar');load();};
 document.getElementById('inbox').onclick=e=>{const d=e.target.closest('[data-id]'); if(d){mailSel=+d.dataset.id; render();}};
-document.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{await fetch('/admin/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:b.dataset.m})});load();});
-document.getElementById('force').onclick=async()=>{const r=await fetch('/admin/enviar-pendientes',{method:'POST'});const j=await r.json();alert(j.enviados+' recordatorio(s) enviado(s).');load();};
+document.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{await fetch('admin/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:b.dataset.m})});load();});
+document.getElementById('force').onclick=async()=>{const r=await fetch('admin/enviar-pendientes',{method:'POST'});const j=await r.json();alert(j.enviados+' recordatorio(s) enviado(s).');load();};
 load(); setInterval(load,5000);
 </script></body></html>`;
 }
@@ -422,6 +444,13 @@ const server = http.createServer((req, res) => {
     const log = (status) => console.log(`${new Date().toISOString()} ${req.method} ${p} → ${status}`);
 
     if (p === '/health') return send(res, 200, { status: 'UP' });
+    if (!p.startsWith('/webhook/')) {
+      const a = await panelAutorizado(req);
+      if (!a.ok) {
+        res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Notificaciones - usuario del personal", charset="UTF-8"', 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(a.motivo || 'Ingresa con tu usuario del personal de la clínica (admin o con permiso Notificaciones).');
+      }
+    }
     if (p === '/webhook/whatsapp' && req.method === 'GET') {
       const ok = WA_VERIFY_TOKEN && url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === WA_VERIFY_TOKEN;
       log(ok ? 'verificado' : 'rechazado');
