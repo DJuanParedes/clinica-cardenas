@@ -63,11 +63,14 @@ public class OnlineChargeService {
     private final AuditService audit;
     private final String publicUrl;
     private final String mode;
+    private final pe.clinicacardenas.billing.PaymentInvoiceService invoices;
 
     public OnlineChargeService(MercadoPagoClient mp, JdbcTemplate jdbc, TransactionTemplate tx, CashService cash,
                                PatientRepository patients, ConversationService conversations, AuditService audit,
                                @Value("${app.public-url:}") String publicUrl,
-                               @Value("${app.payments.mode:simulado}") String mode) {
+                               @Value("${app.payments.mode:simulado}") String mode,
+                               pe.clinicacardenas.billing.PaymentInvoiceService invoices) {
+        this.invoices = invoices;
         this.mp = mp;
         this.jdbc = jdbc;
         this.tx = tx;
@@ -281,6 +284,7 @@ public class OnlineChargeService {
         String methodId = pay.path("payment_method_id").asText("");
         String typeId = pay.path("payment_type_id").asText("");
         BigDecimal paidAmount = pay.path("transaction_amount").decimalValue();
+        java.util.concurrent.atomic.AtomicReference<Long> newPayment = new java.util.concurrent.atomic.AtomicReference<>();
 
         tx.executeWithoutResult(s -> {
             List<Map<String, Object>> rows = jdbc.queryForList("select * from online_charges where id = ? for update", id);
@@ -313,6 +317,7 @@ public class OnlineChargeService {
                                mp_method = ?, payment_id = ?, updated_at = ? where id = ?
                         """, mpId, st, detail, methodId, paymentId, Dates.now(), id);
                 audit.register(COBRO_EN_LINEA, id, "APROBADO", "Mercado Pago " + mpId + " · S/ " + paidAmount.toPlainString());
+                newPayment.set(paymentId);
             } else if ("rejected".equals(st) || "cancelled".equals(st)) {
                 jdbc.update("update online_charges set mp_status = ?, mp_status_detail = ?, mp_method = ?, updated_at = ? where id = ? and status = 'PENDIENTE'",
                         st, detail, methodId, Dates.now(), id);
@@ -321,6 +326,14 @@ public class OnlineChargeService {
                         st, detail, methodId, Dates.now(), id);
             }
         });
+        // Boleta electrónica automática del pago aprobado (si falla, el pago queda registrado y se emite desde Comprobantes).
+        if (newPayment.get() != null) {
+            try {
+                invoices.issueForPayment(newPayment.get());
+            } catch (RuntimeException e) {
+                log.warn("Cobro {}: no se pudo emitir la boleta automática: {}", id, e.getMessage());
+            }
+        }
     }
 
     // ------------------------------------------------------------------ apoyo
@@ -361,6 +374,16 @@ public class OnlineChargeService {
         m.put("mpStatusDetail", c.get("mp_status_detail"));
         m.put("method", c.get("mp_method"));
         m.put("paymentId", c.get("payment_id"));
+        if (c.get("payment_id") != null) {
+            List<Map<String, Object>> inv = jdbc.queryForList(
+                    "select i.id, concat(i.series, '-', lpad(i.number, 8, '0')) as num, i.status from payments p join invoices i on i.id = p.invoice_id where p.id = ?",
+                    c.get("payment_id"));
+            if (!inv.isEmpty()) {
+                m.put("invoiceId", inv.get(0).get("id"));
+                m.put("invoice", inv.get(0).get("num"));
+                m.put("invoiceStatus", inv.get(0).get("status"));
+            }
+        }
         m.put("expiresAt", c.get(EXPIRES_AT));
         m.put("createdAt", c.get("created_at"));
         m.put("source", c.get("source"));

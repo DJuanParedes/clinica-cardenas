@@ -1,7 +1,7 @@
 import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Account, Api, Obligation, OnlineCharge, OnlineConfig, Payment } from '../core/api.service';
+import { Account, Api, Obligation, OnlineCharge, OnlineConfig, Payment, PaymentInvoice } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { Patient } from '../core/models';
@@ -34,11 +34,23 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
           <div class="amount"><span>Importe recibido</span><strong class="tabular">{{ money(done.amount) }}</strong></div>
           <div class="after muted">Saldo pendiente del paciente después del pago: <strong class="tabular">{{ money(acc?.balance) }}</strong>
             @if (acc && acc.inFavor > 0) { · saldo a favor {{ money(acc.inFavor) }} }</div>
-          <p class="muted small">Este recibo es un control interno de caja. El comprobante electrónico (boleta o factura) se emite en Comprobantes.</p>
+          @if (invoice) {
+            <div class="inv-ok"><app-icon name="receipt" [size]="18" /> <span>Boleta electrónica <strong>{{ invoice.invoice }}</strong> emitida
+              automáticamente{{ invoice.status === 'ACEPTADO' ? ' y aceptada por SUNAT' : (invoice.status === 'GENERADO' ? ' (pendiente de envío a SUNAT)' : ' · ' + invoice.status) }}.</span></div>
+          } @else if (invoicing) {
+            <p class="muted small"><span class="spin"></span> Emitiendo la boleta electrónica…</p>
+          } @else {
+            @if (invoiceError) { <p class="err small">{{ invoiceError }}</p> }
+            <p class="muted small">Este recibo es un control interno de caja. El comprobante electrónico (boleta o factura) se emite en Comprobantes.</p>
+          }
           <div class="row wrap no-print">
             <button class="btn" type="button" (click)="print()"><app-icon name="print" [size]="16" /> Imprimir recibo</button>
             @if (auth.can('COMPROBANTES')) {
-              <a class="btn" routerLink="/comprobantes/nuevo" [queryParams]="{ paciente: patient?.id }"><app-icon name="receipt" [size]="16" /> Emitir comprobante</a>
+              @if (invoice) {
+                <a class="btn" [routerLink]="['/comprobantes', invoice.invoiceId]"><app-icon name="receipt" [size]="16" /> Ver boleta {{ invoice.invoice }}</a>
+              } @else if (done.id && !invoicing) {
+                <button class="btn" type="button" (click)="issueInvoice()"><app-icon name="receipt" [size]="16" /> Emitir boleta ahora</button>
+              }
             }
             <button class="btn primary" type="button" (click)="again()"><app-icon name="plus" [size]="16" /> Registrar otro cobro</button>
           </div>
@@ -152,6 +164,10 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
                 <label for="nt">Nota (opcional)</label>
                 <input id="nt" name="nt" class="input" [(ngModel)]="f.notes" [disabled]="!patient" />
               </div>
+              @if (auth.can('COMPROBANTES')) {
+                <label class="auto-inv"><input type="checkbox" name="ai" [(ngModel)]="autoInvoice" />
+                  Emitir la boleta electrónica automáticamente{{ isOnline ? ' cuando se apruebe el pago' : '' }}</label>
+              }
               @if (isOnline) {
                 <button class="btn primary lg block" type="submit" [disabled]="!patient || saving || sel === null || charge?.status === 'PENDIENTE'">
                   @if (saving) { <span class="spin"></span> Generando… } @else { <app-icon name="link" [size]="16" /> Generar link de pago {{ f.amount > 0 ? money(f.amount) : '' }} }
@@ -189,6 +205,9 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
     .receipt { max-width: 640px; padding: 28px 30px; display: flex; flex-direction: column; gap: 16px; border-top: 4px solid var(--brand); }
     .rh { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
     .rh .big { font-size: 18px; font-family: var(--font-display); }
+    .auto-inv { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 4px 0 12px; cursor: pointer; }
+    .inv-ok { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-radius: 10px; background: var(--green-soft); margin: 10px 0; font-size: 14px; }
+    .err { color: var(--red, #b42318); }
     .amount { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; background: var(--green-soft); border-radius: 12px; }
     .amount strong { font-size: 28px; color: var(--green); }
     .kv { grid-template-columns: 130px 1fr; }
@@ -213,6 +232,11 @@ export class PaymentNewComponent implements OnInit, OnDestroy {
   saving = false;
   done: Payment | null = null;
   doneConcept = '';
+  autoInvoice = true;
+  invoice: PaymentInvoice | null = null;
+  invoicing = false;
+  invoiceError = '';
+  private invoiceTries = 0;
   methods = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'];
   online: OnlineConfig | null = null;
   mode: 'ONLINE' | 'MANUAL' = 'ONLINE';
@@ -258,13 +282,15 @@ export class PaymentNewComponent implements OnInit, OnDestroy {
     this.e = {};
     const body = { patientId: this.patient.id, treatmentItemId: this.sel || null, amount: this.f.amount, method: this.f.method,
       reference: this.f.method === 'EFECTIVO' ? null : this.f.reference, notes: this.f.notes };
-    this.api.pay(body).subscribe({
+    this.api.pay(body, this.autoInvoice && this.auth.can('COMPROBANTES')).subscribe({
       next: (r) => {
         this.saving = false;
         this.done = r.payment;
         this.doneConcept = r.concept;
         this.acc = r.account;
-        this.toast.ok(`Cobro de ${soles(r.payment.amount)} registrado.`);
+        this.invoice = r.comprobante || null;
+        this.invoiceError = r.comprobanteError || '';
+        this.toast.ok(`Cobro de ${soles(r.payment.amount)} registrado.` + (this.invoice ? ` Boleta ${this.invoice.invoice} emitida.` : ''));
       },
       error: (err) => { this.saving = false; const a = apiError(err); this.e = a.fields || {}; this.toast.error(a.message); },
     });
@@ -301,7 +327,36 @@ export class PaymentNewComponent implements OnInit, OnDestroy {
       this.doneConcept = c.description;
       this.api.account(this.patient.id).subscribe((a) => (this.acc = a));
       this.toast.ok(`Mercado Pago aprobó el pago de ${soles(c.amount)}. Quedó registrado en caja.`);
+      this.followInvoice(c);
     }
+  }
+
+  /** La boleta del pago en línea la emite el servidor al aprobarse; se consulta unos segundos hasta que aparece. */
+  private followInvoice(c: OnlineCharge) {
+    if (c.invoiceId && c.invoice) {
+      this.invoicing = false;
+      this.invoice = { invoiceId: c.invoiceId, invoice: c.invoice, status: c.invoiceStatus || 'GENERADO', message: '' };
+      return;
+    }
+    if (!this.autoInvoice || !this.auth.can('COMPROBANTES')) return;
+    if (this.invoiceTries >= 5) {
+      // El servidor no la emitió (o tarda): se pide directamente; es idempotente.
+      if (c.paymentId) this.issueInvoice(); else this.invoicing = false;
+      return;
+    }
+    this.invoiceTries++;
+    this.invoicing = true;
+    setTimeout(() => this.api.onlineStatus(c.id).subscribe({ next: (x) => this.followInvoice(x), error: () => (this.invoicing = false) }), 3000);
+  }
+
+  issueInvoice() {
+    if (!this.done?.id) return;
+    this.invoicing = true;
+    this.invoiceError = '';
+    this.api.paymentInvoice(this.done.id).subscribe({
+      next: (r) => { this.invoicing = false; this.invoice = r; this.toast.ok(r.message); },
+      error: (err) => { this.invoicing = false; this.invoiceError = apiError(err).message; },
+    });
   }
 
   copyLink() {
@@ -329,6 +384,10 @@ export class PaymentNewComponent implements OnInit, OnDestroy {
   again() {
     this.stopPoll();
     this.charge = null;
+    this.invoice = null;
+    this.invoiceError = '';
+    this.invoicing = false;
+    this.invoiceTries = 0;
     this.done = null;
     this.f = { amount: null, method: 'EFECTIVO', reference: '', notes: '' };
     this.received = null;

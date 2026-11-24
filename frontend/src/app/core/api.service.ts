@@ -330,7 +330,10 @@ export class Api {
   // ---------- caja (HU-13, HU-14, HU-15)
   cashMeta(): Observable<{ methods: string[]; methodLabels: Record<string, string>; expenseCategories: string[] }> { return this.http.get<any>('/api/cash/meta'); }
   account(pid: number): Observable<Account> { return this.http.get<Account>(`/api/cash/patients/${pid}/account`); }
-  pay(body: any): Observable<{ payment: Payment; concept: string; account: Account }> { return this.http.post<any>('/api/cash/payments', body); }
+  pay(body: any, comprobante = false): Observable<{ payment: Payment; concept: string; account: Account; comprobante?: PaymentInvoice; comprobanteError?: string }> {
+    return this.http.post<any>('/api/cash/payments', body, { params: { comprobante: String(comprobante) } });
+  }
+  paymentInvoice(paymentId: number): Observable<PaymentInvoice> { return this.http.post<PaymentInvoice>(`/api/cash/payments/${paymentId}/invoice`, {}); }
   // Cobros en línea con Mercado Pago (tarjeta, Yape)
   portalOnlineConfig(): Observable<OnlineConfig> { return this.http.get<OnlineConfig>('/api/portal/payments/online/config'); }
   portalOnlineCreate(amount: number): Observable<OnlineCharge> { return this.http.post<OnlineCharge>('/api/portal/payments/online', { amount }); }
@@ -610,7 +613,11 @@ export interface OnlineCharge {
   status: 'PENDIENTE' | 'APROBADO' | 'CANCELADO' | 'VENCIDO'; statusLabel: string; checkoutUrl: string | null;
   mpPaymentId: string | null; mpStatus: string | null; mpStatusDetail: string | null; method: string | null;
   paymentId: number | null; expiresAt: string; createdAt: string; source: string; testMode: boolean;
+  invoiceId?: number; invoice?: string; invoiceStatus?: string;
 }
+
+/** Comprobante emitido automáticamente para un cobro. */
+export interface PaymentInvoice { invoiceId: number; invoice: string; status: string; message: string; }
 
 /** [código, nombre, hijos] — departamentos → provincias → distritos (INEI). */
 export type UbigeoDist = [string, string];
