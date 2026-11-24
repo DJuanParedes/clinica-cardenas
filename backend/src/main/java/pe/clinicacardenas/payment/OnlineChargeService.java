@@ -184,7 +184,9 @@ public class OnlineChargeService {
             jdbc.update("update online_charges set status = 'CANCELADO', mp_status_detail = 'error_al_crear', updated_at = ? where id = ?", Dates.now(), id);
             throw e;
         }
-        String url = mp.testMode() && pref.hasNonNull("sandbox_init_point") ? pref.get("sandbox_init_point").asText() : pref.path("init_point").asText();
+        // El link sandbox solo sirve con las llaves antiguas (TEST-…). Con las credenciales de prueba nuevas (APP_USR-…)
+        // Mercado Pago pide el init_point normal: el ambiente de prueba lo da la credencial, no el link.
+        String url = mp.legacyTestKeys() && pref.hasNonNull("sandbox_init_point") ? pref.get("sandbox_init_point").asText() : pref.path("init_point").asText();
         jdbc.update("update online_charges set preference_id = ?, checkout_url = ?, updated_at = ? where id = ?",
                 pref.path("id").asText(), url, Dates.now(), id);
         audit.register(COBRO_EN_LINEA, id, "CREAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · " + desc);
