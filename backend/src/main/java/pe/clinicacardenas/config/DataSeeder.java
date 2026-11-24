@@ -30,9 +30,11 @@ import java.util.*;
  */
 @Component
 public class DataSeeder implements ApplicationRunner {
+    private static final String CHACLACAYO = "Chaclacayo";
+
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
-    private static final String DEMO_PASSWORD = "Clinica2026";
+    private final String demoPassword;
 
     private final UserRepository users;
     private final UserService userService;
@@ -43,10 +45,14 @@ public class DataSeeder implements ApplicationRunner {
     private final ClinicalService clinical;
     private final ProcedureRepository procedures;
     private final boolean seedDemo;
+    private final HistorySeeder history;
 
     public DataSeeder(UserRepository users, UserService userService, PatientService patientService, AgendaService agenda,
                       AppointmentRepository appointments, DentistRepository dentists, ClinicalService clinical,
-                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo) {
+                      ProcedureRepository procedures, @Value("${app.seed-demo-data}") boolean seedDemo,
+                      @Value("${app.seed-password:Clinica2026}") String seedPassword,
+                      HistorySeeder history) {
+        this.history = history;
         this.users = users;
         this.userService = userService;
         this.patientService = patientService;
@@ -56,42 +62,48 @@ public class DataSeeder implements ApplicationRunner {
         this.clinical = clinical;
         this.procedures = procedures;
         this.seedDemo = seedDemo;
+        this.demoPassword = seedPassword;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         if (users.count() > 0) return;
         log.info("Base de datos vacía: creando cuentas iniciales");
-        userService.create(new UserService.UserRequest("admin", "admin@clinicacardenas.pe", "Juan Paredes Cárdenas", Role.ADMIN, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("recepcion", "recepcion@clinicacardenas.pe", "Lucía Mendoza Flores", Role.RECEPCION, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("dra.cardenas", "rcardenas@clinicacardenas.pe", "Dra. Rosa Cárdenas Vílchez", Role.ODONTOLOGO, DEMO_PASSWORD, "Ortodoncia", "COP 18452"));
-        userService.create(new UserService.UserRequest("dr.ramos", "aramos@clinicacardenas.pe", "Dr. Andrés Ramos Seminario", Role.ODONTOLOGO, DEMO_PASSWORD, "Endodoncia", "COP 21307"));
-        userService.create(new UserService.UserRequest("caja", "caja@clinicacardenas.pe", "Milagros Távara Ruiz", Role.CAJA, DEMO_PASSWORD, null, null));
-        userService.create(new UserService.UserRequest("director", "direccion@clinicacardenas.pe", "Dr. Carlos Cárdenas Ortiz", Role.DIRECTOR, DEMO_PASSWORD, null, null));
+        userService.create(new UserService.UserRequest("admin", "admin@clinicacardenas.pe", "Juan Paredes Cárdenas", Role.ADMIN, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("recepcion", "recepcion@clinicacardenas.pe", "Lucía Mendoza Flores", Role.RECEPCION, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("dra.cardenas", "rcardenas@clinicacardenas.pe", "Dra. Rosa Cárdenas Vílchez", Role.ODONTOLOGO, demoPassword, "Ortodoncia", "COP 18452"));
+        userService.create(new UserService.UserRequest("dr.ramos", "aramos@clinicacardenas.pe", "Dr. Andrés Ramos Seminario", Role.ODONTOLOGO, demoPassword, "Endodoncia", "COP 21307"));
+        userService.create(new UserService.UserRequest("caja", "caja@clinicacardenas.pe", "Milagros Távara Ruiz", Role.CAJA, demoPassword, null, null));
+        userService.create(new UserService.UserRequest("director", "direccion@clinicacardenas.pe", "Dr. Carlos Cárdenas Ortiz", Role.DIRECTOR, demoPassword, null, null));
         if (seedDemo) {
             try {
                 seedDemoData();
             } catch (Exception e) {
                 log.warn("No se pudieron crear todos los datos de demostración: {}", e.getMessage());
             }
+            try {
+                history.seed();
+            } catch (Exception e) {
+                log.warn("No se pudo crear la historia de demostración: {}", e.toString());
+            }
         }
-        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña {}", DEMO_PASSWORD);
+        log.info("Listo. Usuarios: admin, recepcion, dra.cardenas, dr.ramos, caja, director · contraseña: la de APP_SEED_PASSWORD");
     }
 
     private Patient patient(String dni, String first, String last, String birth, String sex, String phone, String email, String district) {
-        return patientService.create(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
+        return patientService.createDemo(new PatientValidator.Input("DNI", dni, first, last, LocalDate.parse(birth), sex, phone,
                 email, null, district, null, null, null));
     }
 
     private void seedDemoData() {
         List<Patient> ps = new ArrayList<>();
-        ps.add(patient("45872196", "María Fernanda", "Quispe Huamán", "1991-03-14", "F", "987654321", "mquispe@gmail.com", "Chaclacayo"));
+        ps.add(patient("45872196", "María Fernanda", "Quispe Huamán", "1991-03-14", "F", "987654321", "mquispe@gmail.com", CHACLACAYO));
         ps.add(patient("70214583", "José Luis", "García Rojas", "1985-07-02", "M", "956123478", "jlgarcia@hotmail.com", "Lurigancho-Chosica"));
-        ps.add(patient("41236985", "Ana Lucía", "Torres Paz", "1978-11-21", "F", "944556677", null, "Chaclacayo"));
+        ps.add(patient("41236985", "Ana Lucía", "Torres Paz", "1978-11-21", "F", "944556677", null, CHACLACAYO));
         ps.add(patient("72589634", "Diego Alonso", "Chávez Medina", "2001-01-09", "M", "923874561", "dchavez@gmail.com", "Ate"));
-        ps.add(patient("46985231", "Rosa Elena", "Sánchez Villegas", "1966-05-30", "F", "961238745", null, "Chaclacayo"));
+        ps.add(patient("46985231", "Rosa Elena", "Sánchez Villegas", "1966-05-30", "F", "961238745", null, CHACLACAYO));
         ps.add(patient("73659812", "Valeria", "Ramírez Silva", "2010-09-17", "F", "912345678", "familia.ramirez@gmail.com", "Santa Eulalia"));
-        ps.add(patient("40125896", "Carlos Alberto", "Zapata Ojeda", "1972-02-11", "M", "978451236", null, "Chaclacayo"));
+        ps.add(patient("40125896", "Carlos Alberto", "Zapata Ojeda", "1972-02-11", "M", "978451236", null, CHACLACAYO));
         ps.add(patient("75896321", "Camila", "Flores Ancajima", "1998-12-03", "F", "934567812", "camila.flores@gmail.com", "Lurigancho-Chosica"));
 
         List<Dentist> ds = dentists.findAvailable();
@@ -129,6 +141,10 @@ public class DataSeeder implements ApplicationRunner {
             a.startAt = today.minusDays(7L * (i + 1)).atTime(LocalTime.of(10, 0));
             a.endAt = a.startAt.plusMinutes(30);
             a.durationMin = 30;
+            if (!appointments.findDentistOverlaps(a.dentist.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()
+                    || !appointments.findPatientOverlaps(a.patient.id, a.startAt, a.endAt, AppointmentStatus.BLOCKING, null).isEmpty()) {
+                continue;
+            }
             a.reason = "Evaluación inicial";
             a.status = AppointmentStatus.ATENDIDA;
             a.createdAt = a.startAt.minusDays(2);

@@ -1,5 +1,6 @@
 package pe.clinicacardenas.agenda;
 
+import pe.clinicacardenas.notification.NotificationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -18,6 +19,8 @@ import java.util.*;
 
 @Service
 public class AgendaService {
+    private static final String STARTAT = "startAt";
+
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DMY_HM = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -37,9 +40,15 @@ public class AgendaService {
     private final DentistScheduleRepository schedules;
     private final PatientRepository patients;
     private final AuditService audit;
+    private final NotificationService notifications;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public AgendaService(AppointmentRepository appointments, DentistRepository dentists,
-                         DentistScheduleRepository schedules, PatientRepository patients, AuditService audit) {
+                         DentistScheduleRepository schedules, PatientRepository patients, AuditService audit,
+                         NotificationService notifications, org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+        this.notifications = notifications;
+        this.events = events;
         this.appointments = appointments;
         this.dentists = dentists;
         this.schedules = schedules;
@@ -47,8 +56,15 @@ public class AgendaService {
         this.audit = audit;
     }
 
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     public record AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
-                                     String reason, String notes, String changeReason) {}
+                                     String reason, String notes, String changeReason, String category) {
+        public AppointmentRequest(Long patientId, Long dentistId, LocalDateTime startAt, Integer durationMin,
+                                  String reason, String notes, String changeReason) {
+            this(patientId, dentistId, startAt, durationMin, reason, notes, changeReason, null);
+        }
+    }
 
     public record StatusRequest(AppointmentStatus status, String reason) {}
 
@@ -68,12 +84,35 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, null);
+    }
+
+    /**
+     * Horarios del odontólogo. Si se indica el paciente, también se marcan como ocupadas las horas en las que
+     * ese paciente ya tiene cita con otro odontólogo (no puede estar en dos consultorios a la vez).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> slots(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
+        return slotsInternal(dentistId, date, durationMin, excludeId, patientId);
+    }
+
+    private Map<String, Object> slotsInternal(Long dentistId, LocalDate date, int durationMin, Long excludeId, Long patientId) {
         Dentist d = dentists.findById(dentistId).orElseThrow(() -> ApiException.notFound("El odontólogo"));
         checkDuration(durationMin);
         List<SlotCalculator.Busy> busy = new ArrayList<>();
         List<Appointment> dayAppts = appointments.findDentistOverlaps(d.id, date.atStartOfDay(),
                 date.plusDays(1).atStartOfDay(), AppointmentStatus.BLOCKING, excludeId);
         for (Appointment a : dayAppts) busy.add(new SlotCalculator.Busy(a.startAt, a.endAt));
+        if (patientId != null) {
+            for (Appointment a : appointments.findPatientOverlaps(patientId, date.atStartOfDay(),
+                    date.plusDays(1).atStartOfDay(), AppointmentStatus.BLOCKING, excludeId)) {
+                busy.add(new SlotCalculator.Busy(a.startAt, a.endAt));
+            }
+        }
         List<SlotCalculator.Block> blocks = blocksFor(d.id, date);
         List<SlotCalculator.Slot> slots = SlotCalculator.compute(date, blocks, busy, durationMin, Dates.now());
         Map<String, Object> m = new LinkedHashMap<>();
@@ -112,6 +151,8 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public List<Appointment> range(LocalDate from, LocalDate to, Long dentistId) {
+        if (to.isBefore(from)) throw pe.clinicacardenas.common.ApiException.field("to", "La fecha final debe ser posterior a la inicial.");
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) > 62) throw pe.clinicacardenas.common.ApiException.field("to", "Consulta como máximo dos meses a la vez.");
         return appointments.findInRange(from.atStartOfDay(), to.plusDays(1).atStartOfDay(), dentistId);
     }
 
@@ -131,7 +172,7 @@ public class AgendaService {
         Map<String, String> errors = new LinkedHashMap<>();
         if (r.patientId() == null) errors.put("patientId", "Selecciona un paciente.");
         if (r.dentistId() == null) errors.put("dentistId", "Selecciona un odontólogo.");
-        if (r.startAt() == null) errors.put("startAt", "Selecciona fecha y hora.");
+        if (r.startAt() == null) errors.put(STARTAT, "Selecciona fecha y hora.");
         if (r.reason() == null || r.reason().isBlank()) errors.put("reason", "Indica el motivo de la cita.");
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
@@ -141,17 +182,18 @@ public class AgendaService {
 
         // Bloqueo pesimista sobre el odontólogo: dos recepcionistas no pueden tomar el mismo horario a la vez.
         Dentist d = dentists.lockById(r.dentistId()).orElseThrow(() -> ApiException.notFound("El odontólogo"));
-        Patient p = patients.findById(r.patientId()).orElseThrow(() -> ApiException.notFound("El paciente"));
+        // También se bloquea al paciente: no puede quedar con dos citas cruzadas aunque sean con distintos odontólogos.
+        Patient p = patients.lockById(r.patientId()).orElseThrow(() -> ApiException.notFound("El paciente"));
         if (!p.active) throw ApiException.badRequest("PACIENTE_INACTIVO", "El paciente está inactivo.");
         if (!d.active || !d.user.active) throw ApiException.badRequest("ODONTOLOGO_INACTIVO", "El odontólogo no está disponible.");
 
         LocalDateTime start = r.startAt().withSecond(0).withNano(0);
         LocalDateTime end = start.plusMinutes(duration);
         if (start.isBefore(Dates.now())) {
-            throw ApiException.field("startAt", "No se pueden programar citas en horas pasadas.");
+            throw ApiException.field(STARTAT, "No se pueden programar citas en horas pasadas.");
         }
         if (start.getMinute() % 15 != 0) {
-            throw ApiException.field("startAt", "La hora de inicio debe ser en bloques de 15 minutos.");
+            throw ApiException.field(STARTAT, "La hora de inicio debe ser en bloques de 15 minutos.");
         }
         List<SlotCalculator.Block> blocks = blocksFor(d.id, start.toLocalDate());
         if (!SlotCalculator.fitsInBlocks(blocks, start.toLocalTime(), end.toLocalTime())) {
@@ -179,7 +221,34 @@ public class AgendaService {
         a.durationMin = duration;
         a.reason = r.reason().trim();
         a.notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().trim();
+        // v2.10: la categoría es la misma de los procedimientos y de las reglas de comisión. Si no llega, se deduce del motivo.
+        a.category = categoryFor(r.category(), a.reason);
         return a;
+    }
+
+    private String categoryFor(String category, String reason) {
+        if (category != null && !category.isBlank()) {
+            List<String> l = jdbc.queryForList("select category from procedures where category = ? limit 1", String.class, category.trim());
+            if (l.isEmpty()) throw ApiException.field("category", "La categoría no existe.");
+            return l.get(0);
+        }
+        if (reason == null || reason.isBlank()) return null;
+        List<String> l = jdbc.queryForList("select category from procedures where active = true and category is not null"
+                + " and (? like concat('%', name, '%') or ? = category) order by length(name) desc limit 1", String.class, reason, reason);
+        if (!l.isEmpty()) return l.get(0);
+        // Palabras de uso diario (las mismas que se usaron para clasificar las citas antiguas en V24).
+        String r = java.text.Normalizer.normalize(reason.toLowerCase(java.util.Locale.ROOT), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        String[][] words = {
+                {"Ortodoncia", "ortodon", "bracket", "brackets", "alineador"}, {"Endodoncia", "endodon", "conducto", "nervio"},
+                {"Prevención", "profila", "limpieza", "fluor", "sellante", "destartraje"}, {"Cirugía", "exodon", "extrac", "cordal", "muela del juicio"},
+                {"Operatoria", "restaura", "resina", "curacion", "caries", "obturac"}, {"Estética", "blanquea", "carilla"},
+                {"Implantología", "implant"}, {"Prótesis", "protesis", "corona", "puente", "placa"},
+                {"Periodoncia", "encia", "periodon", "sangrado"}, {"Diagnóstico", "evaluaci", "control", "dolor", "consulta", "diagnost", "radiograf", "revision"}};
+        for (String[] w : words) for (int i = 1; i < w.length; i++) if (r.contains(w[i])) {
+            List<String> ok = jdbc.queryForList("select category from procedures where category = ? limit 1", String.class, w[0]);
+            if (!ok.isEmpty()) return ok.get(0);
+        }
+        return null;
     }
 
     /*
@@ -194,8 +263,10 @@ public class AgendaService {
         a.createdAt = Dates.now();
         a.createdBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
+        audit.register("CITA", a.id, "CREAR", a.patient.getFullName() + " con " + a.dentist.getFullName()
                 + " el " + a.startAt.format(DMY_HM));
+        notifications.appointmentCreated(a);   // HU-23: recordatorio programado
+        events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.CREATED));
         return a;
     }
 
@@ -210,16 +281,24 @@ public class AgendaService {
             throw ApiException.field("changeReason", "Indica el motivo de la reprogramación.");
         }
         String before = a.startAt.format(DMY_HM) + " con " + a.dentist.getFullName();
+        java.time.LocalDateTime previousStart = a.startAt;
+        String previousDentist = a.dentist.getFullName();
         AppointmentRequest merged = new AppointmentRequest(a.patient.id, r.dentistId(), r.startAt(), r.durationMin(),
-                r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason());
+                r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason(), r.category() == null ? a.category : r.category());
         validateAndFill(a, merged);
         a.status = AppointmentStatus.PROGRAMADA;
         a.statusReason = "Reprogramada: " + r.changeReason().trim();
+        a.rescheduleRequestedAt = null;
+        a.arrivedAt = null;   // si había llegado y se reprograma, la llegada ya no aplica a la nueva hora
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
+        audit.register("CITA", a.id, "REPROGRAMAR", "De " + before + " a " + a.startAt.format(DMY_HM)
                 + " · " + r.changeReason().trim());
+        if (!previousStart.equals(a.startAt) || !previousDentist.equals(a.dentist.getFullName())) {
+            notifications.appointmentRescheduled(a, previousStart, previousDentist);   // HU-24
+            events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.RESCHEDULED));
+        }
         return a;
     }
 
@@ -236,6 +315,7 @@ public class AgendaService {
         if (r.status() == AppointmentStatus.CANCELADA && (r.reason() == null || r.reason().isBlank())) {
             throw ApiException.field("reason", "Indica el motivo de la cancelación.");
         }
+        checkTiming(a, r.status(), Dates.now());
         if (r.status() == AppointmentStatus.EN_ESPERA) {
             a.arrivedAt = Dates.now();
         }
@@ -245,9 +325,41 @@ public class AgendaService {
         a.updatedAt = Dates.now();
         a.updatedBy = CurrentUser.usernameOrSystem();
         appointments.save(a);
-        audit.record("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
+        audit.register("CITA", a.id, "ESTADO", label(prev) + " → " + label(a.status)
                 + (r.reason() == null || r.reason().isBlank() ? "" : " · " + r.reason().trim()));
+        if (a.status == AppointmentStatus.CANCELADA) {
+            notifications.appointmentCancelled(a, r.reason());   // HU-24
+        }
+        if (a.status == AppointmentStatus.ATENDIDA) {
+            notifications.appointmentAttended(a);                 // v2.6: agradecimiento y encuesta
+        }
+        events.publishEvent(new AppointmentEvent(a, AppointmentEvent.Type.STATUS));
         return a;
+    }
+
+    /** Coherencia con el reloj: no se registra una llegada de otro día ni una inasistencia antes de la hora. */
+    static void checkTiming(Appointment a, AppointmentStatus to, LocalDateTime now) {
+        String dia = a.startAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        switch (to) {
+            case EN_ESPERA, EN_ATENCION -> {
+                if (!a.startAt.toLocalDate().equals(now.toLocalDate())) {
+                    throw ApiException.conflict("FUERA_DE_FECHA",
+                            "La llegada y la atención solo se registran el día de la cita (" + dia + ").");
+                }
+            }
+            case NO_ASISTIO -> {
+                if (now.isBefore(a.startAt)) {
+                    throw ApiException.conflict("CITA_NO_INICIADA",
+                            "La cita aún no empieza (" + a.startAt.format(DMY_HM) + "): no se puede marcar como inasistencia.");
+                }
+            }
+            case CONFIRMADA -> {
+                if (!now.isBefore(a.endAt)) {
+                    throw ApiException.conflict("CITA_PASADA", "La cita ya pasó: no se puede confirmar.");
+                }
+            }
+            default -> { /* los demás casos no requieren acción */ }
+        }
     }
 
     private static String label(AppointmentStatus s) {

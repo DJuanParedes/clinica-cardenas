@@ -28,6 +28,8 @@ public class Appointment {
     public int durationMin;
 
     public String reason;
+    /** v2.10: categoría del procedimiento (Diagnóstico, Prevención, Ortodoncia...). */
+    public String category;
     public String notes;
 
     @Enumerated(EnumType.STRING)
@@ -37,6 +39,13 @@ public class Appointment {
     public String statusReason;
     @Column(name = "arrived_at")
     public LocalDateTime arrivedAt;
+
+    /** El paciente pidió reprogramar desde WhatsApp (respondió "2"); recepción debe llamarlo. */
+    @Column(name = "reschedule_requested_at")
+    public LocalDateTime rescheduleRequestedAt;
+    /** v2.6: por dónde se reservó (RECEPCION, APP, WHATSAPP, WEB). */
+    @Column(name = "booked_via")
+    public String bookedVia;
 
     @Column(name = "created_at")
     public LocalDateTime createdAt;

@@ -24,6 +24,11 @@ import java.util.*;
 
 @Service
 public class BillingService {
+    private static final String RECHAZADO = "RECHAZADO";
+    private static final String CUSTOMERDOCNUMBER = "customerDocNumber";
+    private static final String CUSTOMERDOCTYPE = "customerDocType";
+    private static final String ITEMS = "items";
+
 
     private final InvoiceRepository invoices;
     private final InvoiceItemRepository invoiceItems;
@@ -111,33 +116,33 @@ public class BillingService {
             return e;
         }
         if ("01".equals(type)) {
-            if (!"6".equals(cdt)) e.put("customerDocType", "La factura se emite solo a un RUC.");
-            else if (!RucValidator.isValid(doc)) e.put("customerDocNumber", "El RUC no es válido (11 dígitos y dígito verificador).");
+            if (!"6".equals(cdt)) e.put(CUSTOMERDOCTYPE, "La factura se emite solo a un RUC.");
+            else if (!RucValidator.isValid(doc)) e.put(CUSTOMERDOCNUMBER, "El RUC no es válido (11 dígitos y dígito verificador).");
             if (r.customerAddress() == null || r.customerAddress().isBlank()) e.put("customerAddress", "Ingresa la dirección fiscal del cliente.");
         } else {
             switch (cdt) {
-                case "1" -> { if (!doc.matches("^\\d{8}$")) e.put("customerDocNumber", "El DNI debe tener 8 dígitos."); }
-                case "4" -> { if (!doc.matches("^[A-Za-z0-9]{9,12}$")) e.put("customerDocNumber", "Carné de extranjería inválido."); }
-                case "7" -> { if (!doc.matches("^[A-Za-z0-9]{6,12}$")) e.put("customerDocNumber", "Pasaporte inválido."); }
-                case "6" -> { if (!RucValidator.isValid(doc)) e.put("customerDocNumber", "El RUC no es válido."); }
+                case "1" -> { if (!doc.matches("^\\d{8}$")) e.put(CUSTOMERDOCNUMBER, "El DNI debe tener 8 dígitos."); }
+                case "4" -> { if (!doc.matches("^[A-Za-z0-9]{9,12}$")) e.put(CUSTOMERDOCNUMBER, "Carné de extranjería inválido."); }
+                case "7" -> { if (!doc.matches("^[A-Za-z0-9]{6,12}$")) e.put(CUSTOMERDOCNUMBER, "Pasaporte inválido."); }
+                case "6" -> { if (!RucValidator.isValid(doc)) e.put(CUSTOMERDOCNUMBER, "El RUC no es válido."); }
                 case "0" -> {
                     if (total != null && total.compareTo(boletaLimit) > 0) {
-                        e.put("customerDocType", "Las boletas mayores a S/ " + boletaLimit.toPlainString() + " requieren identificar al cliente.");
+                        e.put(CUSTOMERDOCTYPE, "Las boletas mayores a S/ " + boletaLimit.toPlainString() + " requieren identificar al cliente.");
                     }
                 }
-                default -> e.put("customerDocType", "Selecciona el tipo de documento del cliente.");
+                default -> e.put(CUSTOMERDOCTYPE, "Selecciona el tipo de documento del cliente.");
             }
         }
         if (!"0".equals(cdt) && (r.customerName() == null || r.customerName().trim().length() < 3)) {
             e.put("customerName", "Ingresa el nombre o razón social del cliente.");
         }
         if (r.items() == null || r.items().isEmpty()) {
-            e.put("items", "Agrega al menos un concepto.");
+            e.put(ITEMS, "Agrega al menos un concepto.");
         } else {
             for (LineRequest l : r.items()) {
-                if (l.description() == null || l.description().isBlank()) { e.put("items", "Cada concepto necesita una descripción."); break; }
-                if (l.quantity() == null || l.quantity().signum() <= 0) { e.put("items", "La cantidad debe ser mayor a cero."); break; }
-                if (l.unitPrice() == null || l.unitPrice().signum() <= 0) { e.put("items", "El precio debe ser mayor a cero."); break; }
+                if (l.description() == null || l.description().isBlank()) { e.put(ITEMS, "Cada concepto necesita una descripción."); break; }
+                if (l.quantity() == null || l.quantity().signum() <= 0) { e.put(ITEMS, "La cantidad debe ser mayor a cero."); break; }
+                if (l.unitPrice() == null || l.unitPrice().signum() <= 0) { e.put(ITEMS, "El precio debe ser mayor a cero."); break; }
             }
         }
         return e;
@@ -232,8 +237,8 @@ public class BillingService {
         inv.xmlContent = signed.xml();
         inv.hash = signed.digestValue();
         invoices.save(inv);
-        audit.record("COMPROBANTE", inv.id, "GENERAR", inv.getFullNumber() + " · S/ " + inv.totalAmount.toPlainString());
-        return detail(inv.id);
+        audit.register("COMPROBANTE", inv.id, "GENERAR", inv.getFullNumber() + " · S/ " + inv.totalAmount.toPlainString());
+        return detailInternal(inv.id);
     }
 
     // ------------------------------------------------------------------ HU-11 envío a SUNAT
@@ -244,8 +249,8 @@ public class BillingService {
         if ("ACEPTADO".equals(inv.status) || "OBSERVADO".equals(inv.status)) {
             throw ApiException.conflict("YA_ENVIADO", "El comprobante ya fue aceptado por SUNAT.");
         }
-        if ("RECHAZADO".equals(inv.status)) {
-            throw ApiException.conflict("RECHAZADO", "El comprobante fue rechazado. Emite uno nuevo con los datos corregidos.");
+        if (RECHAZADO.equals(inv.status)) {
+            throw ApiException.conflict(RECHAZADO, "El comprobante fue rechazado. Emite uno nuevo con los datos corregidos.");
         }
         long t0 = System.currentTimeMillis();
         SunatGateway.Response res;
@@ -255,7 +260,7 @@ public class BillingService {
             res = new SunatGateway.Response("ERROR", null, "Sin respuesta del servicio: " + e.getMessage(), null, "SUNAT");
         }
         apply(inv, res, (int) (System.currentTimeMillis() - t0), "ENVIO_SUNAT");
-        return detail(inv.id);
+        return detailInternal(inv.id);
     }
 
     /**
@@ -278,12 +283,12 @@ public class BillingService {
         if (res.isPresent()) {
             String before = inv.status;
             apply(inv, res.get(), (int) (System.currentTimeMillis() - t0), "CONSULTA_SUNAT");
-            m = detail(inv.id);
+            m = detailInternal(inv.id);
             m.put("statusMessage", before.equals(inv.status)
                     ? "SUNAT confirma el estado " + inv.status + "."
                     : "SUNAT tiene registrado el comprobante como " + inv.status + ". Se actualizó el estado y se guardó la constancia.");
         } else {
-            m = detail(inv.id);
+            m = detailInternal(inv.id);
             m.put("statusMessage", "SUNAT no tiene registrado este comprobante. "
                     + ("GENERADO".equals(inv.status) || "ERROR".equals(inv.status) ? "Envíalo para obtener la constancia." : ""));
         }
@@ -325,7 +330,7 @@ public class BillingService {
         if (res.cdrXml() != null) inv.cdrContent = res.cdrXml();
         inv.sentAt = sub.attemptAt;
         invoices.save(inv);
-        if ("RECHAZADO".equals(inv.status) && !"RECHAZADO".equals(previous)) {
+        if (RECHAZADO.equals(inv.status) && !RECHAZADO.equals(previous)) {
             // libera los procedimientos para que puedan facturarse en un comprobante corregido
             for (InvoiceItem it : invoiceItems.findByInvoiceIdOrderByLineNumberAsc(inv.id)) {
                 if (it.treatmentItemId != null) {
@@ -333,7 +338,7 @@ public class BillingService {
                 }
             }
         }
-        audit.record("COMPROBANTE", inv.id, action, inv.getFullNumber() + " → " + res.status()
+        audit.register("COMPROBANTE", inv.id, action, inv.getFullNumber() + " → " + res.status()
                 + (res.code() == null ? "" : " (" + res.code() + ")"));
     }
 
@@ -345,10 +350,14 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> detail(Long id) {
+        return detailInternal(id);
+    }
+
+    private Map<String, Object> detailInternal(Long id) {
         Invoice inv = get(id);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("invoice", inv);
-        m.put("items", invoiceItems.findByInvoiceIdOrderByLineNumberAsc(id));
+        m.put(ITEMS, invoiceItems.findByInvoiceIdOrderByLineNumberAsc(id));
         m.put("submissions", submissions.findByInvoiceIdOrderByAttemptAtDesc(id));
         m.put("amountInWords", AmountInWords.of(inv.totalAmount));
         m.put("company", company);
@@ -371,7 +380,7 @@ public class BillingService {
                 } else {
                     String like = "%" + query + "%";
                     ps.add(cb.or(cb.like(cb.upper(root.<String>get("customerName")), like),
-                                 cb.like(root.<String>get("customerDocNumber"), like)));
+                                 cb.like(root.<String>get(CUSTOMERDOCNUMBER), like)));
                 }
             }
             if (status != null && !status.isBlank()) ps.add(cb.equal(root.get("status"), status));

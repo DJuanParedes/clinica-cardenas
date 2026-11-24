@@ -1,5 +1,7 @@
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../core/auth.service';
 import { Api, InvoiceDetail } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { CUSTOMER_DOC, INVOICE_LABEL, INVOICE_TONE, apiError, dateTime, saveBlob, shortDate, soles } from '../core/format';
@@ -10,7 +12,7 @@ import { LogoComponent } from '../shared/logo.component';
 @Component({
   selector: 'app-invoice-detail',
   standalone: true,
-  imports: [RouterLink, IconComponent, LogoComponent],
+  imports: [RouterLink, FormsModule, IconComponent, LogoComponent],
   template: `
     <div class="page">
       <a class="back no-print" routerLink="/comprobantes"><app-icon name="chevronLeft" [size]="16" /> Comprobantes</a>
@@ -100,9 +102,25 @@ import { LogoComponent } from '../shared/logo.component';
                 }
                 <div class="row wrap">
                   <button type="button" class="btn sm" (click)="print()"><app-icon name="print" [size]="15" /> Imprimir</button>
-                  <button type="button" class="btn sm" (click)="xml()"><app-icon name="download" [size]="15" /> XML</button>
-                  <button type="button" class="btn sm" (click)="cdr()" [disabled]="!d.invoice.hasCdr"><app-icon name="download" [size]="15" /> CDR</button>
+                  <button type="button" class="btn sm" (click)="pdf()"><app-icon name="download" [size]="15" /> PDF</button>
+                  <button type="button" class="btn sm" (click)="mailOpen = !mailOpen" [disabled]="d.invoice.status === 'RECHAZADO'"><app-icon name="send" [size]="15" /> Enviar por correo</button>
                 </div>
+                @if (mailOpen) {
+                  <form class="mail" (ngSubmit)="mail()">
+                    <label class="small" for="ml">Correo del cliente</label>
+                    <input id="ml" class="input" type="email" name="ml" [(ngModel)]="mailTo" placeholder="cliente@correo.com" />
+                    <button class="btn primary sm" type="submit" [disabled]="mailing">{{ mailing ? 'Enviando…' : 'Enviar comprobante' }}</button>
+                    <p class="muted small">Se envía la representación impresa y el XML firmado adjunto (validez ante SUNAT).</p>
+                  </form>
+                }
+                @if (isAdmin) {
+                  <details class="tech small"><summary>Archivos técnicos SUNAT</summary>
+                    <div class="row wrap">
+                      <button type="button" class="btn sm" (click)="xml()"><app-icon name="download" [size]="15" /> XML</button>
+                      <button type="button" class="btn sm" (click)="cdr()" [disabled]="!d.invoice.hasCdr"><app-icon name="download" [size]="15" /> CDR</button>
+                    </div>
+                  </details>
+                }
               </div>
             </section>
 
@@ -134,6 +152,9 @@ import { LogoComponent } from '../shared/logo.component';
     </div>
   `,
   styles: [`
+    .mail { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+    .tech { margin-top: 8px; } .tech summary { cursor: pointer; color: var(--ink-3); }
+    @media print { .mail, .tech { display: none !important; } }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
     .doc { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 32px 36px; }
     .dh { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 3px solid var(--brand); }
@@ -163,6 +184,7 @@ import { LogoComponent } from '../shared/logo.component';
 export class InvoiceDetailComponent implements OnInit {
   private api = inject(Api);
   private toast = inject(ToastService);
+  private authSvc = inject(AuthService);
 
   @Input() id!: string;
 
@@ -206,6 +228,21 @@ export class InvoiceDetailComponent implements OnInit {
       next: (b) => saveBlob(b, name),
       error: () => this.toast.error('No se pudo descargar el archivo.'),
     });
+  }
+  mailOpen = false;
+  mailTo = '';
+  mailing = false;
+  get isAdmin() { return this.authSvc.user()?.role === 'ADMIN'; }
+  mail() {
+    this.mailing = true;
+    this.api.emailInvoice(+this.id, this.mailTo).subscribe({
+      next: (r: any) => { this.mailing = false; this.mailOpen = false; r.simulated ? this.toast.warn(r.message) : this.toast.ok(r.message); },
+      error: (e) => { this.mailing = false; this.toast.error(apiError(e).message); },
+    });
+  }
+  pdf() {
+    const inv = this.d!.invoice;
+    this.api.download(`/api/billing/invoices/${inv.id}/pdf`).subscribe({ next: (b) => saveBlob(b, `${inv.series}-${inv.number}.pdf`), error: () => this.toast.error('No se pudo generar el PDF.') });
   }
   xml() { this.file('xml'); }
   cdr() { this.file('cdr'); }

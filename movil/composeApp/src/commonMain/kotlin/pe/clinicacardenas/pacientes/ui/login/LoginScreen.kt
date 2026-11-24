@@ -1,0 +1,293 @@
+package pe.clinicacardenas.pacientes.ui.login
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
+import pe.clinicacardenas.pacientes.data.repository.SessionRepository
+import pe.clinicacardenas.pacientes.platform.PlatformActions
+import pe.clinicacardenas.pacientes.ui.components.Banner
+import pe.clinicacardenas.pacientes.ui.components.Field
+import pe.clinicacardenas.pacientes.ui.components.Logo
+import pe.clinicacardenas.pacientes.ui.components.Panel
+import pe.clinicacardenas.pacientes.ui.components.PrimaryButton
+import pe.clinicacardenas.pacientes.ui.theme.Brand
+
+@Composable
+fun LoginScreen(vm: LoginViewModel = koinViewModel()) {
+    val s by vm.state.collectAsState()
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Brand.CelesteSuave, Brand.Fondo)))
+            .safeDrawingPadding()
+            .imePadding(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            Modifier.widthIn(max = 480.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(24.dp))
+            Logo(84.dp)
+            Spacer(Modifier.height(12.dp))
+            Text("Clínica Dental Cárdenas", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Brand.Tinta)
+            Text("Tus citas, recordatorios y pagos en un solo lugar", color = Brand.Tinta2, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(22.dp))
+
+            WhoSwitch(s.staff, vm::setStaff)
+            Spacer(Modifier.height(10.dp))
+            if (!s.staff) {
+                Tabs(s.mode, vm::mode)
+                Spacer(Modifier.height(12.dp))
+            }
+
+            Panel(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+                when {
+                    s.staff -> StaffForm(s, vm)
+                    s.mode == LoginMode.INGRESAR -> LoginForm(s, vm)
+                    else -> ActivateForm(s, vm)
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "RUC 10102984841 · Lima, Perú",
+                color = Brand.Gris,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
+            )
+        }
+    }
+}
+
+/** Paciente o personal de la clínica: misma app, dos formas de ingresar. */
+@Composable
+private fun WhoSwitch(staff: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(false to "Soy paciente", true to "Soy del personal").forEach { (v, label) ->
+            val on = v == staff
+            Box(
+                Modifier
+                    .background(if (on) Brand.Naranja else Color.White, RoundedCornerShape(50))
+                    .clickable { onSelect(v) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Text(label, color = if (on) Color.White else Brand.Tinta2, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StaffForm(s: LoginState, vm: LoginViewModel) {
+    Text("Ingreso del personal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Odontólogos, recepción, caja y dirección. Usa la misma cuenta de la web.", color = Brand.Tinta2, fontSize = 14.sp)
+    Spacer(Modifier.height(12.dp))
+    Field(s.username, { v -> vm.edit { copy(username = v.trim().lowercase()) } }, "Usuario", error = s.fieldErrors["username"])
+    Field(s.staffPassword, { vm.edit { copy(staffPassword = it) } }, "Contraseña", password = true, error = s.fieldErrors["staffPassword"])
+    if (s.needCode) {
+        Banner("Tu cuenta tiene verificación en 2 pasos. Escribe el código de tu app de autenticación.", Brand.CelesteSuave, Brand.AzulOscuro, Modifier.padding(vertical = 6.dp))
+        Field(
+            value = s.staffCode,
+            onChange = { v -> vm.edit { copy(staffCode = v.filter(Char::isDigit).take(6)) } },
+            label = "Código de 6 dígitos",
+            keyboard = KeyboardType.Number,
+            error = s.fieldErrors["staffCode"],
+        )
+    }
+    s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
+    Spacer(Modifier.height(8.dp))
+    PrimaryButton("Ingresar", vm::staffLogin, loading = s.loading)
+    val platform = koinInject<PlatformActions>()
+    val server = koinInject<SessionRepository>().serverUrl.trimEnd('/')
+    TextButton(onClick = { platform.openUrl("$server/recuperar") }) { Text("¿Olvidaste tu contraseña?", color = Brand.Azul) }
+}
+
+@Composable
+private fun Tabs(mode: LoginMode, onSelect: (LoginMode) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(14.dp)).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        listOf(LoginMode.INGRESAR to "Ingresar", LoginMode.ACTIVAR to "Primera vez").forEach { (m, label) ->
+            val on = m == mode
+            Box(
+                Modifier
+                    .weight(1f)
+                    .background(if (on) Brand.Azul else Color.Transparent, RoundedCornerShape(10.dp))
+                    .clickable { onSelect(m) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, color = if (on) Color.White else Brand.Tinta2, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocFields(s: LoginState, vm: LoginViewModel) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        listOf("DNI", "CE", "PAS").forEach { t ->
+            val on = s.docType == t
+            Box(
+                Modifier
+                    .background(if (on) Brand.CelesteSuave else Brand.Fondo, RoundedCornerShape(50))
+                    .clickable { vm.edit { copy(docType = t) } }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(if (t == "PAS") "Pasaporte" else t, color = if (on) Brand.AzulOscuro else Brand.Gris, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Field(
+        value = s.docNumber,
+        onChange = { v -> vm.edit { copy(docNumber = v.filter { it.isLetterOrDigit() }.take(12)) } },
+        label = "Número de documento",
+        keyboard = if (s.docType == "DNI") KeyboardType.Number else KeyboardType.Text,
+        error = s.fieldErrors["docNumber"],
+    )
+}
+
+@Composable
+private fun LoginForm(s: LoginState, vm: LoginViewModel) {
+    Text("Ingresa a tu cuenta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(12.dp))
+    DocFields(s, vm)
+    Field(s.password, { vm.edit { copy(password = it) } }, "Contraseña", password = true, error = s.fieldErrors["password"])
+    s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
+    Spacer(Modifier.height(8.dp))
+    PrimaryButton("Ingresar", vm::login, loading = s.loading)
+    Spacer(Modifier.height(10.dp))
+    Text(
+        "¿Aún no tienes contraseña? Toca “Primera vez” y te enviamos un código.",
+        color = Brand.Gris,
+        fontSize = 13.sp,
+    )
+}
+
+@Composable
+private fun ActivateForm(s: LoginState, vm: LoginViewModel) {
+    Text("Activa tu cuenta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Usa el documento y la fecha de nacimiento que registraste en la clínica.", color = Brand.Tinta2, fontSize = 14.sp)
+    Spacer(Modifier.height(12.dp))
+    DocFields(s, vm)
+    if (!s.codeSent) {
+        Field(
+            value = s.birthDate,
+            onChange = { v -> vm.edit { copy(birthDate = formatBirth(v)) } },
+            label = "Fecha de nacimiento",
+            placeholder = "dd/mm/aaaa",
+            keyboard = KeyboardType.Number,
+            error = s.fieldErrors["birthDate"],
+        )
+        s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton("Enviarme el código", vm::requestCode, loading = s.loading)
+    } else {
+        s.codeInfo?.let { Banner(it, Brand.VerdeSuave, Brand.Verde, Modifier.padding(bottom = 8.dp)) }
+        Field(
+            value = s.code,
+            onChange = { v -> vm.edit { copy(code = v.filter(Char::isDigit).take(6)) } },
+            label = "Código de 6 dígitos",
+            keyboard = KeyboardType.Number,
+            error = s.fieldErrors["code"],
+        )
+        Field(
+            value = s.newPassword,
+            onChange = { vm.edit { copy(newPassword = it) } },
+            label = "Crea tu contraseña",
+            password = true,
+            error = s.fieldErrors["newPassword"] ?: s.fieldErrors["password"],
+        )
+        Row(
+            Modifier.fillMaxWidth().clickable { if (s.consent) vm.edit { copy(consent = false) } else vm.openTerms() }.padding(vertical = 6.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            androidx.compose.material3.Checkbox(checked = s.consent, onCheckedChange = { if (it) vm.openTerms() else vm.edit { copy(consent = false) } })
+            Text(
+                if (s.consent) "Leíste y aceptaste los términos y la política de privacidad (Ley N.° 29733)."
+                else "Leer y aceptar los términos y la política de privacidad (obligatorio, Ley N.° 29733).",
+                color = if (s.fieldErrors["consent"] != null) Brand.Rojo else Brand.Tinta2,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        if (s.termsOpen) TermsDialog(s, vm)
+        s.error?.let { Banner(it, Brand.RojoSuave, Brand.Rojo, Modifier.padding(vertical = 8.dp)) }
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton("Activar y entrar", vm::activate, loading = s.loading)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = vm::back) { Text("← Regresar") }
+            TextButton(onClick = { vm.back(); vm.requestCode() }, enabled = !s.loading) { Text("Pedir otro código") }
+        }
+    }
+}
+
+/** Inserta las barras mientras se escribe: 15031990 → 15/03/1990. */
+private fun formatBirth(raw: String): String {
+    val d = raw.filter(Char::isDigit).take(8)
+    return buildString {
+        d.forEachIndexed { i, c ->
+            if (i == 2 || i == 4) append('/')
+            append(c)
+        }
+    }
+}
+
+
+
+/** Términos completos en una ventana con desplazamiento: el botón "Acepto" se habilita al llegar al final. */
+@Composable
+private fun TermsDialog(s: LoginState, vm: LoginViewModel) {
+    val scroll = rememberScrollState()
+    val atEnd = scroll.maxValue == 0 || scroll.value >= scroll.maxValue - 8
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.edit { copy(termsOpen = false) } },
+        title = { Text(s.terms?.title ?: "Términos y política de privacidad", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+        text = {
+            Column(Modifier.height(380.dp).verticalScroll(scroll)) {
+                Text(s.terms?.body ?: "Cargando…", fontSize = 13.sp, color = Brand.Tinta2)
+                s.terms?.let { Text("Versión " + it.version, fontSize = 12.sp, color = Brand.Gris, modifier = Modifier.padding(top = 8.dp)) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { vm.edit { copy(consent = true, termsOpen = false) } }, enabled = s.terms != null && atEnd) {
+                Text(if (atEnd) "He leído y acepto" else "Desliza hasta el final")
+            }
+        },
+        dismissButton = { TextButton(onClick = { vm.edit { copy(termsOpen = false) } }) { Text("Cerrar") } },
+    )
+}

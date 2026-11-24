@@ -5,10 +5,10 @@ import { Api } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { Appointment, Dentist, Patient, Slot } from '../core/models';
 import { apiError, hhmm, isoDate, longDay, parseLocal } from '../core/format';
+import { CATEGORY_HINT, categoryColor, sortCategories } from '../core/categories';
 import { IconComponent } from '../shared/icon.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
-const REASONS = ['Evaluación inicial', 'Control', 'Profilaxis', 'Dolor dental', 'Endodoncia', 'Restauración', 'Control de ortodoncia', 'Exodoncia'];
 const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 /** HU-07 programar cita según disponibilidad · HU-08 reprogramar. */
@@ -31,7 +31,7 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
           <section class="panel">
             <div class="panel-head"><h3><span class="n">1</span> Paciente</h3></div>
             <div class="panel-body">
-              <app-patient-picker [value]="patient" (valueChange)="patient = $event" [locked]="!!editing" />
+              <app-patient-picker [value]="patient" (valueChange)="pickPatient($event)" [locked]="!!editing" />
             </div>
           </section>
 
@@ -104,17 +104,20 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
           </section>
 
           <section class="panel">
-            <div class="panel-head"><h3><span class="n">4</span> Motivo</h3></div>
+            <div class="panel-head"><h3><span class="n">4</span> Categoría y motivo</h3></div>
             <div class="panel-body stack">
-              <div class="row wrap">
-                @for (r of reasons; track r) {
-                  <button type="button" class="chip" [class.on]="reason === r" (click)="reason = r">{{ r }}</button>
+              <div class="cats" role="radiogroup" aria-label="Categoría de la atención">
+                @for (c of categories; track c) {
+                  <button type="button" class="cat" role="radio" [attr.aria-checked]="category === c" [class.on]="category === c"
+                          [style.--c]="color(c)" (click)="pickCategory(c)">
+                    <span class="dot"></span><span><b>{{ c }}</b><small>{{ hint[c] || '' }}</small></span>
+                  </button>
                 }
               </div>
               <div class="grid cols-2">
                 <div class="field">
-                  <label class="req" for="rs">Motivo de la cita</label>
-                  <input id="rs" class="input" [(ngModel)]="reason" maxlength="200" />
+                  <label for="rs">Detalle del motivo <span class="muted">(opcional)</span></label>
+                  <input id="rs" class="input" [(ngModel)]="reason" maxlength="200" [placeholder]="category ? 'Ej.: ' + example(category) : 'Primero elige la categoría'" />
                 </div>
                 <div class="field">
                   <label for="nt">Notas para el odontólogo</label>
@@ -139,7 +142,7 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
               <dt>Odontólogo</dt><dd>{{ dentist?.fullName || '—' }}</dd>
               <dt>Fecha</dt><dd>{{ longDate }}</dd>
               <dt>Hora</dt><dd class="big tabular">{{ slot ? hhmm(slot.start) + ' – ' + hhmm(slot.end) : '—' }}</dd>
-              <dt>Motivo</dt><dd>{{ reason || '—' }}</dd>
+              <dt>Categoría</dt><dd>{{ category || '—' }}</dd><dt>Motivo</dt><dd>{{ reason || category || '—' }}</dd>
             </dl>
             @if (editing) {
               <div class="notice small was">Antes: {{ wasLabel }}</div>
@@ -154,6 +157,14 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     </div>
   `,
   styles: [`
+    .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+    .cat { display: flex; align-items: flex-start; gap: 8px; text-align: left; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px;
+      background: #fff; font: inherit; cursor: pointer; min-width: 0; }
+    .cat b { display: block; font-size: 13.5px; }
+    .cat small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+    .cat .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-top: 4px; flex: none; }
+    .cat.on { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); background: color-mix(in srgb, var(--c) 8%, #fff); }
+    @media (max-width: 520px) { .cats { grid-template-columns: 1fr 1fr; } .cat small { display: none; } }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
     .steps { display: flex; flex-direction: column; gap: 16px; }
     h3 .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--night); color: #fff; font-size: 12px; margin-right: 8px; }
@@ -211,9 +222,12 @@ export class AppointmentNewComponent implements OnInit {
   slot: Slot | null = null;
   loadingSlots = false;
   reason = '';
+  category = '';
+  categories: string[] = [];
+  hint = CATEGORY_HINT;
+  color = categoryColor;
   notes = '';
   changeReason = '';
-  reasons = REASONS;
   saving = false;
   editing: Appointment | null = null;
   days: { iso: string; wd: string; n: number }[] = [];
@@ -227,12 +241,13 @@ export class AppointmentNewComponent implements OnInit {
     }
     if (this.fecha && this.fecha >= this.todayIso) this.date = this.fecha;
 
+    this.api.procedures().subscribe((ps) => (this.categories = sortCategories(ps.map((p: any) => p.category))));
     this.api.dentists().subscribe((list) => {
       this.dentists = list;
       if (!this.reprogramar && list.length === 1) this.pickDentist(list[0]);
     });
 
-    if (this.paciente) this.api.patient(+this.paciente).subscribe((r) => (this.patient = r.patient));
+    if (this.paciente) this.api.patient(+this.paciente).subscribe((r) => { this.patient = r.patient; this.loadSlots(); });
 
     if (this.reprogramar) {
       this.loadAppointment(+this.reprogramar);
@@ -244,7 +259,8 @@ export class AppointmentNewComponent implements OnInit {
     this.api.appointment(id).subscribe((a) => {
       this.editing = a;
       this.patient = a.patient;
-      this.reason = a.reason;
+      this.category = a.category || '';
+      this.reason = a.reason === this.category ? '' : a.reason;
       this.notes = a.notes || '';
       this.duration = this.durations.includes(a.durationMin) ? a.durationMin : 30;
       this.dentist = a.dentist;
@@ -274,12 +290,21 @@ export class AppointmentNewComponent implements OnInit {
     if (!this.patient) m.push('paciente');
     if (!this.dentist) m.push('odontólogo');
     if (!this.slot) m.push('horario');
-    if (!this.reason.trim()) m.push('motivo');
+    if (!this.category && !this.reason.trim()) m.push('categoría');
     if (this.editing && !this.changeReason.trim()) m.push('motivo de la reprogramación');
     return m.join(', ');
   }
 
+  pickCategory(c: string) { this.category = this.category === c ? '' : c; }
+
+  example(c: string): string {
+    return ({ 'Diagnóstico': 'dolor en molar inferior', 'Prevención': 'limpieza semestral', 'Ortodoncia': 'control mensual de brackets',
+      'Endodoncia': 'segunda sesión de conducto', 'Cirugía': 'extracción de tercera molar', 'Operatoria': 'curación pieza 36' } as Record<string, string>)[c] || 'control';
+  }
+
   pickDentist(d: Dentist) { this.dentist = d; this.loadSlots(); }
+  /** Al elegir paciente se recalculan los horarios: se ocultan las horas en que ya tiene cita con otro odontólogo. */
+  pickPatient(p: Patient | null) { this.patient = p; this.loadSlots(); }
   pickDate(iso: string) { if (!iso || iso < this.todayIso) return; this.date = iso; this.loadSlots(); }
   pickDuration(m: number) { this.duration = m; this.loadSlots(); }
 
@@ -287,7 +312,7 @@ export class AppointmentNewComponent implements OnInit {
     if (!this.dentist) return;
     this.slot = null;
     this.loadingSlots = true;
-    this.api.slots(this.dentist.id, this.date, this.duration, this.editing?.id).subscribe({
+    this.api.slots(this.dentist.id, this.date, this.duration, this.editing?.id, this.patient?.id).subscribe({
       next: (r) => { this.slots = r.slots; this.works = r.works; this.loadingSlots = false; },
       error: (e) => { this.loadingSlots = false; this.toast.error(apiError(e).message); },
     });
@@ -298,7 +323,7 @@ export class AppointmentNewComponent implements OnInit {
     this.saving = true;
     const body = {
       patientId: this.patient.id, dentistId: this.dentist.id, startAt: this.slot.start, durationMin: this.duration,
-      reason: this.reason.trim(), notes: this.notes.trim() || null, changeReason: this.changeReason.trim() || null,
+      reason: this.reason.trim() || this.category, category: this.category || null, notes: this.notes.trim() || null, changeReason: this.changeReason.trim() || null,
     };
     const req = this.editing ? this.api.reschedule(this.editing.id, body) : this.api.createAppointment(body);
     req.subscribe({
@@ -310,7 +335,7 @@ export class AppointmentNewComponent implements OnInit {
         this.saving = false;
         const err = apiError(e);
         this.toast.error(err.message);
-        if (err.code === 'CRUCE_HORARIO' || err.code === 'FUERA_DE_HORARIO') this.loadSlots();
+        if (err.code === 'CRUCE_HORARIO' || err.code === 'CRUCE_PACIENTE' || err.code === 'FUERA_DE_HORARIO') this.loadSlots();
       },
     });
   }

@@ -1,0 +1,2 @@
+Aquí va el certificado digital de la clínica (certificado.p12) para facturar en SUNAT real.
+Este archivo no entra al repositorio. Ver docs/PAGOS_Y_SUNAT_REAL.md

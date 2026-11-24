@@ -1,0 +1,41 @@
+# HTTPS automático con Let's Encrypt para el dominio del servidor (DOMINIO en el .env)
+{$DOMINIO} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	# Webhook de WhatsApp (Meta): entregado/leído y respuestas de los pacientes
+	handle /webhook/whatsapp {
+		reverse_proxy notificaciones:8093
+	}
+	# Panel del simulador de WhatsApp (pide usuario del personal: admin o con permiso Notificaciones).
+	# Solo el panel: la API tipo Meta del simulador queda interna.
+	redir /whatsapp-sim /whatsapp-sim/
+	handle_path /whatsapp-sim/* {
+		@api path /v*
+		respond @api 404
+		reverse_proxy whatsapp-sim:8094
+	}
+	# Panel del microservicio de notificaciones (pide usuario del personal: admin o con permiso Notificaciones).
+	# Solo el panel; la API /v1 del microservicio queda interna.
+	redir /panel-notificaciones /panel-notificaciones/
+	handle_path /panel-notificaciones/* {
+		@api path /v1/* /webhook/*
+		respond @api 404
+		reverse_proxy notificaciones:8093
+	}
+	# Panel del simulador de SUNAT (pide usuario del personal: admin o con permiso Comprobantes).
+	# Se publican el panel y la consulta RUC; el servicio SOAP billService queda interno.
+	redir /sunat-sim /sunat-sim/
+	handle_path /sunat-sim/* {
+		@soap path /ol-ti-*
+		respond @soap 404
+		reverse_proxy sunat-sim:8090
+	}
+	handle {
+		reverse_proxy frontend:80
+	}
+}

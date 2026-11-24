@@ -17,7 +17,8 @@ RUN jlink \
 # ---------- 3) Imagen final ----------
 FROM alpine:3.20
 ENV JAVA_HOME=/opt/jre PATH="/opt/jre/bin:${PATH}" TZ=America/Lima
-RUN apk add --no-cache tzdata wget && addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache tzdata wget && addgroup -S app && adduser -S app -G app \
+ && mkdir -p /data/archivos && chown app:app /data/archivos
 COPY --from=jre /opt/jre /opt/jre
 WORKDIR /app
 COPY --from=build /src/target/app.jar app.jar

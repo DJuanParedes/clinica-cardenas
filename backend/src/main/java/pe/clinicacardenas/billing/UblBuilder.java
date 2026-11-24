@@ -12,6 +12,9 @@ import java.util.List;
  * se incorpora al pasar al entorno beta/producción (spike SP-01).
  */
 public final class UblBuilder {
+    private static final String CBC_ID_CAC_PARTYIDENTIFICATION = "</cbc:ID></cac:PartyIdentification>";
+    private static final String CBC_TAXAMOUNT = "</cbc:TaxAmount>";
+
 
     private UblBuilder() {}
 
@@ -46,13 +49,13 @@ public final class UblBuilder {
         x.append("  <cbc:DocumentCurrencyCode>").append(cur).append("</cbc:DocumentCurrencyCode>\n");
 
         x.append("  <cac:Signature><cbc:ID>").append(c.ruc()).append("</cbc:ID>")
-         .append("<cac:SignatoryParty><cac:PartyIdentification><cbc:ID>").append(c.ruc()).append("</cbc:ID></cac:PartyIdentification>")
+         .append("<cac:SignatoryParty><cac:PartyIdentification><cbc:ID>").append(c.ruc()).append(CBC_ID_CAC_PARTYIDENTIFICATION)
          .append("<cac:PartyName><cbc:Name>").append(esc(c.businessName())).append("</cbc:Name></cac:PartyName></cac:SignatoryParty>")
          .append("<cac:DigitalSignatureAttachment><cac:ExternalReference><cbc:URI>#SignatureSP</cbc:URI></cac:ExternalReference>")
          .append("</cac:DigitalSignatureAttachment></cac:Signature>\n");
 
         x.append("  <cac:AccountingSupplierParty><cac:Party>")
-         .append("<cac:PartyIdentification><cbc:ID schemeID=\"6\">").append(c.ruc()).append("</cbc:ID></cac:PartyIdentification>")
+         .append("<cac:PartyIdentification><cbc:ID schemeID=\"6\">").append(c.ruc()).append(CBC_ID_CAC_PARTYIDENTIFICATION)
          .append("<cac:PartyName><cbc:Name>").append(esc(c.tradeName())).append("</cbc:Name></cac:PartyName>")
          .append("<cac:PartyLegalEntity><cbc:RegistrationName>").append(esc(c.businessName())).append("</cbc:RegistrationName>")
          .append("<cac:RegistrationAddress><cbc:ID>").append(c.ubigeo()).append("</cbc:ID><cbc:AddressTypeCode>0000</cbc:AddressTypeCode>")
@@ -62,7 +65,7 @@ public final class UblBuilder {
 
         x.append("  <cac:AccountingCustomerParty><cac:Party>")
          .append("<cac:PartyIdentification><cbc:ID schemeID=\"").append(inv.customerDocType).append("\">")
-         .append(esc(inv.customerDocNumber)).append("</cbc:ID></cac:PartyIdentification>")
+         .append(esc(inv.customerDocNumber)).append(CBC_ID_CAC_PARTYIDENTIFICATION)
          .append("<cac:PartyLegalEntity><cbc:RegistrationName>").append(esc(inv.customerName)).append("</cbc:RegistrationName>");
         if (inv.customerAddress != null) {
             x.append("<cac:RegistrationAddress><cac:AddressLine><cbc:Line>").append(esc(inv.customerAddress))
@@ -72,9 +75,9 @@ public final class UblBuilder {
 
         x.append("  <cac:PaymentTerms><cbc:ID>FormaPago</cbc:ID><cbc:PaymentMeansID>Contado</cbc:PaymentMeansID></cac:PaymentTerms>\n");
 
-        x.append("  <cac:TaxTotal><cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(inv.igvAmount)).append("</cbc:TaxAmount>")
+        x.append("  <cac:TaxTotal><cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(inv.igvAmount)).append(CBC_TAXAMOUNT)
          .append("<cac:TaxSubtotal><cbc:TaxableAmount currencyID=\"").append(cur).append("\">").append(amt(inv.taxableAmount)).append("</cbc:TaxableAmount>")
-         .append("<cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(inv.igvAmount)).append("</cbc:TaxAmount>")
+         .append("<cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(inv.igvAmount)).append(CBC_TAXAMOUNT)
          .append("<cac:TaxCategory><cac:TaxScheme><cbc:ID>1000</cbc:ID><cbc:Name>IGV</cbc:Name><cbc:TaxTypeCode>VAT</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory>")
          .append("</cac:TaxSubtotal></cac:TaxTotal>\n");
 
@@ -91,9 +94,9 @@ public final class UblBuilder {
              .append("<cbc:LineExtensionAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineValue)).append("</cbc:LineExtensionAmount>")
              .append("<cac:PricingReference><cac:AlternativeConditionPrice><cbc:PriceAmount currencyID=\"").append(cur).append("\">")
              .append(amt(it.unitPrice)).append("</cbc:PriceAmount><cbc:PriceTypeCode>01</cbc:PriceTypeCode></cac:AlternativeConditionPrice></cac:PricingReference>")
-             .append("<cac:TaxTotal><cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineIgv)).append("</cbc:TaxAmount>")
+             .append("<cac:TaxTotal><cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineIgv)).append(CBC_TAXAMOUNT)
              .append("<cac:TaxSubtotal><cbc:TaxableAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineValue)).append("</cbc:TaxableAmount>")
-             .append("<cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineIgv)).append("</cbc:TaxAmount>")
+             .append("<cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineIgv)).append(CBC_TAXAMOUNT)
              .append("<cac:TaxCategory><cbc:Percent>18.00</cbc:Percent><cbc:TaxExemptionReasonCode>10</cbc:TaxExemptionReasonCode>")
              .append("<cac:TaxScheme><cbc:ID>1000</cbc:ID><cbc:Name>IGV</cbc:Name><cbc:TaxTypeCode>VAT</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory>")
              .append("</cac:TaxSubtotal></cac:TaxTotal>")

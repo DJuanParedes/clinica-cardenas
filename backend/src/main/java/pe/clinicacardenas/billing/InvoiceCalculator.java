@@ -21,7 +21,9 @@ public final class InvoiceCalculator {
     public static Totals compute(List<LineIn> in, BigDecimal igvRate) {
         BigDecimal factor = BigDecimal.ONE.add(igvRate);
         List<LineOut> out = new ArrayList<>();
-        BigDecimal taxable = BigDecimal.ZERO, igv = BigDecimal.ZERO, total = BigDecimal.ZERO;
+        BigDecimal taxable = BigDecimal.ZERO;
+        BigDecimal igv = BigDecimal.ZERO;
+        BigDecimal total = BigDecimal.ZERO;
         for (LineIn l : in) {
             BigDecimal qty = l.quantity().setScale(2, RoundingMode.HALF_UP);
             BigDecimal price = l.unitPrice().setScale(2, RoundingMode.HALF_UP);

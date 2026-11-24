@@ -3,6 +3,8 @@ export type Role = 'ADMIN' | 'RECEPCION' | 'ODONTOLOGO' | 'CAJA' | 'DIRECTOR';
 export interface SessionUser {
   id: number; username: string; fullName: string; email: string;
   role: Role; roleLabel: string; dentistId?: number;
+  /** HU-26: permisos del rol, configurables por el administrador. */
+  permissions: string[];
 }
 
 export interface ApiError {
@@ -12,19 +14,23 @@ export interface ApiError {
 export interface Patient {
   id: number; docType: string; docNumber: string; firstName: string; lastName: string; fullName: string;
   birthDate: string; age: number; sex: 'F' | 'M'; phone: string; email?: string; address?: string; district?: string;
-  emergencyContactName?: string; emergencyContactPhone?: string; notes?: string; active: boolean;
+  emergencyContactName?: string; emergencyContactPhone?: string; notes?: string; active: boolean; notifyChannel?: string;
   createdAt: string; createdBy: string; updatedAt?: string; updatedBy?: string;
+  ubigeo?: string; department?: string; province?: string; emergencyContactRelationship?: string; minor?: boolean;
+  guardianName?: string; guardianDocType?: string; guardianDocNumber?: string; guardianRelationship?: string; guardianPhone?: string;
+  dataConsent?: boolean; consentVersion?: string; consentChannel?: string; consentFileId?: number;
+  source?: string; sourceDetail?: string; hcNumber?: string; fiscalRuc?: string; fiscalName?: string; fiscalAddress?: string;
 }
 
 export interface UserLite { id: number; username: string; fullName: string; role: Role; active: boolean; }
 
-export interface Dentist { id: number; specialty: string; cop?: string; color: string; active: boolean; fullName: string; user: UserLite; }
+export interface Dentist { id: number; specialty: string; cop?: string; color: string; active: boolean; fullName: string; user: UserLite; photoUrl?: string | null; }
 
 export type AppointmentStatus = 'PROGRAMADA' | 'CONFIRMADA' | 'EN_ESPERA' | 'EN_ATENCION' | 'ATENDIDA' | 'CANCELADA' | 'NO_ASISTIO';
 
 export interface Appointment {
   id: number; patient: Patient; dentist: Dentist; startAt: string; endAt: string; durationMin: number;
-  reason: string; notes?: string; status: AppointmentStatus; statusReason?: string; arrivedAt?: string;
+  reason: string; category?: string | null; notes?: string; status: AppointmentStatus; statusReason?: string; arrivedAt?: string;
   createdAt: string; createdBy: string;
 }
 

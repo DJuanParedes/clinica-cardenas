@@ -7,3 +7,19 @@ frontend/.angular/
 *.iml
 .vscode/
 *.log
+apk/
+node_modules/
+
+# Llaves de firma de Android (nunca al repositorio)
+*.jks
+*.keystore
+
+# SonarQube local
+sonar/.clave
+sonar/reporte-sonar.json
+sonar/resumen.txt
+sonar/analisis.log
+
+# Certificado digital de SUNAT (nunca al repositorio)
+deploy/sunat/*.p12
+deploy/sunat/*.pfx

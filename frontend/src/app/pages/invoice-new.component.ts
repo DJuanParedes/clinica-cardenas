@@ -220,7 +220,10 @@ export class InvoiceNewComponent implements OnInit {
     this.rucInfo = null;
     this.rucMsg = '';
     if (t === '01') {
-      this.customer = { docType: '6', docNumber: '', name: '', address: '' };
+      // v2.5: si el paciente tiene datos fiscales, la factura sale a ese RUC
+      this.customer = this.patient?.fiscalRuc
+        ? { docType: '6', docNumber: this.patient.fiscalRuc, name: (this.patient.fiscalName || '').toUpperCase(), address: this.patient.fiscalAddress || '' }
+        : { docType: '6', docNumber: '', name: '', address: '' };
     } else if (this.patient) {
       this.fillFromPatient(this.patient);
     } else {
@@ -239,6 +242,7 @@ export class InvoiceNewComponent implements OnInit {
     this.loadedBillable = false;
     if (!p) return;
     if (this.docType === '03') this.fillFromPatient(p);
+    else this.setType('01');
     this.api.billableItems(p.id).subscribe((b) => {
       this.billable = b;
       this.loadedBillable = true;

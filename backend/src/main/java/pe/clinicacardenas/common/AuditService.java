@@ -15,7 +15,7 @@ public class AuditService {
         this.repo = repo;
     }
 
-    public void record(String entity, Long entityId, String action, String detail) {
+    public void register(String entity, Long entityId, String action, String detail) {
         AuditLog a = new AuditLog();
         a.entity = entity;
         a.entityId = entityId;

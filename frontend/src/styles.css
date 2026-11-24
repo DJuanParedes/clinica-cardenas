@@ -193,6 +193,9 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2);
 }
 .table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table td.right.tabular, .table th.right { white-space: nowrap; }
+.table th.right, .table th.num, .table td.right, .table td.num { text-align: right; }
+.table th.center, .table td.center { text-align: center; }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr.click { cursor: pointer; }
 .table tbody tr.click:hover td { background: #f4f9f8; }
@@ -256,12 +259,51 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   .cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* v2.10: tablas en celular y tablet (hasta 900 px): cada fila se vuelve una tarjeta, sin desplazamiento horizontal */
+@media (max-width: 900px) {
+  /* fila = tarjeta */
+  .table:not(.keep) thead { display: none; }
+  .table:not(.keep), .table:not(.keep) tbody, .table:not(.keep) tr, .table:not(.keep) td { display: block; width: 100%; }
+  .table:not(.keep) tr { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .table:not(.keep) tr:last-child { border-bottom: 0; }
+  .table:not(.keep) td { border: 0 !important; padding: 2px 0 !important; text-align: left !important; white-space: normal !important; }
+  .table:not(.keep) td:empty { display: none; }
+  .table:not(.keep) td[colspan] { padding: 8px 0 !important; }
+  .table:not(.keep) .row.end, .table:not(.keep) td .actions { justify-content: flex-start; }
+  .table:not(.keep) td .btn { margin: 4px 6px 0 0; }
+  .table:not(.keep) tbody tr.click:hover td { background: none; }
+  .table:not(.keep) td.right .row, .table:not(.keep) td .row.end { justify-content: flex-start; }
+  .table:not(.keep) td[data-label]:not([data-label=""])::before {
+    content: attr(data-label) ": "; color: var(--muted); font-size: 12px; font-weight: 600; margin-right: 4px;
+  }
+  .table:not(.keep) td:first-child { font-weight: 600; }
+}
+/* En pantallas grandes una tabla ancha se desplaza dentro de su tarjeta y nunca se sale de ella */
+.panel:has(> .table), .panel:has(> table), .card:has(> .table) { overflow-x: auto; }
+@media (max-width: 1366px) {
+  .table th, .table td { padding-left: 10px; padding-right: 10px; }
+}
+/* Ningún hijo de una grilla puede empujarla más allá de la pantalla */
+.grid > *, .layout > *, .split > * { min-width: 0; }
+img, svg, video { max-width: 100%; }
+/* Rangos de fechas: los campos se encogen en vez de salirse de la tarjeta */
+.row > input[type=date].input { min-width: 0; flex: 1 1 120px; }
+
 @media (max-width: 720px) {
   .page { padding: 20px 16px 48px; }
   .cols-2, .cols-3, .cols-4 { grid-template-columns: minmax(0, 1fr); }
   .span-2 { grid-column: auto; }
   .kv { grid-template-columns: 1fr; gap: 2px; }
   .kv dd { margin-bottom: 8px; }
+
+  .scroll { overflow-x: visible !important; }
+  .panel-head { flex-wrap: wrap; padding: 12px 14px; }
+  .page-head h1 { font-size: 1.6rem; }
+  .page-head .actions, .page-head > .row { width: 100%; }
+  .input.search, .input { max-width: 100%; }
+  .seg { flex-wrap: wrap; }
+  .tabs { overflow-x: auto; }
+  .payform, .grid.two, .grid.three { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -272,3 +314,5 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: ver
   body { background: #fff; }
   .no-print { display: none !important; }
 }
+.teal-ink { color: var(--teal-strong); }
+.input.search { max-width: 360px; }

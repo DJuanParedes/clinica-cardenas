@@ -1,3 +1,6 @@
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+// @ts-ignore: sin tipado
+import qrcode from 'qrcode-generator';
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -73,24 +76,40 @@ import { LogoComponent } from '../shared/logo.component';
             @if (touched && !password) { <span class="err">Ingresa tu contraseña.</span> }
           </div>
 
+          @if (needCode) {
+            <div class="field">
+              <label for="c">Código de verificación</label>
+              <input id="c" name="code" class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6"
+                     autocomplete="one-time-code" placeholder="000000" />
+              @if (codeMethod === 'CORREO') {
+                <span class="muted small">{{ codeHint || 'Te enviamos un código de 6 dígitos a tu correo.' }} Vence en 10 minutos.</span>
+                <button type="button" class="btn sm ghost" (click)="resend()" [disabled]="loading">Enviar otro código</button>
+              } @else {
+                <span class="muted small">Abre tu app de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de 6 dígitos.</span>
+              }
+            </div>
+          }
           <button class="btn primary lg block" type="submit" [disabled]="loading">
             @if (loading) { <span class="spin"></span> Verificando… } @else { Ingresar }
           </button>
 
-          <details class="demo">
-            <summary>Cuentas de prueba</summary>
-            <p class="small muted">Contraseña para todas: <strong>Clinica2026</strong></p>
-            <div class="accounts">
-              @for (a of demo; track a.u) {
-                <button type="button" class="acc" (click)="fill(a.u)"><span class="strong">{{ a.u }}</span><span class="muted">{{ a.r }}</span></button>
-              }
-            </div>
-          </details>
+          <a class="patient-app" routerLink="/app/ingresar"><app-icon name="smartphone" [size]="18" /> <span><strong>¿Eres paciente?</strong> Revisa tus citas en la app</span></a>
+          <div class="getapp">
+            <div class="qr" [innerHTML]="qr" role="img" aria-label="Código QR para descargar la app"></div>
+            <div><strong>Descarga la app para Android</strong>
+              <p class="small muted">Escanea el código con la cámara de tu celular o <a href="/app/ClinicaCardenas.apk" download>descárgala aquí</a>. Al instalar, permite "orígenes desconocidos" si Android lo pide.</p></div>
+          </div>
+          <a class="lrb" routerLink="/libro-reclamaciones"><img src="libro-reclamaciones.svg" alt="" width="30" height="30" /> Libro de Reclamaciones</a>
         </form>
       </section>
     </div>
   `,
   styles: [`
+    .lrb { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 13.5px; font-weight: 700; }
+    .getapp { display: flex; gap: 14px; align-items: center; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+    .getapp .qr { width: 104px; height: 104px; flex: none; background: #fff; }
+    .getapp .qr :is(svg) { width: 100%; height: 100%; display: block; }
+    .getapp p { margin: 4px 0 0; }
     .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; background: var(--surface); }
     .art { position: relative; overflow: hidden; background: #f4fbfe; display: flex; flex-direction: column; justify-content: center; padding: 150px 64px 140px; }
     .dot { position: absolute; border-radius: 50%; }
@@ -111,14 +130,14 @@ import { LogoComponent } from '../shared/logo.component';
     .card h2 { font-size: var(--step-3); }
     .mobile-brand { display: none; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 900; font-size: 20px; }
     .pw { position: relative; }
+    .code { font-size: 22px; letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
     .pw .input { padding-right: 44px; }
     .eye { position: absolute; right: 4px; top: 4px; height: 32px; width: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
     .eye:hover { color: var(--ink); background: var(--surface-2); }
-    .demo { border-top: 1px solid var(--line); padding-top: 14px; font-size: var(--step--1); }
-    .demo summary { cursor: pointer; color: var(--ink-2); font-weight: 700; }
-    .demo p { margin: 8px 0; }
     .accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .acc { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+    .patient-app { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--orange-soft); color: var(--orange-ink); font-size: 13.5px; }
+    .patient-app:hover { text-decoration: none; filter: brightness(.98); }
     .acc:hover { border-color: var(--brand); background: var(--brand-soft); }
     @media (max-width: 900px) {
       .wrap { grid-template-columns: 1fr; }
@@ -138,31 +157,42 @@ export class LoginComponent {
   touched = false;
   error = '';
   locked = false;
+  needCode = false;
+  codeMethod = 'APP';
+  codeHint = '';
+  resend() { this.code = ''; this.needCode = false; this.submit(); }
+  code = '';
+  private sanitizer = inject(DomSanitizer);
+  qr: SafeHtml = (() => {
+    const q = (qrcode as any)(0, 'M');
+    q.addData(location.origin + '/app/ClinicaCardenas.apk');
+    q.make();
+    return this.sanitizer.bypassSecurityTrustHtml(q.createSvgTag({ cellSize: 3, margin: 1, scalable: true }));
+  })();
 
-  demo = [
-    { u: 'admin', r: 'Administrador' }, { u: 'recepcion', r: 'Recepcionista' },
-    { u: 'dra.cardenas', r: 'Odontóloga' }, { u: 'dr.ramos', r: 'Odontólogo' },
-    { u: 'caja', r: 'Caja' }, { u: 'director', r: 'Director' },
-  ];
-
-  fill(u: string) {
-    this.username = u;
-    this.password = 'Clinica2026';
-  }
 
   submit() {
     this.touched = true;
     this.error = '';
     if (!this.username || !this.password) return;
     this.loading = true;
-    this.auth.login(this.username.trim(), this.password).subscribe({
+    this.auth.login(this.username.trim(), this.password, this.needCode ? this.code.trim() : undefined).subscribe({
       next: () => this.router.navigateByUrl(this.auth.home()),
       error: (e) => {
         const err = apiError(e);
         this.loading = false;
         this.locked = err.code === 'CUENTA_BLOQUEADA';
+        if (err.code === 'REQUIERE_2FA') {
+          this.needCode = true; this.error = '';
+          this.codeMethod = err.fields?.['method'] || 'APP';
+          this.codeHint = this.codeMethod === 'CORREO' ? err.message : '';
+          return;
+        }
+        if (err.code === 'CODIGO_2FA_INVALIDO') { this.code = ''; this.error = err.message; return; }
         this.error = err.status === 0 ? 'No hay conexión con el servidor.' : err.message;
         this.password = '';
+        this.needCode = false;
+        this.code = '';
       },
     });
   }

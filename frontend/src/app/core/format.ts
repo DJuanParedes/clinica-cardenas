@@ -40,7 +40,8 @@ export function parseLocal(iso: string): Date {
   // "2026-11-05T09:30:00" o "2026-11-05" interpretados como hora local
   const [d, t] = iso.split('T');
   const [y, m, day] = d.split('-').map(Number);
-  const [hh, mm, ss] = (t || '00:00:00').split(':').map((x) => parseInt(x, 10) || 0);
+  // los segundos pueden faltar ("2026-11-24T10:00", así serializa Java cuando son 0)
+  const [hh = 0, mm = 0, ss = 0] = (t || '00:00:00').split(':').map((x) => parseInt(x, 10) || 0);
   return new Date(y, m - 1, day, hh, mm, ss);
 }
 
@@ -102,4 +103,63 @@ export function saveBlob(blob: Blob, filename: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export const METHOD_LABEL: Record<string, string> = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' };
+export const CATEGORY_LABEL: Record<string, string> = {
+  INSUMOS: 'Insumos', LABORATORIO: 'Laboratorio', HONORARIOS: 'Honorarios de odontólogos', ALQUILER: 'Alquiler', SERVICIOS: 'Servicios', PLANILLA: 'Planilla',
+  MANTENIMIENTO: 'Mantenimiento', MARKETING: 'Publicidad', IMPUESTOS: 'Impuestos', OTROS: 'Otros',
+};
+export const NOTIF_TYPE: Record<string, string> = { RECORDATORIO: 'Recordatorio', CAMBIO_CITA: 'Cambio de cita', CANCELACION: 'Cancelación', CODIGO_ACCESO: 'Código de acceso',
+  MENSAJE: 'Mensaje', CONTROL: 'Control preventivo', LISTA_ESPERA: 'Lista de espera', CUOTA: 'Cuota por vencer', CITA_REGISTRADA: 'Cita registrada',
+  CAMPANA: 'Campaña', CUMPLEANOS: 'Cumpleaños', AVISO_PREVIO: 'Aviso previo', RECORDATORIO_DIA: 'Recordatorio del día', AGRADECIMIENTO: 'Agradecimiento', ENCUESTA: 'Encuesta' };
+export const NOTIF_STATUS: Record<string, string> = {
+  PENDIENTE: 'En cola', PROGRAMADO: 'Programado', ENVIADO: 'Enviado', ENTREGADO: 'Entregado', LEIDO: 'Leído', FALLIDO: 'Fallido', ANULADO: 'Anulado', DUPLICADO: 'Duplicado evitado',
+};
+export const NOTIF_TONE: Record<string, string> = { PENDIENTE: 'amber', PROGRAMADO: 'blue', ENVIADO: 'green', ENTREGADO: 'green', LEIDO: 'teal', FALLIDO: 'gum', ANULADO: 'grey', DUPLICADO: 'teal' };
+export const CHANNEL_LABEL: Record<string, string> = { WHATSAPP: 'WhatsApp', EMAIL: 'Correo', AMBOS: 'WhatsApp y correo', NINGUNO: 'No recibir avisos' };
+export const SETTLEMENT_LABEL: Record<string, string> = { PENDIENTE: 'Por pagar', PARCIAL: 'Pago parcial', PAGADA: 'Pagada', ANULADA: 'Anulada' };
+export const SETTLEMENT_TONE: Record<string, string> = { PENDIENTE: 'amber', PARCIAL: 'blue', PAGADA: 'green', ANULADA: 'grey' };
+
+/** Períodos rápidos para filtros de reportes. */
+export function periodPreset(key: string): { from: string; to: string } {
+  const t = new Date();
+  const d = (y: number, m: number, day: number) => isoDate(new Date(y, m, day));
+  const y = t.getFullYear(), m = t.getMonth();
+  switch (key) {
+    case 'hoy': return { from: isoDate(t), to: isoDate(t) };
+    case 'semana': {
+      const dow = (t.getDay() + 6) % 7;
+      const s = new Date(t); s.setDate(t.getDate() - dow);
+      return { from: isoDate(s), to: isoDate(t) };
+    }
+    case 'mes': return { from: d(y, m, 1), to: isoDate(t) };
+    case 'mes-anterior': return { from: d(y, m - 1, 1), to: d(y, m, 0) };
+    case '3-meses': return { from: d(y, m - 2, 1), to: isoDate(t) };
+    case 'anio': return { from: d(y, 0, 1), to: isoDate(t) };
+    default: { const s = new Date(t); s.setDate(t.getDate() - 29); return { from: isoDate(s), to: isoDate(t) }; }
+  }
+}
+export const PERIODS = [
+  { key: 'hoy', label: 'Hoy' }, { key: 'semana', label: 'Esta semana' }, { key: 'mes', label: 'Este mes' },
+  { key: 'mes-anterior', label: 'Mes anterior' }, { key: '3-meses', label: 'Últimos 3 meses' }, { key: 'anio', label: 'Este año' },
+];
+
+/** Descarga una tabla como CSV (Excel en español usa punto y coma). */
+export function downloadCsv(filename: string, header: string[], rows: (string | number | null | undefined)[][]) {
+  const cell = (v: unknown) => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const csv = '\ufeff' + [header, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
+  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename);
+}
+
+export const FILE_KIND: Record<string, string> = {
+  FOTO: 'Foto', RADIOGRAFIA: 'Radiografía', DOCUMENTO: 'Documento', CONSENTIMIENTO: 'Consentimiento', RECETA: 'Receta', PRESUPUESTO: 'Presupuesto',
+};
+export function fileSize(b: number): string {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+  return (b / 1024 / 1024).toFixed(1) + ' MB';
 }

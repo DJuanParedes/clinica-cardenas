@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -10,7 +11,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, FormsModule],
   template: `
     <div class="page">
       <div class="page-head">
@@ -19,12 +20,20 @@ import { IconComponent } from '../shared/icon.component';
           <h1>{{ greeting }}, {{ firstName }}</h1>
         </div>
         <div class="actions">
-          @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+          @if (auth.can('PACIENTES_EDITAR')) {
             <a class="btn" routerLink="/pacientes/nuevo"><app-icon name="patient" [size]="16" /> Registrar paciente</a>
+          }
+          @if (auth.can('CITAS_GESTIONAR')) {
             <a class="btn primary" routerLink="/citas/nueva"><app-icon name="plus" [size]="16" /> Nueva cita</a>
           }
-          @if (auth.hasRole('CAJA')) {
-            <a class="btn primary" routerLink="/comprobantes/nuevo"><app-icon name="receipt" [size]="16" /> Emitir comprobante</a>
+          @if (auth.can('COMPROBANTES') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn" routerLink="/comprobantes/nuevo"><app-icon name="receipt" [size]="16" /> Emitir comprobante</a>
+          }
+          @if (auth.can('CAJA_COBRAR') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn primary" routerLink="/caja/cobro"><app-icon name="wallet" [size]="16" /> Registrar cobro</a>
+          }
+          @if (auth.can('REPORTES') && !auth.can('CITAS_GESTIONAR')) {
+            <a class="btn primary" routerLink="/reportes"><app-icon name="chart" [size]="16" /> Ver indicadores</a>
           }
         </div>
       </div>
@@ -33,6 +42,36 @@ import { IconComponent } from '../shared/icon.component';
         <div class="skeleton" style="height: 92px; margin-bottom: 16px"></div>
         <div class="skeleton" style="height: 320px"></div>
       } @else {
+        @if (ts && (ts.mineOverdue || ts.mineToday)) {
+          <a class="task-strip" routerLink="/tareas" [class.hot]="ts.mineOverdue">
+            <app-icon name="checks" [size]="18" />
+            <span><strong>{{ ts.mineToday }} tarea{{ ts.mineToday === 1 ? '' : 's' }} para hoy</strong>{{ ts.mineOverdue ? ' · ' + ts.mineOverdue + ' vencida' + (ts.mineOverdue === 1 ? '' : 's') : '' }}{{ ts.unassigned ? ' · ' + ts.unassigned + ' sin asignar' : '' }}</span>
+            <span class="go">Ver mis tareas →</span>
+          </a>
+        }
+        @if (unc?.total && canCall) {
+          <section class="panel unc" [class.hot]="unc.overdue" aria-label="Citas por confirmar">
+            <div class="panel-head"><h3><app-icon name="phone" [size]="16" /> Citas sin confirmar (próximas 24 h)</h3>
+              <span class="small">@if (unc.overdue) { <strong class="hotx">{{ unc.overdue }} ya no pueden confirmar: llama al paciente</strong> } @else { {{ unc.total }} esperando confirmación }</span></div>
+            <table class="table">
+              <tbody>
+                @for (a of unc.items.slice(0, 8); track a.id) {
+                  <tr>
+                    <td class="nowrap tabular">{{ when(a.startAt) }}<div class="muted small">{{ a.dentist }}</div></td>
+                    <td><a [routerLink]="['/pacientes', a.patientId]">{{ a.patient }}</a> <a class="small" [href]="'tel:' + a.phone">{{ a.phone }}</a>
+                      <div class="muted small">{{ a.reason }}{{ a.callNote ? ' · última llamada: ' + a.callNote : '' }}</div></td>
+                    <td>@if (a.overdue) { <span class="tag gum">Plazo vencido</span> } @else { <span class="tag amber">Puede confirmar hasta {{ hm(a.deadline) }}</span> }</td>
+                    <td class="right nowrap">
+                      <button class="btn sm primary" type="button" (click)="call(a, 'CONFIRMADA')">Confirmó</button>
+                      <button class="btn sm" type="button" (click)="call(a, 'NO_CONTESTA')">No contesta</button>
+                      <button class="btn sm ghost" type="button" (click)="call(a, 'REPROGRAMAR')">Pide cambio</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
         <section class="figures panel" aria-label="Resumen del día">
           <div class="fig">
             <span class="v tabular">{{ data.appointmentsToday }}</span>
@@ -44,16 +83,16 @@ import { IconComponent } from '../shared/icon.component';
             <span class="l">en sala de espera</span>
             <span class="meta">o en atención ahora</span>
           </div>
-          @if (auth.hasRole('ADMIN', 'CAJA', 'DIRECTOR')) {
+          @if (auth.can('CAJA_COBRAR', 'CAJA_REPORTE', 'REPORTES')) {
             <div class="fig">
-              <span class="v tabular">{{ money(data.billedToday) }}</span>
-              <span class="l">facturado hoy</span>
-              <span class="meta">{{ money(data.billedMonth) }} en el mes</span>
+              <span class="v tabular">{{ money(data.collectedToday) }}</span>
+              <span class="l">cobrado hoy</span>
+              <span class="meta">{{ money(data.collectedMonth) }} en el mes · {{ money(data.receivable) }} por cobrar</span>
             </div>
             <div class="fig">
               <span class="v tabular" [class.warn]="data.pendingSunat > 0">{{ data.pendingSunat }}</span>
               <span class="l">comprobantes sin enviar</span>
-              @if (data.pendingSunat > 0 && auth.hasRole('ADMIN', 'CAJA')) {
+              @if (data.pendingSunat > 0 && auth.can('COMPROBANTES')) {
                 <a class="meta" routerLink="/comprobantes" [queryParams]="{ status: 'GENERADO' }">Revisar envíos</a>
               } @else { <span class="meta">todo enviado a SUNAT</span> }
             </div>
@@ -71,11 +110,19 @@ import { IconComponent } from '../shared/icon.component';
           }
         </section>
 
+        @if (alerts().length) {
+          <section class="attn" aria-label="Pendientes de seguimiento">
+            @for (a of alerts(); track a.text) {
+              <a class="attn-item" [routerLink]="a.link" [class.warn]="a.warn"><app-icon [name]="a.icon" [size]="18" /><span>{{ a.text }}</span></a>
+            }
+          </section>
+        }
+
         <div class="board">
           <section class="panel">
             <div class="panel-head">
               <h3>Próximas citas de hoy</h3>
-              @if (auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO', 'DIRECTOR')) { <a routerLink="/agenda" class="small">Ver agenda completa</a> }
+              @if (auth.can('AGENDA_VER')) { <a routerLink="/agenda" class="small">Ver agenda completa</a> }
             </div>
             @if (data.upcoming.length === 0) {
               <div class="empty">
@@ -93,7 +140,7 @@ import { IconComponent } from '../shared/icon.component';
                       <div class="muted small">{{ a.reason }} · {{ a.dentist.fullName }} · {{ a.durationMin }} min</div>
                     </div>
                     <span class="tag" [class]="'tag ' + tone(a.status)">{{ label(a.status) }}</span>
-                    @if (auth.hasRole('ADMIN', 'RECEPCION')) {
+                    @if (auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="arrive(a)" [disabled]="busy === a.id">Registrar llegada</button>
                     }
                   </li>
@@ -115,9 +162,9 @@ import { IconComponent } from '../shared/icon.component';
                       <div class="strong">{{ a.patient.fullName }}</div>
                       <div class="muted small">Cita {{ hhmm(a.startAt) }} · llegó {{ hhmm(a.arrivedAt) }}</div>
                     </div>
-                    @if (a.status === 'EN_ESPERA' && auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO')) {
+                    @if (a.status === 'EN_ESPERA' && auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="move(a, 'EN_ATENCION')" [disabled]="busy === a.id">Pasar a atención</button>
-                    } @else if (a.status === 'EN_ATENCION' && auth.hasRole('ADMIN', 'RECEPCION', 'ODONTOLOGO')) {
+                    } @else if (a.status === 'EN_ATENCION' && auth.can('CITAS_ESTADO')) {
                       <button type="button" class="btn sm" (click)="move(a, 'ATENDIDA')" [disabled]="busy === a.id">Marcar atendida</button>
                     } @else {
                       <span class="tag" [class]="'tag ' + tone(a.status)">{{ label(a.status) }}</span>
@@ -132,6 +179,15 @@ import { IconComponent } from '../shared/icon.component';
     </div>
   `,
   styles: [`
+    .task-strip { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: var(--radius);
+      background: var(--teal-soft); color: var(--ink); text-decoration: none; }
+    .task-strip.hot { background: var(--gum-soft); border-color: #efc3cf; }
+    .task-strip .go { margin-left: auto; color: var(--teal-strong); font-weight: 700; font-size: var(--step--1); }
+    .unc { margin-bottom: 16px; } .unc.hot { border-color: #f3b4ac; } .hotx { color: var(--gum); }
+    .attn { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
+    .attn-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--teal-strong); font-size: 13.5px; font-weight: 600; }
+    .attn-item.warn { background: var(--orange-soft); color: var(--orange-ink); }
+    .attn-item:hover { text-decoration: none; filter: brightness(.97); }
     .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
     .fig { display: flex; flex-direction: column; padding: 18px 22px; border-right: 1px solid var(--line); }
     .fig:last-child { border-right: 0; }
@@ -180,7 +236,40 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() { this.load(); }
 
-  load() { this.api.dashboard().subscribe((d) => (this.data = d)); }
+  load() {
+    this.api.dashboard().subscribe((d) => (this.data = d));
+    if (this.auth.can('TAREAS')) this.api.taskSummary().subscribe({ next: (t) => (this.ts = t), error: () => {} });
+    if (this.canCall) this.api.unconfirmed().subscribe({ next: (u) => (this.unc = u), error: () => {} });
+  }
+
+  unc: any = null;
+  ts: any = null;
+  get canCall() { return this.auth.can('CITAS_GESTIONAR') || this.auth.can('CITAS_ESTADO'); }
+  when(iso: string) { const d = new Date(iso); return d.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit' }) + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }
+  hm(iso: string) { return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); }
+  call(a: any, result: string) {
+    const note = result === 'CONFIRMADA' ? '' : (prompt('Nota de la llamada (opcional)') || '');
+    this.api.callResult(a.id, result, note).subscribe({
+      next: (u) => { this.unc = u; this.toast.ok(result === 'CONFIRMADA' ? 'Cita confirmada por teléfono.' : 'Llamada registrada.'); },
+      error: (e) => this.toast.error(apiError(e).message),
+    });
+  }
+
+  /** Avisos que piden acción: reprogramaciones, lista de espera, stock bajo y satisfacción. */
+  alerts(): { text: string; link: string; icon: string; warn: boolean }[] {
+    const d = this.data; if (!d) return [];
+    const out: { text: string; link: string; icon: string; warn: boolean }[] = [];
+    const n = (v: any) => +v || 0;
+    if (n(d.rescheduleRequests) && this.auth.can('AGENDA_VER'))
+      out.push({ text: `${d.rescheduleRequests} ${n(d.rescheduleRequests) === 1 ? 'paciente pide' : 'pacientes piden'} reprogramar`, link: '/seguimiento', icon: 'refresh', warn: true });
+    if (n(d.waitlist) && this.auth.can('AGENDA_VER'))
+      out.push({ text: `${d.waitlist} en lista de espera`, link: '/seguimiento', icon: 'clock', warn: false });
+    if (n(d.lowStock) && this.auth.can('INVENTARIO'))
+      out.push({ text: `${d.lowStock} ${n(d.lowStock) === 1 ? 'material por agotarse' : 'materiales por agotarse'}`, link: '/inventario', icon: 'alert', warn: true });
+    if (n(d.surveysCount) && this.auth.can('AGENDA_VER', 'REPORTES'))
+      out.push({ text: `Satisfacción ${(+d.satisfaction).toFixed(1)} ★ (${d.surveysCount} encuestas)`, link: '/seguimiento', icon: 'activity', warn: false });
+    return out;
+  }
 
   hhmm = hhmm;
   money = soles;
