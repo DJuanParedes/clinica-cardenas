@@ -19,6 +19,14 @@
 		respond @api 404
 		reverse_proxy whatsapp-sim:8094
 	}
+	# Panel del simulador de SUNAT (pide usuario del personal: admin o con permiso Comprobantes).
+	# Se publican el panel y la consulta RUC; el servicio SOAP billService queda interno.
+	redir /sunat-sim /sunat-sim/
+	handle_path /sunat-sim/* {
+		@soap path /ol-ti-*
+		respond @soap 404
+		reverse_proxy sunat-sim:8090
+	}
 	handle {
 		reverse_proxy frontend:80
 	}
