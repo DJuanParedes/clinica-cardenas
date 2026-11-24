@@ -16,8 +16,10 @@ public class CashController {
 
     private final CashService service;
     private final CashClosingService closings;
+    private final pe.clinicacardenas.billing.PaymentInvoiceService invoices;
 
-    public CashController(CashService service, CashClosingService closings) {
+    public CashController(CashService service, CashClosingService closings, pe.clinicacardenas.billing.PaymentInvoiceService invoices) {
+        this.invoices = invoices;
         this.closings = closings;
         this.service = service;
     }
@@ -37,9 +39,28 @@ public class CashController {
     @PostMapping("/payments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CAJA_COBRAR')")
-    public Map<String, Object> pay(@RequestBody CashService.PaymentRequest req) {
+    public Map<String, Object> pay(@RequestBody CashService.PaymentRequest req,
+                                   @RequestParam(name = "comprobante", defaultValue = "false") boolean comprobante,
+                                   org.springframework.security.core.Authentication auth) {
         closings.ensureOpen(Dates.today());
-        return service.registerPayment(req);
+        Map<String, Object> out = service.registerPayment(req);
+        boolean canInvoice = auth != null && auth.getAuthorities().stream().anyMatch(a -> "COMPROBANTES".equals(a.getAuthority()));
+        if (comprobante && canInvoice && out.get("payment") instanceof Payment p) {
+            Map<String, Object> copy = new java.util.LinkedHashMap<>(out);
+            try {
+                copy.put("comprobante", invoices.issueForPayment(p.id));
+            } catch (RuntimeException e) {
+                copy.put("comprobanteError", "El cobro quedó registrado, pero no se pudo emitir la boleta: " + e.getMessage());
+            }
+            return copy;
+        }
+        return out;
+    }
+
+    @PostMapping("/payments/{id}/invoice")
+    @PreAuthorize("hasAuthority('COMPROBANTES')")
+    public Map<String, Object> invoice(@PathVariable Long id) {
+        return invoices.issueForPayment(id);
     }
 
     @PostMapping("/payments/{id}/void")
