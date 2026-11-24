@@ -124,6 +124,8 @@ app:
     mercadopago:
       access-token: ${MP_ACCESS_TOKEN:}
       webhook-secret: ${MP_WEBHOOK_SECRET:}
+      # auto: detecta credenciales de prueba (TEST-… o usuario de prueba); true/false lo fija
+      test-mode: ${MP_MODO_PRUEBA:auto}
 
 logging:
   level:

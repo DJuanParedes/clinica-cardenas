@@ -158,8 +158,10 @@ public class OnlineChargeService {
         Map<String, Object> payer = new LinkedHashMap<>();
         payer.put("name", p.firstName);
         payer.put("surname", p.lastName);
-        if (p.email != null && !p.email.isBlank()) payer.put("email", p.email);
-        if ("DNI".equals(p.docType)) payer.put("identification", Map.of("type", "DNI", "number", p.docNumber));
+        // En modo de pruebas no se envía el correo real del paciente: Mercado Pago rechaza mezclar un vendedor de prueba
+        // con un comprador real ("Una de las partes con la que intentas hacer el pago es de prueba").
+        if (!mp.testMode() && p.email != null && !p.email.isBlank()) payer.put("email", p.email);
+        if (!mp.testMode() && "DNI".equals(p.docType)) payer.put("identification", Map.of("type", "DNI", "number", p.docNumber));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("items", List.of(item));
         body.put("payer", payer);
