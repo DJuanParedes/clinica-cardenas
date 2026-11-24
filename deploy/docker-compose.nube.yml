@@ -1,14 +1,17 @@
 # Ajustes para el servidor en la nube (Oracle Cloud). Se usa junto con el docker-compose.yml principal:
 #   docker compose -f docker-compose.yml -f deploy/docker-compose.nube.yml up -d --build
 # - Solo la web queda pública, por HTTPS (Caddy obtiene el certificado de Let's Encrypt solo).
-# - La base de datos y los paneles de SUNAT y notificaciones no se publican a internet. El panel del simulador de
-#   WhatsApp se ve en https://DOMINIO/whatsapp-sim/ con usuario y contraseña del personal.
+# - La base de datos y el panel de notificaciones no se publican a internet. Los paneles de los simuladores se ven en
+#   https://DOMINIO/whatsapp-sim/ y https://DOMINIO/sunat-sim/ con usuario y contraseña del personal.
 services:
   db:
     ports: !reset []
   sunat-sim:
     ports: !override
       - "127.0.0.1:9082:8090"
+    environment:
+      # En internet el panel (https://DOMINIO/sunat-sim/) pide usuario y contraseña del personal.
+      AUTH_URL: http://backend:8080/api/auth/login
   notificaciones:
     ports: !override
       - "127.0.0.1:9083:8093"

@@ -17,6 +17,7 @@
  * Sin dependencias externas: Node 20 (http, zlib, crypto).
  */
 const http = require('http');
+const crypto = require('crypto');
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
@@ -25,6 +26,9 @@ const PORT = Number(process.env.PORT || 8090);
 const DATA_FILE = process.env.DATA_FILE || '/data/registro.json';
 const USUARIO_SOL = (process.env.SUNAT_USUARIO || 'MODDATOS').toUpperCase();
 const CLAVE_SOL = process.env.SUNAT_CLAVE || 'MODDATOS';
+// En internet el panel se publica detrás del proxy (https://DOMINIO/sunat-sim/) y pide usuario del personal.
+// Las llamadas internas del backend (sin proxy) no piden usuario.
+const AUTH_URL = process.env.AUTH_URL || '';
 const SUNAT_RUC = '20131312955';
 
 let modo = 'normal';
@@ -325,7 +329,7 @@ th{background:#f7f9fb;color:#5b6b7a}.modo button{border:1px solid #fff;backgroun
 </style></head><body>
 <header><h1>SUNAT · Servicio de facturación electrónica (simulado, entorno beta)</h1>
 <div class="modo">Estado del servicio:
-${['normal', 'lento', 'caido'].map((m) => `<button class="${modo === m ? 'on' : ''}" onclick="fetch('/admin/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'${m}'})}).then(()=>location.reload())">${m === 'caido' ? 'Caído' : m[0].toUpperCase() + m.slice(1)}</button>`).join('')}
+${['normal', 'lento', 'caido'].map((m) => `<button class="${modo === m ? 'on' : ''}" onclick="fetch('admin/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'${m}'})}).then(()=>location.reload())">${m === 'caido' ? 'Caído' : m[0].toUpperCase() + m.slice(1)}</button>`).join('')}
 </div></header>
 <main>
 <div class="card"><h2>Comprobantes registrados (${filas.length})</h2>
@@ -336,9 +340,30 @@ ${['normal', 'lento', 'caido'].map((m) => `<button class="${modo === m ? 'on' : 
 <tbody>${exc || '<tr><td colspan="4">Sin excepciones.</td></tr>'}</tbody></table></div>
 <div class="card"><h2>Servicios</h2><table><tbody>
 <tr><td><code>POST /ol-ti-itcpfegem-beta/billService</code></td><td>SOAP <b>sendBill</b> y <b>getStatusCdr</b> · usuario SOL <code>RUC + ${USUARIO_SOL}</code></td></tr>
-<tr><td><code>GET /v1/ruc/{ruc}</code></td><td>Consulta RUC (padrón simulado). Prueba: <a href="/v1/ruc/10102984841">10102984841</a>, <a href="/v1/ruc/20100070970">20100070970</a>, <a href="/v1/ruc/20548777217">20548777217</a> (no habido)</td></tr>
+<tr><td><code>GET /v1/ruc/{ruc}</code></td><td>Consulta RUC (padrón simulado). Prueba: <a href="v1/ruc/10102984841">10102984841</a>, <a href="v1/ruc/20100070970">20100070970</a>, <a href="v1/ruc/20548777217">20548777217</a> (no habido)</td></tr>
 </tbody></table></div>
 </main></body></html>`;
+}
+
+// ---------------------------------------------------------------- acceso al panel público
+const sesiones = new Map(); // hash(cabecera Basic) → vence (ms)
+async function panelAutorizado(req) {
+  if (!AUTH_URL || !req.headers['x-forwarded-for']) return { ok: true }; // llamada interna del backend
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Basic ')) return { ok: false };
+  const llave = crypto.createHash('sha256').update(h).digest('hex');
+  if ((sesiones.get(llave) || 0) > Date.now()) return { ok: true };
+  const [username, ...resto] = Buffer.from(h.slice(6), 'base64').toString('utf8').split(':');
+  try {
+    const r = await fetch(AUTH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password: resto.join(':') }), signal: AbortSignal.timeout(8000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, motivo: j.code === 'REQUIERE_2FA' ? 'Tu cuenta usa verificación en 2 pasos: entra con una cuenta del personal sin 2 pasos.' : (j.message || 'Usuario o contraseña incorrectos.') };
+    const u = j.user || {};
+    if (u.role !== 'ADMIN' && !(u.permissions || []).includes('COMPROBANTES')) return { ok: false, motivo: 'Tu usuario no tiene el permiso Comprobantes.' };
+    sesiones.set(llave, Date.now() + 15 * 60_000);
+    return { ok: true };
+  } catch (e) { return { ok: false, motivo: 'No se pudo validar el usuario con el sistema (' + e.message + ').' }; }
 }
 
 // ---------------------------------------------------------------- servidor
@@ -358,7 +383,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   let chunks = [];
   req.on('data', (c) => chunks.push(c));
-  req.on('end', () => {
+  req.on('end', async () => {
     const body = Buffer.concat(chunks).toString('utf8');
     const t0 = Date.now();
     const done = (status, payload, type) => {
@@ -367,6 +392,11 @@ const server = http.createServer((req, res) => {
     };
 
     if (url.pathname === '/health') return done(200, '{"status":"UP"}', 'application/json');
+    const a = await panelAutorizado(req);
+    if (!a.ok) {
+      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="SUNAT simulada - usuario del personal", charset="UTF-8"', 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(a.motivo || 'Ingresa con tu usuario del personal de la clínica (admin o con permiso Comprobantes).');
+    }
     if (url.pathname === '/' && req.method === 'GET') return done(200, panel(), 'text/html; charset=utf-8');
     if (url.pathname === '/admin/modo' && req.method === 'POST') {
       try { const m = JSON.parse(body).modo; if (['normal', 'lento', 'caido'].includes(m)) modo = m; } catch {}
