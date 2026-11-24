@@ -567,7 +567,7 @@ export class CommissionsComponent implements OnInit {
   pay() {
     this.busy = true;
     this.api.paySettlement(this.st.settlement.id, this.pf).subscribe({
-      next: (d) => { this.busy = false; this.toast.ok('Pago registrado.'); this.showSettlement(d); this.refresh(); },
+      next: (d) => { this.busy = false; this.toast.ok('Pago registrado: quedó como egreso en la caja (Honorarios de odontólogos).'); this.showSettlement(d); this.refresh(); },
       error: (err) => { this.busy = false; const a = apiError(err); this.pe = a.fields || {}; this.toast.error(a.message); },
     });
   }

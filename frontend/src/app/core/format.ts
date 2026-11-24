@@ -107,7 +107,7 @@ export function saveBlob(blob: Blob, filename: string) {
 
 export const METHOD_LABEL: Record<string, string> = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' };
 export const CATEGORY_LABEL: Record<string, string> = {
-  INSUMOS: 'Insumos', LABORATORIO: 'Laboratorio', ALQUILER: 'Alquiler', SERVICIOS: 'Servicios', PLANILLA: 'Planilla',
+  INSUMOS: 'Insumos', LABORATORIO: 'Laboratorio', HONORARIOS: 'Honorarios de odontólogos', ALQUILER: 'Alquiler', SERVICIOS: 'Servicios', PLANILLA: 'Planilla',
   MANTENIMIENTO: 'Mantenimiento', MARKETING: 'Publicidad', IMPUESTOS: 'Impuestos', OTROS: 'Otros',
 };
 export const NOTIF_TYPE: Record<string, string> = { RECORDATORIO: 'Recordatorio', CAMBIO_CITA: 'Cambio de cita', CANCELACION: 'Cancelación', CODIGO_ACCESO: 'Código de acceso',

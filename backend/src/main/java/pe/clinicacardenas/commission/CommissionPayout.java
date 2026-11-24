@@ -19,6 +19,8 @@ public class CommissionPayout {
     public BigDecimal amount;
     public String method;
     public String reference;
+    @Column(name = "expense_id")
+    public Long expenseId;
     @Column(name = "created_at")
     public LocalDateTime createdAt;
     @Column(name = "created_by")

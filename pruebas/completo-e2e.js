@@ -215,6 +215,17 @@ async function completoE2E(BASE, NOTIF = BASE.replace(/:(\d+)$/, (m, p) => ':' +
     expect(r.body.settlement.status === 'PARCIAL' && r.body.settlement.pendingAmount == 50, 'parcial');
     r = await api('POST', `/api/commissions/settlements/${set.id}/payouts`, { amount: 50, method: 'EFECTIVO' }, admin);
     expect(r.body.settlement.status === 'PAGADA' && r.body.payouts.length === 2, 'pagada');
+    // Cada pago al odontólogo quedó como egreso de caja (Honorarios) y anular el egreso revierte el pago.
+    const day = (await api('GET', '/api/cash/today', undefined, admin)).body;
+    const hon = (day.detail || []).filter((d) => d.type === 'EGRESO' && String(d.concept || '').includes('liquidación N.° ' + set.id));
+    expect(hon.length === 2, 'egresos de honorarios ' + hon.length);
+    expect(r.body.payouts.every((p) => p.expenseId), 'pagos vinculados a egresos');
+    const last = r.body.payouts[r.body.payouts.length - 1];
+    expectStatus(await api('POST', `/api/cash/expenses/${last.expenseId}/void`, { reason: 'Prueba de reversión' }, admin), 200, 'anular egreso');
+    const back = (await api('GET', `/api/commissions/settlements/${set.id}`, undefined, admin)).body;
+    expect(back.settlement.status === 'PARCIAL' && back.settlement.pendingAmount == 50 && back.payouts.length === 1, 'reversión ' + back.settlement.status);
+    r = await api('POST', `/api/commissions/settlements/${set.id}/payouts`, { amount: 50, method: 'EFECTIVO' }, admin);
+    expect(r.body.settlement.status === 'PAGADA', 'pagada de nuevo');
     expectStatus(await api('POST', `/api/commissions/settlements/${set.id}/annul`, { reason: 'Prueba' }, admin), 409, 'anular pagada');
     const s = (await api('GET', '/api/commissions/summary', undefined, admin)).body;
     expect(s.length >= 2 && s.every((x) => x.pending !== undefined), 'resumen');

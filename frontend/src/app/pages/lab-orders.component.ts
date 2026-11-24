@@ -218,9 +218,9 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
               <strong class="grow">Pagar al laboratorio</strong>
               <input class="input amt tabular" name="pa" type="number" step="0.01" min="0" [(ngModel)]="pay.amount" aria-label="Importe" [class.invalid]="pe['amount']" />
               <select class="input" name="pm" [(ngModel)]="pay.method" aria-label="Medio de pago">@for (m of methods; track m) { <option [value]="m">{{ methodLabel[m] }}</option> }</select>
-              <input class="input" name="pr" [(ngModel)]="pay.reference" placeholder="N° operación" maxlength="40" aria-label="Referencia" />
+              <input class="input" name="pr" [(ngModel)]="pay.reference" [placeholder]="pay.method === 'EFECTIVO' ? 'N° operación (opcional)' : 'N° operación *'" maxlength="40" aria-label="Número de operación" [class.invalid]="pe['reference']" />
               <button class="btn primary sm" type="submit" [disabled]="saving">Registrar pago</button>
-              @if (pe['amount'] || pe['method']) { <span class="err full">{{ pe['amount'] || pe['method'] }}</span> }
+              @if (pe['amount'] || pe['method'] || pe['reference']) { <span class="err full">{{ pe['amount'] || pe['method'] || pe['reference'] }}</span> }
               <span class="muted small full">Se registra como egreso de caja (categoría Laboratorio).</span>
             </form>
           }
@@ -395,7 +395,15 @@ export class LabOrdersComponent implements OnInit {
   }
 
   doPay() {
-    this.saving = true; this.pe = {};
+    this.pe = {};
+    if (this.pay.method !== 'EFECTIVO' && !(this.pay.reference || '').trim()) {
+      this.pe = { reference: 'Ingresa el número de operación del pago al laboratorio.' };
+      return;
+    }
+    const msg = `¿Confirmas que la clínica ya pagó ${this.money(this.pay.amount)} al laboratorio ${this.d.laboratoryName} por ${this.methodLabel[this.pay.method] || this.pay.method}`
+      + `${this.pay.reference ? ' (op. ' + this.pay.reference + ')' : ''}?\n\nSe registrará como egreso en la caja de hoy.`;
+    if (!confirm(msg)) return;
+    this.saving = true;
     this.api.payLabOrder(this.d.id, this.pay).subscribe({
       next: (o) => { this.saving = false; this.d = o; this.pay = { method: this.pay.method, amount: o.balance }; this.toast.ok('Pago registrado en caja.'); this.load(); },
       error: (err) => { this.saving = false; const a = apiError(err); this.pe = a.fields || {}; this.toast.error(a.message); },
