@@ -7,14 +7,16 @@ import { PlanView, Procedure } from '../../core/models';
 import { ITEM_LABEL, ITEM_TONE, apiError, isoDate, shortDate, soles } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 import { ModalComponent } from '../../shared/modal.component';
+import { OnlyDirective } from '../../shared/only.directive';
+import { MAX_PRICE, validTooth } from '../../core/rules';
 
-interface DraftItem { procedureId: number | null; tooth: number | null; price: number | null; }
+interface DraftItem { procedureId: number | null; tooth: string | number | null; price: string | number | null; }
 
 /** HU-06: plan de tratamiento y evolución por sesión. */
 @Component({
   selector: 'app-plan-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, OnlyDirective],
   template: `
     <div class="spread head">
       <p class="muted small">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }} · los procedimientos realizados quedan disponibles para facturar en caja.</p>
@@ -78,7 +80,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                     @for (i of v.items; track i.id) { @if (i.status !== 'REALIZADO') { <option [ngValue]="i.id">{{ i.procedure.name }}{{ i.tooth ? ' · ' + i.tooth : '' }}</option> } }
                   </select>
                 </div>
-                <textarea class="input" rows="2" name="n{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].notes" placeholder="Qué se realizó, materiales, indicaciones…"></textarea>
+                <textarea class="input" rows="2" name="n{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].notes" placeholder="Qué se realizó, materiales, indicaciones…" appOnly="text" maxlength="1000"></textarea>
                 <div class="spread">
                   <label class="check">
                     <input type="checkbox" name="m{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].markDone" [disabled]="!evo[v.plan.id].itemId" />
@@ -120,7 +122,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
         @if (!addTo) {
           <div class="field">
             <label class="req" for="pt">Nombre del plan</label>
-            <input id="pt" name="pt" class="input" [(ngModel)]="title" placeholder="Ej. Rehabilitación sector posterior" />
+            <input id="pt" name="pt" class="input" [(ngModel)]="title" placeholder="Ej. Rehabilitación sector posterior" appOnly="text" maxlength="120" />
           </div>
         }
         <div class="items">
@@ -135,8 +137,10 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                   </optgroup>
                 }
               </select>
-              <input class="input tabular" type="number" [name]="'t' + $index" [(ngModel)]="it.tooth" min="11" max="85" placeholder="—" aria-label="Pieza" />
-              <input class="input tabular" type="number" [name]="'pr' + $index" [(ngModel)]="it.price" min="0" step="0.5" aria-label="Precio" />
+              <input class="input tabular" [name]="'t' + $index" [(ngModel)]="it.tooth" placeholder="—" aria-label="Pieza"
+                     appOnly="digits" maxlength="2" inputmode="numeric" [class.invalid]="it.tooth && !toothOk(it.tooth)" title="Notación FDI: 11–48 o 51–85" />
+              <input class="input tabular" [name]="'pr' + $index" [(ngModel)]="it.price" aria-label="Precio"
+                     appOnly="decimal" [maxInt]="5" maxlength="8" inputmode="decimal" placeholder="0.00" />
               <button type="button" class="btn ghost sm" (click)="draft.splice($index, 1)" [disabled]="draft.length === 1" aria-label="Quitar fila"><app-icon name="x" [size]="15" /></button>
             </div>
           }
@@ -145,7 +149,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
         @if (!addTo) {
           <div class="field">
             <label for="pn">Indicaciones</label>
-            <textarea id="pn" name="pn" class="input" rows="2" [(ngModel)]="notes"></textarea>
+            <textarea id="pn" name="pn" class="input" rows="2" [(ngModel)]="notes" appOnly="text" maxlength="500"></textarea>
           </div>
         }
         <div class="spread">
@@ -203,6 +207,7 @@ export class PlanTabComponent implements OnInit {
   notes = '';
   draft: DraftItem[] = [];
   modalError = '';
+  toothOk = validTooth;
 
   get canEdit() { return this.auth.hasRole('ODONTOLOGO', 'ADMIN'); }
 
@@ -293,13 +298,19 @@ export class PlanTabComponent implements OnInit {
     const items = this.draft.filter((d) => d.procedureId);
     if (!this.addTo && !this.title.trim()) { this.modalError = 'Ponle un nombre al plan.'; return; }
     if (items.length === 0) { this.modalError = 'Agrega al menos un procedimiento.'; return; }
+    const badTooth = items.find((i) => i.tooth !== null && i.tooth !== '' && !validTooth(i.tooth));
+    if (badTooth) { this.modalError = `La pieza ${badTooth.tooth} no existe en la notación FDI (11–48 o 51–85).`; return; }
+    if (items.some((i) => i.price === null || i.price === '' || !(Number(i.price) >= 0) || Number(i.price) > MAX_PRICE)) {
+      this.modalError = 'Cada procedimiento necesita un precio entre S/ 0.00 y S/ 99,999.99.'; return;
+    }
+    const payload = items.map((i) => ({ procedureId: i.procedureId, tooth: i.tooth ? Number(i.tooth) : null, price: Number(i.price) }));
     this.busy = true;
     const done = () => (this.busy = false);
     if (this.addTo) {
       const planId = this.addTo.plan.id;
       let pending = items.length;
       let last: PlanView | null = null;
-      for (const it of items) {
+      for (const it of payload) {
         this.api.addPlanItem(planId, it).subscribe({
           next: (view) => { last = view; if (--pending === 0) { done(); this.modal = false; this.load(); this.toast.ok('Procedimientos agregados.'); } },
           error: (e) => { done(); this.modalError = apiError(e).message; },
@@ -307,7 +318,7 @@ export class PlanTabComponent implements OnInit {
       }
       return;
     }
-    this.api.createPlan(this.patientId, { title: this.title, notes: this.notes, items }).subscribe({
+    this.api.createPlan(this.patientId, { title: this.title.trim(), notes: this.notes.trim() || null, items: payload }).subscribe({
       next: () => { done(); this.modal = false; this.toast.ok('Plan de tratamiento creado.'); this.load(); },
       error: (e) => { done(); this.modalError = apiError(e).message; },
     });

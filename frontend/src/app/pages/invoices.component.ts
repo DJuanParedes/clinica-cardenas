@@ -5,12 +5,13 @@ import { Api } from '../core/api.service';
 import { Invoice, Page } from '../core/models';
 import { INVOICE_LABEL, INVOICE_TONE, shortDate, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { OnlyDirective } from '../shared/only.directive';
 
 /** HU-12: consultar comprobantes por número, cliente, estado y fecha. */
 @Component({
   selector: 'app-invoices',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, OnlyDirective],
   template: `
     <div class="page">
       <div class="page-head">
@@ -24,7 +25,7 @@ import { IconComponent } from '../shared/icon.component';
       <form class="filters panel" (ngSubmit)="search(0)">
         <div class="field grow">
           <label for="q">Número, cliente o documento</label>
-          <input id="q" name="q" class="input" [(ngModel)]="q" placeholder="B001-12, RUC, DNI o nombre" />
+          <input id="q" name="q" class="input" [(ngModel)]="q" placeholder="B001-12, RUC, DNI o nombre" appOnly="text" maxlength="100" />
         </div>
         <div class="field">
           <label for="st">Estado</label>
@@ -39,10 +40,11 @@ import { IconComponent } from '../shared/icon.component';
             <option value="">Todos</option><option value="03">Boletas</option><option value="01">Facturas</option>
           </select>
         </div>
-        <div class="field"><label for="f">Desde</label><input id="f" name="f" type="date" class="input" [(ngModel)]="from" /></div>
-        <div class="field"><label for="t">Hasta</label><input id="t" name="t" type="date" class="input" [(ngModel)]="to" /></div>
+        <div class="field"><label for="f">Desde</label><input id="f" name="f" type="date" class="input" [(ngModel)]="from" [max]="to || null" [class.invalid]="rangeError" /></div>
+        <div class="field"><label for="t">Hasta</label><input id="t" name="t" type="date" class="input" [(ngModel)]="to" [min]="from || null" [class.invalid]="rangeError" /></div>
         <button class="btn" type="submit"><app-icon name="search" [size]="16" /> Buscar</button>
       </form>
+      @if (rangeError) { <p class="err small" role="alert">{{ rangeError }}</p> }
 
       <section class="panel">
         @if (page && page.content.length === 0) {
@@ -111,7 +113,11 @@ export class InvoicesComponent implements OnInit, OnChanges {
     }
   }
 
+  rangeError = '';
+
   search(n: number) {
+    this.rangeError = this.from && this.to && this.from > this.to ? 'La fecha "Desde" no puede ser posterior a "Hasta".' : '';
+    if (this.rangeError) return;
     this.api.invoices({ q: this.q, status: this.status, docType: this.docType, from: this.from, to: this.to, page: n })
       .subscribe((p) => (this.page = p));
   }

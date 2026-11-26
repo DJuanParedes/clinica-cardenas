@@ -7,6 +7,8 @@ import { AuditEntry } from '../core/models';
 import { apiError, dateTime, initials } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
+import { OnlyDirective } from '../shared/only.directive';
+import { MAX, RE, validPassword } from '../core/rules';
 
 const ROLE_TONE: Record<string, string> = { ADMIN: 'gum', RECEPCION: 'teal', ODONTOLOGO: 'blue', CAJA: 'amber', DIRECTOR: 'grey' };
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -23,7 +25,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [FormsModule, IconComponent, ModalComponent, OnlyDirective],
   template: `
     <div class="page">
       <div class="page-head">
@@ -83,17 +85,19 @@ const PERMISSIONS: { role: string; can: string }[] = [
       <form class="grid cols-2" (ngSubmit)="save()" autocomplete="off">
         <div class="field span-2">
           <label class="req" for="fn">Nombres y apellidos</label>
-          <input id="fn" name="fn" class="input" [class.invalid]="e['fullName']" [(ngModel)]="f.fullName" />
+          <input id="fn" name="fn" class="input" [class.invalid]="e['fullName']" [(ngModel)]="f.fullName" appOnly="letters" [maxlength]="max.fullName" />
           @if (e['fullName']) { <span class="err">{{ e['fullName'] }}</span> }
         </div>
         <div class="field">
           <label class="req" for="un">Usuario</label>
-          <input id="un" name="un" class="input" [class.invalid]="e['username']" [(ngModel)]="f.username" [disabled]="!!editing" autocapitalize="none" />
+          <input id="un" name="un" class="input" [class.invalid]="e['username']" [(ngModel)]="f.username" [disabled]="!!editing" autocapitalize="none"
+                 appOnly="username" [maxlength]="max.username" spellcheck="false" />
+          @if (!e['username'] && !editing) { <span class="hint">3 a 40: letras, números, punto, guion o guion bajo.</span> }
           @if (e['username']) { <span class="err">{{ e['username'] }}</span> }
         </div>
         <div class="field">
           <label class="req" for="em">Correo</label>
-          <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" />
+          <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" appOnly="email" [maxlength]="max.email" />
           @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
         </div>
         <div class="field">
@@ -106,20 +110,21 @@ const PERMISSIONS: { role: string; can: string }[] = [
         @if (!editing) {
           <div class="field">
             <label class="req" for="pw">Contraseña inicial</label>
-            <input id="pw" name="pw" class="input" [class.invalid]="e['password']" [(ngModel)]="f.password" autocomplete="new-password" />
+            <input id="pw" name="pw" class="input" [class.invalid]="e['password']" [(ngModel)]="f.password" autocomplete="new-password" appOnly="nospace" [maxlength]="max.password" />
             @if (e['password']) { <span class="err">{{ e['password'] }}</span> } @else { <span class="hint">Mínimo 8 caracteres, una letra y un número.</span> }
           </div>
         } @else { <div></div> }
         @if (f.role === 'ODONTOLOGO') {
           <div class="field">
             <label class="req" for="sp">Especialidad</label>
-            <input id="sp" name="sp" class="input" [class.invalid]="e['specialty']" [(ngModel)]="f.specialty" list="specs" />
+            <input id="sp" name="sp" class="input" [class.invalid]="e['specialty']" [(ngModel)]="f.specialty" list="specs" appOnly="letters" [maxlength]="max.specialty" />
             <datalist id="specs"><option value="Odontología general"></option><option value="Ortodoncia"></option><option value="Endodoncia"></option><option value="Periodoncia"></option><option value="Rehabilitación oral"></option><option value="Odontopediatría"></option><option value="Cirugía bucal"></option></datalist>
             @if (e['specialty']) { <span class="err">{{ e['specialty'] }}</span> }
           </div>
           <div class="field">
             <label for="cop">Colegiatura (COP)</label>
-            <input id="cop" name="cop" class="input" [(ngModel)]="f.cop" />
+            <input id="cop" name="cop" class="input tabular" [class.invalid]="e['cop']" [(ngModel)]="f.cop" appOnly="digits" [maxlength]="max.cop" inputmode="numeric" placeholder="Solo números" />
+            @if (e['cop']) { <span class="err">{{ e['cop'] }}</span> }
           </div>
         }
       </form>
@@ -135,8 +140,10 @@ const PERMISSIONS: { role: string; can: string }[] = [
           <div class="dz-row">
             <div><div class="strong small">Contraseña temporal</div><div class="muted small">Desbloquea la cuenta y reemplaza la contraseña.</div></div>
             <div class="row">
-              <input class="input pwi" [(ngModel)]="tempPassword" placeholder="Nueva contraseña" aria-label="Contraseña temporal" />
-              <button class="btn sm" type="button" (click)="setPassword()" [disabled]="tempPassword.length < 8">Asignar</button>
+              <input class="input pwi" [(ngModel)]="tempPassword" placeholder="Nueva contraseña" aria-label="Contraseña temporal"
+                     appOnly="nospace" [maxlength]="max.password" [class.invalid]="tempPassword && !pwOk(tempPassword)"
+                     title="Mínimo 8 caracteres, una letra y un número" />
+              <button class="btn sm" type="button" (click)="setPassword()" [disabled]="!pwOk(tempPassword)">Asignar</button>
             </div>
           </div>
           <div class="dz-row">
@@ -224,6 +231,8 @@ export class UsersComponent implements OnInit {
   e: Record<string, string> = {};
   saving = false;
   tempPassword = '';
+  max = MAX;
+  pwOk = validPassword;
   audit: AuditEntry[] = [];
 
   scheduleOpen = false;
@@ -245,7 +254,7 @@ export class UsersComponent implements OnInit {
 
   openEdit(u: any) {
     this.editing = u;
-    this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, specialty: u.dentist?.specialty || '', cop: u.dentist?.cop || '' };
+    this.f = { fullName: u.fullName, username: u.username, email: u.email, role: u.role, specialty: u.dentist?.specialty || '', cop: (u.dentist?.cop || '').replace(/\D/g, '') };
     this.e = {};
     this.tempPassword = '';
     this.audit = [];
@@ -253,7 +262,24 @@ export class UsersComponent implements OnInit {
     this.modal = true;
   }
 
+  private validate(): boolean {
+    const f = this.f, e: Record<string, string> = {};
+    const name = (f.fullName || '').trim();
+    if (!/^\p{L}[\p{L} '.-]{2,119}$/u.test(name)) e['fullName'] = 'Ingresa nombres y apellidos (solo letras).';
+    if (!this.editing && !RE.username.test((f.username || '').trim())) e['username'] = 'Usa de 3 a 40 caracteres: letras, números, punto, guion o guion bajo.';
+    if (!RE.email.test((f.email || '').trim())) e['email'] = 'Ingresa un correo válido (ej. nombre@correo.com).';
+    if (!f.role) e['role'] = 'Selecciona un rol.';
+    if (!this.editing && !validPassword(f.password || '')) e['password'] = 'Mínimo 8 caracteres, con al menos una letra y un número.';
+    if (f.role === 'ODONTOLOGO') {
+      if (!(f.specialty || '').trim()) e['specialty'] = 'Indica la especialidad del odontólogo.';
+      if ((f.cop || '').trim() && !RE.cop.test(f.cop.trim())) e['cop'] = 'La colegiatura tiene de 3 a 6 dígitos.';
+    }
+    this.e = e;
+    return Object.keys(e).length === 0;
+  }
+
   save() {
+    if (!this.validate()) { this.toast.warn('Revisa los campos marcados.'); return; }
     this.saving = true;
     this.e = {};
     const req = this.editing ? this.api.updateUser(this.editing.id, this.f) : this.api.createUser(this.f);
@@ -290,6 +316,7 @@ export class UsersComponent implements OnInit {
   }
 
   setPassword() {
+    if (!validPassword(this.tempPassword)) { this.toast.warn('La contraseña debe tener al menos 8 caracteres, una letra y un número.'); return; }
     this.api.setUserPassword(this.editing.id, this.tempPassword).subscribe({
       next: () => { this.toast.ok('Contraseña temporal asignada. Compártela de forma privada.'); this.tempPassword = ''; this.load(); },
       error: (err) => this.toast.error(apiError(err).message),
@@ -308,6 +335,13 @@ export class UsersComponent implements OnInit {
   removeBlock(b: any) { this.blocks = this.blocks.filter((x) => x !== b); }
 
   saveSchedule() {
+    for (const b of this.blocks) {
+      if (!/^\d{2}:\d{2}$/.test(b.start || '') || !/^\d{2}:\d{2}$/.test(b.end || '')) { this.toast.warn('Completa la hora de inicio y fin de cada bloque.'); return; }
+      if (b.end <= b.start) { this.toast.warn(`${this.days[b.weekday - 1] ?? 'Un día'}: la hora de fin debe ser posterior al inicio.`); return; }
+    }
+    for (const a of this.blocks) for (const c of this.blocks) {
+      if (a !== c && a.weekday === c.weekday && a.start < c.end && c.start < a.end) { this.toast.warn('Hay bloques que se superponen el mismo día.'); return; }
+    }
     this.api.saveSchedules(this.editing.dentist.id, this.blocks).subscribe({
       next: () => { this.scheduleOpen = false; this.toast.ok('Horario actualizado.'); },
       error: (err) => this.toast.error(apiError(err).message),

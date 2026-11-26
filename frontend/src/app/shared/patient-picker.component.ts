@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, OnDestroy, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { OnlyDirective } from './only.directive';
 import { RouterLink } from '@angular/router';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { Api } from '../core/api.service';
@@ -11,7 +12,7 @@ import { initials } from '../core/format';
 @Component({
   selector: 'app-patient-picker',
   standalone: true,
-  imports: [FormsModule, IconComponent, RouterLink],
+  imports: [FormsModule, IconComponent, RouterLink, OnlyDirective],
   template: `
     @if (value) {
       <div class="picked">
@@ -26,7 +27,7 @@ import { initials } from '../core/format';
       <div class="search-box">
         <app-icon class="ico" name="search" />
         <input class="input" [(ngModel)]="q" (ngModelChange)="input$.next($event)" [placeholder]="placeholder"
-               autocomplete="off" aria-label="Buscar paciente por documento o nombre" />
+               autocomplete="off" aria-label="Buscar paciente por documento o nombre" appOnly="search" maxlength="100" />
       </div>
       @if (q.trim().length >= 2) {
         <div class="results">

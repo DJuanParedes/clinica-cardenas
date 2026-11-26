@@ -101,6 +101,9 @@ public class BillingService {
         return out;
     }
 
+    private static final BigDecimal MAX_QTY = new BigDecimal("999");
+    private static final BigDecimal MAX_PRICE = new BigDecimal("99999.99");
+
     private Map<String, String> validate(InvoiceRequest r, BigDecimal total) {
         Map<String, String> e = new LinkedHashMap<>();
         String type = r.docType();
@@ -116,7 +119,7 @@ public class BillingService {
             if (r.customerAddress() == null || r.customerAddress().isBlank()) e.put("customerAddress", "Ingresa la dirección fiscal del cliente.");
         } else {
             switch (cdt) {
-                case "1" -> { if (!doc.matches("^\\d{8}$")) e.put("customerDocNumber", "El DNI debe tener 8 dígitos."); }
+                case "1" -> { if (!doc.matches("^\\d{8}$")) e.put("customerDocNumber", "El DNI debe tener exactamente 8 dígitos numéricos."); }
                 case "4" -> { if (!doc.matches("^[A-Za-z0-9]{9,12}$")) e.put("customerDocNumber", "Carné de extranjería inválido."); }
                 case "7" -> { if (!doc.matches("^[A-Za-z0-9]{6,12}$")) e.put("customerDocNumber", "Pasaporte inválido."); }
                 case "6" -> { if (!RucValidator.isValid(doc)) e.put("customerDocNumber", "El RUC no es válido."); }
@@ -130,14 +133,28 @@ public class BillingService {
         }
         if (!"0".equals(cdt) && (r.customerName() == null || r.customerName().trim().length() < 3)) {
             e.put("customerName", "Ingresa el nombre o razón social del cliente.");
+        } else if (!"0".equals(cdt) && r.customerName().trim().length() > 200) {
+            e.put("customerName", "El nombre admite hasta 200 caracteres.");
+        } else if (!"0".equals(cdt) && !"6".equals(cdt) && !r.customerName().trim().matches("^[\\p{L}][\\p{L} '.-]{2,199}$")) {
+            e.put("customerName", "El nombre del cliente solo admite letras.");
+        }
+        if (r.customerAddress() != null && r.customerAddress().trim().length() > 200) {
+            e.put("customerAddress", "La dirección admite hasta 200 caracteres.");
         }
         if (r.items() == null || r.items().isEmpty()) {
             e.put("items", "Agrega al menos un concepto.");
         } else {
             for (LineRequest l : r.items()) {
                 if (l.description() == null || l.description().isBlank()) { e.put("items", "Cada concepto necesita una descripción."); break; }
+                if (l.description().trim().length() > 250) { e.put("items", "La descripción admite hasta 250 caracteres."); break; }
                 if (l.quantity() == null || l.quantity().signum() <= 0) { e.put("items", "La cantidad debe ser mayor a cero."); break; }
+                if (l.quantity().stripTrailingZeros().scale() > 0 || l.quantity().compareTo(MAX_QTY) > 0) {
+                    e.put("items", "La cantidad debe ser un número entero entre 1 y 999."); break;
+                }
                 if (l.unitPrice() == null || l.unitPrice().signum() <= 0) { e.put("items", "El precio debe ser mayor a cero."); break; }
+                if (l.unitPrice().compareTo(MAX_PRICE) > 0 || l.unitPrice().stripTrailingZeros().scale() > 2) {
+                    e.put("items", "El precio debe tener hasta 2 decimales y no superar S/ 99,999.99."); break;
+                }
             }
         }
         return e;

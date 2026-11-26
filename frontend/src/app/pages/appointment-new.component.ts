@@ -6,6 +6,7 @@ import { ToastService } from '../core/toast.service';
 import { Appointment, Dentist, Patient, Slot } from '../core/models';
 import { apiError, hhmm, isoDate, longDay, parseLocal } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { OnlyDirective } from '../shared/only.directive';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
 const REASONS = ['Evaluación inicial', 'Control', 'Profilaxis', 'Dolor dental', 'Endodoncia', 'Restauración', 'Control de ortodoncia', 'Exodoncia'];
@@ -15,7 +16,7 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 @Component({
   selector: 'app-appointment-new',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, PatientPickerComponent],
+  imports: [FormsModule, RouterLink, IconComponent, PatientPickerComponent, OnlyDirective],
   template: `
     <div class="page">
       <a class="back" routerLink="/agenda"><app-icon name="chevronLeft" [size]="16" /> Agenda</a>
@@ -114,16 +115,16 @@ const WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
               <div class="grid cols-2">
                 <div class="field">
                   <label class="req" for="rs">Motivo de la cita</label>
-                  <input id="rs" class="input" [(ngModel)]="reason" maxlength="200" />
+                  <input id="rs" class="input" [(ngModel)]="reason" maxlength="200" appOnly="text" />
                 </div>
                 <div class="field">
                   <label for="nt">Notas para el odontólogo</label>
-                  <input id="nt" class="input" [(ngModel)]="notes" maxlength="500" placeholder="Opcional" />
+                  <input id="nt" class="input" [(ngModel)]="notes" maxlength="500" appOnly="text" placeholder="Opcional" />
                 </div>
                 @if (editing) {
                   <div class="field span-all">
                     <label class="req" for="cr">Motivo de la reprogramación</label>
-                    <input id="cr" class="input" [(ngModel)]="changeReason" placeholder="Ej. paciente pidió cambiar por trabajo" />
+                    <input id="cr" class="input" [(ngModel)]="changeReason" maxlength="180" appOnly="text" placeholder="Ej. paciente pidió cambiar por trabajo" />
                   </div>
                 }
               </div>
