@@ -21,7 +21,10 @@ import java.util.regex.Pattern;
 public class UserService {
 
     private static final Pattern USERNAME = Pattern.compile("^[a-zA-Z0-9._-]{3,40}$");
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern FULL_NAME = Pattern.compile("^[\\p{L}][\\p{L} '.-]{2,119}$");
+    private static final Pattern SPECIALTY = Pattern.compile("^[\\p{L}][\\p{L} '.-]{1,79}$");
+    private static final Pattern COP = Pattern.compile("^(?i:COP\\s*)?\\d{3,6}$");
+    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$");
     private static final String[] COLORS = {"#00A3D4", "#F08A00", "#1E5FAE", "#7A4FC9", "#217A4A", "#C2410C"};
 
     private final UserRepository users;
@@ -94,10 +97,10 @@ public class UserService {
                 errors.put("password", "Mínimo 8 caracteres, con al menos una letra y un número.");
             }
         }
-        if (r.fullName() == null || r.fullName().trim().length() < 3) {
-            errors.put("fullName", "Ingresa nombres y apellidos.");
+        if (r.fullName() == null || !FULL_NAME.matcher(r.fullName().trim()).matches()) {
+            errors.put("fullName", "Ingresa nombres y apellidos (solo letras, 3 a 120).");
         }
-        if (r.email() == null || !EMAIL.matcher(r.email().trim()).matches()) {
+        if (r.email() == null || r.email().trim().length() > 120 || !EMAIL.matcher(r.email().trim()).matches()) {
             errors.put("email", "Ingresa un correo válido.");
         } else {
             users.findByEmailIgnoreCase(r.email().trim()).ifPresent(other -> {
@@ -109,6 +112,11 @@ public class UserService {
         }
         if (r.role() == Role.ODONTOLOGO && (r.specialty() == null || r.specialty().isBlank())) {
             errors.put("specialty", "Indica la especialidad del odontólogo.");
+        } else if (r.role() == Role.ODONTOLOGO && !SPECIALTY.matcher(r.specialty().trim()).matches()) {
+            errors.put("specialty", "La especialidad solo admite letras (hasta 80).");
+        }
+        if (r.role() == Role.ODONTOLOGO && r.cop() != null && !r.cop().isBlank() && !COP.matcher(r.cop().trim()).matches()) {
+            errors.put("cop", "La colegiatura tiene de 3 a 6 dígitos.");
         }
         if (!errors.isEmpty()) {
             throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDACION",

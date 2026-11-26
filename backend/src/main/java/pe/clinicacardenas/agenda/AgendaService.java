@@ -133,6 +133,8 @@ public class AgendaService {
         if (r.dentistId() == null) errors.put("dentistId", "Selecciona un odontólogo.");
         if (r.startAt() == null) errors.put("startAt", "Selecciona fecha y hora.");
         if (r.reason() == null || r.reason().isBlank()) errors.put("reason", "Indica el motivo de la cita.");
+        else if (r.reason().trim().length() > 200) errors.put("reason", "El motivo admite hasta 200 caracteres.");
+        if (r.notes() != null && r.notes().trim().length() > 500) errors.put("notes", "Las notas admiten hasta 500 caracteres.");
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", errors);
         }
@@ -209,6 +211,9 @@ public class AgendaService {
         if (r.changeReason() == null || r.changeReason().isBlank()) {
             throw ApiException.field("changeReason", "Indica el motivo de la reprogramación.");
         }
+        if (r.changeReason().trim().length() > 180) {
+            throw ApiException.field("changeReason", "El motivo de la reprogramación admite hasta 180 caracteres.");
+        }
         String before = a.startAt.format(DMY_HM) + " con " + a.dentist.getFullName();
         AppointmentRequest merged = new AppointmentRequest(a.patient.id, r.dentistId(), r.startAt(), r.durationMin(),
                 r.reason() == null ? a.reason : r.reason(), r.notes(), r.changeReason());
@@ -235,6 +240,9 @@ public class AgendaService {
         }
         if (r.status() == AppointmentStatus.CANCELADA && (r.reason() == null || r.reason().isBlank())) {
             throw ApiException.field("reason", "Indica el motivo de la cancelación.");
+        }
+        if (r.reason() != null && r.reason().trim().length() > 200) {
+            throw ApiException.field("reason", "El motivo admite hasta 200 caracteres.");
         }
         if (r.status() == AppointmentStatus.EN_ESPERA) {
             a.arrivedAt = Dates.now();

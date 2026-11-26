@@ -39,6 +39,22 @@ class ReglasDeNegocioTest {
     }
 
     @Test
+    void hu01_dniNoAdmiteMasDeOchoDigitosNiSimbolos() {
+        assertTrue(PatientValidator.validate(paciente("DNI", "458721961"), HOY).containsKey("docNumber"));
+        assertTrue(PatientValidator.validate(paciente("DNI", "4587-219"), HOY).containsKey("docNumber"));
+    }
+
+    @Test
+    void hu01_nombresTelefonoYContactoSoloConCaracteresValidos() {
+        var in = new PatientValidator.Input("DNI", "45872196", "María2", "Quispe#", LocalDate.of(1991, 3, 14), "F",
+                "98765abc", "maria@correo", null, "Ate1", "Ana@", "12x", null);
+        var e = PatientValidator.validate(in, HOY);
+        for (String k : List.of("firstName", "lastName", "phone", "email", "district", "emergencyContactName", "emergencyContactPhone")) {
+            assertTrue(e.containsKey(k), "Debe marcar " + k);
+        }
+    }
+
+    @Test
     void hu01_fechaFuturaNoPermitida() {
         var in = new PatientValidator.Input("DNI", "45872196", "Ana", "Paz", HOY.plusDays(1), "F", "987654321",
                 null, null, null, null, null, null);

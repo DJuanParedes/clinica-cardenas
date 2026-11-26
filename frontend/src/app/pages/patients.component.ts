@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { OnlyDirective } from '../shared/only.directive';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, switchMap, catchError, of } from 'rxjs';
 import { Api } from '../core/api.service';
@@ -12,7 +13,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-patients',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, OnlyDirective],
   template: `
     <div class="page">
       <div class="page-head">
@@ -28,7 +29,7 @@ import { IconComponent } from '../shared/icon.component';
       <div class="search-box">
         <app-icon class="ico" name="search" [size]="20" />
         <input class="input" [(ngModel)]="q" (ngModelChange)="search$.next($event)" placeholder="Ej. 45872196 o Quispe Huamán"
-               aria-label="Buscar paciente" autofocus />
+               aria-label="Buscar paciente" autofocus appOnly="search" maxlength="100" />
       </div>
       <p class="mode muted small">
         @if (loading) { Buscando… }

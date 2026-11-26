@@ -5,11 +5,12 @@ import { AuthService } from '../core/auth.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
+import { OnlyDirective } from '../shared/only.directive';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, LogoComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LogoComponent, OnlyDirective],
   template: `
     <div class="wrap">
       <section class="art" aria-label="Clínica Dental Cárdenas">
@@ -57,7 +58,7 @@ import { LogoComponent } from '../shared/logo.component';
           <div class="field">
             <label for="u">Usuario</label>
             <input id="u" name="username" class="input" [class.invalid]="touched && !username" [(ngModel)]="username"
-                   autocomplete="username" autocapitalize="none" spellcheck="false" autofocus />
+                   autocomplete="username" autocapitalize="none" spellcheck="false" autofocus appOnly="username" maxlength="40" />
             @if (touched && !username) { <span class="err">Ingresa tu usuario.</span> }
           </div>
 
@@ -65,7 +66,7 @@ import { LogoComponent } from '../shared/logo.component';
             <div class="spread"><label for="p">Contraseña</label><a routerLink="/recuperar" class="small">¿Olvidaste tu contraseña?</a></div>
             <div class="pw">
               <input id="p" name="password" class="input" [class.invalid]="touched && !password" [(ngModel)]="password"
-                     [type]="show ? 'text' : 'password'" autocomplete="current-password" />
+                     [type]="show ? 'text' : 'password'" autocomplete="current-password" maxlength="72" />
               <button type="button" class="eye" (click)="show = !show" [attr.aria-label]="show ? 'Ocultar contraseña' : 'Mostrar contraseña'">
                 <app-icon [name]="show ? 'eyeOff' : 'eye'" />
               </button>

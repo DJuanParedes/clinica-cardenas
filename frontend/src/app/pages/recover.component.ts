@@ -6,11 +6,13 @@ import { ToastService } from '../core/toast.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
+import { OnlyDirective } from '../shared/only.directive';
+import { RE, validPassword } from '../core/rules';
 
 @Component({
   selector: 'app-recover',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, LogoComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LogoComponent, OnlyDirective],
   template: `
     <div class="wrap">
       <form class="card panel" (ngSubmit)="step === 1 ? request() : reset()" novalidate>
@@ -27,7 +29,7 @@ import { LogoComponent } from '../shared/logo.component';
           <p class="muted">Te enviaremos un código de 6 dígitos al correo registrado en tu cuenta.</p>
           <div class="field">
             <label for="l">Usuario o correo</label>
-            <input id="l" name="login" class="input" [(ngModel)]="login" autocomplete="username" autofocus />
+            <input id="l" name="login" class="input" [(ngModel)]="login" autocomplete="username" autofocus appOnly="nospace" maxlength="120" autocapitalize="none" spellcheck="false" />
             @if (errors['login']) { <span class="err">{{ errors['login'] }}</span> }
           </div>
           <button class="btn primary lg block" type="submit" [disabled]="loading || !login.trim()">
@@ -44,18 +46,18 @@ import { LogoComponent } from '../shared/logo.component';
           <div class="field">
             <label for="c">Código de 6 dígitos</label>
             <input id="c" name="code" class="input code" [class.invalid]="errors['code']" [(ngModel)]="code"
-                   inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+                   inputmode="numeric" maxlength="6" autocomplete="one-time-code" appOnly="digits" placeholder="000000" />
             @if (errors['code']) { <span class="err">{{ errors['code'] }}</span> }
           </div>
           <div class="field">
             <label for="n">Nueva contraseña</label>
-            <input id="n" name="newPassword" type="password" class="input" [class.invalid]="errors['newPassword']" [(ngModel)]="newPassword" autocomplete="new-password" />
+            <input id="n" name="newPassword" type="password" class="input" [class.invalid]="errors['newPassword']" [(ngModel)]="newPassword" autocomplete="new-password" appOnly="nospace" maxlength="72" />
             <span class="hint">Mínimo 8 caracteres, con al menos una letra y un número.</span>
             @if (errors['newPassword']) { <span class="err">{{ errors['newPassword'] }}</span> }
           </div>
           <div class="field">
             <label for="r">Repite la contraseña</label>
-            <input id="r" name="repeat" type="password" class="input" [class.invalid]="errors['repeat']" [(ngModel)]="repeat" autocomplete="new-password" />
+            <input id="r" name="repeat" type="password" class="input" [class.invalid]="errors['repeat']" [(ngModel)]="repeat" autocomplete="new-password" appOnly="nospace" maxlength="72" />
             @if (errors['repeat']) { <span class="err">{{ errors['repeat'] }}</span> }
           </div>
           <button class="btn primary lg block" type="submit" [disabled]="loading">
@@ -95,6 +97,8 @@ export class RecoverComponent {
 
   request() {
     this.errors = {};
+    const l = this.login.trim();
+    if (!(RE.username.test(l) || RE.email.test(l))) { this.errors['login'] = 'Ingresa tu usuario o un correo válido.'; return; }
     this.loading = true;
     this.auth.recover(this.login.trim()).subscribe({
       next: (r) => {
@@ -110,7 +114,7 @@ export class RecoverComponent {
   reset() {
     this.errors = {};
     if (!/^\d{6}$/.test(this.code.trim())) this.errors['code'] = 'El código tiene 6 dígitos.';
-    if (this.newPassword.length < 8 || !/[A-Za-zÁÉÍÓÚáéíóúñÑ]/.test(this.newPassword) || !/\d/.test(this.newPassword)) {
+    if (!validPassword(this.newPassword)) {
       this.errors['newPassword'] = 'Mínimo 8 caracteres, con al menos una letra y un número.';
     }
     if (this.repeat !== this.newPassword) this.errors['repeat'] = 'Las contraseñas no coinciden.';

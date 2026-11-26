@@ -91,9 +91,29 @@ public class ClinicalService {
         return m;
     }
 
+    private static final java.util.Set<String> BLOOD = java.util.Set.of("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-");
+    private static final java.util.regex.Pattern CIE10 = java.util.regex.Pattern.compile("^[A-Z]\\d{2}(\\.[0-9A-Z]{1,2})?$");
+    private static final BigDecimal MAX_PRICE = new BigDecimal("99999.99");
+
+    private static void maxLen(String field, String value, int max, String label) {
+        if (value != null && value.trim().length() > max) {
+            throw ApiException.field(field, label + " admite hasta " + max + " caracteres.");
+        }
+    }
+
     @Transactional
     public ClinicalHistory saveHistory(Long patientId, HistoryRequest r) {
         patient(patientId);
+        if (r.bloodType() != null && !r.bloodType().isBlank() && !BLOOD.contains(r.bloodType().trim())) {
+            throw ApiException.field("bloodType", "Grupo sanguíneo inválido.");
+        }
+        maxLen("allergies", r.allergies(), 500, "Alergias");
+        maxLen("medicalBackground", r.medicalBackground(), 1000, "Antecedentes médicos");
+        maxLen("currentMedication", r.currentMedication(), 500, "Medicación actual");
+        maxLen("surgeries", r.surgeries(), 500, "Cirugías previas");
+        maxLen("habits", r.habits(), 500, "Hábitos");
+        maxLen("familyBackground", r.familyBackground(), 500, "Antecedentes familiares");
+        maxLen("observations", r.observations(), 1000, "Observaciones");
         ClinicalHistory h = histories.findByPatientId(patientId).orElse(null);
         boolean isNew = h == null;
         if (isNew) {
@@ -121,6 +141,10 @@ public class ClinicalService {
         patient(patientId);
         if (r.description() == null || r.description().isBlank()) {
             throw ApiException.field("description", "Describe el diagnóstico.");
+        }
+        maxLen("description", r.description(), 500, "La descripción");
+        if (r.cie10Code() != null && !r.cie10Code().isBlank() && !CIE10.matcher(r.cie10Code().trim().toUpperCase()).matches()) {
+            throw ApiException.field("cie10Code", "Formato CIE-10: letra y 2 números (ej. K02 o K02.1).");
         }
         if (r.tooth() != null && !OdontogramRules.isValidTooth(r.tooth())) {
             throw ApiException.field("tooth", "La pieza no existe en la notación FDI.");
@@ -248,6 +272,7 @@ public class ClinicalService {
         }
         BigDecimal price = r.price() == null ? proc.price : r.price();
         if (price.signum() < 0) throw ApiException.field("items", "El precio no puede ser negativo.");
+        if (price.compareTo(MAX_PRICE) > 0) throw ApiException.field("items", "El precio máximo es S/ 99,999.99.");
         TreatmentItem i = new TreatmentItem();
         i.planId = planId;
         i.procedure = proc;
@@ -262,6 +287,8 @@ public class ClinicalService {
     public Map<String, Object> createPlan(Long patientId, PlanRequest r) {
         patient(patientId);
         if (r.title() == null || r.title().isBlank()) throw ApiException.field("title", "Ponle un nombre al plan.");
+        maxLen("title", r.title(), 120, "El nombre del plan");
+        maxLen("notes", r.notes(), 500, "Las indicaciones");
         if (r.items() == null || r.items().isEmpty()) throw ApiException.field("items", "Agrega al menos un procedimiento.");
         TreatmentPlan p = new TreatmentPlan();
         p.patientId = patientId;
@@ -320,6 +347,7 @@ public class ClinicalService {
     public Map<String, Object> addEvolution(Long planId, EvolutionRequest r) {
         TreatmentPlan p = plan(planId);
         if (r.notes() == null || r.notes().isBlank()) throw ApiException.field("notes", "Describe lo realizado en la sesión.");
+        maxLen("notes", r.notes(), 1000, "La evolución");
         LocalDate date = r.sessionDate() == null ? Dates.today() : r.sessionDate();
         if (date.isAfter(Dates.today())) throw ApiException.field("sessionDate", "La fecha de la sesión no puede ser futura.");
         TreatmentItem item = null;

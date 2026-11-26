@@ -7,6 +7,7 @@ import { ToastService } from '../core/toast.service';
 import { Appointment, AuditEntry, Block, Dentist } from '../core/models';
 import { STATUS_LABEL, STATUS_TONE, apiError, dateTime, hhmm, isoDate, longDay, parseLocal } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
+import { OnlyDirective } from '../shared/only.directive';
 import { ModalComponent } from '../shared/modal.component';
 
 const SLOT_PX = 30;     // alto de 15 minutos
@@ -18,7 +19,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
 @Component({
   selector: 'app-agenda',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, OnlyDirective],
   template: `
     <div class="page wide">
       <div class="page-head">
@@ -124,7 +125,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             @if (cancelling) {
               <div class="field">
                 <label for="cr">Motivo de la cancelación</label>
-                <input id="cr" class="input" [(ngModel)]="reason" placeholder="Ej. paciente avisó por teléfono" />
+                <input id="cr" class="input" [(ngModel)]="reason" maxlength="200" appOnly="text" placeholder="Ej. paciente avisó por teléfono" />
                 <div class="row" style="justify-content: flex-end; margin-top: 6px">
                   <button type="button" class="btn sm" (click)="cancelling = false">Volver</button>
                   <button type="button" class="btn sm danger" (click)="change('CANCELADA')" [disabled]="!reason.trim() || busy">Cancelar cita</button>

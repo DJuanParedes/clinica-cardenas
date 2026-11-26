@@ -5,6 +5,8 @@ import { ToastService } from '../../core/toast.service';
 import { ClinicalHistory, Diagnosis } from '../../core/models';
 import { apiError, dateTime } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
+import { OnlyDirective } from '../../shared/only.directive';
+import { RE, validTooth } from '../../core/rules';
 
 const CIE10 = [
   { c: 'K02.0', d: 'Caries limitada al esmalte' },
@@ -22,21 +24,21 @@ const CIE10 = [
   { c: 'S02.5', d: 'Fractura de los dientes' },
 ];
 
-const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
+const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string; max?: number }[] = [
   { key: 'allergies', label: 'Alergias', hint: 'Medicamentos, látex, anestésicos…' },
   { key: 'currentMedication', label: 'Medicación actual' },
-  { key: 'medicalBackground', label: 'Antecedentes médicos', hint: 'Enfermedades sistémicas, embarazo, tratamientos en curso' },
+  { key: 'medicalBackground', label: 'Antecedentes médicos', hint: 'Enfermedades sistémicas, embarazo, tratamientos en curso', max: 1000 },
   { key: 'surgeries', label: 'Cirugías previas' },
   { key: 'habits', label: 'Hábitos', hint: 'Bruxismo, tabaco, onicofagia, respiración bucal…' },
   { key: 'familyBackground', label: 'Antecedentes familiares' },
-  { key: 'observations', label: 'Observaciones clínicas' },
+  { key: 'observations', label: 'Observaciones clínicas', max: 1000 },
 ];
 
 /** HU-04: historia clínica con antecedentes, alergias y diagnósticos. */
 @Component({
   selector: 'app-history-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, OnlyDirective],
   template: `
     @if (alerts.length) {
       <div class="notice gum alerts" role="alert">
@@ -66,7 +68,8 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
             @for (f of fields; track f.key) {
               <div class="field">
                 <label [attr.for]="f.key">{{ f.label }}</label>
-                <textarea class="input" [id]="f.key" [name]="f.key" rows="2" [(ngModel)]="draft[f.key]" [placeholder]="f.hint || ''"></textarea>
+                <textarea class="input" [id]="f.key" [name]="f.key" rows="2" [(ngModel)]="draft[f.key]" [placeholder]="f.hint || ''" appOnly="text" [maxlength]="f.max || 500"></textarea>
+                <span class="hint">{{ (draft[f.key] || '').length }}/{{ f.max || 500 }}</span>
               </div>
             }
             <div class="span-all row" style="justify-content: flex-end">
@@ -95,17 +98,21 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
           <div class="grid dx">
             <div class="field">
               <label for="cie">CIE-10</label>
-              <input id="cie" name="cie" class="input" list="cie10" [(ngModel)]="dx.cie10Code" (ngModelChange)="fillFromCie()" placeholder="K02.1" />
+              <input id="cie" name="cie" class="input tabular" list="cie10" [class.invalid]="dxErrors['cie10Code']" [(ngModel)]="dx.cie10Code" (ngModelChange)="fillFromCie()" placeholder="K02.1"
+                     appOnly="cie10" maxlength="6" autocomplete="off" />
+              @if (dxErrors['cie10Code']) { <span class="err">{{ dxErrors['cie10Code'] }}</span> }
               <datalist id="cie10">@for (c of cie10; track c.c) { <option [value]="c.c">{{ c.d }}</option> }</datalist>
             </div>
             <div class="field">
               <label for="tooth">Pieza</label>
-              <input id="tooth" name="tooth" class="input" type="number" min="11" max="85" [(ngModel)]="dx.tooth" placeholder="36" />
+              <input id="tooth" name="tooth" class="input tabular" [class.invalid]="dxErrors['tooth']" [(ngModel)]="dx.tooth" placeholder="36"
+                     appOnly="digits" maxlength="2" inputmode="numeric" autocomplete="off" />
+              @if (dxErrors['tooth']) { <span class="err">{{ dxErrors['tooth'] }}</span> }
             </div>
           </div>
           <div class="field">
             <label for="dxd">Descripción</label>
-            <textarea id="dxd" name="dxd" class="input" rows="2" [class.invalid]="dxError" [(ngModel)]="dx.description"></textarea>
+            <textarea id="dxd" name="dxd" class="input" rows="2" [class.invalid]="dxError" [(ngModel)]="dx.description" appOnly="text" maxlength="500"></textarea>
             @if (dxError) { <span class="err">{{ dxError }}</span> }
           </div>
           <div class="row" style="justify-content: flex-end"><button type="submit" class="btn primary sm" [disabled]="savingDx">Registrar diagnóstico</button></div>
@@ -153,8 +160,9 @@ export class HistoryTabComponent implements OnInit {
   editing = false;
   saving = false;
   savingDx = false;
-  dx: { cie10Code: string; description: string; tooth: number | null } = { cie10Code: '', description: '', tooth: null };
+  dx: { cie10Code: string; description: string; tooth: string } = { cie10Code: '', description: '', tooth: '' };
   dxError = '';
+  dxErrors: Record<string, string> = {};
   fields = FIELDS;
   cie10 = CIE10;
   blood = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
@@ -190,12 +198,17 @@ export class HistoryTabComponent implements OnInit {
 
   addDiagnosis() {
     this.dxError = '';
-    if (!this.dx.description?.trim()) { this.dxError = 'Describe el diagnóstico.'; return; }
+    this.dxErrors = {};
+    const cie = (this.dx.cie10Code || '').trim().toUpperCase();
+    if (cie && !RE.cie10.test(cie)) this.dxErrors['cie10Code'] = 'Formato CIE-10: letra y 2 números (ej. K02 o K02.1).';
+    if (this.dx.tooth && !validTooth(this.dx.tooth)) this.dxErrors['tooth'] = 'Pieza FDI inválida (11–48 o 51–85).';
+    if (!this.dx.description?.trim()) this.dxError = 'Describe el diagnóstico.';
+    if (this.dxError || Object.keys(this.dxErrors).length) return;
     this.savingDx = true;
-    this.api.addDiagnosis(this.patientId, { ...this.dx, tooth: this.dx.tooth || null }).subscribe({
+    this.api.addDiagnosis(this.patientId, { cie10Code: cie || null, description: this.dx.description.trim(), tooth: this.dx.tooth ? Number(this.dx.tooth) : null }).subscribe({
       next: () => {
         this.savingDx = false;
-        this.dx = { cie10Code: '', description: '', tooth: null };
+        this.dx = { cie10Code: '', description: '', tooth: '' };
         this.toast.ok('Diagnóstico registrado.');
         this.load();
       },
