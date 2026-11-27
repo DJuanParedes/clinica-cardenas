@@ -155,21 +155,31 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
           <div class="field span2">
             <label class="req" for="ds">Descripción del trabajo</label>
             <input id="ds" name="ds" class="input" [(ngModel)]="f.description" maxlength="300" placeholder="Ej.: corona de zirconio monolítica" [class.invalid]="e['description']" appOnly="text" />
+            <span class="hint">Qué pieza protésica se fabrica (lo que se le pide al laboratorio).</span>
             @if (e['description']) { <span class="err">{{ e['description'] }}</span> }
           </div>
           <div class="field"><label for="tt">Piezas (FDI)</label><input id="tt" name="tt" class="input" [(ngModel)]="f.teeth" maxlength="60" placeholder="16, 17" [class.invalid]="e['teeth']" appOnly="teeth" />
             @if (e['teeth']) { <span class="err">{{ e['teeth'] }}</span> }</div>
           <div class="field"><label for="sh">Color (VITA)</label>
-            <input id="sh" name="sh" class="input" [(ngModel)]="f.shade" list="shades" maxlength="20" placeholder="A2" appOnly="text" />
-            <datalist id="shades">@for (s of shades; track s) { <option [value]="s"></option> }</datalist></div>
-          <div class="field"><label for="mt">Material</label><input id="mt" name="mt" class="input" [(ngModel)]="f.material" maxlength="60" placeholder="Zirconio, disilicato, metal-cerámica…" appOnly="text" /></div>
-          <div class="field"><label for="dd">Fecha de entrega del laboratorio</label><input id="dd" name="dd" type="date" class="input" [(ngModel)]="f.dueDate" [min]="f.id ? null : today" [class.invalid]="e['dueDate']" />
+            <select id="sh" name="sh" class="input" [(ngModel)]="f.shade">
+              <option [ngValue]="null">Sin indicar / según foto</option>
+              @for (g of shadeGroups; track g.label) {
+                <optgroup [label]="g.label">@for (s of g.items; track s) { <option [ngValue]="s">{{ s }}</option> }</optgroup>
+              }
+            </select>
+            <span class="hint">Guía VITA Classical. Si el color no está en la lista, indícalo en "Indicaciones".</span></div>
+          <div class="field"><label for="mt">Material</label><input id="mt" name="mt" class="input" [(ngModel)]="f.material" maxlength="60" placeholder="Zirconio, disilicato, metal-cerámica…" appOnly="text" />
+            <span class="hint">Con qué material se fabrica.</span></div>
+          <div class="field"><label for="dd">Fecha en que el laboratorio nos entrega el trabajo</label><input id="dd" name="dd" type="date" class="input" [(ngModel)]="f.dueDate" [min]="f.id ? null : today" [class.invalid]="e['dueDate']" />
+            <span class="hint">Fecha pactada de devolución a la clínica. La fecha de envío al laboratorio se registra al marcar "Enviado".</span>
             @if (e['dueDate']) { <span class="err">{{ e['dueDate'] }}</span> }</div>
-          <div class="field"><label for="cs">Costo del laboratorio (S/)</label><input id="cs" name="cs" type="number" step="0.01" min="0" class="input tabular" [(ngModel)]="f.cost" [class.invalid]="e['cost']" appOnly="decimal" />
+          <div class="field"><label for="cs">Costo que cobra el laboratorio (S/)</label><input id="cs" name="cs" type="number" step="0.01" min="0" class="input tabular" [(ngModel)]="f.cost" [class.invalid]="e['cost']" appOnly="decimal" />
+            <span class="hint">Lo que la clínica le paga al laboratorio (según su lista de precios). No es el precio al paciente.</span>
             @if (e['cost']) { <span class="err">{{ e['cost'] }}</span> }</div>
-          <div class="field span2"><label for="nt">Indicaciones para el laboratorio</label><textarea id="nt" name="nt" class="input" rows="2" [(ngModel)]="f.notes" maxlength="500" placeholder="Tipo de terminación, antagonista, fotos de color…" appOnly="text"></textarea></div>
+          <div class="field span2"><label for="nt">Indicaciones para el laboratorio</label><textarea id="nt" name="nt" class="input" rows="2" [(ngModel)]="f.notes" maxlength="500" placeholder="Tipo de terminación, antagonista, fotos de color…" appOnly="text"></textarea>
+            <span class="hint">Detalles técnicos para fabricarlo: terminación, oclusión, antagonista, caracterización, urgencia.</span></div>
         </div>
-        @if (!f.id) { <label class="check"><input type="checkbox" name="send" [(ngModel)]="f.send" /> Ya se envió hoy (registrar como "En laboratorio")</label> }
+        @if (!f.id) { <label class="check"><input type="checkbox" name="send" [(ngModel)]="f.send" /> El trabajo sale hoy hacia el laboratorio (registra hoy como fecha de envío y el estado pasa a «En laboratorio»)</label> }
       </form>
       <div modal-actions class="row end">
         <button type="button" class="btn" (click)="formOpen = false">Cancelar</button>
@@ -296,6 +306,13 @@ export class LabOrdersComponent implements OnInit {
   filter: { status: string; laboratoryId: number | null; overdue: boolean; unpaid: boolean; q: string } = { status: '', laboratoryId: null, overdue: false, unpaid: false, q: '' };
   statusKeys = Object.keys(LAB_STATUS);
   shades = SHADES;
+  shadeGroups = [
+    { label: 'A · rojizo-marrón', items: SHADES.filter((s) => s.startsWith('A')) },
+    { label: 'B · rojizo-amarillo', items: SHADES.filter((s) => s.startsWith('B') && !s.startsWith('BL')) },
+    { label: 'C · grisáceo', items: SHADES.filter((s) => s.startsWith('C')) },
+    { label: 'D · rojizo-gris', items: SHADES.filter((s) => s.startsWith('D')) },
+    { label: 'BL · blanqueados', items: SHADES.filter((s) => s.startsWith('BL')) },
+  ];
   methods = Object.keys(METHOD_LABEL);
   methodLabel = METHOD_LABEL;
   today = new Date().toLocaleDateString('en-CA');
