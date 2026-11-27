@@ -189,7 +189,7 @@ public class PortalRecordsService {
                 .title(String.valueOf(r.get(TITLE) == null ? r.get("code") : r.get(TITLE)))
                 .paragraph("Paciente: " + p.getFullName() + "  ·  " + p.docType + " " + p.docNumber, 10, false)
                 .paragraph("Aceptado por: " + r.get("acceptedBy"), 10, false)
-                .paragraph("Fecha y hora: " + (at == null ? "-" : at.format(DMY)) + "  ·  Canal: " + canal + "  ·  Versión " + r.get("version"), 10, false)
+                .paragraph("Fecha y hora: " + (at == null ? "-" : at.format(DMY)) + "  ·  Canal: " + canal, 10, false)
                 .space(8)
                 .paragraph(String.valueOf(r.get("body") == null ? "" : r.get("body")), 9.5f, false)
                 .space(14)
