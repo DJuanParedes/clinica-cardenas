@@ -64,6 +64,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                     } @else {
                       <span class="tag" [class]="'tag ' + itemTone(i.status)">{{ itemLabel(i.status) }}</span>
                     }
+                    @if (!i.invoiceId) { <app-delete-button entity="treatment_items" [recordId]="i.id" [what]="'Tratamiento ' + i.procedure.name" [iconOnly]="true" [ghost]="true" (deleted)="load()" /> }
                   </td>
                 </tr>
               }

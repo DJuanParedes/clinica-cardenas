@@ -40,6 +40,12 @@ public class CareController {
         return service.addToWaitlist(req);
     }
 
+    @PutMapping("/waitlist/{id}")
+    @PreAuthorize("hasAuthority('CITAS_GESTIONAR')")
+    public WaitlistEntry updateWaitlist(@PathVariable Long id, @RequestBody CareService.WaitRequest req) {
+        return service.updateWaitlist(id, req);
+    }
+
     @PostMapping("/waitlist/{id}/close")
     @PreAuthorize("hasAuthority('CITAS_GESTIONAR')")
     public WaitlistEntry close(@PathVariable Long id) {

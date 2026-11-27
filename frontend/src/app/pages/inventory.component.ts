@@ -295,7 +295,9 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
         <p class="right strong">Total {{ money(purchaseView.total) }}</p>
         <p class="muted small">Registrada por {{ purchaseView.createdBy }} · {{ dt(purchaseView.createdAt) }}{{ purchaseView.expenseId ? ' · egreso de caja #' + purchaseView.expenseId : '' }}</p>
       }
-      <ng-container modal-actions><button class="btn" type="button" (click)="purchaseView = null">Cerrar</button></ng-container>
+      <ng-container modal-actions>
+        @if (purchaseView) { <app-delete-button entity="inventory_purchases" [recordId]="purchaseView.id" what="Compra" [small]="false" (deleted)="purchaseView = null; loadPurchases(); load()" /> }
+        <button class="btn" type="button" (click)="purchaseView = null">Cerrar</button></ng-container>
     </app-modal>
 
     <app-modal [open]="!!payFor" title="Pagar compra al proveedor" [subtitle]="payFor ? payFor.supplier + ' · ' + money(payFor.total) : ''" (close)="payFor = null">
