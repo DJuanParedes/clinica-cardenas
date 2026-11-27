@@ -404,6 +404,7 @@ export class PatientDetailComponent implements OnChanges {
         const today = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
         const minor = !!p.minor;
         const name = `${esc(p.firstName)} ${esc(p.lastName)}`;
+        const box = (on: boolean) => (on ? '&#9746;' : '&#9744;');
         const signer = minor
           ? `${esc(p.guardianName)}, ${esc(this.relLabel(p.guardianRelationship)).toLowerCase()} y representante legal de ${name}, identificado(a) con ${esc(p.guardianDocType || 'DNI')} N.° ${esc(p.guardianDocNumber)}`
           : `${name}, identificado(a) con ${esc(p.docType)} N.° ${esc(p.docNumber)}`;
@@ -412,16 +413,34 @@ export class PatientDetailComponent implements OnChanges {
           subtitle: `Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS) · ${esc(doc.title)}`,
           code: `CDC-PRIV<br>Versión ${esc(doc.version)}<br>HC ${esc(p.hcNumber || p.id)}`,
           body: `
-<h2>1. Datos del paciente</h2>
+<p>En cumplimiento de la Ley N.° 29733, Ley de Protección de Datos Personales, y su Reglamento aprobado por Decreto Supremo N.° 016-2024-JUS (en adelante, la Ley y su Reglamento), y siguiendo las recomendaciones de la Autoridad Nacional de Protección de Datos Personales, la ${CLINIC.name} (en adelante, "la Clínica"), con RUC ${CLINIC.ruc} y domicilio en ${esc(CLINIC.address)}, informa al titular de los datos lo siguiente:</p>
+<h2>1. Datos del titular</h2>
 <table><tr><td class="k">Paciente</td><td>${name}</td></tr>
 <tr><td class="k">Documento de identidad</td><td>${esc(p.docType)} ${esc(p.docNumber)}</td></tr>
 <tr><td class="k">Fecha de nacimiento</td><td>${esc(p.birthDate)}${p.age != null ? ' (' + esc(p.age) + ' años)' : ''}</td></tr>
 <tr><td class="k">Celular / correo</td><td>${esc(p.phone)}${p.email ? ' · ' + esc(p.email) : ''}</td></tr>
 ${minor ? `<tr><td class="k">Representante legal</td><td>${esc(p.guardianName)} (${esc(this.relLabel(p.guardianRelationship))}) · ${esc(p.guardianDocType || 'DNI')} ${esc(p.guardianDocNumber)} · ${esc(p.guardianPhone)}</td></tr>` : ''}
 </table>
-<h2>2. Política de privacidad</h2>${paragraphs(doc.body)}
-<h2>3. Declaración y consentimiento</h2>
-<p>Yo, ${signer}, declaro haber leído y comprendido la política de privacidad de la ${CLINIC.name} y otorgo mi consentimiento libre, previo, expreso, informado e inequívoco para el tratamiento de ${minor ? 'sus' : 'mis'} datos personales y de salud con las finalidades indicadas. Sé que puedo revocarlo y ejercer mis derechos de acceso, rectificación, cancelación y oposición en cualquier momento.</p>
+<h2>2. Se informa</h2>
+<ul>
+<li>Los datos personales y de salud que el titular proporciona se incorporan al banco de datos personales <b>"Pacientes"</b>, cuyo titular y responsable es la Clínica.</li>
+<li>Solo se solicitan los datos estrictamente necesarios para la atención odontológica, la historia clínica, la facturación y la comunicación con el paciente.</li>
+<li>El titular declara que los datos que entrega son <b>verdaderos, completos, exactos y actuales</b>, y que corresponden a su identidad (o a la de la persona que representa).</li>
+<li>Los datos se tratan con confidencialidad y con las medidas de seguridad técnicas y organizativas que exige la Ley.</li>
+<li>Los datos no se venden ni se ceden. Solo acceden a ellos el personal autorizado y los proveedores que actúan como encargados por cuenta de la Clínica, bajo contrato de confidencialidad, salvo que una ley, una orden judicial o una autoridad competente exija entregarlos.</li>
+<li>Cuando los datos dejen de ser necesarios para su finalidad, se conservarán bloqueados y protegidos durante los plazos legales (historia clínica, tributarios y de reclamos) y luego se eliminarán.</li>
+</ul>
+<h2>3. Política de privacidad de la Clínica (${esc(doc.title)}, versión ${esc(doc.version)})</h2>${paragraphs(doc.body)}
+<h2>4. Ejercicio de los derechos ARCO y derecho de información</h2>
+<p>El titular puede ejercer en cualquier momento sus derechos de <b>Acceso, Rectificación, Cancelación y Oposición (ARCO)</b> y su derecho de información: conocer qué datos suyos se tratan, corregir los inexactos, pedir su supresión cuando ya no sean necesarios, oponerse a su tratamiento y revocar este consentimiento. Para ello presenta una solicitud escrita en recepción o por los canales de contacto de la Clínica, adjuntando copia de su documento de identidad (y del documento que acredite la representación, si corresponde). La Clínica responderá en los plazos que fija el Reglamento. Si no queda conforme, puede presentar un reclamo ante la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos.</p>
+<h2>5. Autorizaciones</h2>
+<table>
+<tr><td class="k">Atención, historia clínica, citas y facturación</td><td>Necesario para atenderlo. Al firmar este documento lo autoriza.</td></tr>
+<tr><td class="k">Recordatorios de citas y avisos por WhatsApp, SMS o correo</td><td>${box(false)} Sí autorizo &nbsp;&nbsp; ${box(false)} No autorizo</td></tr>
+<tr><td class="k">Promociones, campañas, encuestas y saludos (opcional)</td><td>${box(p.marketingConsent === true)} Sí autorizo &nbsp;&nbsp; ${box(p.marketingConsent === false)} No autorizo<br><span class="small">No aceptarlo no afecta su atención. Puede darse de baja respondiendo BAJA.</span></td></tr>
+</table>
+<h2>6. Declaración</h2>
+<p>Yo, ${signer}, declaro haber sido informado(a) de lo anterior, haber leído la política de privacidad de la Clínica y otorgo mi consentimiento libre, previo, expreso, informado e inequívoco para el tratamiento de ${minor ? 'sus' : 'mis'} datos personales y de salud con las finalidades indicadas.</p>
 <p>${CLINIC.city}, ${today}.</p>
 <div class="firmas"><div class="f">Firma del ${minor ? 'representante legal' : 'paciente'}<br>${minor ? esc(p.guardianName) : name}<br>${minor ? esc(p.guardianDocType || 'DNI') + ' ' + esc(p.guardianDocNumber) : esc(p.docType) + ' ' + esc(p.docNumber)}</div>
 <div class="f">Firma y sello de la clínica<br>Recibido por</div><div class="huella">Huella digital</div></div>`,
