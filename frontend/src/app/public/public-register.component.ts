@@ -7,11 +7,12 @@ import { LogoComponent } from '../shared/logo.component';
 import { LegalModalComponent } from '../shared/legal-modal.component';
 import { PUBLIC_STYLES } from './public-styles';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.6: prerregistro: el paciente nuevo llena su ficha y antecedentes antes de su primera cita. */
 @Component({
   selector: 'app-public-register',
   standalone: true,
-  imports: [FormsModule, RouterLink, LogoComponent, LegalModalComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, LogoComponent, LegalModalComponent],
   template: `
     <header class="top"><app-logo [size]="44" /><div><div class="name">{{ f?.clinic?.name || 'Clínica Dental' }}</div><div class="addr">{{ f?.clinic?.address }}</div></div></header>
     <main>
@@ -29,29 +30,29 @@ import { PUBLIC_STYLES } from './public-styles';
         <form class="card" (ngSubmit)="send()">
           <h3>Tus datos</h3>
           <div class="grid2">
-            <div class="field"><label class="req" for="dn">DNI</label><input id="dn" name="dn" class="input tabular" [(ngModel)]="p.docNumber" maxlength="8" inputmode="numeric" [class.invalid]="e['docNumber']" />@if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }</div>
+            <div class="field"><label class="req" for="dn">DNI</label><input id="dn" name="dn" class="input tabular" [(ngModel)]="p.docNumber" maxlength="8" appOnly="digits" inputmode="numeric" [class.invalid]="e['docNumber']" />@if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }</div>
             <div class="field"><label class="req" for="bd">Fecha de nacimiento</label><input id="bd" name="bd" type="date" class="input" [(ngModel)]="p.birthDate" [max]="today" [class.invalid]="e['birthDate']" />@if (e['birthDate']) { <span class="err">{{ e['birthDate'] }}</span> }</div>
-            <div class="field"><label class="req" for="fn">Nombres</label><input id="fn" name="fn" class="input" [(ngModel)]="p.firstName" maxlength="60" [class.invalid]="e['firstName']" />@if (e['firstName']) { <span class="err">{{ e['firstName'] }}</span> }</div>
-            <div class="field"><label class="req" for="ln">Apellidos</label><input id="ln" name="ln" class="input" [(ngModel)]="p.lastName" maxlength="80" [class.invalid]="e['lastName']" />@if (e['lastName']) { <span class="err">{{ e['lastName'] }}</span> }</div>
+            <div class="field"><label class="req" for="fn">Nombres</label><input id="fn" name="fn" class="input" [(ngModel)]="p.firstName" maxlength="60" [class.invalid]="e['firstName']" appOnly="letters" />@if (e['firstName']) { <span class="err">{{ e['firstName'] }}</span> }</div>
+            <div class="field"><label class="req" for="ln">Apellidos</label><input id="ln" name="ln" class="input" [(ngModel)]="p.lastName" maxlength="80" [class.invalid]="e['lastName']" appOnly="letters" />@if (e['lastName']) { <span class="err">{{ e['lastName'] }}</span> }</div>
             <div class="field"><label class="req" for="sx">Sexo</label><select id="sx" name="sx" class="input" [(ngModel)]="p.sex" [class.invalid]="e['sex']"><option value="">Elige…</option><option value="F">Femenino</option><option value="M">Masculino</option></select>@if (e['sex']) { <span class="err">{{ e['sex'] }}</span> }</div>
-            <div class="field"><label class="req" for="ph">Celular (WhatsApp)</label><input id="ph" name="ph" class="input tabular" [(ngModel)]="p.phone" maxlength="9" inputmode="numeric" [class.invalid]="e['phone']" />@if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }</div>
-            <div class="field"><label for="em">Correo</label><input id="em" name="em" type="email" class="input" [(ngModel)]="p.email" maxlength="120" [class.invalid]="e['email']" />@if (e['email']) { <span class="err">{{ e['email'] }}</span> }</div>
-            <div class="field"><label for="ad">Dirección</label><input id="ad" name="ad" class="input" [(ngModel)]="p.address" maxlength="200" /></div>
-            <div class="field"><label for="ec">Contacto de emergencia</label><input id="ec" name="ec" class="input" [(ngModel)]="p.emergencyContactName" maxlength="120" /></div>
-            <div class="field"><label for="ep">Celular de emergencia</label><input id="ep" name="ep" class="input tabular" [(ngModel)]="p.emergencyContactPhone" maxlength="9" [class.invalid]="e['emergencyContactPhone']" /></div>
+            <div class="field"><label class="req" for="ph">Celular (WhatsApp)</label><input id="ph" name="ph" class="input tabular" [(ngModel)]="p.phone" maxlength="9" inputmode="numeric" [class.invalid]="e['phone']" appOnly="phone" />@if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }</div>
+            <div class="field"><label for="em">Correo</label><input id="em" name="em" type="email" class="input" [(ngModel)]="p.email" maxlength="120" [class.invalid]="e['email']" appOnly="email" />@if (e['email']) { <span class="err">{{ e['email'] }}</span> }</div>
+            <div class="field"><label for="ad">Dirección</label><input id="ad" name="ad" class="input" [(ngModel)]="p.address" maxlength="200" appOnly="text" /></div>
+            <div class="field"><label for="ec">Contacto de emergencia</label><input id="ec" name="ec" class="input" [(ngModel)]="p.emergencyContactName" maxlength="120" appOnly="letters" /></div>
+            <div class="field"><label for="ep">Celular de emergencia</label><input id="ep" name="ep" class="input tabular" [(ngModel)]="p.emergencyContactPhone" maxlength="9" [class.invalid]="e['emergencyContactPhone']" appOnly="phone" /></div>
             @if (minor) {
               <p class="span2 notice">Es menor de edad: completa los datos del padre, madre o tutor.</p>
-              <div class="field"><label class="req" for="gn">Nombre del apoderado</label><input id="gn" name="gn" class="input" [(ngModel)]="p.guardianName" maxlength="120" [class.invalid]="e['guardianName']" />@if (e['guardianName']) { <span class="err">{{ e['guardianName'] }}</span> }</div>
-              <div class="field"><label class="req" for="gd">DNI del apoderado</label><input id="gd" name="gd" class="input tabular" [(ngModel)]="p.guardianDocNumber" maxlength="8" [class.invalid]="e['guardianDocNumber']" /></div>
+              <div class="field"><label class="req" for="gn">Nombre del apoderado</label><input id="gn" name="gn" class="input" [(ngModel)]="p.guardianName" maxlength="120" [class.invalid]="e['guardianName']" appOnly="letters" />@if (e['guardianName']) { <span class="err">{{ e['guardianName'] }}</span> }</div>
+              <div class="field"><label class="req" for="gd">DNI del apoderado</label><input id="gd" name="gd" class="input tabular" [(ngModel)]="p.guardianDocNumber" maxlength="8" appOnly="digits" inputmode="numeric" [class.invalid]="e['guardianDocNumber']" /></div>
               <div class="field"><label class="req" for="gr">Vínculo</label><select id="gr" name="gr" class="input" [(ngModel)]="p.guardianRelationship"><option value="">Elige…</option><option value="MADRE">Madre</option><option value="PADRE">Padre</option><option value="TUTOR">Tutor legal</option></select></div>
-              <div class="field"><label class="req" for="gp">Celular del apoderado</label><input id="gp" name="gp" class="input tabular" [(ngModel)]="p.guardianPhone" maxlength="9" /></div>
+              <div class="field"><label class="req" for="gp">Celular del apoderado</label><input id="gp" name="gp" class="input tabular" [(ngModel)]="p.guardianPhone" maxlength="9" appOnly="phone" /></div>
             }
             <div class="field span2"><label for="src">¿Cómo nos conociste?</label><select id="src" name="src" class="input" [(ngModel)]="p.source"><option value="">Prefiero no decir</option>@for (s of f.sources; track s.code) { <option [value]="s.code">{{ s.label }}</option> }</select></div>
           </div>
           <h3>Tu salud</h3>
           <div class="grid2">
-            <div class="field"><label for="al">¿Alergias? (medicamentos, látex, anestesia…)</label><input id="al" name="al" class="input" [(ngModel)]="allergies" maxlength="500" placeholder="Ninguna" /></div>
-            <div class="field"><label for="md">¿Tomas algún medicamento?</label><input id="md" name="md" class="input" [(ngModel)]="medication" maxlength="500" placeholder="Ninguno" /></div>
+            <div class="field"><label for="al">¿Alergias? (medicamentos, látex, anestesia…)</label><input id="al" name="al" class="input" [(ngModel)]="allergies" maxlength="500" placeholder="Ninguna" appOnly="text" /></div>
+            <div class="field"><label for="md">¿Tomas algún medicamento?</label><input id="md" name="md" class="input" [(ngModel)]="medication" maxlength="500" placeholder="Ninguno" appOnly="text" /></div>
           </div>
           <p class="muted small">¿Tienes o has tenido…?</p>
           <div class="opts">
@@ -59,7 +60,7 @@ import { PUBLIC_STYLES } from './public-styles';
               <div class="opt yn"><span class="grow">{{ q.label }}</span>
                 <div class="chips"><button type="button" [class.on]="ans[q.id]?.value === 'NO'" (click)="set(q.id, 'NO')">No</button><button type="button" [class.on]="ans[q.id]?.value === 'SI'" (click)="set(q.id, 'SI')">Sí</button></div>
               </div>
-              @if (ans[q.id]?.value === 'SI') { <input class="input" [name]="'n' + q.id" [(ngModel)]="ans[q.id].note" placeholder="Detalle (desde cuándo, medicamento…)" maxlength="300" /> }
+              @if (ans[q.id]?.value === 'SI') { <input class="input" [name]="'n' + q.id" [(ngModel)]="ans[q.id].note" placeholder="Detalle (desde cuándo, medicamento…)" maxlength="300" appOnly="text" /> }
             }
           </div>
           <div class="consent" [class.ok]="p.dataConsent" [class.invalid]="e['dataConsent']">

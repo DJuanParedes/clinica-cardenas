@@ -25,12 +25,13 @@ import { PeriodontogramTabComponent } from './clinical/periodontogram-tab.compon
 import { LabOrdersComponent } from './lab-orders.component';
 import { PatientProfile } from '../core/api.service';
 
+import { OnlyDirective } from '../shared/only.directive';
 type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' | 'laboratorio' | 'ortodoncia' | 'archivos' | 'cuenta';
 
 @Component({
   selector: 'app-patient-detail',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent, PatientFlagsComponent, OrthoTabComponent, InformedConsentsComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, IconComponent, HistoryTabComponent, OdontogramTabComponent, PlanTabComponent, AccountTabComponent, FilesTabComponent, PatientProfilePanelsComponent, AnamnesisTabComponent, VitalsTabComponent, PeriodontogramTabComponent, LabOrdersComponent, TaskListComponent, MarketingConsentComponent, PatientFlagsComponent, OrthoTabComponent, InformedConsentsComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/pacientes"><app-icon name="chevronLeft" [size]="16" /> Pacientes</a>
@@ -194,9 +195,9 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
                 <div class="panel-body small">
                   @if (reqOpen) {
                     <form class="reqform" (ngSubmit)="createReq()">
-                      <input class="input" name="rt" [(ngModel)]="rq.title" placeholder="Ej. Radiografía panorámica" maxlength="150" />
+                      <input class="input" name="rt" [(ngModel)]="rq.title" placeholder="Ej. Radiografía panorámica" maxlength="150" appOnly="text" />
                       <select class="input" name="rk" [(ngModel)]="rq.kind"><option value="RADIOGRAFIA">Radiografía / placa</option><option value="DOCUMENTO">Documento / informe</option><option value="FOTO">Foto</option></select>
-                      <input class="input" name="rd" [(ngModel)]="rq.description" placeholder="Para qué (opcional)" maxlength="500" />
+                      <input class="input" name="rd" [(ngModel)]="rq.description" placeholder="Para qué (opcional)" maxlength="500" appOnly="text" />
                       <input class="input" name="rdue" type="date" [(ngModel)]="rq.dueDate" />
                       <button class="btn primary sm" type="submit" [disabled]="busyReq || !rq.title">Pedir</button>
                     </form>

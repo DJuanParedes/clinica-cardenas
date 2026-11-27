@@ -5,11 +5,12 @@ import { apiError, isoDate, shortDate } from '../../core/format';
 import { ToastService } from '../../core/toast.service';
 import { ModalComponent } from '../../shared/modal.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 /** v2.8: ortodoncia del paciente: caso, controles y álbumes de fotos por etapa (las fotos son archivos de su ficha). */
 @Component({
   selector: 'app-ortho-tab',
   standalone: true,
-  imports: [FormsModule, ModalComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent],
   template: `
     @if (!opts || !cases) { <div class="skeleton" style="height: 200px"></div> }
     @else if (!c) {
@@ -109,14 +110,14 @@ import { ModalComponent } from '../../shared/modal.component';
           <div class="field"><label class="req" for="oa">Aparato</label><select id="oa" name="oa" class="input" [(ngModel)]="cf.appliance" [class.invalid]="e['appliance']"><option value="">Elige…</option>@for (a of entries(opts?.appliances); track a[0]) { <option [value]="a[0]">{{ a[1] }}</option> }</select>@if (e['appliance']) { <span class="err">{{ e['appliance'] }}</span> }</div>
           <div class="field"><label for="ocl">Clase de Angle</label><select id="ocl" name="ocl" class="input" [(ngModel)]="cf.angleClass"><option value="">Sin registrar</option>@for (a of entries(opts?.classes); track a[0]) { <option [value]="a[0]">{{ a[1] }}</option> }</select></div>
           <div class="field"><label class="req" for="osd">Inicio</label><input id="osd" name="osd" class="input" type="date" [(ngModel)]="cf.startDate" [class.invalid]="e['startDate']" />@if (e['startDate']) { <span class="err">{{ e['startDate'] }}</span> }</div>
-          <div class="field"><label for="oem">Duración estimada (meses)</label><input id="oem" name="oem" class="input" type="number" min="1" max="60" [(ngModel)]="cf.estimatedMonths" [class.invalid]="e['estimatedMonths']" /></div>
+          <div class="field"><label for="oem">Duración estimada (meses)</label><input id="oem" name="oem" class="input" type="number" min="1" max="60" [(ngModel)]="cf.estimatedMonths" [class.invalid]="e['estimatedMonths']" appOnly="int" /></div>
           @if (cf.id) {
             <div class="field"><label for="ost">Estado</label><select id="ost" name="ost" class="input" [(ngModel)]="cf.status">@for (a of entries(opts?.statuses); track a[0]) { <option [value]="a[0]">{{ a[1] }}</option> }</select></div>
             <div class="field"><label for="ocs">Etapa actual</label><select id="ocs" name="ocs" class="input" [(ngModel)]="cf.currentStage">@for (a of stageList; track a[0]) { <option [value]="a[0]">{{ a[1] }}</option> }</select></div>
           }
         </div>
-        <div class="field"><label for="odx">Diagnóstico</label><textarea id="odx" name="odx" class="input" rows="2" [(ngModel)]="cf.diagnosis" maxlength="1000" placeholder="Ej.: apiñamiento moderado, mordida profunda"></textarea></div>
-        <div class="field"><label for="oob">Objetivos del tratamiento</label><textarea id="oob" name="oob" class="input" rows="2" [(ngModel)]="cf.objectives" maxlength="1000"></textarea></div>
+        <div class="field"><label for="odx">Diagnóstico</label><textarea id="odx" name="odx" class="input" rows="2" [(ngModel)]="cf.diagnosis" maxlength="1000" placeholder="Ej.: apiñamiento moderado, mordida profunda" appOnly="text"></textarea></div>
+        <div class="field"><label for="oob">Objetivos del tratamiento</label><textarea id="oob" name="oob" class="input" rows="2" [(ngModel)]="cf.objectives" maxlength="1000" appOnly="text"></textarea></div>
         @if (error) { <div class="err">{{ error }}</div> }
       </form>
       <div modal-actions><button class="btn" type="button" (click)="caseOpen = false">Cancelar</button><button class="btn primary" type="submit" form="ocf" [disabled]="busy">Guardar</button></div>
@@ -128,14 +129,14 @@ import { ModalComponent } from '../../shared/modal.component';
         <div class="cols-2">
           <div class="field"><label class="req" for="cd">Fecha</label><input id="cd" name="cd" class="input" type="date" [(ngModel)]="ctl.controlDate" [max]="today" [class.invalid]="e['controlDate']" />@if (e['controlDate']) { <span class="err">{{ e['controlDate'] }}</span> }</div>
           <div class="field"><label for="cs">Etapa</label><select id="cs" name="cs" class="input" [(ngModel)]="ctl.stage">@for (a of stageList; track a[0]) { <option [value]="a[0]">{{ a[1] }}</option> }</select></div>
-          <div class="field"><label for="cu">Arco superior</label><input id="cu" name="cu" class="input" [(ngModel)]="ctl.upperWire" maxlength="60" placeholder="NiTi 0.016" list="wires" /></div>
-          <div class="field"><label for="cl">Arco inferior</label><input id="cl" name="cl" class="input" [(ngModel)]="ctl.lowerWire" maxlength="60" placeholder="NiTi 0.016" list="wires" /></div>
-          <div class="field"><label for="ce">Elásticos</label><input id="ce" name="ce" class="input" [(ngModel)]="ctl.elastics" maxlength="100" placeholder="Clase II 3/16 bilateral" /></div>
+          <div class="field"><label for="cu">Arco superior</label><input id="cu" name="cu" class="input" [(ngModel)]="ctl.upperWire" maxlength="60" placeholder="NiTi 0.016" list="wires" appOnly="text" /></div>
+          <div class="field"><label for="cl">Arco inferior</label><input id="cl" name="cl" class="input" [(ngModel)]="ctl.lowerWire" maxlength="60" placeholder="NiTi 0.016" list="wires" appOnly="text" /></div>
+          <div class="field"><label for="ce">Elásticos</label><input id="ce" name="ce" class="input" [(ngModel)]="ctl.elastics" maxlength="100" placeholder="Clase II 3/16 bilateral" appOnly="text" /></div>
           <div class="field"><label for="ch">Higiene</label><select id="ch" name="ch" class="input" [(ngModel)]="ctl.hygiene"><option value="">Sin evaluar</option><option value="BUENA">Buena</option><option value="REGULAR">Regular</option><option value="MALA">Mala</option></select></div>
-          <div class="field"><label for="cn">Próximo control en (semanas)</label><input id="cn" name="cn" class="input" type="number" min="1" max="26" [(ngModel)]="ctl.nextWeeks" /></div>
+          <div class="field"><label for="cn">Próximo control en (semanas)</label><input id="cn" name="cn" class="input" type="number" min="1" max="26" [(ngModel)]="ctl.nextWeeks" appOnly="int" /></div>
         </div>
         <datalist id="wires"><option value="NiTi 0.012"></option><option value="NiTi 0.014"></option><option value="NiTi 0.016"></option><option value="NiTi 0.016x0.022"></option><option value="NiTi 0.018x0.025"></option><option value="Acero 0.016x0.022"></option><option value="Acero 0.019x0.025"></option><option value="TMA 0.017x0.025"></option></datalist>
-        <div class="field"><label for="cno">Notas</label><textarea id="cno" name="cno" class="input" rows="2" [(ngModel)]="ctl.notes" maxlength="1000" placeholder="Se recementó bracket 23, se activó cadeneta…"></textarea></div>
+        <div class="field"><label for="cno">Notas</label><textarea id="cno" name="cno" class="input" rows="2" [(ngModel)]="ctl.notes" maxlength="1000" placeholder="Se recementó bracket 23, se activó cadeneta…" appOnly="text"></textarea></div>
         @if (error) { <div class="err">{{ error }}</div> }
       </form>
       <div modal-actions><button class="btn" type="button" (click)="ctlOpen = false">Cancelar</button><button class="btn primary" type="submit" form="octl" [disabled]="busy">Guardar control</button></div>

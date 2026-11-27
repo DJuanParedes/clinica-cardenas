@@ -9,6 +9,7 @@ import { Patient } from '../core/models';
 import { IconComponent } from '../shared/icon.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** Respuestas rápidas que el personal envía con un clic (se pueden editar antes de enviar). */
 const QUICK = [
   'Hola, gracias por escribirnos 😊 ¿En qué te podemos ayudar?',
@@ -36,7 +37,7 @@ const INTENT_LABEL: Record<string, string> = {
 @Component({
   selector: 'app-messages',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, PatientPickerComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, PatientPickerComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -80,7 +81,7 @@ const INTENT_LABEL: Record<string, string> = {
           <h3>Probar el asistente</h3>
           <p class="muted small">Escribe como si fueras un paciente. No se envía nada ni se ejecutan acciones.</p>
           <div class="row">
-            <input class="input" [(ngModel)]="testText" placeholder="Ej.: ¿cuánto cuesta una limpieza? · ¿atienden los sábados? · quiero cambiar mi cita" (keydown.enter)="runTest()" />
+            <input class="input" [(ngModel)]="testText" placeholder="Ej.: ¿cuánto cuesta una limpieza? · ¿atienden los sábados? · quiero cambiar mi cita" (keydown.enter)="runTest()" appOnly="text" maxlength="200" />
             <div class="pp"><app-patient-picker [value]="testPatient" (valueChange)="testPatient = $event" placeholder="Paciente (opcional)" /></div>
             <button class="btn primary" type="button" (click)="runTest()" [disabled]="testing">{{ testing ? 'Pensando…' : 'Probar' }}</button>
           </div>
@@ -99,8 +100,8 @@ const INTENT_LABEL: Record<string, string> = {
         <section class="panel tool">
           <div class="panel-head"><h3>Base de conocimiento</h3><span class="muted small">Además de estas preguntas, el asistente usa los horarios, precios del catálogo, dirección y medios de pago reales.</span></div>
           <div class="faq-new">
-            <input class="input" [(ngModel)]="faqForm.question" placeholder="Pregunta (ej.: ¿Atienden con seguro?)" maxlength="300" />
-            <textarea class="input" rows="2" [(ngModel)]="faqForm.answer" placeholder="Respuesta que dará el asistente" maxlength="1500"></textarea>
+            <input class="input" [(ngModel)]="faqForm.question" placeholder="Pregunta (ej.: ¿Atienden con seguro?)" maxlength="300" appOnly="text" />
+            <textarea class="input" rows="2" [(ngModel)]="faqForm.answer" placeholder="Respuesta que dará el asistente" maxlength="1500" appOnly="text"></textarea>
             <div class="row-end">
               @if (faqForm.id) { <button class="btn ghost sm" type="button" (click)="resetFaq()">Cancelar</button> }
               <button class="btn primary sm" type="button" (click)="saveFaq()" [disabled]="!canConfigure">{{ faqForm.id ? 'Guardar cambios' : 'Agregar pregunta' }}</button>
@@ -125,7 +126,7 @@ const INTENT_LABEL: Record<string, string> = {
       <section class="chat panel">
         <aside class="list">
           <div class="list-h">
-            <input class="input" [(ngModel)]="q" (ngModelChange)="loadThreads()" placeholder="Buscar paciente o número" aria-label="Buscar conversación" />
+            <input class="input" [(ngModel)]="q" (ngModelChange)="loadThreads()" placeholder="Buscar paciente o número" aria-label="Buscar conversación" appOnly="search" maxlength="100" />
             <div class="filters">
               <button type="button" class="chip" [class.on]="filter === 'all'" (click)="filter = 'all'">Todas</button>
               <button type="button" class="chip" [class.on]="filter === 'attention'" (click)="filter = 'attention'">Por atender @if (attention) { <b>{{ attention }}</b> }</button>
@@ -198,7 +199,7 @@ const INTENT_LABEL: Record<string, string> = {
               </div>
               <div class="send-row">
                 <textarea class="input" rows="2" [(ngModel)]="draft" placeholder="Escribe un mensaje para el paciente (Enter para enviar, Shift+Enter nueva línea)"
-                          (keydown.enter)="onEnter($event)" maxlength="1500"></textarea>
+                          (keydown.enter)="onEnter($event)" maxlength="1500" appOnly="text"></textarea>
                 <button class="btn primary" type="button" (click)="send()" [disabled]="sending || !draft.trim()"><app-icon name="send" [size]="16" /> {{ sending ? 'Enviando…' : 'Enviar' }}</button>
               </div>
               <div class="muted small">Al escribir tú, el asistente se pausa en este chat por {{ settings?.pauseMinutes ?? 120 }} min para no interrumpir.</div>

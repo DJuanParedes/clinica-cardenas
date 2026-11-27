@@ -7,11 +7,12 @@ import { ToastService } from '../core/toast.service';
 import { apiError, dateTime, initials } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** Mi perfil: cada usuario actualiza sus datos y su contraseña (exige la actual). */
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
   template: `
     <div class="page narrow">
       <div class="page-head"><div><h1>Mi perfil</h1><p class="sub">Tus datos de contacto y tu contraseña. El puesto y los permisos los asigna administración.</p></div></div>
@@ -30,12 +31,12 @@ import { IconComponent } from '../shared/icon.component';
           <section class="panel">
             <div class="panel-head"><h3>Datos personales</h3></div>
             <form class="panel-body stack" (ngSubmit)="save()">
-              <div class="field"><label class="req" for="pn">Nombres y apellidos</label><input id="pn" class="input" name="pn" [(ngModel)]="f.fullName" maxlength="120" />
+              <div class="field"><label class="req" for="pn">Nombres y apellidos</label><input id="pn" class="input" name="pn" [(ngModel)]="f.fullName" maxlength="120" appOnly="letters" />
                 @if (err['fullName']) { <span class="err">{{ err['fullName'] }}</span> }</div>
-              <div class="field"><label class="req" for="pe">Correo</label><input id="pe" class="input" type="email" name="pe" [(ngModel)]="f.email" maxlength="120" />
+              <div class="field"><label class="req" for="pe">Correo</label><input id="pe" class="input" type="email" name="pe" [(ngModel)]="f.email" maxlength="120" appOnly="email" />
                 <span class="hint">Aquí llegan los códigos para recuperar la contraseña o ingresar.</span>
                 @if (err['email']) { <span class="err">{{ err['email'] }}</span> }</div>
-              <div class="field"><label for="pt">Celular</label><input id="pt" class="input" name="pt" [(ngModel)]="f.phone" maxlength="9" inputmode="numeric" placeholder="9XXXXXXXX" />
+              <div class="field"><label for="pt">Celular</label><input id="pt" class="input" name="pt" [(ngModel)]="f.phone" maxlength="9" inputmode="numeric" placeholder="9XXXXXXXX" appOnly="phone" />
                 @if (err['phone']) { <span class="err">{{ err['phone'] }}</span> }</div>
               <button class="btn primary" type="submit" [disabled]="busy">Guardar cambios</button>
             </form>
@@ -43,12 +44,12 @@ import { IconComponent } from '../shared/icon.component';
           <section class="panel">
             <div class="panel-head"><h3>Cambiar contraseña</h3></div>
             <form class="panel-body stack" (ngSubmit)="changePassword()">
-              <div class="field"><label class="req" for="pc">Contraseña actual</label><input id="pc" class="input" type="password" name="pc" [(ngModel)]="pw.currentPassword" autocomplete="current-password" />
+              <div class="field"><label class="req" for="pc">Contraseña actual</label><input id="pc" class="input" type="password" name="pc" [(ngModel)]="pw.currentPassword" autocomplete="current-password" appOnly="text" maxlength="72" />
                 @if (err['currentPassword']) { <span class="err">{{ err['currentPassword'] }}</span> }</div>
-              <div class="field"><label class="req" for="pw1">Nueva contraseña</label><input id="pw1" class="input" type="password" name="pw1" [(ngModel)]="pw.newPassword" autocomplete="new-password" />
+              <div class="field"><label class="req" for="pw1">Nueva contraseña</label><input id="pw1" class="input" type="password" name="pw1" [(ngModel)]="pw.newPassword" autocomplete="new-password" appOnly="nospace" maxlength="72" />
                 <span class="hint">Mínimo 8 caracteres, con letras y números.</span>
                 @if (err['newPassword']) { <span class="err">{{ err['newPassword'] }}</span> }</div>
-              <div class="field"><label class="req" for="pw2">Repite la nueva contraseña</label><input id="pw2" class="input" type="password" name="pw2" [(ngModel)]="pw.repeat" autocomplete="new-password" />
+              <div class="field"><label class="req" for="pw2">Repite la nueva contraseña</label><input id="pw2" class="input" type="password" name="pw2" [(ngModel)]="pw.repeat" autocomplete="new-password" appOnly="nospace" maxlength="72" />
                 @if (pw.repeat && pw.repeat !== pw.newPassword) { <span class="err">No coincide.</span> }</div>
               <button class="btn primary" type="submit" [disabled]="busy || !pw.currentPassword || !pw.newPassword || pw.repeat !== pw.newPassword">Cambiar contraseña</button>
             </form>

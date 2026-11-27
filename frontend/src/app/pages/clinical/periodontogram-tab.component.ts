@@ -5,6 +5,7 @@ import { ToastService } from '../../core/toast.service';
 import { apiError, dateTime, shortDate } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 interface Face { mg: number[]; ps: number[]; bleed: boolean[]; plaque: boolean[]; }
 interface Tooth { missing: boolean; implant: boolean; mobility: number; furcation: number; v: Face; l: Face; }
 interface ExamSummary { id: number; examDate: string; dentistName?: string; plaqueIndex: number; bleedingIndex: number; meanDepth: number; deepSites: number; teethPresent: number; notes?: string; createdAt: string; createdBy: string; }
@@ -19,7 +20,7 @@ const blankTooth = (): Tooth => ({ missing: false, implant: false, mobility: 0, 
 @Component({
   selector: 'app-periodontogram-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <section class="panel">
       <div class="panel-head">
@@ -124,7 +125,7 @@ const blankTooth = (): Tooth => ({ missing: false, implant: false, mobility: 0, 
           }
           <div class="field">
             <label for="pn">Notas del examen</label>
-            @if (editing) { <textarea id="pn" class="input" rows="2" [(ngModel)]="notes" maxlength="500" placeholder="Diagnóstico periodontal, plan (raspado, control en 3 meses)…"></textarea> }
+            @if (editing) { <textarea id="pn" class="input" rows="2" [(ngModel)]="notes" maxlength="500" placeholder="Diagnóstico periodontal, plan (raspado, control en 3 meses)…" appOnly="text"></textarea> }
             @else { <p>{{ current?.notes || '—' }}</p> }
           </div>
         </div>

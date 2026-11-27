@@ -7,13 +7,14 @@ import { ToastService } from '../core/toast.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 interface Group { name: string; perms: { code: string; label: string; group: string; description?: string }[]; }
 
 /** HU-26: asignar permisos a cada rol. Se aplica en el servidor en la siguiente petición del usuario. */
 @Component({
   selector: 'app-roles',
   standalone: true,
-  imports: [IconComponent, FormsModule, ModalComponent],
+  imports: [OnlyDirective, IconComponent, FormsModule, ModalComponent],
   template: `
     <div class="page wide">
       <div class="page-head">
@@ -95,8 +96,8 @@ interface Group { name: string; perms: { code: string; label: string; group: str
     <app-modal [open]="!!editing" [title]="'Editar rol: ' + (editing?.label || '')" (close)="editing = null">
       @if (editing) {
         <form class="stack" (ngSubmit)="saveEdit()">
-          <div class="field"><label class="req" for="en">Nombre</label><input id="en" class="input" name="en" [(ngModel)]="ef.name" maxlength="60" /></div>
-          <div class="field"><label for="ed">Descripción</label><input id="ed" class="input" name="ed" [(ngModel)]="ef.description" maxlength="255" /></div>
+          <div class="field"><label class="req" for="en">Nombre</label><input id="en" class="input" name="en" [(ngModel)]="ef.name" maxlength="60" appOnly="text" /></div>
+          <div class="field"><label for="ed">Descripción</label><input id="ed" class="input" name="ed" [(ngModel)]="ef.description" maxlength="255" appOnly="text" /></div>
           @if (!editing.locked) {
             <label class="check"><input type="checkbox" name="eh" [(ngModel)]="ef.hidden" />
               Ocultar (no aparece al asignar roles en Personal)@if (editing.users > 0) { <span class="muted small"> — primero cambia de rol a sus {{ editing.users }} persona(s)</span> }</label>
@@ -129,10 +130,10 @@ interface Group { name: string; perms: { code: string; label: string; group: str
 
     <app-modal [open]="!!perm" [title]="'Editar permiso'" [subtitle]="perm?.code || ''" (close)="perm = null">
       <form class="stack" (ngSubmit)="savePerm()">
-        <div class="field"><label class="req" for="pl">Nombre</label><input id="pl" class="input" name="pl" [(ngModel)]="pf.label" maxlength="120" /></div>
-        <div class="field"><label class="req" for="pg">Grupo</label><input id="pg" class="input" name="pg" [(ngModel)]="pf.group" maxlength="40" list="pgroups" />
+        <div class="field"><label class="req" for="pl">Nombre</label><input id="pl" class="input" name="pl" [(ngModel)]="pf.label" maxlength="120" appOnly="text" /></div>
+        <div class="field"><label class="req" for="pg">Grupo</label><input id="pg" class="input" name="pg" [(ngModel)]="pf.group" maxlength="40" list="pgroups" appOnly="text" />
           <datalist id="pgroups">@for (g of groups; track g.name) { <option [value]="g.name"></option> }</datalist></div>
-        <div class="field"><label for="pd">Descripción</label><input id="pd" class="input" name="pd" [(ngModel)]="pf.description" maxlength="255" /></div>
+        <div class="field"><label for="pd">Descripción</label><input id="pd" class="input" name="pd" [(ngModel)]="pf.description" maxlength="255" appOnly="text" /></div>
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="perm = null">Cancelar</button>
@@ -142,7 +143,7 @@ interface Group { name: string; perms: { code: string; label: string; group: str
 
     <app-modal [open]="newOpen" title="Nuevo rol" subtitle="Elige el puesto y de dónde copiar los permisos; luego ajústalos en la matriz." (close)="newOpen = false">
       <form class="stack" (ngSubmit)="create()">
-        <div class="field"><label class="req" for="rn">Nombre del rol</label><input id="rn" class="input" name="rn" [(ngModel)]="nf.name" maxlength="60" placeholder="Asistente dental" /></div>
+        <div class="field"><label class="req" for="rn">Nombre del rol</label><input id="rn" class="input" name="rn" [(ngModel)]="nf.name" maxlength="60" placeholder="Asistente dental" appOnly="text" /></div>
         <div class="field"><label class="req" for="rb">Puesto base</label>
           <select id="rb" class="input" name="rb" [(ngModel)]="nf.baseRole"><option value="">Seleccionar…</option>
             @for (b of baseRoles; track b.code) { <option [value]="b.code">{{ b.label }}</option> }</select>
@@ -151,7 +152,7 @@ interface Group { name: string; perms: { code: string; label: string; group: str
           <select id="rc" class="input" name="rc" [(ngModel)]="nf.copyFrom"><option value="">El puesto base</option>
             @for (o of m?.roles || []; track o.code) { @if (!o.locked) { <option [value]="o.code">{{ o.label }}</option> } }
             <option value="VACIO">Ninguno (empezar sin permisos)</option></select></div>
-        <div class="field"><label for="rd">Descripción</label><input id="rd" class="input" name="rd" [(ngModel)]="nf.description" maxlength="255" /></div>
+        <div class="field"><label for="rd">Descripción</label><input id="rd" class="input" name="rd" [(ngModel)]="nf.description" maxlength="255" appOnly="text" /></div>
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="newOpen = false">Cancelar</button>

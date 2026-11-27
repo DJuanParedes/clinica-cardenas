@@ -4,6 +4,7 @@ import { Api } from '../core/api.service';
 import { dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 const TITLES: Record<string, string> = {
   patients: 'Paciente', appointments: 'Cita', users: 'Usuario', dentists: 'Odontólogo', procedures: 'Procedimiento',
   treatment_plans: 'Plan de tratamiento', treatment_items: 'Tratamiento', tasks: 'Tarea', leads: 'Oportunidad CRM',
@@ -18,7 +19,7 @@ const TITLES: Record<string, string> = {
 @Component({
   selector: 'app-trash',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -26,7 +27,7 @@ const TITLES: Record<string, string> = {
           <h1>Papelera</h1>
           <p class="sub">Registros eliminados por el administrador. Cada uno guarda una copia completa (con lo que se borró junto) que puedes descargar.</p>
         </div>
-        <input class="input search" placeholder="Buscar…" [(ngModel)]="q" aria-label="Buscar en la papelera" />
+        <input class="input search" placeholder="Buscar…" [(ngModel)]="q" aria-label="Buscar en la papelera" appOnly="search" maxlength="100" />
       </div>
       @if (!rows) {
         <div class="skeleton" style="height: 240px"></div>

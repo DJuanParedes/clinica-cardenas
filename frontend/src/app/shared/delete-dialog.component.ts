@@ -6,11 +6,12 @@ import { ToastService } from '../core/toast.service';
 import { apiError } from '../core/format';
 import { IconComponent } from './icon.component';
 
+import { OnlyDirective } from './only.directive';
 /** v2.11: confirmación de eliminación con todo lo que se borra junto, lo que lo impide y la papelera. */
 @Component({
   selector: 'app-delete-dialog',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     @if (svc.current(); as c) {
       <div class="backdrop" (click)="cancel()"></div>
@@ -50,9 +51,9 @@ import { IconComponent } from './icon.component';
             @for (w of p.warnings; track w) { <p class="warn"><app-icon name="alert" [size]="14" /> {{ w }}</p> }
             @if (p.canDelete) {
               <div class="field"><label for="del-reason">Motivo (opcional)</label>
-                <input id="del-reason" class="input" [(ngModel)]="reason" maxlength="300" placeholder="Registro de prueba, duplicado…" /></div>
+                <input id="del-reason" class="input" [(ngModel)]="reason" maxlength="300" placeholder="Registro de prueba, duplicado…" appOnly="text" /></div>
               <div class="field"><label for="del-confirm">Escribe <b>ELIMINAR</b> para confirmar</label>
-                <input id="del-confirm" class="input" [(ngModel)]="confirm" autocomplete="off" (keyup.enter)="go()" /></div>
+                <input id="del-confirm" class="input" [(ngModel)]="confirm" autocomplete="off" (keyup.enter)="go()" appOnly="nospace" maxlength="72" /></div>
               <p class="muted small">No se puede deshacer desde la pantalla, pero queda una copia completa en <b>Papelera</b>.</p>
             }
           }

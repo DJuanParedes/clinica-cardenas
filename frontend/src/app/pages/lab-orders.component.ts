@@ -11,6 +11,7 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 export const LAB_STATUS: Record<string, { label: string; tone: string }> = {
   POR_ENVIAR: { label: 'Por enviar', tone: 'grey' }, ENVIADA: { label: 'En laboratorio', tone: 'blue' }, EN_PRUEBA: { label: 'En prueba', tone: 'amber' },
   RECIBIDA: { label: 'Recibida', tone: 'teal' }, ENTREGADA: { label: 'Entregada', tone: 'green' }, ANULADA: { label: 'Anulada', tone: 'gum' },
@@ -24,7 +25,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
 @Component({
   selector: 'app-lab-orders',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
   template: `
     <div [class.page]="!patientId">
       @if (!patientId) {
@@ -53,7 +54,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
         <section class="panel">
           <div class="panel-head">
             <div class="row wrap filters">
-              @if (!patientId) { <input class="input" [(ngModel)]="filter.q" (keyup.enter)="load()" placeholder="Paciente, DNI, código o trabajo" aria-label="Buscar" /> }
+              @if (!patientId) { <input class="input" [(ngModel)]="filter.q" (keyup.enter)="load()" placeholder="Paciente, DNI, código o trabajo" aria-label="Buscar" appOnly="search" maxlength="100" /> }
               <select class="input" [(ngModel)]="filter.status" (ngModelChange)="filter.overdue = false; filter.unpaid = false; load()" aria-label="Estado">
                 <option value="">Todos los estados</option><option value="ACTIVAS">Activas (sin entregar)</option><option value="EN_LAB">En laboratorio o en prueba</option>
                 @for (s of statusKeys; track s) { <option [value]="s">{{ st(s).label }}</option> }
@@ -153,20 +154,20 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
           }
           <div class="field span2">
             <label class="req" for="ds">Descripción del trabajo</label>
-            <input id="ds" name="ds" class="input" [(ngModel)]="f.description" maxlength="300" placeholder="Ej.: corona de zirconio monolítica" [class.invalid]="e['description']" />
+            <input id="ds" name="ds" class="input" [(ngModel)]="f.description" maxlength="300" placeholder="Ej.: corona de zirconio monolítica" [class.invalid]="e['description']" appOnly="text" />
             @if (e['description']) { <span class="err">{{ e['description'] }}</span> }
           </div>
-          <div class="field"><label for="tt">Piezas (FDI)</label><input id="tt" name="tt" class="input" [(ngModel)]="f.teeth" maxlength="60" placeholder="16, 17" [class.invalid]="e['teeth']" />
+          <div class="field"><label for="tt">Piezas (FDI)</label><input id="tt" name="tt" class="input" [(ngModel)]="f.teeth" maxlength="60" placeholder="16, 17" [class.invalid]="e['teeth']" appOnly="teeth" />
             @if (e['teeth']) { <span class="err">{{ e['teeth'] }}</span> }</div>
           <div class="field"><label for="sh">Color (VITA)</label>
-            <input id="sh" name="sh" class="input" [(ngModel)]="f.shade" list="shades" maxlength="20" placeholder="A2" />
+            <input id="sh" name="sh" class="input" [(ngModel)]="f.shade" list="shades" maxlength="20" placeholder="A2" appOnly="text" />
             <datalist id="shades">@for (s of shades; track s) { <option [value]="s"></option> }</datalist></div>
-          <div class="field"><label for="mt">Material</label><input id="mt" name="mt" class="input" [(ngModel)]="f.material" maxlength="60" placeholder="Zirconio, disilicato, metal-cerámica…" /></div>
+          <div class="field"><label for="mt">Material</label><input id="mt" name="mt" class="input" [(ngModel)]="f.material" maxlength="60" placeholder="Zirconio, disilicato, metal-cerámica…" appOnly="text" /></div>
           <div class="field"><label for="dd">Fecha de entrega del laboratorio</label><input id="dd" name="dd" type="date" class="input" [(ngModel)]="f.dueDate" [min]="f.id ? null : today" [class.invalid]="e['dueDate']" />
             @if (e['dueDate']) { <span class="err">{{ e['dueDate'] }}</span> }</div>
-          <div class="field"><label for="cs">Costo del laboratorio (S/)</label><input id="cs" name="cs" type="number" step="0.01" min="0" class="input tabular" [(ngModel)]="f.cost" [class.invalid]="e['cost']" />
+          <div class="field"><label for="cs">Costo del laboratorio (S/)</label><input id="cs" name="cs" type="number" step="0.01" min="0" class="input tabular" [(ngModel)]="f.cost" [class.invalid]="e['cost']" appOnly="decimal" />
             @if (e['cost']) { <span class="err">{{ e['cost'] }}</span> }</div>
-          <div class="field span2"><label for="nt">Indicaciones para el laboratorio</label><textarea id="nt" name="nt" class="input" rows="2" [(ngModel)]="f.notes" maxlength="500" placeholder="Tipo de terminación, antagonista, fotos de color…"></textarea></div>
+          <div class="field span2"><label for="nt">Indicaciones para el laboratorio</label><textarea id="nt" name="nt" class="input" rows="2" [(ngModel)]="f.notes" maxlength="500" placeholder="Tipo de terminación, antagonista, fotos de color…" appOnly="text"></textarea></div>
         </div>
         @if (!f.id) { <label class="check"><input type="checkbox" name="send" [(ngModel)]="f.send" /> Ya se envió hoy (registrar como "En laboratorio")</label> }
       </form>
@@ -205,7 +206,7 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
               @if (pendingStatus) {
                 <div class="row wrap gap confirm">
                   <input class="input" type="date" [(ngModel)]="statusDate" [max]="today" aria-label="Fecha" />
-                  <input class="input grow" [(ngModel)]="statusNote" [placeholder]="pendingStatus === 'ANULADA' ? 'Motivo de la anulación (obligatorio)' : pendingStatus === 'EN_PRUEBA' ? 'Qué se prueba (estructura, bizcocho…)' : 'Nota (opcional)'" maxlength="300" aria-label="Nota" />
+                  <input class="input grow" [(ngModel)]="statusNote" [placeholder]="pendingStatus === 'ANULADA' ? 'Motivo de la anulación (obligatorio)' : pendingStatus === 'EN_PRUEBA' ? 'Qué se prueba (estructura, bizcocho…)' : 'Nota (opcional)'" maxlength="300" aria-label="Nota" appOnly="text" />
                   <button type="button" class="btn primary sm" (click)="doStatus()" [disabled]="saving">Confirmar: {{ act(pendingStatus) }}</button>
                   <button type="button" class="btn sm" (click)="pendingStatus = null">Cancelar</button>
                 </div>
@@ -216,9 +217,9 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
           @if (canPay && d.status !== 'ANULADA' && d.balance > 0) {
             <form class="pay row wrap gap" (ngSubmit)="doPay()">
               <strong class="grow">Pagar al laboratorio</strong>
-              <input class="input amt tabular" name="pa" type="number" step="0.01" min="0" [(ngModel)]="pay.amount" aria-label="Importe" [class.invalid]="pe['amount']" />
+              <input class="input amt tabular" name="pa" type="number" step="0.01" min="0" [(ngModel)]="pay.amount" aria-label="Importe" [class.invalid]="pe['amount']" appOnly="decimal" />
               <select class="input" name="pm" [(ngModel)]="pay.method" aria-label="Medio de pago">@for (m of methods; track m) { <option [value]="m">{{ methodLabel[m] }}</option> }</select>
-              <input class="input" name="pr" [(ngModel)]="pay.reference" [placeholder]="pay.method === 'EFECTIVO' ? 'N° operación (opcional)' : 'N° operación *'" maxlength="40" aria-label="Número de operación" [class.invalid]="pe['reference']" />
+              <input class="input" name="pr" [(ngModel)]="pay.reference" [placeholder]="pay.method === 'EFECTIVO' ? 'N° operación (opcional)' : 'N° operación *'" maxlength="40" aria-label="Número de operación" [class.invalid]="pe['reference']" appOnly="text" />
               <button class="btn primary sm" type="submit" [disabled]="saving">Registrar pago</button>
               @if (pe['amount'] || pe['method'] || pe['reference']) { <span class="err full">{{ pe['amount'] || pe['method'] || pe['reference'] }}</span> }
               <span class="muted small full">Se registra como egreso de caja (categoría Laboratorio).</span>
@@ -238,13 +239,13 @@ const SHADES = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C
     <!-- Laboratorio -->
     <app-modal [open]="labOpen" [title]="lf.id ? 'Editar laboratorio' : 'Agregar laboratorio'" [width]="560" (close)="labOpen = false">
       <form id="labF" class="form grid cols-2" (ngSubmit)="saveLab()">
-        <div class="field span2"><label class="req" for="ln">Nombre</label><input id="ln" name="ln" class="input" [(ngModel)]="lf.name" maxlength="120" [class.invalid]="le['name']" />@if (le['name']) { <span class="err">{{ le['name'] }}</span> }</div>
-        <div class="field"><label for="lr">RUC</label><input id="lr" name="lr" class="input tabular" [(ngModel)]="lf.ruc" maxlength="11" [class.invalid]="le['ruc']" />@if (le['ruc']) { <span class="err">{{ le['ruc'] }}</span> }</div>
-        <div class="field"><label for="lc">Contacto</label><input id="lc" name="lc" class="input" [(ngModel)]="lf.contact" maxlength="120" /></div>
-        <div class="field"><label for="lp">Teléfono</label><input id="lp" name="lp" class="input tabular" [(ngModel)]="lf.phone" maxlength="15" [class.invalid]="le['phone']" />@if (le['phone']) { <span class="err">{{ le['phone'] }}</span> }</div>
-        <div class="field"><label for="le">Correo</label><input id="le" name="le" class="input" [(ngModel)]="lf.email" maxlength="120" [class.invalid]="le['email']" />@if (le['email']) { <span class="err">{{ le['email'] }}</span> }</div>
-        <div class="field span2"><label for="la">Dirección</label><input id="la" name="la" class="input" [(ngModel)]="lf.address" maxlength="200" /></div>
-        <div class="field span2"><label for="lno">Notas</label><input id="lno" name="lno" class="input" [(ngModel)]="lf.notes" maxlength="300" placeholder="Tiempos de entrega, horario de recojo…" /></div>
+        <div class="field span2"><label class="req" for="ln">Nombre</label><input id="ln" name="ln" class="input" [(ngModel)]="lf.name" maxlength="120" [class.invalid]="le['name']" appOnly="text" />@if (le['name']) { <span class="err">{{ le['name'] }}</span> }</div>
+        <div class="field"><label for="lr">RUC</label><input id="lr" name="lr" class="input tabular" [(ngModel)]="lf.ruc" maxlength="11" [class.invalid]="le['ruc']" appOnly="digits" inputmode="numeric" />@if (le['ruc']) { <span class="err">{{ le['ruc'] }}</span> }</div>
+        <div class="field"><label for="lc">Contacto</label><input id="lc" name="lc" class="input" [(ngModel)]="lf.contact" maxlength="120" appOnly="text" /></div>
+        <div class="field"><label for="lp">Teléfono</label><input id="lp" name="lp" class="input tabular" [(ngModel)]="lf.phone" maxlength="15" [class.invalid]="le['phone']" appOnly="phone" />@if (le['phone']) { <span class="err">{{ le['phone'] }}</span> }</div>
+        <div class="field"><label for="le">Correo</label><input id="le" name="le" class="input" [(ngModel)]="lf.email" maxlength="120" [class.invalid]="le['email']" appOnly="email" />@if (le['email']) { <span class="err">{{ le['email'] }}</span> }</div>
+        <div class="field span2"><label for="la">Dirección</label><input id="la" name="la" class="input" [(ngModel)]="lf.address" maxlength="200" appOnly="text" /></div>
+        <div class="field span2"><label for="lno">Notas</label><input id="lno" name="lno" class="input" [(ngModel)]="lf.notes" maxlength="300" placeholder="Tiempos de entrega, horario de recojo…" appOnly="text" /></div>
         @if (lf.id) { <label class="check span2"><input type="checkbox" name="lact" [(ngModel)]="lf.active" /> Activo</label> }
       </form>
       <div modal-actions class="row end">

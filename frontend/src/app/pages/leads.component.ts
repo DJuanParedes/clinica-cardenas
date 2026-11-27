@@ -10,11 +10,12 @@ import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 import { TaskListComponent } from '../shared/task-list.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.7: embudo de ventas. Tablero por etapas; se mueve arrastrando o desde la ficha del lead. */
 @Component({
   selector: 'app-leads',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, PatientPickerComponent, TaskListComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, PatientPickerComponent, TaskListComponent],
   template: `
     <div class="page wide">
       <header class="page-head">
@@ -27,7 +28,7 @@ import { TaskListComponent } from '../shared/task-list.component';
 
       @if (mode === 'board') {
         <div class="filters">
-          <input class="input grow" [(ngModel)]="q" (keyup.enter)="load()" (blur)="load()" placeholder="Buscar por nombre, celular o interés" aria-label="Buscar" />
+          <input class="input grow" [(ngModel)]="q" (keyup.enter)="load()" (blur)="load()" placeholder="Buscar por nombre, celular o interés" aria-label="Buscar" appOnly="search" maxlength="100" />
           <select class="input" [(ngModel)]="source" (ngModelChange)="load()" aria-label="Fuente"><option value="">Todas las fuentes</option>@for (s of opts?.sources || []; track s.code) { <option [value]="s.code">{{ s.label }}</option> }</select>
           <select class="input" [(ngModel)]="assigneeId" (ngModelChange)="load()" aria-label="Responsable"><option [ngValue]="null">Cualquier responsable</option>@for (u of opts?.assignees || []; track u.id) { <option [ngValue]="u.id">{{ u.fullName }}</option> }</select>
           @if (auth.can('MARKETING') && opts) {
@@ -94,16 +95,16 @@ import { TaskListComponent } from '../shared/task-list.component';
     <app-modal [open]="formOpen" [title]="form.id ? 'Editar lead' : 'Nuevo lead'" [width]="600" (close)="formOpen = false">
       <form class="grid" id="leadForm" (ngSubmit)="saveLead()">
         <div class="cols-2">
-          <div class="field span-2"><label class="req" for="ln">Nombre</label><input id="ln" name="ln" class="input" [(ngModel)]="form.fullName" maxlength="120" [class.invalid]="fe['fullName']" />@if (fe['fullName']) { <span class="err">{{ fe['fullName'] }}</span> }</div>
-          <div class="field"><label for="lp">Celular</label><input id="lp" name="lp" class="input tabular" [(ngModel)]="form.phone" maxlength="12" inputmode="tel" [class.invalid]="fe['phone']" />@if (fe['phone']) { <span class="err">{{ fe['phone'] }}</span> }</div>
-          <div class="field"><label for="le">Correo</label><input id="le" name="le" class="input" type="email" [(ngModel)]="form.email" maxlength="120" [class.invalid]="fe['email']" />@if (fe['email']) { <span class="err">{{ fe['email'] }}</span> }</div>
+          <div class="field span-2"><label class="req" for="ln">Nombre</label><input id="ln" name="ln" class="input" [(ngModel)]="form.fullName" maxlength="120" [class.invalid]="fe['fullName']" appOnly="letters" />@if (fe['fullName']) { <span class="err">{{ fe['fullName'] }}</span> }</div>
+          <div class="field"><label for="lp">Celular</label><input id="lp" name="lp" class="input tabular" [(ngModel)]="form.phone" maxlength="12" inputmode="tel" [class.invalid]="fe['phone']" appOnly="phone" />@if (fe['phone']) { <span class="err">{{ fe['phone'] }}</span> }</div>
+          <div class="field"><label for="le">Correo</label><input id="le" name="le" class="input" type="email" [(ngModel)]="form.email" maxlength="120" [class.invalid]="fe['email']" appOnly="email" />@if (fe['email']) { <span class="err">{{ fe['email'] }}</span> }</div>
           <div class="field"><label class="req" for="ls">¿De dónde llegó?</label><select id="ls" name="ls" class="input" [(ngModel)]="form.source" [class.invalid]="fe['source']"><option value="">Elige…</option>@for (s of opts?.sources || []; track s.code) { <option [value]="s.code">{{ s.label }}</option> }</select>@if (fe['source']) { <span class="err">{{ fe['source'] }}</span> }</div>
           <div class="field"><label for="la">Responsable</label><select id="la" name="la" class="input" [(ngModel)]="form.assigneeId"><option [ngValue]="null">Sin asignar</option>@for (u of opts?.assignees || []; track u.id) { <option [ngValue]="u.id">{{ u.fullName }}</option> }</select></div>
           <div class="field"><label for="lpr">Tratamiento de interés</label><select id="lpr" name="lpr" class="input" [(ngModel)]="form.procedureId" (ngModelChange)="procPicked()"><option [ngValue]="null">Otro / no sabe</option>@for (p of opts?.procedures || []; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }</select></div>
-          <div class="field"><label for="lv">Valor estimado (S/)</label><input id="lv" name="lv" class="input tabular" type="number" min="0" step="10" [(ngModel)]="form.estimatedValue" [class.invalid]="fe['estimatedValue']" /></div>
-          <div class="field span-2"><label for="li">Qué preguntó o le interesa</label><input id="li" name="li" class="input" [(ngModel)]="form.interest" maxlength="150" placeholder="Ej.: Precio de brackets estéticos" /></div>
+          <div class="field"><label for="lv">Valor estimado (S/)</label><input id="lv" name="lv" class="input tabular" type="number" min="0" step="10" [(ngModel)]="form.estimatedValue" [class.invalid]="fe['estimatedValue']" appOnly="decimal" /></div>
+          <div class="field span-2"><label for="li">Qué preguntó o le interesa</label><input id="li" name="li" class="input" [(ngModel)]="form.interest" maxlength="150" placeholder="Ej.: Precio de brackets estéticos" appOnly="text" /></div>
           @if (!form.id) { <div class="field"><label for="lf">Contactar el (crea una tarea)</label><input id="lf" name="lf" class="input" type="date" [(ngModel)]="form.followUpDate" [min]="today" /></div> }
-          <div class="field span-2"><label for="lno">Notas</label><textarea id="lno" name="lno" class="input" rows="2" [(ngModel)]="form.notes" maxlength="1000"></textarea></div>
+          <div class="field span-2"><label for="lno">Notas</label><textarea id="lno" name="lno" class="input" rows="2" [(ngModel)]="form.notes" maxlength="1000" appOnly="text"></textarea></div>
         </div>
         @if (formErr) { <div class="err">{{ formErr }} @if (dupId) { <a (click)="formOpen = false; open(dupId)">Abrir ese lead</a> }</div> }
       </form>
@@ -122,7 +123,7 @@ import { TaskListComponent } from '../shared/task-list.component';
           <div class="lost-box">
             <strong>¿Por qué se perdió?</strong>
             <div class="chips">@for (r of opts?.lostReasons || []; track r) { <button type="button" [class.on]="lostReason === r" (click)="lostReason = r">{{ r }}</button> }</div>
-            <input class="input" [(ngModel)]="lostDetail" maxlength="150" placeholder="Detalle (opcional)" />
+            <input class="input" [(ngModel)]="lostDetail" maxlength="150" placeholder="Detalle (opcional)" appOnly="text" />
             <div class="row"><button class="btn sm" type="button" (click)="lostFor = null">Cancelar</button><button class="btn sm primary" type="button" [disabled]="!lostReason" (click)="confirmLost()">Marcar como perdido</button></div>
           </div>
         }
@@ -154,7 +155,7 @@ import { TaskListComponent } from '../shared/task-list.component';
               @if (lead.notes) { <dt>Notas</dt><dd>{{ lead.notes }}</dd> }
             </dl>
             <div class="row"><button class="btn sm ghost" type="button" (click)="editLead()">Editar datos</button> <app-delete-button entity="leads" [recordId]="lead.id" what="Oportunidad" (deleted)="lead = null; load()" /></div>
-            <form class="note" (ngSubmit)="addNote()"><input class="input" name="nt" [(ngModel)]="note" maxlength="500" placeholder="Anotar algo (llamada, respuesta, precio enviado…)" /><button class="btn sm" type="submit" [disabled]="!note.trim()">Anotar</button></form>
+            <form class="note" (ngSubmit)="addNote()"><input class="input" name="nt" [(ngModel)]="note" maxlength="500" placeholder="Anotar algo (llamada, respuesta, precio enviado…)" appOnly="text" /><button class="btn sm" type="submit" [disabled]="!note.trim()">Anotar</button></form>
             <ul class="tl">
               @for (e of lead.events; track $index) { <li><span class="muted small">{{ dt(e.createdAt) }} · {{ e.createdBy }}</span><div>{{ e.detail }}</div></li> }
             </ul>

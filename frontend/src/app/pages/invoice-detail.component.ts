@@ -8,11 +8,12 @@ import { CUSTOMER_DOC, INVOICE_LABEL, INVOICE_TONE, apiError, dateTime, saveBlob
 import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** HU-11 envío a SUNAT y HU-12 consulta / descarga del comprobante. */
 @Component({
   selector: 'app-invoice-detail',
   standalone: true,
-  imports: [RouterLink, FormsModule, IconComponent, LogoComponent],
+  imports: [OnlyDirective, RouterLink, FormsModule, IconComponent, LogoComponent],
   template: `
     <div class="page">
       <a class="back no-print" routerLink="/comprobantes"><app-icon name="chevronLeft" [size]="16" /> Comprobantes</a>
@@ -108,7 +109,7 @@ import { LogoComponent } from '../shared/logo.component';
                 @if (mailOpen) {
                   <form class="mail" (ngSubmit)="mail()">
                     <label class="small" for="ml">Correo del cliente</label>
-                    <input id="ml" class="input" type="email" name="ml" [(ngModel)]="mailTo" placeholder="cliente@correo.com" />
+                    <input id="ml" class="input" type="email" name="ml" [(ngModel)]="mailTo" placeholder="cliente@correo.com" appOnly="email" maxlength="120" />
                     <button class="btn primary sm" type="submit" [disabled]="mailing">{{ mailing ? 'Enviando…' : 'Enviar comprobante' }}</button>
                     <p class="muted small">Se envía la representación impresa y el XML firmado adjunto (validez ante SUNAT).</p>
                   </form>

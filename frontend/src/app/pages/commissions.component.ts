@@ -14,13 +14,14 @@ import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
 import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 type Tab = 'reglas' | 'calcular' | 'liquidaciones';
 
 /** HU-16 reglas · HU-17 cálculo · HU-18 liquidación de comisiones. */
 @Component({
   selector: 'app-commissions',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -230,7 +231,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
         </div>
         <div class="field">
           <label class="req" for="rv">{{ rf.calcType === 'PORCENTAJE' ? 'Porcentaje (%)' : 'Monto por procedimiento (S/)' }}</label>
-          <input id="rv" name="rv" type="number" step="0.01" min="0" class="input tabular" [class.invalid]="e['value']" [(ngModel)]="rf.value" [disabled]="ruleLocked" />
+          <input id="rv" name="rv" type="number" step="0.01" min="0" class="input tabular" [class.invalid]="e['value']" [(ngModel)]="rf.value" [disabled]="ruleLocked" appOnly="decimal" />
           @if (e['value']) { <span class="err">{{ e['value'] }}</span> }
         </div>
         <div class="field span-2">
@@ -252,7 +253,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
         </div>
         <div class="field span-2">
           <label for="rn">Nota del acuerdo</label>
-          <input id="rn" name="rn" class="input" [(ngModel)]="rf.notes" placeholder="Ej. acuerdo firmado el 02/01/2026" />
+          <input id="rn" name="rn" class="input" [(ngModel)]="rf.notes" placeholder="Ej. acuerdo firmado el 02/01/2026" appOnly="text" maxlength="200" />
         </div>
         @if (ruleEditing) {
           <label class="check span-2"><input type="checkbox" name="ra" [(ngModel)]="rf.active" /> Regla activa</label>
@@ -300,7 +301,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
           @if (st.settlement.status === 'PENDIENTE' || st.settlement.status === 'PARCIAL') {
             <form class="payform panel" (ngSubmit)="pay()">
               <div class="field"><label class="req" for="pa">Importe pagado (S/)</label>
-                <input id="pa" name="pa" type="number" step="0.01" min="0" class="input tabular" [class.invalid]="pe['amount']" [(ngModel)]="pf.amount" />
+                <input id="pa" name="pa" type="number" step="0.01" min="0" class="input tabular" [class.invalid]="pe['amount']" [(ngModel)]="pf.amount" appOnly="decimal" />
                 @if (pe['amount']) { <span class="err">{{ pe['amount'] }}</span> }</div>
               <div class="field"><label class="req" for="pd">Fecha de pago</label>
                 <input id="pd" name="pd" type="date" class="input" [class.invalid]="pe['paidOn']" [(ngModel)]="pf.paidOn" [max]="today" />
@@ -308,7 +309,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
               <div class="field"><label class="req" for="pm">Medio</label>
                 <select id="pm" name="pm" class="input" [(ngModel)]="pf.method"><option value="">Seleccionar…</option>@for (m of methods; track m) { <option [value]="m">{{ method(m) }}</option> }</select></div>
               <div class="field"><label for="pr">N.° de operación</label>
-                <input id="pr" name="pr" class="input" [class.invalid]="pe['reference']" [(ngModel)]="pf.reference" />
+                <input id="pr" name="pr" class="input" [class.invalid]="pe['reference']" [(ngModel)]="pf.reference" appOnly="text" maxlength="200" />
                 @if (pe['reference']) { <span class="err">{{ pe['reference'] }}</span> }</div>
               <button class="btn primary" type="submit" [disabled]="busy"><app-icon name="check" [size]="15" /> Registrar pago</button>
             </form>
@@ -317,7 +318,7 @@ type Tab = 'reglas' | 'calcular' | 'liquidaciones';
             @if (annulling) {
               <div class="field">
                 <label class="req" for="ar">Motivo de la anulación</label>
-                <input id="ar" class="input" [(ngModel)]="annulReason" />
+                <input id="ar" class="input" [(ngModel)]="annulReason" appOnly="text" maxlength="200" />
                 <div class="row" style="justify-content: flex-end; margin-top: 6px">
                   <button class="btn sm" type="button" (click)="annulling = false">Volver</button>
                   <button class="btn sm danger" type="button" (click)="annul()" [disabled]="annulReason.trim().length < 5 || busy">Anular liquidación</button>

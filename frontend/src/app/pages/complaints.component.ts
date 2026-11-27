@@ -5,11 +5,12 @@ import { Api } from '../core/api.service';
 import { apiError, dateTime, saveBlob, shortDate, soles } from '../core/format';
 import { ToastService } from '../core/toast.service';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.9: Libro de Reclamaciones: hojas recibidas, plazo en días hábiles, respuesta y reporte anual. */
 @Component({
   selector: 'app-complaints',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [OnlyDirective, FormsModule, RouterLink],
   template: `
     <div class="page">
       <header class="page-head">
@@ -25,8 +26,8 @@ import { ToastService } from '../core/toast.service';
 
       @if (showCfg) {
         <section class="panel cfg">
-          <label>Plazo (días hábiles)<input class="input" type="number" min="1" max="30" [(ngModel)]="cfg.termDays" /></label>
-          <label>Correo que recibe el aviso de cada reclamo y el recordatorio diario<input class="input" type="email" [(ngModel)]="cfg.noticeEmail" placeholder="direccion@clinica.pe" /></label>
+          <label>Plazo (días hábiles)<input class="input" type="number" min="1" max="30" [(ngModel)]="cfg.termDays" appOnly="int" /></label>
+          <label>Correo que recibe el aviso de cada reclamo y el recordatorio diario<input class="input" type="email" [(ngModel)]="cfg.noticeEmail" placeholder="direccion@clinica.pe" appOnly="email" maxlength="120" /></label>
           <button class="btn primary" type="button" (click)="saveCfg()">Guardar</button>
           <p class="muted small">INDECOPI exige responder en 15 días hábiles como máximo; no conviene subirlo.</p>
         </section>
@@ -41,7 +42,7 @@ import { ToastService } from '../core/toast.service';
 
       <div class="bar">
         <div class="seg">@for (s of statuses; track s[0]) { <button type="button" [class.on]="status === s[0]" (click)="setStatus(s[0])">{{ s[1] }}</button> }</div>
-        <input class="input" [(ngModel)]="q" (keyup.enter)="load()" placeholder="Buscar por nombre, documento, N.° o código" aria-label="Buscar" />
+        <input class="input" [(ngModel)]="q" (keyup.enter)="load()" placeholder="Buscar por nombre, documento, N.° o código" aria-label="Buscar" appOnly="search" maxlength="100" />
       </div>
 
       <div class="split" [class.open]="cur">
@@ -84,9 +85,9 @@ import { ToastService } from '../core/toast.service';
                 <p class="pre">{{ cur.response }}</p>
                 @if (cur.providerNotes) { <p class="muted small pre">Observaciones: {{ cur.providerNotes }}</p> }</div>
             } @else {
-              <label>Observaciones y acciones adoptadas (internas, salen en la hoja)<textarea class="input" rows="3" [(ngModel)]="form.providerNotes"></textarea></label>
+              <label>Observaciones y acciones adoptadas (internas, salen en la hoja)<textarea class="input" rows="3" [(ngModel)]="form.providerNotes" appOnly="text" maxlength="5000"></textarea></label>
               <button class="btn ghost sm" type="button" (click)="markInProcess()">{{ cur.status === 'PENDIENTE' ? 'Marcar en revisión' : 'Guardar observaciones' }}</button>
-              <label>Respuesta al consumidor<textarea class="input" rows="6" [(ngModel)]="form.response" placeholder="Explica qué revisaste y qué solución ofrece la clínica."></textarea></label>
+              <label>Respuesta al consumidor<textarea class="input" rows="6" [(ngModel)]="form.response" placeholder="Explica qué revisaste y qué solución ofrece la clínica." appOnly="text" maxlength="5000"></textarea></label>
               <div class="seg">@for (c of channels; track c[0]) { <button type="button" [class.on]="form.channel === c[0]" [disabled]="c[0] === 'EMAIL' && !cur.email" (click)="form.channel = c[0]">{{ c[1] }}</button> }</div>
               @if (err) { <div class="err">{{ err }}</div> }
               <button class="btn primary" type="button" [disabled]="busy" (click)="respond()">{{ form.channel === 'EMAIL' ? 'Responder y enviar por correo' : 'Registrar respuesta' }}</button>

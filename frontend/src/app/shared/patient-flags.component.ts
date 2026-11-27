@@ -6,11 +6,12 @@ import { apiError, dateTime } from '../core/format';
 import { ToastService } from '../core/toast.service';
 import { ModalComponent } from './modal.component';
 
+import { OnlyDirective } from './only.directive';
 /** v2.8: franja fija arriba de la ficha: alergias, medicación y notas fijadas. Se ve en todas las pestañas. */
 @Component({
   selector: 'app-patient-flags',
   standalone: true,
-  imports: [FormsModule, ModalComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent],
   template: `
     @if (f) {
       <div class="flags" role="region" aria-label="Alertas y notas del paciente">
@@ -25,7 +26,7 @@ import { ModalComponent } from './modal.component';
     }
     <app-modal [open]="open" title="Notas del paciente" subtitle="Las fijadas se ven arriba en toda la ficha" [width]="560" (close)="open = false">
       <form class="new" (ngSubmit)="add()">
-        <input class="input" name="nt" [(ngModel)]="text" maxlength="500" placeholder="Ej.: Prefiere citas en la tarde · Viene con su hija · Pide factura" />
+        <input class="input" name="nt" [(ngModel)]="text" maxlength="500" placeholder="Ej.: Prefiere citas en la tarde · Viene con su hija · Pide factura" appOnly="text" />
         <select class="input tone" name="tn" [(ngModel)]="tone" aria-label="Color"><option value="AMARILLO">Aviso</option><option value="ROJO">Importante</option><option value="AZUL">Dato útil</option></select>
         <button class="btn primary" type="submit" [disabled]="!text.trim()">Agregar</button>
       </form>

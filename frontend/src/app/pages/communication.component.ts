@@ -8,6 +8,7 @@ import { ToastService } from '../core/toast.service';
 import { apiError, dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 type View = 'automatizaciones' | 'plantillas' | 'historial' | 'enlaces';
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -26,7 +27,7 @@ const VAR_HELP: Record<string, string> = {
 @Component({
   selector: 'app-communication',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -51,7 +52,7 @@ const VAR_HELP: Record<string, string> = {
                 </div>
                 <div class="cfg">
                   @if (r.kind !== 'DIA') {
-                    <input class="input num tabular" type="number" [(ngModel)]="r.amount" [attr.aria-label]="'Cantidad ' + r.name" />
+                    <input class="input num tabular" type="number" [(ngModel)]="r.amount" [attr.aria-label]="'Cantidad ' + r.name" appOnly="decimal" />
                     <select class="input unit" [(ngModel)]="r.unit" [attr.aria-label]="'Unidad ' + r.name"><option value="HORAS">horas</option><option value="DIAS">días</option></select>
                     <span class="muted small">{{ r.kind === 'ANTES' ? 'antes' : 'después' }}</span>
                   }
@@ -95,11 +96,11 @@ const VAR_HELP: Record<string, string> = {
               @else {
                 <div class="panel-head"><div><h3>{{ d.name }}</h3><p class="muted small">{{ d.description }}</p></div></div>
                 <form class="panel-body" (ngSubmit)="saveTpl()">
-                  <div class="field"><label for="ts">Asunto (correo)</label><input id="ts" name="ts" class="input" [(ngModel)]="d.subject" (ngModelChange)="preview()" maxlength="150" [class.invalid]="e['subject']" />
+                  <div class="field"><label for="ts">Asunto (correo)</label><input id="ts" name="ts" class="input" [(ngModel)]="d.subject" (ngModelChange)="preview()" maxlength="150" [class.invalid]="e['subject']" appOnly="text" />
                     @if (e['subject']) { <span class="err">{{ e['subject'] }}</span> }</div>
                   <div class="field">
                     <label for="tb">Mensaje</label>
-                    <textarea id="tb" #tb name="tb" class="input" rows="8" [(ngModel)]="d.body" (ngModelChange)="preview()" maxlength="1000" [class.invalid]="e['body']"></textarea>
+                    <textarea id="tb" #tb name="tb" class="input" rows="8" [(ngModel)]="d.body" (ngModelChange)="preview()" maxlength="1000" [class.invalid]="e['body']" appOnly="text"></textarea>
                     <span class="hint">{{ (d.body || '').length }}/1000 · *texto* sale en negrita en WhatsApp</span>
                     @if (e['body']) { <span class="err">{{ e['body'] }}</span> }
                   </div>
@@ -111,7 +112,7 @@ const VAR_HELP: Record<string, string> = {
                     <label>Botones de respuesta (WhatsApp, máx. 3)</label>
                     <div class="row wrap gap">
                       @for (b of d.buttons; track $index; let i = $index) {
-                        <input class="input btn-in" [name]="'b' + i" [(ngModel)]="d.buttons[i]" maxlength="20" [attr.aria-label]="'Botón ' + (i + 1)" />
+                        <input class="input btn-in" [name]="'b' + i" [(ngModel)]="d.buttons[i]" maxlength="20" [attr.aria-label]="'Botón ' + (i + 1)" appOnly="text" />
                         <button type="button" class="btn ghost sm" (click)="d.buttons.splice(i, 1)" aria-label="Quitar botón"><app-icon name="x" [size]="14" /></button>
                       }
                       @if (d.buttons.length < 3) { <button type="button" class="btn sm" (click)="d.buttons.push('')"><app-icon name="plus" [size]="14" /> Botón</button> }
@@ -137,7 +138,7 @@ const VAR_HELP: Record<string, string> = {
           <section class="panel">
             <div class="panel-head">
               <div class="row wrap gap">
-                <input class="input" [(ngModel)]="h.q" (keyup.enter)="loadHistory()" placeholder="Paciente o número" aria-label="Buscar" />
+                <input class="input" [(ngModel)]="h.q" (keyup.enter)="loadHistory()" placeholder="Paciente o número" aria-label="Buscar" appOnly="search" maxlength="100" />
                 <select class="input" [(ngModel)]="h.template" (ngModelChange)="loadHistory()" aria-label="Plantilla">
                   <option value="">Todas las plantillas</option>@for (t of templates; track t.code) { <option [value]="t.code">{{ t.name }}</option> }
                 </select>

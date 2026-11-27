@@ -9,11 +9,12 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PagerComponent, pageOf } from '../shared/pager.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** Catálogo de procedimientos con variantes (familias) y promociones con vigencia. */
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head spread">
@@ -32,7 +33,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
 
       @if (tab === 'proc') {
         <section class="panel">
-          <div class="panel-head spread"><input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pg = 1" placeholder="Buscar procedimiento, código o familia" /></div>
+          <div class="panel-head spread"><input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pg = 1" placeholder="Buscar procedimiento, código o familia" appOnly="search" maxlength="100" /></div>
           <table class="table">
             <thead><tr><th>Código</th><th>Procedimiento</th><th>Familia / categoría</th><th class="num">Precio de lista</th><th>Hoy</th><th></th></tr></thead>
             <tbody>
@@ -96,18 +97,18 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
     <app-modal [open]="procOpen" [title]="pf.id ? 'Editar procedimiento' : 'Nuevo procedimiento'" (close)="procOpen = false">
       <form class="stack" (ngSubmit)="saveProc()">
         <div class="grid two">
-          <div class="field"><label class="req" for="pc">Código</label><input id="pc" class="input" name="pc" [(ngModel)]="pf.code" [disabled]="!!pf.id" placeholder="PRE-006" maxlength="7" /></div>
+          <div class="field"><label class="req" for="pc">Código</label><input id="pc" class="input" name="pc" [(ngModel)]="pf.code" [disabled]="!!pf.id" placeholder="PRE-006" maxlength="7" appOnly="text" /></div>
           <div class="field"><label class="req" for="pg">Categoría</label>
             <select id="pg" class="input" name="pg" [(ngModel)]="pf.category"><option value="">Seleccionar…</option>@for (c of categories; track c) { <option [value]="c">{{ c }}</option> }</select></div>
         </div>
-        <div class="field"><label class="req" for="pn">Nombre</label><input id="pn" class="input" name="pn" [(ngModel)]="pf.name" maxlength="120" /></div>
+        <div class="field"><label class="req" for="pn">Nombre</label><input id="pn" class="input" name="pn" [(ngModel)]="pf.name" maxlength="120" appOnly="text" /></div>
         <div class="grid two">
-          <div class="field"><label for="pfm">Familia (variantes)</label><input id="pfm" class="input" name="pfm" [(ngModel)]="pf.family" list="fams" maxlength="60" placeholder="Limpieza dental" />
+          <div class="field"><label for="pfm">Familia (variantes)</label><input id="pfm" class="input" name="pfm" [(ngModel)]="pf.family" list="fams" maxlength="60" placeholder="Limpieza dental" appOnly="text" />
             <datalist id="fams">@for (f of families; track f) { <option [value]="f"></option> }</datalist></div>
-          <div class="field"><label class="req" for="pp">Precio de lista (S/)</label><input id="pp" class="input" type="number" min="0" step="0.5" name="pp" [(ngModel)]="pf.price" /></div>
-          <div class="field"><label for="pd">Duración (min)</label><input id="pd" class="input" type="number" min="5" step="5" name="pd" [(ngModel)]="pf.durationMin" /></div>
+          <div class="field"><label class="req" for="pp">Precio de lista (S/)</label><input id="pp" class="input" type="number" min="0" step="0.5" name="pp" [(ngModel)]="pf.price" appOnly="decimal" /></div>
+          <div class="field"><label for="pd">Duración (min)</label><input id="pd" class="input" type="number" min="5" step="5" name="pd" [(ngModel)]="pf.durationMin" appOnly="int" /></div>
         </div>
-        <div class="field"><label for="pds">Descripción para el paciente</label><input id="pds" class="input" name="pds" [(ngModel)]="pf.description" maxlength="255" /></div>
+        <div class="field"><label for="pds">Descripción para el paciente</label><input id="pds" class="input" name="pds" [(ngModel)]="pf.description" maxlength="255" appOnly="text" /></div>
         @if (pf.id) { <label class="check"><input type="checkbox" name="pa" [(ngModel)]="pf.active" /> Activo (se puede agregar a planes)</label> }
       </form>
       <ng-container modal-actions>
@@ -118,7 +119,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
 
     <app-modal [open]="promoOpen" [title]="mf.id ? 'Editar promoción' : 'Nueva promoción'" (close)="promoOpen = false">
       <form class="stack" (ngSubmit)="savePromo()">
-        <div class="field"><label class="req" for="mn">Nombre</label><input id="mn" class="input" name="mn" [(ngModel)]="mf.name" maxlength="100" placeholder="Campaña de limpieza" /></div>
+        <div class="field"><label class="req" for="mn">Nombre</label><input id="mn" class="input" name="mn" [(ngModel)]="mf.name" maxlength="100" placeholder="Campaña de limpieza" appOnly="text" /></div>
         <div class="seg"><button type="button" [class.on]="mf.scope === 'proc'" (click)="mf.scope = 'proc'">Un procedimiento</button><button type="button" [class.on]="mf.scope === 'fam'" (click)="mf.scope = 'fam'">Toda una familia</button></div>
         @if (mf.scope === 'proc') {
           <div class="field"><label class="req" for="mp">Procedimiento</label>
@@ -131,12 +132,12 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
         <div class="grid two">
           <div class="field"><label class="req" for="mt">Tipo</label>
             <select id="mt" class="input" name="mt" [(ngModel)]="mf.discountType"><option value="">Seleccionar…</option><option value="PORCENTAJE">% de descuento</option><option value="MONTO">S/ de descuento</option><option value="PRECIO">Precio promocional</option></select></div>
-          <div class="field"><label class="req" for="mv">{{ mf.discountType === 'PORCENTAJE' ? 'Porcentaje' : 'Soles' }}</label><input id="mv" class="input" type="number" min="0" step="0.5" name="mv" [(ngModel)]="mf.value" /></div>
+          <div class="field"><label class="req" for="mv">{{ mf.discountType === 'PORCENTAJE' ? 'Porcentaje' : 'Soles' }}</label><input id="mv" class="input" type="number" min="0" step="0.5" name="mv" [(ngModel)]="mf.value" appOnly="decimal" /></div>
           <div class="field"><label class="req" for="mfr">Desde</label><input id="mfr" class="input" type="date" name="mfr" [(ngModel)]="mf.validFrom" /></div>
           <div class="field"><label class="req" for="mto">Hasta</label><input id="mto" class="input" type="date" name="mto" [(ngModel)]="mf.validTo" /></div>
         </div>
         @if (preview) { <p class="notice small">{{ preview }}</p> }
-        <div class="field"><label for="mc">Condiciones (se muestran al paciente)</label><input id="mc" class="input" name="mc" [(ngModel)]="mf.conditions" maxlength="255" placeholder="No acumulable. Previa evaluación." /></div>
+        <div class="field"><label for="mc">Condiciones (se muestran al paciente)</label><input id="mc" class="input" name="mc" [(ngModel)]="mf.conditions" maxlength="255" placeholder="No acumulable. Previa evaluación." appOnly="text" /></div>
         <label class="check"><input type="checkbox" name="ma" [(ngModel)]="mf.active" /> Activa</label>
       </form>
       <ng-container modal-actions>
