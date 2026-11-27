@@ -198,6 +198,35 @@ public class FileService {
         audit.register("HISTORIA", f.patientId, "ARCHIVO_ELIMINADO", f.title);
     }
 
+    /** Edita los datos del archivo (título, tipo, nota, pieza). El contenido no se cambia: para eso se sube otro. */
+    @Transactional
+    public PatientFile edit(Long id, String title, String kind, String note, Integer tooth, boolean setTooth) {
+        PatientFile f = get(id);
+        if (title != null) {
+            String t = title.trim();
+            if (t.isEmpty()) throw ApiException.field("title", "Ponle un título al archivo.");
+            if (t.length() > 150) throw ApiException.field("title", "El título admite hasta 150 caracteres.");
+            f.title = t;
+        }
+        if (kind != null) {
+            String k = kind.trim().toUpperCase();
+            if (!KINDS.contains(k)) throw ApiException.field("kind", "Tipo de archivo inválido.");
+            f.kind = k;
+        }
+        if (note != null) {
+            String n = note.trim();
+            if (n.length() > 500) throw ApiException.field("note", "La nota admite hasta 500 caracteres.");
+            f.note = n.isEmpty() ? null : n;
+        }
+        if (setTooth) {
+            if (tooth != null && !validTooth(tooth)) throw ApiException.field("tooth", "Pieza FDI inválida.");
+            f.tooth = tooth;
+        }
+        files.save(f);
+        audit.register("HISTORIA", f.patientId, "ARCHIVO_EDITADO", f.title);
+        return f;
+    }
+
     @Transactional
     public PatientFile share(Long id, boolean share) {
         PatientFile f = get(id);
