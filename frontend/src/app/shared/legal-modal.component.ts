@@ -11,7 +11,7 @@ import { ModalComponent } from './modal.component';
   standalone: true,
   imports: [ModalComponent],
   template: `
-    <app-modal [open]="open" [title]="doc?.title || 'Política de privacidad'" [subtitle]="doc ? 'Versión ' + doc.version + (who ? ' · acepta: ' + who : '') : ''" [width]="760" (close)="closed.emit()">
+    <app-modal [open]="open" [title]="doc?.title || 'Política de privacidad'" [subtitle]="doc ? (who ? 'Acepta: ' + who : '') : ''" [width]="760" (close)="closed.emit()">
       @if (doc) {
         <div #box class="legal" (scroll)="onScroll($event)" tabindex="0" aria-label="Texto completo del documento">
           @for (p of paragraphs; track $index) { <p>{{ p }}</p> }

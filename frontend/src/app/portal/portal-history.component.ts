@@ -91,7 +91,7 @@ import { IconComponent } from '../shared/icon.component';
           <h3>Consentimientos firmados</h3>
           <section class="card">
             @for (c of consents?.records || []; track c.id) {
-              <div class="req"><div class="grow"><strong>{{ c.title || c.code }}</strong><div class="muted small">v{{ c.version }} · {{ dt(c.acceptedAt) }} · {{ channel(c.channel) }} · {{ c.acceptedBy }}</div></div>
+              <div class="req"><div class="grow"><strong>{{ c.title || c.code }}</strong><div class="muted small">{{ dt(c.acceptedAt) }} · {{ channel(c.channel) }} · {{ c.acceptedBy }}</div></div>
                 <button class="btn sm" type="button" (click)="consentPdf(c)"><app-icon name="download" [size]="14" /> Constancia</button></div>
             } @empty { <span class="muted">Sin registros.</span> }
             @if (consents?.signedFileId) { <button class="btn sm" type="button" (click)="openFile(consents.signedFileId)"><app-icon name="file" [size]="14" /> Ver mi copia firmada</button> }
@@ -160,5 +160,5 @@ export class PortalHistoryComponent implements OnInit {
   }
   openFile(id: number) { this.api.portalFileLink(id).subscribe({ next: (r) => window.open(r.url, '_blank'), error: (e) => this.toast.error(apiError(e).message) }); }
   openInvoice(i: any) { this.api.portalInvoiceLink(i.id).subscribe({ next: (r) => window.open(r.url, '_blank'), error: (e) => this.toast.error(apiError(e).message) }); }
-  consentPdf(c: any) { this.api.portalConsentPdf(c.id).subscribe({ next: (b) => saveBlob(b, `consentimiento-${c.code.toLowerCase()}-v${c.version}.pdf`), error: () => this.toast.error('No se pudo descargar.') }); }
+  consentPdf(c: any) { this.api.portalConsentPdf(c.id).subscribe({ next: (b) => saveBlob(b, `consentimiento-${c.code.toLowerCase()}.pdf`), error: () => this.toast.error('No se pudo descargar.') }); }
 }

@@ -96,7 +96,7 @@ public class ConsentService {
         Patient p = patients.findById(patientId).orElseThrow(() -> ApiException.notFound("El paciente"));
         if (!p.dataConsent) throw ApiException.conflict("SIN_CONSENTIMIENTO", "Primero registra la aceptación de la política de privacidad.");
         PatientFile f = files.upload(patientId, file, "CONSENTIMIENTO",
-                "Consentimiento de datos personales firmado (v" + p.consentVersion + ")", null, null, false);
+                "Consentimiento de datos personales firmado", null, null, false);
         p.consentFileId = f.id;
         patients.save(p);
         jdbc.update("""

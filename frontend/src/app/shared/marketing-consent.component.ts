@@ -67,8 +67,8 @@ export class MarketingConsentComponent {
     this.api.legal('PUBLICIDAD').subscribe({
       next: (doc: any) => writePrintDoc(w, {
         title: 'Consentimiento para envío de promociones y novedades',
-        subtitle: `Finalidad adicional según la Ley N.° 29733 · ${esc(doc.title)}`,
-        code: `CDC-PUBL<br>Versión ${esc(doc.version)}`,
+        subtitle: 'Finalidad adicional según la Ley N.° 29733',
+        code: 'CDC-PUBL',
         body: `
 <h2>1. Datos del paciente</h2>
 <table><tr><td class="k">Paciente</td><td>${name}</td></tr>
