@@ -157,7 +157,7 @@ type Tab = 'resumen' | 'historia' | 'odontograma' | 'periodontograma' | 'plan' |
                     <dt>Datos personales</dt>
                     <dd>
                       @if (p.dataConsent) {
-                        <span class="tag green">Consentimiento Ley 29733{{ p.consentVersion ? ' · v' + p.consentVersion : '' }}</span>
+                        <span class="tag green">Consentimiento Ley 29733</span>
                         @if (consent?.acceptedBy) { <div class="muted small">Aceptó: {{ consent.acceptedBy }} · {{ consentChannel(p.consentChannel) }}</div> }
                         <div class="row wrap up">
                           <button type="button" class="btn sm" (click)="printConsent()"><app-icon name="print" [size]="14" /> Imprimir documento para firmar</button>
@@ -410,8 +410,8 @@ export class PatientDetailComponent implements OnChanges {
           : `${name}, identificado(a) con ${esc(p.docType)} N.° ${esc(p.docNumber)}`;
         writePrintDoc(w, {
           title: 'Consentimiento para el tratamiento de datos personales',
-          subtitle: `Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS) · ${esc(doc.title)}`,
-          code: `CDC-PRIV<br>Versión ${esc(doc.version)}<br>HC ${esc(p.hcNumber || p.id)}`,
+          subtitle: 'Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS)',
+          code: `CDC-PRIV<br>HC ${esc(p.hcNumber || p.id)}`,
           body: `
 <p>En cumplimiento de la Ley N.° 29733, Ley de Protección de Datos Personales, y su Reglamento aprobado por Decreto Supremo N.° 016-2024-JUS (en adelante, la Ley y su Reglamento), y siguiendo las recomendaciones de la Autoridad Nacional de Protección de Datos Personales, la ${CLINIC.name} (en adelante, "la Clínica"), con RUC ${CLINIC.ruc} y domicilio en ${esc(CLINIC.address)}, informa al titular de los datos lo siguiente:</p>
 <h2>1. Datos del titular</h2>
@@ -430,7 +430,7 @@ ${minor ? `<tr><td class="k">Representante legal</td><td>${esc(p.guardianName)} 
 <li>Los datos no se venden ni se ceden. Solo acceden a ellos el personal autorizado y los proveedores que actúan como encargados por cuenta de la Clínica, bajo contrato de confidencialidad, salvo que una ley, una orden judicial o una autoridad competente exija entregarlos.</li>
 <li>Cuando los datos dejen de ser necesarios para su finalidad, se conservarán bloqueados y protegidos durante los plazos legales (historia clínica, tributarios y de reclamos) y luego se eliminarán.</li>
 </ul>
-<h2>3. Política de privacidad de la Clínica (${esc(doc.title)}, versión ${esc(doc.version)})</h2>${paragraphs(doc.body)}
+<h2>3. Política de privacidad de la Clínica</h2>${paragraphs(doc.body)}
 <h2>4. Ejercicio de los derechos ARCO y derecho de información</h2>
 <p>El titular puede ejercer en cualquier momento sus derechos de <b>Acceso, Rectificación, Cancelación y Oposición (ARCO)</b> y su derecho de información: conocer qué datos suyos se tratan, corregir los inexactos, pedir su supresión cuando ya no sean necesarios, oponerse a su tratamiento y revocar este consentimiento. Para ello presenta una solicitud escrita en recepción o por los canales de contacto de la Clínica, adjuntando copia de su documento de identidad (y del documento que acredite la representación, si corresponde). La Clínica responderá en los plazos que fija el Reglamento. Si no queda conforme, puede presentar un reclamo ante la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos.</p>
 <h2>5. Autorizaciones</h2>

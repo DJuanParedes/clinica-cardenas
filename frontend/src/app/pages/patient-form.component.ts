@@ -227,7 +227,7 @@ interface Form {
                 <app-icon [name]="f.dataConsent ? 'check' : 'shield'" />
                 <div class="grow">
                   @if (f.dataConsent) {
-                    <strong>Política de privacidad aceptada{{ consentVersion ? ' (v' + consentVersion + ')' : '' }}</strong>
+                    <strong>Política de privacidad aceptada</strong>
                     <div class="muted small">{{ minor ? 'Aceptó el representante legal.' : 'Aceptó el paciente.' }} Al guardar queda el registro con fecha, versión y usuario.
                       Imprime la política para su firma y luego adjunta la copia firmada en la ficha del paciente.</div>
                   } @else {
