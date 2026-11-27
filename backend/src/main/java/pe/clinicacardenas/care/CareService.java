@@ -128,6 +128,23 @@ public class CareService {
         return w;
     }
 
+    /** Corrige el motivo, la preferencia o el odontólogo de una solicitud activa. */
+    @Transactional
+    public WaitlistEntry updateWaitlist(Long id, WaitRequest r) {
+        WaitlistEntry w = waitlist.findById(id).orElseThrow(() -> ApiException.notFound("La solicitud"));
+        if ("CERRADA".equals(w.status)) throw ApiException.conflict("LISTA_CERRADA", "La solicitud ya está cerrada.");
+        if (r.reason() == null || r.reason().isBlank()) throw ApiException.field("reason", "Indica el motivo.");
+        if (r.reason().trim().length() > 200) throw ApiException.field("reason", "El motivo admite hasta 200 caracteres.");
+        if (r.preference() != null && r.preference().trim().length() > 200) throw ApiException.field("preference", "La preferencia admite hasta 200 caracteres.");
+        if (r.dentistId() != null && !dentists.existsById(r.dentistId())) throw ApiException.notFound("El odontólogo");
+        w.dentistId = r.dentistId();
+        w.reason = r.reason().trim();
+        w.preference = r.preference() == null || r.preference().isBlank() ? null : r.preference().trim();
+        waitlist.save(w);
+        audit.register(PACIENTE, w.patientId, LISTA_ESPERA, "Solicitud de lista de espera editada: " + w.reason);
+        return w;
+    }
+
     @Transactional
     public WaitlistEntry closeWaitlist(Long id) {
         WaitlistEntry w = waitlist.findById(id).orElseThrow(() -> ApiException.notFound("La solicitud"));

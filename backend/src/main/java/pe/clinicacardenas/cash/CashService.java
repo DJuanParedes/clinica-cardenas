@@ -290,6 +290,17 @@ public class CashService {
 
     @Transactional
     public Expense registerExpense(ExpenseRequest r) {
+        Expense x = registerPreview(r);
+        x.status = VALIDO;
+        x.createdAt = Dates.now();
+        x.createdBy = CurrentUser.usernameOrSystem();
+        expenses.save(x);
+        audit.register(EGRESO, x.id, "REGISTRAR", x.concept + " · S/ " + x.amount.toPlainString());
+        return x;
+    }
+
+    /** Valida los datos del egreso y devuelve un objeto sin guardar. */
+    private Expense registerPreview(ExpenseRequest r) {
         Map<String, String> e = new LinkedHashMap<>();
         LocalDate date = r.expenseDate() == null ? Dates.today() : r.expenseDate();
         if (date.isAfter(Dates.today())) e.put("expenseDate", "La fecha no puede ser futura.");
@@ -313,11 +324,37 @@ public class CashService {
         x.method = method;
         x.reference = clean(r.reference());
         x.supplier = clean(r.supplier());
-        x.status = VALIDO;
-        x.createdAt = Dates.now();
-        x.createdBy = CurrentUser.usernameOrSystem();
+        return x;
+    }
+
+    /**
+     * Corrige un egreso válido de un día con caja abierta. No se editan los egresos generados por otros módulos
+     * (compras de inventario, pagos a laboratorio o a odontólogos): se corrigen desde su módulo o se anulan.
+     */
+    public Expense expense(Long id) {
+        return expenses.findById(id).orElseThrow(() -> ApiException.notFound("El egreso"));
+    }
+
+    @Transactional
+    public Expense updateExpense(Long id, ExpenseRequest r) {
+        Expense x = expenses.findById(id).orElseThrow(() -> ApiException.notFound("El egreso"));
+        if (!VALIDO.equals(x.status)) throw ApiException.conflict("EGRESO_ANULADO", "El egreso está anulado; no se puede editar.");
+        Integer linked = jdbc.queryForObject("""
+                select (select count(*) from inventory_purchases where expense_id = ?)
+                     + (select count(*) from lab_order_payments where expense_id = ?)
+                     + (select count(*) from commission_payouts where expense_id = ?)""", Integer.class, id, id, id);
+        if (linked != null && linked > 0) throw ApiException.conflict("EGRESO_VINCULADO",
+                "Este egreso se generó desde inventario, laboratorio o comisiones: corrígelo allí o anúlalo.");
+        Expense tmp = registerPreview(r);
+        x.expenseDate = tmp.expenseDate;
+        x.category = tmp.category;
+        x.concept = tmp.concept;
+        x.amount = tmp.amount;
+        x.method = tmp.method;
+        x.reference = tmp.reference;
+        x.supplier = tmp.supplier;
         expenses.save(x);
-        audit.register(EGRESO, x.id, "REGISTRAR", concept + " · S/ " + amount.toPlainString());
+        audit.register(EGRESO, x.id, "EDITAR", x.concept + " · S/ " + x.amount.toPlainString());
         return x;
     }
 

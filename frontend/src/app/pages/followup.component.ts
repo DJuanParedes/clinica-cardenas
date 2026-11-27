@@ -13,6 +13,7 @@ import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
 import { OnlyDirective } from '../shared/only.directive';
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 type Tab = 'reprogramar' | 'espera' | 'controles' | 'satisfaccion';
 const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODONCIA: 'Control de ortodoncia', CONTROL: 'Control preventivo' };
 
@@ -20,7 +21,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
 @Component({
   selector: 'app-followup',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent, TableSearchComponent],
+  imports: [DeleteButtonComponent, OnlyDirective, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -73,7 +74,8 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
                     <td>{{ w.entry.reason }}<div class="muted small">{{ w.dentist || 'Cualquier odontólogo' }}@if (w.entry.preference) { · {{ w.entry.preference }} }</div></td>
                     <td>@if (w.entry.status === 'AVISADA') { <span class="tag blue">Avisado {{ dt(w.entry.notifiedAt) }}</span> } @else { <span class="tag amber">Esperando</span> }</td>
                     <td class="muted small">desde {{ date(w.entry.createdAt) }}</td>
-                    <td class="right">@if (auth.can('CITAS_GESTIONAR')) { <button class="btn sm" type="button" (click)="close(w.entry.id)">Cerrar</button> }</td>
+                    <td class="right">@if (auth.can('CITAS_GESTIONAR')) { <button class="btn sm ghost" type="button" (click)="openEdit(w)" title="Editar"><app-icon name="edit" [size]="14" /></button> <button class="btn sm" type="button" (click)="close(w.entry.id)">Cerrar</button> }
+                      <app-delete-button entity="waitlist" [recordId]="w.entry.id" what="Solicitud de lista de espera" [iconOnly]="true" [ghost]="true" (deleted)="loadWait()" /></td>
                   </tr>
                 } @empty { <tr><td class="muted empty-row">La lista de espera está vacía.</td></tr> }
               </tbody>
@@ -139,9 +141,9 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
       }
     </div>
 
-    <app-modal [open]="addOpen" title="Agregar a la lista de espera" (close)="addOpen = false">
+    <app-modal [open]="addOpen" [title]="editId ? 'Editar solicitud' : 'Agregar a la lista de espera'" (close)="addOpen = false">
       <div class="stack">
-        <div class="field"><label>Paciente</label><app-patient-picker [value]="newPatient" (valueChange)="newPatient = $event" /></div>
+        <div class="field"><label>Paciente</label>@if (editId) { <div class="strong">{{ newPatient?.fullName }}</div> } @else { <app-patient-picker [value]="newPatient" (valueChange)="newPatient = $event" /> }</div>
         <div class="field"><label for="wr">Motivo</label><input id="wr" class="input" [(ngModel)]="newReason" maxlength="200" placeholder="Limpieza, evaluación, dolor…" appOnly="text" /></div>
         <div class="grid two">
           <div class="field"><label for="wd">Odontólogo</label>
@@ -154,7 +156,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
       </div>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="addOpen = false">Cancelar</button>
-        <button class="btn primary" type="button" (click)="add()" [disabled]="!newPatient || !newReason.trim()">Agregar</button>
+        <button class="btn primary" type="button" (click)="add()" [disabled]="!newPatient || !newReason.trim()">{{ editId ? 'Guardar' : 'Agregar' }}</button>
       </ng-container>
     </app-modal>
   `,
@@ -213,15 +215,25 @@ export class FollowupComponent implements OnInit {
   }
   loadWait() { this.api.waitlist().subscribe((w) => (this.wait = w)); }
 
+  editId: number | null = null;
+  openEdit(w: any) {
+    this.editId = w.entry.id;
+    this.newPatient = w.patient; this.newReason = w.entry.reason || ''; this.newDentist = w.entry.dentistId ?? null; this.newPref = w.entry.preference || '';
+    this.addOpen = true;
+    if (!this.dentists.length) this.api.dentists().subscribe((d) => (this.dentists = d));
+  }
   openAdd() {
+    this.editId = null;
     this.addOpen = true;
     this.newPatient = null; this.newReason = ''; this.newDentist = null; this.newPref = '';
     if (!this.dentists.length) this.api.dentists().subscribe((d) => (this.dentists = d));
   }
   add() {
     if (!this.newPatient) return;
-    this.api.addWaitlist({ patientId: this.newPatient.id, dentistId: this.newDentist, reason: this.newReason, preference: this.newPref }).subscribe({
-      next: () => { this.addOpen = false; this.toast.ok('Agregado a la lista de espera.'); this.loadWait(); },
+    const body = { dentistId: this.newDentist, reason: this.newReason, preference: this.newPref };
+    const call = this.editId ? this.api.updateWaitlist(this.editId, body) : this.api.addWaitlist({ patientId: this.newPatient.id, ...body });
+    call.subscribe({
+      next: () => { this.addOpen = false; this.toast.ok(this.editId ? 'Solicitud actualizada.' : 'Agregado a la lista de espera.'); this.editId = null; this.loadWait(); },
       error: (e) => this.toast.error(apiError(e).message),
     });
   }
