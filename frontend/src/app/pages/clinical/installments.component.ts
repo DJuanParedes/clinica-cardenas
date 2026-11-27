@@ -4,6 +4,7 @@ import { Api, Installments } from '../../core/api.service';
 import { ToastService } from '../../core/toast.service';
 import { apiError, isoDate, shortDate, soles } from '../../core/format';
 
+import { OnlyDirective } from '../../shared/only.directive';
 const LABEL: Record<string, string> = { PAGADA: 'Pagada', PENDIENTE: 'Pendiente', VENCIDA: 'Vencida' };
 const TONE: Record<string, string> = { PAGADA: 'green', PENDIENTE: 'grey', VENCIDA: 'gum' };
 
@@ -11,7 +12,7 @@ const TONE: Record<string, string> = { PAGADA: 'green', PENDIENTE: 'grey', VENCI
 @Component({
   selector: 'app-installments',
   standalone: true,
-  imports: [FormsModule],
+  imports: [OnlyDirective, FormsModule],
   template: `
     <div class="inst">
       <div class="spread">
@@ -35,7 +36,7 @@ const TONE: Record<string, string> = { PAGADA: 'green', PENDIENTE: 'grey', VENCI
       @if (canEdit) {
         <form class="row form" (ngSubmit)="create()">
           <label class="small" for="c{{ planId }}">Cuotas</label>
-          <input id="c{{ planId }}" class="input sm" type="number" min="2" max="24" name="count" [(ngModel)]="count" />
+          <input id="c{{ planId }}" class="input sm" type="number" min="2" max="24" name="count" [(ngModel)]="count" appOnly="int" />
           <label class="small" for="d{{ planId }}">Primera</label>
           <input id="d{{ planId }}" class="input sm" type="date" name="first" [(ngModel)]="first" [min]="today" />
           <button class="btn sm" type="submit" [disabled]="busy">{{ data?.items?.length ? 'Rehacer cuotas' : 'Crear cuotas' }}</button>

@@ -6,6 +6,7 @@ import { ToastService } from '../../core/toast.service';
 import { apiError, dateTime } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 export interface AnamQuestion { id: string; section: string; label: string; type: 'TEXT' | 'YES_NO' | 'CHOICE'; options?: string[] | null; alert?: boolean | null; }
 export interface AnamTemplate { id: number; code: string; name: string; specialty?: string; questions: AnamQuestion[]; active: boolean | number; }
 interface AnamRecord { id: number; templateId: number; templateName: string; questions: AnamQuestion[]; answers: Record<string, { value?: string; note?: string }>; alerts?: string; createdAt: string; createdBy: string; updatedAt?: string; }
@@ -14,7 +15,7 @@ interface AnamRecord { id: number; templateId: number; templateName: string; que
 @Component({
   selector: 'app-anamnesis-tab',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
   template: `
     @if (alerts.length) {
       <div class="notice gum alerts" role="alert"><app-icon name="alert" /><div>@for (a of alerts; track a) { <div class="strong">{{ a }}</div> }</div></div>
@@ -45,7 +46,7 @@ interface AnamRecord { id: number; templateId: number; templateName: string; que
                       <div class="yn">
                         <button type="button" [class.on]="draft.answers[q.id].value === 'NO'" (click)="set(q, 'NO')">No</button>
                         <button type="button" [class.on]="draft.answers[q.id].value === 'SI'" [class.yes]="draft.answers[q.id].value === 'SI'" (click)="set(q, 'SI')">Sí</button>
-                        @if (draft.answers[q.id].value === 'SI') { <input class="input note" [name]="'n-' + q.id" [(ngModel)]="draft.answers[q.id].note" placeholder="Detalle (medicamento, desde cuándo…)" maxlength="300" /> }
+                        @if (draft.answers[q.id].value === 'SI') { <input class="input note" [name]="'n-' + q.id" [(ngModel)]="draft.answers[q.id].note" placeholder="Detalle (medicamento, desde cuándo…)" maxlength="300" appOnly="text" /> }
                       </div>
                     }
                     @case ('CHOICE') {
@@ -53,7 +54,7 @@ interface AnamRecord { id: number; templateId: number; templateName: string; que
                         @for (o of q.options || []; track o) { <button type="button" [class.on]="draft.answers[q.id].value === o" (click)="set(q, o)">{{ o }}</button> }
                       </div>
                     }
-                    @default { <textarea class="input" [id]="'q-' + q.id" [name]="'q-' + q.id" rows="2" [(ngModel)]="draft.answers[q.id].value" maxlength="2000"></textarea> }
+                    @default { <textarea class="input" [id]="'q-' + q.id" [name]="'q-' + q.id" rows="2" [(ngModel)]="draft.answers[q.id].value" maxlength="2000" appOnly="decimal" inputmode="decimal"></textarea> }
                   }
                 </div>
               }

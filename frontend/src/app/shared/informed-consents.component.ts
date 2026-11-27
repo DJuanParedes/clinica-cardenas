@@ -7,11 +7,12 @@ import { apiError, dateTime } from '../core/format';
 import { ToastService } from '../core/toast.service';
 import { ModalComponent } from './modal.component';
 
+import { OnlyDirective } from './only.directive';
 /** v2.8: consentimientos informados del paciente: enviar para firmar a distancia o en la tablet, y su estado. */
 @Component({
   selector: 'app-informed-consents',
   standalone: true,
-  imports: [FormsModule, ModalComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent],
   template: `
     <section class="panel">
       <div class="panel-head"><h3>Consentimientos informados</h3><button class="btn sm" type="button" (click)="openSend()">+ Enviar para firmar</button></div>
@@ -46,10 +47,10 @@ import { ModalComponent } from './modal.component';
           <select id="it" name="it" class="input" [(ngModel)]="f.templateId" [class.invalid]="e['templateId']"><option [ngValue]="null">Elige…</option>@for (t of templates; track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }</select>
           @if (e['templateId']) { <span class="err">{{ e['templateId'] }}</span> }</div>
         <div class="field"><label class="req" for="ip">Procedimiento (aparece en el texto)</label>
-          <input id="ip" name="ip" class="input" [(ngModel)]="f.procedure" maxlength="300" placeholder="Ej.: endodoncia multirradicular" [class.invalid]="e['procedure']" />
+          <input id="ip" name="ip" class="input" [(ngModel)]="f.procedure" maxlength="300" placeholder="Ej.: endodoncia multirradicular" [class.invalid]="e['procedure']" appOnly="text" />
           @if (e['procedure']) { <span class="err">{{ e['procedure'] }}</span> }</div>
         <div class="cols-2">
-          <div class="field"><label for="ipz">Pieza (opcional)</label><input id="ipz" name="ipz" class="input" type="number" [(ngModel)]="f.tooth" placeholder="36" [class.invalid]="e['tooth']" /></div>
+          <div class="field"><label for="ipz">Pieza (opcional)</label><input id="ipz" name="ipz" class="input" type="number" [(ngModel)]="f.tooth" placeholder="36" [class.invalid]="e['tooth']" appOnly="digits" /></div>
           <div class="field"><label for="id">Odontólogo</label><select id="id" name="id" class="input" [(ngModel)]="f.dentistId"><option [ngValue]="null">—</option>@for (d of dentists; track d.id) { <option [ngValue]="d.id">{{ d.fullName }}</option> }</select></div>
         </div>
         <div class="field"><label>¿Cómo lo firmará?</label>

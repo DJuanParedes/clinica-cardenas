@@ -8,11 +8,12 @@ import { ToastService } from '../core/toast.service';
 import { ModalComponent } from '../shared/modal.component';
 import { TaskFormComponent } from '../shared/task-form.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.7: bandeja de tareas (mías, sin asignar, todas) agrupadas en vencidas, hoy y próximas. */
 @Component({
   selector: 'app-tasks',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -36,7 +37,7 @@ import { TaskFormComponent } from '../shared/task-form.component';
           <select class="input" [(ngModel)]="assigneeId" (ngModelChange)="load()" aria-label="Responsable"><option [ngValue]="null">Cualquier responsable</option>@for (u of assignees; track u.id) { <option [ngValue]="u.id">{{ u.fullName }}</option> }</select>
         }
         <select class="input" [(ngModel)]="status" (ngModelChange)="load()" aria-label="Estado"><option value="PENDIENTE">Pendientes</option><option value="HECHA">Hechas</option><option value="CANCELADA">Canceladas</option></select>
-        <input class="input grow" [(ngModel)]="q" (keyup.enter)="load()" (blur)="load()" placeholder="Buscar por paciente, lead o tarea" aria-label="Buscar" />
+        <input class="input grow" [(ngModel)]="q" (keyup.enter)="load()" (blur)="load()" placeholder="Buscar por paciente, lead o tarea" aria-label="Buscar" appOnly="search" maxlength="100" />
       </div>
 
       @if (loading && !items.length) { <div class="panel"><div class="skeleton" style="height: 220px"></div></div> }
@@ -80,7 +81,7 @@ import { TaskFormComponent } from '../shared/task-form.component';
     <app-task-form [open]="formOpen" [task]="edit" [askPatient]="!edit" (close)="formOpen = false" (saved)="formOpen = false; load()" />
     <app-modal [open]="!!closing" [title]="closeMode === 'HECHA' ? 'Marcar como hecha' : 'Cancelar tarea'" [subtitle]="closing?.title" [width]="460" (close)="closing = null">
       <div class="field"><label for="rs">{{ closeMode === 'HECHA' ? '¿Qué pasó? (opcional)' : '¿Por qué se cancela?' }}</label>
-        <textarea id="rs" class="input" rows="2" [(ngModel)]="result" maxlength="500" placeholder="Ej.: Contestó y agendó para el lunes"></textarea></div>
+        <textarea id="rs" class="input" rows="2" [(ngModel)]="result" maxlength="500" placeholder="Ej.: Contestó y agendó para el lunes" appOnly="text"></textarea></div>
       @if (closing?.patient && closeMode === 'HECHA') { <p class="muted small">¿Hay que volver a llamar? Crea otra tarea después de cerrarla.</p> }
       <div modal-actions>
         @if (closeMode === 'HECHA') { <button class="btn ghost" type="button" (click)="closeMode = 'CANCELADA'">Cancelar la tarea</button> }

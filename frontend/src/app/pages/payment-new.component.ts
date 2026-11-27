@@ -10,11 +10,12 @@ import { IconComponent } from '../shared/icon.component';
 import { LogoComponent } from '../shared/logo.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** HU-13: registrar un pago y su medio de pago, eligiendo la obligación que se paga. */
 @Component({
   selector: 'app-payment-new',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, LogoComponent, PatientPickerComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, LogoComponent, PatientPickerComponent],
   template: `
     <div class="page">
       <a class="back no-print" routerLink="/caja"><app-icon name="chevronLeft" [size]="16" /> Caja del día</a>
@@ -104,7 +105,7 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
             <form class="panel-body stack" (ngSubmit)="submit()">
               <div class="field">
                 <label class="req" for="am">Importe (S/)</label>
-                <input id="am" name="am" type="number" min="0" step="0.01" class="input tabular big" [class.invalid]="e['amount']" [(ngModel)]="f.amount" [disabled]="!patient" />
+                <input id="am" name="am" type="number" min="0" step="0.01" class="input tabular big" [class.invalid]="e['amount']" [(ngModel)]="f.amount" [disabled]="!patient" appOnly="decimal" />
                 @if (e['amount']) { <span class="err">{{ e['amount'] }}</span> }
                 @else if (selected) { <span class="hint">Pendiente de este procedimiento: {{ money(selected.pending) }}</span> }
               </div>
@@ -136,7 +137,7 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
                     @if (charge.status === 'PENDIENTE') { <span class="spin dark"></span> }</div>
                   <div class="muted small">{{ charge.reference }} · vence {{ dt(charge.expiresAt) }}</div>
                   @if (charge.status === 'PENDIENTE' && charge.checkoutUrl) {
-                    <input class="input small" readonly [value]="charge.checkoutUrl" (focus)="$any($event.target).select()" aria-label="Link de pago" />
+                    <input class="input small" readonly [value]="charge.checkoutUrl" (focus)="$any($event.target).select()" aria-label="Link de pago" appOnly="text" maxlength="200" />
                     <div class="row wrap">
                       <a class="btn sm primary" [href]="charge.checkoutUrl" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> Abrir página de pago</a>
                       <button class="btn sm" type="button" (click)="copyLink()">Copiar link</button>
@@ -150,19 +151,19 @@ import { PatientPickerComponent } from '../shared/patient-picker.component';
               @if (f.method !== 'EFECTIVO' && !(online && (f.method === 'TARJETA' || f.method === 'YAPE') && mode === 'ONLINE')) {
                 <div class="field">
                   <label class="req" for="rf">{{ f.method === 'TARJETA' ? 'N.° de voucher' : 'N.° de operación' }}</label>
-                  <input id="rf" name="rf" class="input tabular" [class.invalid]="e['reference']" [(ngModel)]="f.reference" [disabled]="!patient" />
+                  <input id="rf" name="rf" class="input tabular" [class.invalid]="e['reference']" [(ngModel)]="f.reference" [disabled]="!patient" appOnly="text" maxlength="200" />
                   @if (e['reference']) { <span class="err">{{ e['reference'] }}</span> }
                 </div>
               } @else if (f.amount > 0) {
                 <div class="field">
                   <label for="rc">Recibe (para calcular el vuelto)</label>
-                  <input id="rc" name="rc" type="number" min="0" step="0.10" class="input tabular" [(ngModel)]="received" />
+                  <input id="rc" name="rc" type="number" min="0" step="0.10" class="input tabular" [(ngModel)]="received" appOnly="decimal" />
                   @if (received && received >= f.amount) { <span class="hint ok">Vuelto: {{ money(received - f.amount) }}</span> }
                 </div>
               }
               <div class="field">
                 <label for="nt">Nota (opcional)</label>
-                <input id="nt" name="nt" class="input" [(ngModel)]="f.notes" [disabled]="!patient" />
+                <input id="nt" name="nt" class="input" [(ngModel)]="f.notes" [disabled]="!patient" appOnly="text" maxlength="200" />
               </div>
               @if (auth.can('COMPROBANTES')) {
                 <label class="auto-inv"><input type="checkbox" name="ai" [(ngModel)]="autoInvoice" />

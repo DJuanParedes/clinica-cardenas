@@ -6,11 +6,12 @@ import { ToastService } from '../core/toast.service';
 import { ModalComponent } from './modal.component';
 import { TaskFormComponent } from './task-form.component';
 
+import { OnlyDirective } from './only.directive';
 /** v2.7: tareas de un paciente o de un lead, para su ficha. */
 @Component({
   selector: 'app-task-list',
   standalone: true,
-  imports: [FormsModule, ModalComponent, TaskFormComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent, TaskFormComponent],
   template: `
     <section class="panel">
       <div class="panel-head"><h3>Tareas{{ pending.length ? ' · ' + pending.length + ' pendiente' + (pending.length > 1 ? 's' : '') : '' }}</h3>
@@ -43,7 +44,7 @@ import { TaskFormComponent } from './task-form.component';
       (close)="formOpen = false" (saved)="formOpen = false; load()" />
     <app-modal [open]="!!closing" [title]="closeMode === 'HECHA' ? 'Marcar como hecha' : 'Cancelar tarea'" [subtitle]="closing?.title" [width]="460" (close)="closing = null">
       <div class="field"><label for="rs">{{ closeMode === 'HECHA' ? '¿Qué pasó? (opcional)' : '¿Por qué se cancela?' }}</label>
-        <textarea id="rs" class="input" rows="2" [(ngModel)]="result" maxlength="500" placeholder="Ej.: Contestó, agenda el lunes"></textarea></div>
+        <textarea id="rs" class="input" rows="2" [(ngModel)]="result" maxlength="500" placeholder="Ej.: Contestó, agenda el lunes" appOnly="text"></textarea></div>
       <div modal-actions>
         @if (closeMode === 'HECHA') { <button class="btn ghost" type="button" (click)="closeMode = 'CANCELADA'">Cancelar la tarea</button> }
         <button class="btn primary" type="button" (click)="confirmClose()">{{ closeMode === 'HECHA' ? 'Marcar hecha' : 'Cancelar tarea' }}</button>

@@ -6,11 +6,12 @@ import { ToastService } from '../core/toast.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** HU-22 / HU-23: datos del paciente y canal preferido para recordatorios. */
 @Component({
   selector: 'app-portal-profile',
   standalone: true,
-  imports: [IconComponent, FormsModule],
+  imports: [OnlyDirective, IconComponent, FormsModule],
   template: `
     @if (p(); as me) {
       <section class="card">
@@ -21,9 +22,9 @@ import { IconComponent } from '../shared/icon.component';
           <div class="kv2"><app-icon name="mail" [size]="15" /> {{ me.email || 'Sin correo registrado' }}</div>
           <button class="btn sm edit" type="button" (click)="startEdit(me)"><app-icon name="edit" [size]="14" /> Cambiar celular o correo</button>
         } @else {
-          <div class="field"><label for="cp">Celular</label><input id="cp" class="input" inputmode="numeric" maxlength="9" [(ngModel)]="phone" />
+          <div class="field"><label for="cp">Celular</label><input id="cp" class="input" inputmode="numeric" maxlength="9" [(ngModel)]="phone" appOnly="phone" />
             @if (fe['phone']) { <span class="err">{{ fe['phone'] }}</span> }</div>
-          <div class="field"><label for="ce">Correo</label><input id="ce" class="input" type="email" [(ngModel)]="email" />
+          <div class="field"><label for="ce">Correo</label><input id="ce" class="input" type="email" [(ngModel)]="email" appOnly="email" maxlength="120" />
             @if (fe['email']) { <span class="err">{{ fe['email'] }}</span> }</div>
           <div class="row"><button class="btn" type="button" (click)="editing = false">Cancelar</button>
             <button class="btn primary" type="button" (click)="saveContact()" [disabled]="busy">Guardar</button></div>

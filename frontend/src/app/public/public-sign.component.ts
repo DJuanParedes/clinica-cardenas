@@ -5,11 +5,12 @@ import { apiError, dateTime } from '../core/format';
 import { LogoComponent } from '../shared/logo.component';
 import { PUBLIC_STYLES } from './public-styles';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.8: firma a distancia de un consentimiento informado (enlace por WhatsApp o correo, o tablet de la clínica). */
 @Component({
   selector: 'app-public-sign',
   standalone: true,
-  imports: [FormsModule, LogoComponent],
+  imports: [OnlyDirective, FormsModule, LogoComponent],
   template: `
     <header class="top"><app-logo [size]="44" /><div><div class="name">{{ d?.clinic || 'Clínica Dental' }}</div><div class="addr">Consentimiento informado</div></div></header>
     <main>
@@ -24,9 +25,9 @@ import { PUBLIC_STYLES } from './public-styles';
         <div class="card doc">{{ d.body }}</div>
         <form class="card" (ngSubmit)="sign()">
           <div class="grid2">
-            <div class="field"><label class="req" for="sn">Nombre completo de quien firma</label><input id="sn" name="sn" class="input" [(ngModel)]="f.signerName" maxlength="120" autocomplete="name" [class.invalid]="e['signerName']" />
+            <div class="field"><label class="req" for="sn">Nombre completo de quien firma</label><input id="sn" name="sn" class="input" [(ngModel)]="f.signerName" maxlength="120" autocomplete="name" [class.invalid]="e['signerName']" appOnly="letters" />
               @if (e['signerName']) { <span class="err">{{ e['signerName'] }}</span> }</div>
-            <div class="field"><label class="req" for="sd">DNI o carné de extranjería</label><input id="sd" name="sd" class="input tabular" [(ngModel)]="f.signerDoc" maxlength="12" inputmode="numeric" [class.invalid]="e['signerDoc']" />
+            <div class="field"><label class="req" for="sd">DNI o carné de extranjería</label><input id="sd" name="sd" class="input tabular" [(ngModel)]="f.signerDoc" maxlength="12" appOnly="alnum" inputmode="numeric" [class.invalid]="e['signerDoc']" />
               @if (e['signerDoc']) { <span class="err">{{ e['signerDoc'] }}</span> }</div>
             @if (d.minor) {
               <div class="field span2"><label class="req" for="sr">Firmo como</label><select id="sr" name="sr" class="input" [(ngModel)]="f.relationship" [class.invalid]="e['relationship']">

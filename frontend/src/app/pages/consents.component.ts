@@ -7,11 +7,12 @@ import { AuthService } from '../core/auth.service';
 import { apiError, dateTime } from '../core/format';
 import { ToastService } from '../core/toast.service';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.8: plantillas de consentimiento informado (editables) y seguimiento de los enviados para firmar. */
 @Component({
   selector: 'app-consents',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink],
   template: `
     <div class="page">
       <header class="page-head"><div><h1>Consentimientos informados</h1>
@@ -54,9 +55,9 @@ import { ToastService } from '../core/toast.service';
           <section class="panel">
             @if (cur) {
               <div class="panel-body grid">
-                <div class="field"><label class="req" for="tn">Nombre</label><input id="tn" class="input" [(ngModel)]="cur.name" maxlength="120" [class.invalid]="e['name']" />@if (e['name']) { <span class="err">{{ e['name'] }}</span> }</div>
+                <div class="field"><label class="req" for="tn">Nombre</label><input id="tn" class="input" [(ngModel)]="cur.name" maxlength="120" [class.invalid]="e['name']" appOnly="text" />@if (e['name']) { <span class="err">{{ e['name'] }}</span> }</div>
                 <div class="field"><label class="req" for="tb">Texto</label>
-                  <textarea id="tb" class="input" rows="18" [(ngModel)]="cur.body" maxlength="8000" [class.invalid]="e['body']"></textarea>
+                  <textarea id="tb" class="input" rows="18" [(ngModel)]="cur.body" maxlength="8000" [class.invalid]="e['body']" appOnly="text"></textarea>
                   <div class="vars">@for (v of vars; track v) { <button type="button" (click)="cur.body = (cur.body || '') + '{' + v + '}'">{{ '{' + v + '}' }}</button> }</div>
                   @if (e['body']) { <span class="err">{{ e['body'] }}</span> }
                   <span class="muted small">Los consentimientos ya enviados conservan el texto con el que se enviaron. Guardar un cambio crea una nueva versión.</span>

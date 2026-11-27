@@ -6,6 +6,7 @@ import { apiError, dateTime, saveBlob, shortDate } from '../core/format';
 import { LogoComponent } from '../shared/logo.component';
 import { PUBLIC_STYLES } from './public-styles';
 
+import { OnlyDirective } from '../shared/only.directive';
 /**
  * v2.9: Libro de Reclamaciones virtual (sin iniciar sesión). Campos del Anexo I del DS 011-2011-PCM.
  * No se pide aceptar la política de privacidad para registrar: el aviso es solo informativo.
@@ -13,7 +14,7 @@ import { PUBLIC_STYLES } from './public-styles';
 @Component({
   selector: 'app-public-complaints',
   standalone: true,
-  imports: [FormsModule, RouterLink, LogoComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, LogoComponent],
   template: `
     <header class="top"><app-logo [size]="44" />
       <div><div class="name">{{ info?.tradeName || 'Clínica Dental' }}</div><div class="addr">Libro de Reclamaciones</div></div>
@@ -28,8 +29,8 @@ import { PUBLIC_STYLES } from './public-styles';
           <h1>Consulta tu reclamo o queja</h1>
           <p class="lead">Usa el código de 8 letras que te dimos al registrarla y tu número de documento.</p>
           <div class="grid2">
-            <label>Código<input class="input" [(ngModel)]="lk.code" maxlength="8" autocapitalize="characters" /></label>
-            <label>N.° de documento<input class="input" [(ngModel)]="lk.doc" maxlength="15" inputmode="numeric" /></label>
+            <label>Código<input class="input" [(ngModel)]="lk.code" maxlength="8" appOnly="alnum" autocapitalize="characters" /></label>
+            <label>N.° de documento<input class="input" [(ngModel)]="lk.doc" maxlength="15" appOnly="alnum" inputmode="numeric" /></label>
           </div>
           @if (lkError) { <div class="err">{{ lkError }}</div> }
           <button class="btn primary block" type="button" [disabled]="!lk.code || !lk.doc || busy" (click)="lookup()">Consultar</button>
@@ -63,32 +64,32 @@ import { PUBLIC_STYLES } from './public-styles';
 
           <h2>1. Tus datos</h2>
           <div class="grid2">
-            <label class="span2">Nombres y apellidos<input class="input" [(ngModel)]="f.fullName" maxlength="150" autocomplete="name" [class.invalid]="e['fullName']" />
+            <label class="span2">Nombres y apellidos<input class="input" [(ngModel)]="f.fullName" maxlength="150" autocomplete="name" [class.invalid]="e['fullName']" appOnly="letters" />
               @if (e['fullName']) { <span class="err">{{ e['fullName'] }}</span> }</label>
             <label>Tipo de documento<select class="input" [(ngModel)]="f.docType">
               <option value="DNI">DNI</option><option value="CE">Carné de extranjería</option><option value="PASAPORTE">Pasaporte</option><option value="RUC">RUC</option></select></label>
-            <label>N.° de documento<input class="input" [(ngModel)]="f.docNumber" maxlength="15" inputmode="numeric" [class.invalid]="e['docNumber']" />
+            <label>N.° de documento<input class="input" [(ngModel)]="f.docNumber" maxlength="15" appOnly="alnum" inputmode="numeric" [class.invalid]="e['docNumber']" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }</label>
-            <label class="span2">Domicilio<input class="input" [(ngModel)]="f.address" maxlength="250" autocomplete="street-address" [class.invalid]="e['address']" />
+            <label class="span2">Domicilio<input class="input" [(ngModel)]="f.address" maxlength="250" autocomplete="street-address" [class.invalid]="e['address']" appOnly="text" />
               @if (e['address']) { <span class="err">{{ e['address'] }}</span> }</label>
-            <label>Teléfono<input class="input" [(ngModel)]="f.phone" maxlength="20" inputmode="tel" autocomplete="tel" />
+            <label>Teléfono<input class="input" [(ngModel)]="f.phone" maxlength="20" inputmode="tel" autocomplete="tel" appOnly="phone" />
               @if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }</label>
-            <label>Correo (te enviamos la copia aquí)<input class="input" type="email" [(ngModel)]="f.email" maxlength="120" autocomplete="email" />
+            <label>Correo (te enviamos la copia aquí)<input class="input" type="email" [(ngModel)]="f.email" maxlength="120" autocomplete="email" appOnly="email" />
               @if (e['email']) { <span class="err">{{ e['email'] }}</span> }</label>
             <label class="chk span2"><input type="checkbox" [(ngModel)]="f.minor" /> Soy menor de edad (lo registra mi padre, madre o apoderado)</label>
             @if (f.minor) {
-              <label>Nombre del padre, madre o apoderado<input class="input" [(ngModel)]="f.guardianName" maxlength="150" />
+              <label>Nombre del padre, madre o apoderado<input class="input" [(ngModel)]="f.guardianName" maxlength="150" appOnly="letters" />
                 @if (e['guardianName']) { <span class="err">{{ e['guardianName'] }}</span> }</label>
-              <label>Su documento<input class="input" [(ngModel)]="f.guardianDoc" maxlength="12" />
+              <label>Su documento<input class="input" [(ngModel)]="f.guardianDoc" maxlength="12" appOnly="alnum" />
                 @if (e['guardianDoc']) { <span class="err">{{ e['guardianDoc'] }}</span> }</label>
             }
           </div>
 
           <h2>2. Servicio contratado</h2>
           <div class="grid2">
-            <label>Servicio o tratamiento<input class="input" [(ngModel)]="f.service" maxlength="250" placeholder="Ej.: curación, ortodoncia, consulta" />
+            <label>Servicio o tratamiento<input class="input" [(ngModel)]="f.service" maxlength="250" placeholder="Ej.: curación, ortodoncia, consulta" appOnly="text" />
               @if (e['service']) { <span class="err">{{ e['service'] }}</span> }</label>
-            <label>Monto reclamado (S/, opcional)<input class="input" type="number" min="0" step="0.01" [(ngModel)]="f.amount" /></label>
+            <label>Monto reclamado (S/, opcional)<input class="input" type="number" min="0" step="0.01" [(ngModel)]="f.amount" appOnly="decimal" /></label>
           </div>
 
           <h2>3. Detalle</h2>
@@ -99,9 +100,9 @@ import { PUBLIC_STYLES } from './public-styles';
               <div><b>Queja</b><small>Malestar con la atención (no con el servicio en sí).</small></div></button>
           </div>
           @if (e['kind']) { <span class="err">{{ e['kind'] }}</span> }
-          <label>¿Qué pasó?<textarea class="input" rows="5" [(ngModel)]="f.detail" maxlength="4000" [class.invalid]="e['detail']"></textarea>
+          <label>¿Qué pasó?<textarea class="input" rows="5" [(ngModel)]="f.detail" maxlength="4000" [class.invalid]="e['detail']" appOnly="text"></textarea>
             @if (e['detail']) { <span class="err">{{ e['detail'] }}</span> }</label>
-          <label>¿Qué solicitas?<textarea class="input" rows="3" [(ngModel)]="f.request" maxlength="2000" [class.invalid]="e['request']"></textarea>
+          <label>¿Qué solicitas?<textarea class="input" rows="3" [(ngModel)]="f.request" maxlength="2000" [class.invalid]="e['request']" appOnly="text"></textarea>
             @if (e['request']) { <span class="err">{{ e['request'] }}</span> }</label>
 
           <p class="small muted">Usaremos estos datos solo para atender tu reclamo o queja, según la Ley 29733 de Protección de Datos Personales.

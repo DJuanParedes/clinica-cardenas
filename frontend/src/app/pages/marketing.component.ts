@@ -10,13 +10,14 @@ import { ToastService } from '../core/toast.service';
 import { ModalComponent } from '../shared/modal.component';
 import { TaskFormComponent } from '../shared/task-form.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 /** v2.7: segmentos de pacientes, campañas y cumpleaños. */
 @Component({
   selector: 'app-marketing',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, ModalComponent, TaskFormComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -53,8 +54,8 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
               }
               <div class="cols-3">
                 <div class="field"><label for="sx">Sexo</label><select id="sx" class="input" [(ngModel)]="f.sex" (ngModelChange)="changed()"><option [ngValue]="null">Todos</option><option value="F">Mujeres</option><option value="M">Hombres</option></select></div>
-                <div class="field"><label for="a1">Edad desde</label><input id="a1" class="input" type="number" min="0" max="120" [(ngModel)]="f.ageMin" (ngModelChange)="changed()" /></div>
-                <div class="field"><label for="a2">hasta</label><input id="a2" class="input" type="number" min="0" max="120" [(ngModel)]="f.ageMax" (ngModelChange)="changed()" /></div>
+                <div class="field"><label for="a1">Edad desde</label><input id="a1" class="input" type="number" min="0" max="120" [(ngModel)]="f.ageMin" (ngModelChange)="changed()" appOnly="int" /></div>
+                <div class="field"><label for="a2">hasta</label><input id="a2" class="input" type="number" min="0" max="120" [(ngModel)]="f.ageMax" (ngModelChange)="changed()" appOnly="int" /></div>
               </div>
               <div class="cols-2">
                 <div class="field"><label for="vi">Última visita</label><select id="vi" class="input" [(ngModel)]="f.visit" (ngModelChange)="changed()">
@@ -179,9 +180,9 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
     <!-- guardar segmento -->
     <app-modal [open]="saveOpen" [title]="current ? 'Guardar cambios del segmento' : 'Guardar segmento'" [subtitle]="pv?.description" [width]="480" (close)="saveOpen = false">
       <div class="grid">
-        <div class="field"><label class="req" for="sn">Nombre</label><input id="sn" class="input" [(ngModel)]="segName" maxlength="80" placeholder="Ej.: Ortodoncia sin control hace 6 meses" [class.invalid]="se['name']" />
+        <div class="field"><label class="req" for="sn">Nombre</label><input id="sn" class="input" [(ngModel)]="segName" maxlength="80" placeholder="Ej.: Ortodoncia sin control hace 6 meses" [class.invalid]="se['name']" appOnly="text" />
           @if (se['name']) { <span class="err">{{ se['name'] }}</span> }</div>
-        <div class="field"><label for="sd">Para qué sirve (opcional)</label><input id="sd" class="input" [(ngModel)]="segDesc" maxlength="300" /></div>
+        <div class="field"><label for="sd">Para qué sirve (opcional)</label><input id="sd" class="input" [(ngModel)]="segDesc" maxlength="300" appOnly="text" /></div>
       </div>
       <div modal-actions>
         @if (current) { <button class="btn ghost" type="button" (click)="current = null; saveSegment()">Guardar como nuevo</button> }
@@ -193,12 +194,12 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
     <app-modal [open]="bulkOpen" title="Crear una tarea por paciente" [subtitle]="(pv?.count || 0) + ' pacientes · ' + (pv?.description || '')" [width]="520" (close)="bulkOpen = false">
       <div class="grid">
         <div class="field"><label for="bk">Tipo</label><select id="bk" class="input" [(ngModel)]="bulk.kind">@for (k of kinds; track k[0]) { <option [value]="k[0]">{{ k[1] }}</option> }</select></div>
-        <div class="field"><label class="req" for="bt">Tarea</label><input id="bt" class="input" [(ngModel)]="bulk.title" maxlength="150" [class.invalid]="be['title']" />@if (be['title']) { <span class="err">{{ be['title'] }}</span> }</div>
+        <div class="field"><label class="req" for="bt">Tarea</label><input id="bt" class="input" [(ngModel)]="bulk.title" maxlength="150" [class.invalid]="be['title']" appOnly="text" />@if (be['title']) { <span class="err">{{ be['title'] }}</span> }</div>
         <div class="cols-2">
           <div class="field"><label class="req" for="bdd">Fecha</label><input id="bdd" class="input" type="date" [(ngModel)]="bulk.dueDate" [min]="today" [class.invalid]="be['dueDate']" /></div>
           <div class="field"><label for="ba">Responsable</label><select id="ba" class="input" [(ngModel)]="bulk.assigneeId"><option [ngValue]="null">Sin asignar</option>@for (u of assignees; track u.id) { <option [ngValue]="u.id">{{ u.fullName }}</option> }</select></div>
         </div>
-        <div class="field"><label for="bn">Notas (opcional)</label><textarea id="bn" class="input" rows="2" [(ngModel)]="bulk.notes" maxlength="1000" placeholder="Ej.: Ofrecer control con 20 % de descuento"></textarea></div>
+        <div class="field"><label for="bn">Notas (opcional)</label><textarea id="bn" class="input" rows="2" [(ngModel)]="bulk.notes" maxlength="1000" placeholder="Ej.: Ofrecer control con 20 % de descuento" appOnly="text"></textarea></div>
         <p class="muted small">No se repite a quien ya tiene esa misma tarea pendiente. Máximo 500 a la vez.</p>
         @if (bulkErr) { <div class="err">{{ bulkErr }}</div> }
       </div>
@@ -210,7 +211,7 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
       @if (camp) {
         <div class="ced">
           <div class="grid">
-            <div class="field"><label class="req" for="cn">Nombre (interno)</label><input id="cn" class="input" [(ngModel)]="camp.name" maxlength="100" [class.invalid]="ce['name']" placeholder="Ej.: Limpieza de verano" />@if (ce['name']) { <span class="err">{{ ce['name'] }}</span> }</div>
+            <div class="field"><label class="req" for="cn">Nombre (interno)</label><input id="cn" class="input" [(ngModel)]="camp.name" maxlength="100" [class.invalid]="ce['name']" placeholder="Ej.: Limpieza de verano" appOnly="text" />@if (ce['name']) { <span class="err">{{ ce['name'] }}</span> }</div>
             <div class="field"><label for="cs">Para quién</label>
               <select id="cs" class="input" [(ngModel)]="camp.segmentId" (ngModelChange)="campAudience()">
                 <option [ngValue]="null">Los filtros que armé en Segmentos</option>
@@ -218,9 +219,9 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
               </select>
               <span class="muted small">{{ campAud }}</span></div>
             <div class="field"><label for="cc">Canal</label><select id="cc" class="input" [(ngModel)]="camp.channel"><option value="PREFERIDO">El que prefiere cada paciente</option><option value="WHATSAPP">Solo WhatsApp</option><option value="EMAIL">Solo correo</option></select></div>
-            <div class="field"><label class="req" for="csu">Asunto (correo)</label><input id="csu" class="input" [(ngModel)]="camp.subject" maxlength="150" (ngModelChange)="pvCamp$.next(0)" [class.invalid]="ce['subject']" />@if (ce['subject']) { <span class="err">{{ ce['subject'] }}</span> }</div>
+            <div class="field"><label class="req" for="csu">Asunto (correo)</label><input id="csu" class="input" [(ngModel)]="camp.subject" maxlength="150" (ngModelChange)="pvCamp$.next(0)" [class.invalid]="ce['subject']" appOnly="text" />@if (ce['subject']) { <span class="err">{{ ce['subject'] }}</span> }</div>
             <div class="field"><label class="req" for="cb">Mensaje</label>
-              <textarea id="cb" class="input" rows="7" [(ngModel)]="camp.body" maxlength="1000" (ngModelChange)="pvCamp$.next(0)" [class.invalid]="ce['body']"></textarea>
+              <textarea id="cb" class="input" rows="7" [(ngModel)]="camp.body" maxlength="1000" (ngModelChange)="pvCamp$.next(0)" [class.invalid]="ce['body']" appOnly="text"></textarea>
               <div class="vars">@for (v of vars; track v) { <button type="button" (click)="insertVar(v)">{{ '{' + v + '}' }}</button> }</div>
               @if (ce['body']) { <span class="err">{{ ce['body'] }}</span> }<span class="muted small">{{ (camp.body || '').length }}/1000</span></div>
           </div>

@@ -9,11 +9,12 @@ import { ToastService } from '../core/toast.service';
 import { apiError } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** Verificación en 2 pasos (TOTP) para la cuenta del personal. */
 @Component({
   selector: 'app-security',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -46,7 +47,7 @@ import { IconComponent } from '../shared/icon.component';
           <p>Enviamos un código a <strong>{{ emailSetup.email }}</strong>. Escríbelo para confirmar que el correo es tuyo:</p>
           @if (emailSetup.demoCode) { <p class="muted small">Modo demostración: el código es {{ emailSetup.demoCode }}</p> }
           <div class="row confirm">
-            <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código del correo" />
+            <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código del correo" appOnly="digits" />
             <button class="btn primary" type="button" (click)="enableEmail()" [disabled]="busy || code.length !== 6">Confirmar y activar</button>
             <button class="btn ghost" type="button" (click)="emailSetup = null; code = ''">Cancelar</button>
           </div>
@@ -61,7 +62,7 @@ import { IconComponent } from '../shared/icon.component';
             </li>
             <li>Escribe el código de 6 dígitos que muestra la app:
               <div class="row confirm">
-                <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código de 6 dígitos" />
+                <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código de 6 dígitos" appOnly="digits" />
                 <button class="btn primary" type="button" (click)="enable()" [disabled]="busy || code.length !== 6">Confirmar y activar</button>
               </div>
             </li>
@@ -70,7 +71,7 @@ import { IconComponent } from '../shared/icon.component';
 
         @if (enabled) {
           <div class="row confirm">
-            <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código actual para desactivar" />
+            <input class="input code" [(ngModel)]="code" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código actual para desactivar" appOnly="digits" />
             <button class="btn danger" type="button" (click)="disable()" [disabled]="busy || code.length !== 6">Desactivar</button>
           </div>
           @if (method === 'CORREO') { <button class="btn sm ghost" type="button" (click)="sendDisableCode()" [disabled]="busy">Enviarme un código para desactivar</button> }

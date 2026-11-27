@@ -7,11 +7,12 @@ import { Patient } from '../core/models';
 import { IconComponent } from './icon.component';
 import { initials } from '../core/format';
 
+import { OnlyDirective } from './only.directive';
 /** Buscador de pacientes reutilizable (HU-02) para cita y comprobante. */
 @Component({
   selector: 'app-patient-picker',
   standalone: true,
-  imports: [FormsModule, IconComponent, RouterLink],
+  imports: [OnlyDirective, FormsModule, IconComponent, RouterLink],
   template: `
     @if (value) {
       <div class="picked">
@@ -26,7 +27,7 @@ import { initials } from '../core/format';
       <div class="search-box">
         <app-icon class="ico" name="search" />
         <input class="input" [(ngModel)]="q" (ngModelChange)="input$.next($event)" [placeholder]="placeholder"
-               autocomplete="off" aria-label="Buscar paciente por documento o nombre" />
+               autocomplete="off" aria-label="Buscar paciente por documento o nombre" appOnly="search" maxlength="100" />
       </div>
       @if (q.trim().length >= 2) {
         <div class="results">

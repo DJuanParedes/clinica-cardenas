@@ -11,13 +11,14 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
 import { ProductThumbComponent } from '../shared/product-thumb.component';
 import { ModalComponent } from '../shared/modal.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste', CONSUMO: 'Consumo en tratamiento' };
 
 /** Inventario de materiales: stock, mínimos, entradas/salidas y consumo automático por procedimiento. */
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent, InventoryCostsComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, PagerComponent, ProductThumbComponent, InventoryCostsComponent],
   template: `
     <div class="page">
       <header class="page-head spread">
@@ -60,7 +61,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
       }
 
       <div class="row tools">
-        <input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pgItems = 1" placeholder="Buscar por nombre, marca o proveedor" aria-label="Buscar material" />
+        <input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pgItems = 1" placeholder="Buscar por nombre, marca o proveedor" aria-label="Buscar material" appOnly="search" maxlength="100" />
         <select class="input" style="max-width: 200px" [(ngModel)]="cat" (ngModelChange)="pgItems = 1" aria-label="Tipo">
           <option value="">Todos los tipos</option><option value="INSUMO">Insumos</option><option value="INSTRUMENTAL">Instrumental</option><option value="MEDICAMENTO">Medicamentos</option>
         </select>
@@ -128,7 +129,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
       @if (tab === 'buy') {
         <section class="panel">
           <div class="panel-head spread"><h3>Compras a proveedores</h3>
-            <input class="input search" type="search" [(ngModel)]="qBuy" (ngModelChange)="pgBuy = 1" placeholder="Buscar proveedor o comprobante" /></div>
+            <input class="input search" type="search" [(ngModel)]="qBuy" (ngModelChange)="pgBuy = 1" placeholder="Buscar proveedor o comprobante" appOnly="search" maxlength="100" /></div>
           <table class="table">
             <thead><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="num">Total</th><th>Pago</th><th></th></tr></thead>
             <tbody>
@@ -183,7 +184,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
       @if (tab === 'moves') {
       <section class="panel">
         <div class="panel-head spread"><h3>Últimos movimientos</h3>
-          <input class="input search" type="search" [(ngModel)]="qMoves" (ngModelChange)="pgMoves = 1" placeholder="Buscar material o motivo" /></div>
+          <input class="input search" type="search" [(ngModel)]="qMoves" (ngModelChange)="pgMoves = 1" placeholder="Buscar material o motivo" appOnly="search" maxlength="100" /></div>
         <table class="table">
           <tbody>
             @for (m of pageOf(shownMoves, pgMoves); track m.id) {
@@ -238,11 +239,11 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
     <app-modal [open]="buyOpen" title="Registrar compra a proveedor" subtitle="Ingresa los lotes al stock y registra el egreso en caja con el comprobante del proveedor." [width]="900" (close)="buyOpen = false">
       <form class="stack" (ngSubmit)="savePurchase()">
         <div class="grid three">
-          <div class="field"><label class="req" for="bs">Proveedor / laboratorio</label><input id="bs" class="input" name="bs" [(ngModel)]="buy.supplier" list="suppliers" maxlength="120" />
+          <div class="field"><label class="req" for="bs">Proveedor / laboratorio</label><input id="bs" class="input" name="bs" [(ngModel)]="buy.supplier" list="suppliers" maxlength="120" appOnly="text" />
             <datalist id="suppliers">@for (x of suppliers; track x) { <option [value]="x"></option> }</datalist></div>
           <div class="field"><label class="req" for="bd">Comprobante</label>
             <select id="bd" class="input" name="bd" [(ngModel)]="buy.docType"><option value="">Seleccionar…</option><option value="FACTURA">Factura</option><option value="BOLETA">Boleta</option><option value="GUIA">Guía de remisión</option><option value="SIN_COMPROBANTE">Sin comprobante</option></select></div>
-          <div class="field"><label for="bn">Serie y número</label><input id="bn" class="input" name="bn" [(ngModel)]="buy.docNumber" placeholder="F001-00012345" maxlength="20" /></div>
+          <div class="field"><label for="bn">Serie y número</label><input id="bn" class="input" name="bn" [(ngModel)]="buy.docNumber" placeholder="F001-00012345" maxlength="20" appOnly="search" /></div>
           <div class="field"><label class="req" for="bf">Fecha</label><input id="bf" class="input" type="date" name="bf" [(ngModel)]="buy.purchaseDate" /></div>
           <div class="field"><label class="req" for="bp">Pago</label>
             <select id="bp" class="input" name="bp" [(ngModel)]="buy.paid"><option [ngValue]="true">Pagada al contado</option><option [ngValue]="false">Al crédito (pagar después)</option></select></div>
@@ -260,9 +261,9 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
               <tr>
                 <td><select class="input" [(ngModel)]="l.itemId" [name]="'li' + $index" (ngModelChange)="prefill(l)"><option [ngValue]="null">Seleccionar…</option>
                   @for (i of activeItems; track i.id) { <option [ngValue]="i.id">{{ i.name }}{{ i.brand ? ' · ' + i.brand : '' }}</option> }</select></td>
-                <td><input class="input" type="number" min="0" step="1" [(ngModel)]="l.quantity" [name]="'lq' + $index" /></td>
-                <td><input class="input" type="number" min="0" step="0.01" [(ngModel)]="l.unitCost" [name]="'lc' + $index" /></td>
-                <td><input class="input" [(ngModel)]="l.lotCode" [name]="'ll' + $index" maxlength="40" placeholder="Nº de lote" /></td>
+                <td><input class="input" type="number" min="0" step="1" [(ngModel)]="l.quantity" [name]="'lq' + $index" appOnly="int" /></td>
+                <td><input class="input" type="number" min="0" step="0.01" [(ngModel)]="l.unitCost" [name]="'lc' + $index" appOnly="decimal" /></td>
+                <td><input class="input" [(ngModel)]="l.lotCode" [name]="'ll' + $index" maxlength="40" placeholder="Nº de lote" appOnly="alnum" /></td>
                 <td><input class="input" type="date" [(ngModel)]="l.expiresOn" [name]="'le' + $index" [disabled]="tracks(l.itemId) === false" /></td>
                 <td class="num tabular">{{ money((+l.quantity || 0) * (+l.unitCost || 0)) }}</td>
                 <td><button class="btn ghost sm" type="button" (click)="buy.lines.splice($index, 1)" aria-label="Quitar"><app-icon name="x" [size]="14" /></button></td>
@@ -274,7 +275,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
           <button class="btn sm" type="button" (click)="addLine()"><app-icon name="plus" [size]="14" /> Agregar producto</button>
           <strong class="tabular">Total {{ money(buyTotal) }}</strong>
         </div>
-        <div class="field"><label for="bo">Observaciones</label><input id="bo" class="input" name="bo" [(ngModel)]="buy.notes" maxlength="255" /></div>
+        <div class="field"><label for="bo">Observaciones</label><input id="bo" class="input" name="bo" [(ngModel)]="buy.notes" maxlength="255" appOnly="text" /></div>
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="buyOpen = false">Cancelar</button>
@@ -308,7 +309,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
     </app-modal>
 
     <app-modal [open]="!!rejectFor" title="Rechazar solicitud" [subtitle]="rejectFor ? rejectFor.item + ' · ' + (rejectFor.requestedByName || rejectFor.requestedBy) : ''" (close)="rejectFor = null">
-      <div class="field"><label class="req" for="rj">Motivo</label><input id="rj" class="input" [(ngModel)]="rejectText" maxlength="255" placeholder="Sin stock, se pidió al proveedor; usar alternativa…" /></div>
+      <div class="field"><label class="req" for="rj">Motivo</label><input id="rj" class="input" [(ngModel)]="rejectText" maxlength="255" placeholder="Sin stock, se pidió al proveedor; usar alternativa…" appOnly="text" /></div>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="rejectFor = null">Cancelar</button>
         <button class="btn primary" type="button" (click)="answer(rejectFor, 'RECHAZAR', rejectText)" [disabled]="busy || !rejectText.trim()">Rechazar</button>
@@ -322,16 +323,16 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
           @for (k of ['ENTRADA', 'SALIDA', 'AJUSTE']; track k) { <button type="button" [class.on]="move.kind === k" (click)="move.kind = k">{{ moveLabel(k) }}</button> }
         </div>
         <div class="field"><label for="mq">{{ move.kind === 'AJUSTE' ? 'Stock contado (queda en)' : 'Cantidad' }}</label>
-          <input id="mq" class="input" type="number" min="0" step="0.01" name="q" [(ngModel)]="move.quantity" /></div>
+          <input id="mq" class="input" type="number" min="0" step="0.01" name="q" [(ngModel)]="move.quantity" appOnly="decimal" /></div>
         @if (move.kind === 'ENTRADA') {
           <div class="grid two">
-            <div class="field"><label for="ml">Lote</label><input id="ml" class="input" name="ml" [(ngModel)]="move.lotCode" maxlength="40" /></div>
+            <div class="field"><label for="ml">Lote</label><input id="ml" class="input" name="ml" [(ngModel)]="move.lotCode" maxlength="40" appOnly="alnum" /></div>
             <div class="field"><label for="me">Vence</label><input id="me" class="input" type="date" name="me" [(ngModel)]="move.expiresOn" [disabled]="moveFor?.tracksExpiry === false" /></div>
           </div>
           <p class="muted small">¿Es una compra? Usa <strong>Registrar compra</strong> para que quede la factura y el egreso en caja.</p>
         }
         <div class="field"><label for="mr" [class.req]="move.kind === 'SALIDA'">Motivo</label>
-          <input id="mr" class="input" name="r" [(ngModel)]="move.reason" maxlength="200" [placeholder]="move.kind === 'ENTRADA' ? 'Compra, proveedor, factura…' : 'Vencido, roto, inventario…'" /></div>
+          <input id="mr" class="input" name="r" [(ngModel)]="move.reason" maxlength="200" [placeholder]="move.kind === 'ENTRADA' ? 'Compra, proveedor, factura…' : 'Vencido, roto, inventario…'" appOnly="text" /></div>
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="moveFor = null">Cancelar</button>
@@ -355,25 +356,25 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
             </div>
           </div>
         } @else { <p class="muted small">Podrás subir la foto del producto después de guardarlo.</p> }
-        <div class="field"><label class="req" for="in">Nombre</label><input id="in" class="input" name="name" [(ngModel)]="item.name" maxlength="120" /></div>
+        <div class="field"><label class="req" for="in">Nombre</label><input id="in" class="input" name="name" [(ngModel)]="item.name" maxlength="120" appOnly="text" /></div>
         <div class="grid two">
           <div class="field"><label class="req" for="ic">Tipo</label>
             <select id="ic" class="input" name="cat" [(ngModel)]="item.category" (ngModelChange)="item.tracksExpiry = $event !== 'INSTRUMENTAL'">
               <option value="">Seleccionar…</option><option value="INSUMO">Insumo (se consume)</option><option value="INSTRUMENTAL">Instrumental (se esteriliza y reutiliza)</option><option value="MEDICAMENTO">Medicamento</option></select></div>
-          <div class="field"><label for="ib">Marca</label><input id="ib" class="input" name="brand" [(ngModel)]="item.brand" maxlength="80" placeholder="3M, Dentsply…" /></div>
-          <div class="field"><label for="ip">Proveedor / laboratorio</label><input id="ip" class="input" name="sup" [(ngModel)]="item.supplier" maxlength="120" list="suppliers2" />
+          <div class="field"><label for="ib">Marca</label><input id="ib" class="input" name="brand" [(ngModel)]="item.brand" maxlength="80" placeholder="3M, Dentsply…" appOnly="text" /></div>
+          <div class="field"><label for="ip">Proveedor / laboratorio</label><input id="ip" class="input" name="sup" [(ngModel)]="item.supplier" maxlength="120" list="suppliers2" appOnly="text" />
             <datalist id="suppliers2">@for (x of suppliers; track x) { <option [value]="x"></option> }</datalist></div>
-          <div class="field"><label for="ik">Costo unitario (S/)</label><input id="ik" class="input" type="number" min="0" step="0.01" name="cost" [(ngModel)]="item.unitCost" /></div>
+          <div class="field"><label for="ik">Costo unitario (S/)</label><input id="ik" class="input" type="number" min="0" step="0.01" name="cost" [(ngModel)]="item.unitCost" appOnly="decimal" /></div>
         </div>
         <label class="check"><input type="checkbox" name="trk" [(ngModel)]="item.tracksExpiry" /> Controlar fecha de vencimiento por lote</label>
         <div class="grid two">
-          <div class="field"><label for="iu">Unidad</label><input id="iu" class="input" name="unit" [(ngModel)]="item.unit" maxlength="20" placeholder="unidad, caja, par…" /></div>
-          <div class="field"><label for="im">Stock mínimo</label><input id="im" class="input" type="number" min="0" name="min" [(ngModel)]="item.minStock" /></div>
+          <div class="field"><label for="iu">Unidad</label><input id="iu" class="input" name="unit" [(ngModel)]="item.unit" maxlength="20" placeholder="unidad, caja, par…" appOnly="text" /></div>
+          <div class="field"><label for="im">Stock mínimo</label><input id="im" class="input" type="number" min="0" name="min" [(ngModel)]="item.minStock" appOnly="int" /></div>
         </div>
         @if (!itemId) {
           <div class="grid three">
-            <div class="field"><label for="is">Stock inicial</label><input id="is" class="input" type="number" min="0" name="init" [(ngModel)]="item.initialStock" /></div>
-            <div class="field"><label for="il">Lote</label><input id="il" class="input" name="lot" [(ngModel)]="item.lotCode" maxlength="40" /></div>
+            <div class="field"><label for="is">Stock inicial</label><input id="is" class="input" type="number" min="0" name="init" [(ngModel)]="item.initialStock" appOnly="int" /></div>
+            <div class="field"><label for="il">Lote</label><input id="il" class="input" name="lot" [(ngModel)]="item.lotCode" maxlength="40" appOnly="alnum" /></div>
             <div class="field"><label for="ie">Vence</label><input id="ie" class="input" type="date" name="exp" [(ngModel)]="item.expiresOn" [disabled]="!item.tracksExpiry" /></div>
           </div>
         } @else {
@@ -399,7 +400,7 @@ const MOVE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', SALIDA: 'Salida
                 <td><select class="input" [(ngModel)]="r.itemId" aria-label="Material"><option [ngValue]="null">Seleccionar…</option>
                   @for (i of items; track i.id) { <option [ngValue]="i.id">{{ i.name }}</option> }
                 </select></td>
-                <td style="width:120px"><input class="input" type="number" min="0" step="0.05" [(ngModel)]="r.quantity" aria-label="Cantidad" /></td>
+                <td style="width:120px"><input class="input" type="number" min="0" step="0.05" [(ngModel)]="r.quantity" aria-label="Cantidad" appOnly="decimal" /></td>
                 <td style="width:40px"><button class="btn ghost sm" type="button" (click)="rows.splice($index, 1)" aria-label="Quitar"><app-icon name="x" [size]="14" /></button></td>
               </tr>
             } @empty { <tr><td class="muted">Este procedimiento no descuenta materiales.</td></tr> }

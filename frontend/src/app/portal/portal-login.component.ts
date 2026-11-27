@@ -8,13 +8,14 @@ import { IconComponent } from '../shared/icon.component';
 import { LegalModalComponent } from '../shared/legal-modal.component';
 import { LogoComponent } from '../shared/logo.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 type Mode = 'login' | 'activar' | 'codigo';
 
 /** HU-22: ingreso del paciente y activación de su cuenta con un código enviado por WhatsApp. */
 @Component({
   selector: 'app-portal-login',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, IconComponent, LogoComponent, LegalModalComponent],
+  imports: [OnlyDirective, FormsModule, NgTemplateOutlet, RouterLink, IconComponent, LogoComponent, LegalModalComponent],
   template: `
     <div class="wrap">
       <div class="hero">
@@ -34,7 +35,7 @@ type Mode = 'login' | 'activar' | 'codigo';
             <ng-container *ngTemplateOutlet="doc"></ng-container>
             <div class="field">
               <label for="pp">Contraseña</label>
-              <input id="pp" name="pp" class="input lg" type="password" [(ngModel)]="password" autocomplete="current-password" />
+              <input id="pp" name="pp" class="input lg" type="password" [(ngModel)]="password" autocomplete="current-password" appOnly="nospace" maxlength="72" />
             </div>
             @if (error) { <div class="notice gum small" role="alert"><app-icon name="alert" [size]="16" /><div>{{ error }}</div></div> }
             <button class="btn primary lg block" type="submit" [disabled]="busy || !docNumber || !password">@if (busy) { <span class="spin"></span> } Ingresar</button>
@@ -63,12 +64,12 @@ type Mode = 'login' | 'activar' | 'codigo';
           <form class="stack" (ngSubmit)="activate()" novalidate>
             <div class="field">
               <label for="cd">Código recibido</label>
-              <input id="cd" name="cd" class="input lg code" inputmode="numeric" maxlength="6" [(ngModel)]="code" autocomplete="one-time-code" />
+              <input id="cd" name="cd" class="input lg code" inputmode="numeric" maxlength="6" [(ngModel)]="code" autocomplete="one-time-code" appOnly="digits" />
               @if (fe['code']) { <span class="err">{{ fe['code'] }}</span> }
             </div>
             <div class="field">
               <label for="np">Nueva contraseña</label>
-              <input id="np" name="np" class="input lg" type="password" [(ngModel)]="password" autocomplete="new-password" />
+              <input id="np" name="np" class="input lg" type="password" [(ngModel)]="password" autocomplete="new-password" appOnly="nospace" maxlength="72" />
               @if (fe['password']) { <span class="err">{{ fe['password'] }}</span> } @else { <span class="hint">Mínimo 8 caracteres, con letras y números.</span> }
             </div>
             <div class="terms">
@@ -101,7 +102,7 @@ type Mode = 'login' | 'activar' | 'codigo';
         </div>
         <div class="field">
           <label for="dn">Número</label>
-          <input id="dn" name="dn" class="input lg tabular" [(ngModel)]="docNumber" inputmode="numeric" autocomplete="username" />
+          <input id="dn" name="dn" class="input lg tabular" [(ngModel)]="docNumber" inputmode="numeric" appOnly="alnum" maxlength="12" autocomplete="username" />
         </div>
       </div>
     </ng-template>

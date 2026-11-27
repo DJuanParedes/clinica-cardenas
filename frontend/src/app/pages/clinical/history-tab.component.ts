@@ -6,6 +6,7 @@ import { ClinicalHistory, Diagnosis } from '../../core/models';
 import { apiError, dateTime } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 const CIE10 = [
   { c: 'K02.0', d: 'Caries limitada al esmalte' },
   { c: 'K02.1', d: 'Caries de la dentina' },
@@ -36,7 +37,7 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
 @Component({
   selector: 'app-history-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     @if (alerts.length) {
       <div class="notice gum alerts" role="alert">
@@ -66,7 +67,7 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
             @for (f of fields; track f.key) {
               <div class="field">
                 <label [attr.for]="f.key">{{ f.label }}</label>
-                <textarea class="input" [id]="f.key" [name]="f.key" rows="2" [(ngModel)]="draft[f.key]" [placeholder]="f.hint || ''"></textarea>
+                <textarea class="input" [id]="f.key" [name]="f.key" rows="2" [(ngModel)]="draft[f.key]" [placeholder]="f.hint || ''" appOnly="text" maxlength="1000"></textarea>
               </div>
             }
             <div class="span-all row" style="justify-content: flex-end">
@@ -95,17 +96,17 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
           <div class="grid dx">
             <div class="field">
               <label for="cie">CIE-10</label>
-              <input id="cie" name="cie" class="input" list="cie10" [(ngModel)]="dx.cie10Code" (ngModelChange)="fillFromCie()" placeholder="K02.1" />
+              <input id="cie" name="cie" class="input" list="cie10" [(ngModel)]="dx.cie10Code" (ngModelChange)="fillFromCie()" placeholder="K02.1" appOnly="cie10" maxlength="6" />
               <datalist id="cie10">@for (c of cie10; track c.c) { <option [value]="c.c">{{ c.d }}</option> }</datalist>
             </div>
             <div class="field">
               <label for="tooth">Pieza</label>
-              <input id="tooth" name="tooth" class="input" type="number" min="11" max="85" [(ngModel)]="dx.tooth" placeholder="36" />
+              <input id="tooth" name="tooth" class="input" type="number" min="11" max="85" [(ngModel)]="dx.tooth" placeholder="36" appOnly="digits" />
             </div>
           </div>
           <div class="field">
             <label for="dxd">Descripción</label>
-            <textarea id="dxd" name="dxd" class="input" rows="2" [class.invalid]="dxError" [(ngModel)]="dx.description"></textarea>
+            <textarea id="dxd" name="dxd" class="input" rows="2" [class.invalid]="dxError" [(ngModel)]="dx.description" appOnly="text" maxlength="1000"></textarea>
             @if (dxError) { <span class="err">{{ dxError }}</span> }
           </div>
           <div class="row" style="justify-content: flex-end"><button type="submit" class="btn primary sm" [disabled]="savingDx">Registrar diagnóstico</button></div>
