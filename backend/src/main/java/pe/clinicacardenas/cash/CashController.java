@@ -70,6 +70,15 @@ public class CashController {
         return service.voidPayment(id, req.reason());
     }
 
+    @PutMapping("/expenses/{id}")
+    @PreAuthorize("hasAuthority('CAJA_EGRESOS')")
+    public Expense updateExpense(@PathVariable Long id, @RequestBody CashService.ExpenseRequest req) {
+        Expense old = service.expense(id);
+        closings.ensureOpen(old.expenseDate);
+        closings.ensureOpen(req.expenseDate() == null ? old.expenseDate : req.expenseDate());
+        return service.updateExpense(id, req);
+    }
+
     @PostMapping("/expenses")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CAJA_EGRESOS')")

@@ -80,6 +80,7 @@ import { OnlyDirective } from '../shared/only.directive';
                       </td>
                       <td class="right">
                         @if ((d.type === 'INGRESO' && auth.can('CAJA_COBRAR')) || (d.type === 'EGRESO' && auth.can('CAJA_EGRESOS'))) {
+                          @if (d.type === 'EGRESO') { <button class="btn sm ghost" type="button" (click)="editExpense(d)" title="Editar"><app-icon name="edit" [size]="14" /></button> }
                           <button class="btn sm ghost" type="button" (click)="askVoid(d)" title="Anular"><app-icon name="x" [size]="14" /></button>
                         }
                         @if (d.type === 'EGRESO') { <app-delete-button entity="expenses" [recordId]="d.id" what="Egreso" [iconOnly]="true" [ghost]="true" (deleted)="load()" /> }
@@ -112,7 +113,7 @@ import { OnlyDirective } from '../shared/only.directive';
       }
     </div>
 
-    <app-modal [open]="expenseOpen" title="Registrar egreso" subtitle="Pagos a proveedores, servicios, insumos u otros gastos" [width]="600" (close)="expenseOpen = false">
+    <app-modal [open]="expenseOpen" [title]="editingId ? 'Editar egreso' : 'Registrar egreso'" subtitle="Pagos a proveedores, servicios, insumos u otros gastos" [width]="600" (close)="expenseOpen = false">
       <form class="grid cols-2" (ngSubmit)="saveExpense()">
         <div class="field">
           <label class="req" for="ed">Fecha</label>
@@ -155,7 +156,7 @@ import { OnlyDirective } from '../shared/only.directive';
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="expenseOpen = false">Cancelar</button>
-        <button class="btn primary" type="button" (click)="saveExpense()" [disabled]="busy">Registrar egreso</button>
+        <button class="btn primary" type="button" (click)="saveExpense()" [disabled]="busy">{{ editingId ? 'Guardar cambios' : 'Registrar egreso' }}</button>
       </ng-container>
     </app-modal>
 
@@ -232,7 +233,18 @@ export class CashComponent implements OnInit {
     return c ? c.net : 0;
   }
 
+  editingId: number | null = null;
+
+  editExpense(d: any) {
+    this.editingId = d.id;
+    this.x = { expenseDate: String(d.date || '').slice(0, 10) || isoDate(), category: d.category || '', concept: d.concept || '', amount: d.amount,
+      method: d.method || '', supplier: d.party || '', reference: d.reference || '' };
+    this.e = {};
+    this.expenseOpen = true;
+  }
+
   openExpense() {
+    this.editingId = null;
     this.x = { expenseDate: isoDate(), category: '', concept: '', amount: null, method: '', supplier: '', reference: '' };
     this.e = {};
     this.expenseOpen = true;
@@ -240,8 +252,9 @@ export class CashComponent implements OnInit {
 
   saveExpense() {
     this.busy = true;
-    this.api.addExpense(this.x).subscribe({
-      next: () => { this.busy = false; this.expenseOpen = false; this.toast.ok('Egreso registrado.'); this.load(); },
+    const call = this.editingId ? this.api.updateExpense(this.editingId, this.x) : this.api.addExpense(this.x);
+    call.subscribe({
+      next: () => { this.busy = false; this.expenseOpen = false; this.toast.ok(this.editingId ? 'Egreso actualizado.' : 'Egreso registrado.'); this.editingId = null; this.load(); },
       error: (err) => { this.busy = false; const a = apiError(err); this.e = a.fields || {}; this.toast.error(a.message); },
     });
   }

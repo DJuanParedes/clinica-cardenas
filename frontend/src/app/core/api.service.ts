@@ -345,6 +345,7 @@ export class Api {
   onlineWhatsapp(id: number): Observable<{ sent: boolean; phone: string }> { return this.http.post<any>(`/api/cash/online/${id}/whatsapp`, {}); }
   voidPayment(id: number, reason: string): Observable<Payment> { return this.http.post<Payment>(`/api/cash/payments/${id}/void`, { reason }); }
   addExpense(body: any): Observable<any> { return this.http.post('/api/cash/expenses', body); }
+  updateExpense(id: number, body: any): Observable<any> { return this.http.put(`/api/cash/expenses/${id}`, body); }
   voidExpense(id: number, reason: string): Observable<any> { return this.http.post(`/api/cash/expenses/${id}/void`, { reason }); }
   cashToday(): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/today'); }
   cashReport(from: string, to: string): Observable<CashReport> { return this.http.get<CashReport>('/api/cash/report', { params: params({ from, to }) }); }
@@ -418,6 +419,7 @@ export class Api {
   // ---------- seguimiento: lista de espera, cuotas, controles, satisfacción
   waitlist(): Observable<any[]> { return this.http.get<any[]>('/api/waitlist'); }
   addWaitlist(body: { patientId: number; dentistId?: number | null; reason: string; preference?: string }): Observable<any> { return this.http.post('/api/waitlist', body); }
+  updateWaitlist(id: number, body: { dentistId?: number | null; reason: string; preference?: string }): Observable<any> { return this.http.put(`/api/waitlist/${id}`, body); }
   closeWaitlist(id: number): Observable<any> { return this.http.post(`/api/waitlist/${id}/close`, {}); }
   installments(planId: number): Observable<Installments> { return this.http.get<Installments>(`/api/plans/${planId}/installments`); }
   createInstallments(planId: number, count: number, firstDueDate: string): Observable<Installments> {

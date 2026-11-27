@@ -8,11 +8,12 @@ import { ModalComponent } from '../shared/modal.component';
 import { PagerComponent, pageOf } from '../shared/pager.component';
 
 import { OnlyDirective } from '../shared/only.directive';
+import { DeleteButtonComponent } from '../shared/delete-button.component';
 /** El odontólogo pide materiales; recepción los entrega desde Inventario. No ve costos ni proveedores. */
 @Component({
   selector: 'app-supply-requests',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, IconComponent, ModalComponent, PagerComponent],
+  imports: [DeleteButtonComponent, OnlyDirective, FormsModule, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head spread">
@@ -32,7 +33,8 @@ import { OnlyDirective } from '../shared/only.directive';
                 <td class="num tabular">{{ n(r.quantity) }} {{ r.unit || '' }}</td>
                 <td><span class="tag" [class.amber]="r.status === 'PENDIENTE'" [class.green]="r.status === 'ENTREGADA'" [class.grey]="r.status !== 'PENDIENTE' && r.status !== 'ENTREGADA'">{{ label(r.status) }}</span></td>
                 <td class="small">{{ r.answer || (r.answeredBy ? 'Atendió ' + r.answeredBy : '—') }}</td>
-                <td class="right">@if (r.status === 'PENDIENTE') { <button class="btn sm ghost" type="button" (click)="cancel(r)">Anular</button> }</td>
+                <td class="right">@if (r.status === 'PENDIENTE') { <button class="btn sm ghost" type="button" (click)="cancel(r)">Anular</button> }
+                  <app-delete-button entity="supply_requests" [recordId]="r.id" what="Pedido de material" [iconOnly]="true" [ghost]="true" (deleted)="load()" /></td>
               </tr>
             } @empty { <tr><td colspan="6" class="muted center">Aún no has pedido insumos.</td></tr> }
           </tbody>
