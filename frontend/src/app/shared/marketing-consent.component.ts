@@ -24,20 +24,22 @@ import { CLINIC, esc, openPrintWindow, paragraphs, writePrintDoc } from '../core
         </p>
         @if (auth.can('PACIENTES_EDITAR')) {
           <div class="row wrap">
-            <select class="input sm" [(ngModel)]="channel" aria-label="Cómo lo indicó" title="Por dónde dio el paciente su respuesta; queda registrado como prueba del consentimiento"><option value="PRESENCIAL">En la clínica</option><option value="TELEFONO">Por teléfono</option><option value="WHATSAPP">Por WhatsApp</option></select>
             @if (state !== true) { <button class="btn sm" type="button" (click)="legal = true">Registrar que acepta</button> }
             @if (state !== false) { <button class="btn sm ghost" type="button" (click)="set(false)">Registrar que no acepta</button> }
             <button class="btn sm ghost" type="button" (click)="print()" title="Constancia para firmar y archivar">Imprimir constancia</button>
+            <label class="btn sm ghost" [class.disabled]="uploading" title="PDF o foto de la constancia firmada por el paciente">{{ uploading ? 'Subiendo…' : signedAt ? 'Reemplazar constancia firmada' : 'Subir constancia firmada' }}
+              <input type="file" accept="application/pdf,image/jpeg,image/png" hidden (change)="upload($event)" [disabled]="uploading" /></label>
           </div>
         }
+        @if (signedAt) { <p class="small ok-line">✔ Constancia firmada adjunta el {{ dt(signedAt) }} (en Archivos del paciente).</p> }
       </div>
     </section>
     <app-legal-modal [open]="legal" code="PUBLICIDAD" [who]="patient?.fullName || ''" (accepted)="legal = false; set(true)" (closed)="legal = false" />
   `,
-  styles: [`.row { gap: 8px; align-items: center; } .input.sm { width: auto; height: 30px; padding: 0 8px; }`],
+  styles: [`.row { gap: 8px; align-items: center; } .ok-line { color: var(--green, #1a7f4b); margin-top: 8px; } .disabled { opacity: .6; pointer-events: none; }`],
 })
 export class MarketingConsentComponent {
-  @Input() set patient(p: any) { this._p = p; this.state = p?.marketingConsent ?? null; this.at = p?.marketingConsentAt ?? null; }
+  @Input() set patient(p: any) { this._p = p; this.state = p?.marketingConsent ?? null; this.at = p?.marketingConsentAt ?? null; this.loadSigned(); }
   get patient() { return this._p; }
   private _p: any;
   private api = inject(Api);
@@ -46,6 +48,9 @@ export class MarketingConsentComponent {
   state: boolean | null = null;
   at: string | null = null;
   channel = 'PRESENCIAL';
+  uploading = false;
+  signedAt: string | null = null;
+  private static TITLE = 'Constancia de promociones firmada';
   legal = false;
   set(accepted: boolean) {
     this.api.setMarketingConsent(this._p.id, accepted, this.channel).subscribe({
@@ -61,7 +66,6 @@ export class MarketingConsentComponent {
     if (!p) return;
     const w = openPrintWindow();
     if (!w) { this.toast.error('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.'); return; }
-    const via: Record<string, string> = { PRESENCIAL: 'En la clínica', TELEFONO: 'Por teléfono', WHATSAPP: 'Por WhatsApp' };
     const today = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
     const name = esc(p.fullName || `${p.firstName ?? ''} ${p.lastName ?? ''}`);
     this.api.legal('PUBLICIDAD').subscribe({
@@ -79,12 +83,35 @@ export class MarketingConsentComponent {
 <h2>2. Texto informado al paciente</h2>${paragraphs(doc.body)}
 <h2>3. Decisión del paciente</h2>
 <table><tr><td class="k">Marque una opción</td><td>☐ Sí acepto recibir promociones, campañas y saludos &nbsp;&nbsp; ☐ No acepto</td></tr>
-<tr><td class="k">Medio por el que respondió</td><td>${esc(via[this.channel] || this.channel)}</td></tr></table>
+</table>
 <p>Esta autorización es voluntaria: no aceptarla no afecta la atención ni los avisos de citas. Puede retirarla en cualquier momento respondiendo BAJA o en recepción.</p>
 <p>${CLINIC.city}, ${today}.</p>
 <div class="firmas"><div class="f">Firma del paciente o representante<br>${name}<br>${esc(p.docType)} ${esc(p.docNumber)}</div><div class="f">Firma y sello de la clínica<br>Recibido por</div></div>`,
       }),
       error: () => { w.close(); this.toast.error('No se pudo cargar el texto vigente.'); },
+    });
+  }
+
+  private loadSigned() {
+    this.signedAt = null;
+    if (!this._p?.id) return;
+    this.api.patientFiles(this._p.id).subscribe({
+      next: (fs: any[]) => { const f = fs.find((x) => x.title === MarketingConsentComponent.TITLE); this.signedAt = f ? (f.createdAt || f.uploadedAt || null) : null; },
+      error: () => {},
+    });
+  }
+
+  /** Adjunta a la ficha la constancia firmada (queda en Archivos como consentimiento). */
+  upload(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this._p) return;
+    if (file.size > 10 * 1024 * 1024) { this.toast.error('El archivo supera 10 MB.'); return; }
+    this.uploading = true;
+    this.api.uploadFile(this._p.id, file, file.name, { kind: 'CONSENTIMIENTO', title: MarketingConsentComponent.TITLE }).subscribe({
+      next: (f: any) => { this.uploading = false; this.signedAt = f?.createdAt || new Date().toISOString(); this.toast.ok('Constancia firmada adjuntada a la ficha.'); },
+      error: (e) => { this.uploading = false; this.toast.error(apiError(e).message); },
     });
   }
 }
