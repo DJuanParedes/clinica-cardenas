@@ -6,6 +6,7 @@ import { ToastService } from '../../core/toast.service';
 import { apiError, dateTime } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 interface Vital {
   id: number; takenAt: string; systolic?: number; diastolic?: number; heartRate?: number; respRate?: number; temperature?: number;
   spo2?: number; weight?: number; height?: number; glucose?: number; notes?: string; createdBy: string; flags: string[]; bmi?: number;
@@ -15,7 +16,7 @@ interface Vital {
 @Component({
   selector: 'app-vitals-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <section class="panel">
       <div class="panel-head"><h3>Registrar signos vitales</h3><span class="muted small">Llena solo lo que mediste</span></div>
@@ -23,20 +24,20 @@ interface Vital {
         <div class="vgrid">
           <div class="field pa">
             <label>Presión arterial <span class="muted">(mmHg)</span></label>
-            <div class="row"><input class="input tabular" name="sys" type="number" [(ngModel)]="f.systolic" placeholder="120" [class.invalid]="e['systolic']" />
-              <span>/</span><input class="input tabular" name="dia" type="number" [(ngModel)]="f.diastolic" placeholder="80" [class.invalid]="e['diastolic']" /></div>
+            <div class="row"><input class="input tabular" name="sys" type="number" [(ngModel)]="f.systolic" placeholder="120" [class.invalid]="e['systolic']" appOnly="int" />
+              <span>/</span><input class="input tabular" name="dia" type="number" [(ngModel)]="f.diastolic" placeholder="80" [class.invalid]="e['diastolic']" appOnly="int" /></div>
             @if (e['systolic'] || e['diastolic']) { <span class="err">{{ e['systolic'] || e['diastolic'] }}</span> }
           </div>
           @for (x of fields; track x.k) {
             <div class="field">
               <label [for]="'v-' + x.k">{{ x.label }} <span class="muted">({{ x.unit }})</span></label>
-              <input class="input tabular" [id]="'v-' + x.k" [name]="x.k" type="number" [step]="x.step || 1" [(ngModel)]="f[x.k]" [placeholder]="x.ph" [class.invalid]="e[x.k]" />
+              <input class="input tabular" [id]="'v-' + x.k" [name]="x.k" type="number" [step]="x.step || 1" [(ngModel)]="f[x.k]" appOnly="decimal" [maxInt]="3" [placeholder]="x.ph" [class.invalid]="e[x.k]" />
               @if (e[x.k]) { <span class="err">{{ e[x.k] }}</span> }
             </div>
           }
           <div class="field wide">
             <label for="v-notes">Observación</label>
-            <input class="input" id="v-notes" name="notes" [(ngModel)]="f.notes" maxlength="250" placeholder="Ej.: tomó su antihipertensivo hoy" />
+            <input class="input" id="v-notes" name="notes" [(ngModel)]="f.notes" maxlength="250" placeholder="Ej.: tomó su antihipertensivo hoy" appOnly="text" />
           </div>
         </div>
         <div class="row end"><button class="btn primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando…' : 'Guardar' }}</button></div>

@@ -11,6 +11,7 @@ import { IconComponent } from '../shared/icon.component';
 import { categoryColor } from '../core/categories';
 import { ModalComponent } from '../shared/modal.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 const SLOT_PX = 30;     // alto de 15 minutos
 const MIN_PER_SLOT = 15;
 
@@ -20,7 +21,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
 @Component({
   selector: 'app-agenda',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent],
   template: `
     <div class="page wide">
       <div class="page-head">
@@ -219,7 +220,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
             @if (cancelling) {
               <div class="field">
                 <label for="cr">Motivo de la cancelación</label>
-                <input id="cr" class="input" [(ngModel)]="reason" placeholder="Ej. paciente avisó por teléfono" />
+                <input id="cr" class="input" [(ngModel)]="reason" placeholder="Ej. paciente avisó por teléfono" appOnly="text" maxlength="200" />
                 <div class="row" style="justify-content: flex-end; margin-top: 6px">
                   <button type="button" class="btn sm" (click)="cancelling = false">Volver</button>
                   <button type="button" class="btn sm danger" (click)="change('CANCELADA')" [disabled]="!reason.trim() || busy">Cancelar cita</button>

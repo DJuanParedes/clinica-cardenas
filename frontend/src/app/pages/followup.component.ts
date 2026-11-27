@@ -12,6 +12,7 @@ import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 type Tab = 'reprogramar' | 'espera' | 'controles' | 'satisfaccion';
 const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODONCIA: 'Control de ortodoncia', CONTROL: 'Control preventivo' };
 
@@ -19,7 +20,7 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
 @Component({
   selector: 'app-followup',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent, TableSearchComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <header class="page-head">
@@ -141,14 +142,14 @@ const RECALL: Record<string, string> = { LIMPIEZA: 'Limpieza (6 meses)', ORTODON
     <app-modal [open]="addOpen" title="Agregar a la lista de espera" (close)="addOpen = false">
       <div class="stack">
         <div class="field"><label>Paciente</label><app-patient-picker [value]="newPatient" (valueChange)="newPatient = $event" /></div>
-        <div class="field"><label for="wr">Motivo</label><input id="wr" class="input" [(ngModel)]="newReason" maxlength="200" placeholder="Limpieza, evaluación, dolor…" /></div>
+        <div class="field"><label for="wr">Motivo</label><input id="wr" class="input" [(ngModel)]="newReason" maxlength="200" placeholder="Limpieza, evaluación, dolor…" appOnly="text" /></div>
         <div class="grid two">
           <div class="field"><label for="wd">Odontólogo</label>
             <select id="wd" class="input" [(ngModel)]="newDentist">
               <option [ngValue]="null">Cualquiera</option>
               @for (d of dentists; track d.id) { <option [ngValue]="d.id">{{ d.fullName }}</option> }
             </select></div>
-          <div class="field"><label for="wp">Preferencia</label><input id="wp" class="input" [(ngModel)]="newPref" maxlength="200" placeholder="Mañanas, sábados…" /></div>
+          <div class="field"><label for="wp">Preferencia</label><input id="wp" class="input" [(ngModel)]="newPref" maxlength="200" placeholder="Mañanas, sábados…" appOnly="text" /></div>
         </div>
       </div>
       <ng-container modal-actions>

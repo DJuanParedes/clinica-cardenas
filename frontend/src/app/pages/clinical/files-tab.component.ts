@@ -7,6 +7,7 @@ import { FILE_KIND, apiError, dateTime, fileSize, saveBlob } from '../../core/fo
 import { IconComponent } from '../../shared/icon.component';
 import { ModalComponent } from '../../shared/modal.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 const TEMPLATES: Record<string, { title: string; body: string }> = {
   CONSENTIMIENTO: {
     title: 'Consentimiento informado',
@@ -22,7 +23,7 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
 @Component({
   selector: 'app-files-tab',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent, ModalComponent],
   template: `
     <div class="spread head">
       <p class="muted small">{{ files.length }} {{ files.length === 1 ? 'archivo' : 'archivos' }} · los marcados como compartidos aparecen en la app del paciente.</p>
@@ -84,11 +85,11 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
             </select>
           </div>
           <div class="field"><label for="ft">Pieza (opcional)</label>
-            <input id="ft" class="input" name="tooth" type="number" min="11" max="85" [(ngModel)]="meta.tooth" placeholder="Ej. 36" />
+            <input id="ft" class="input" name="tooth" type="number" min="11" max="85" [(ngModel)]="meta.tooth" placeholder="Ej. 36" appOnly="digits" />
           </div>
         </div>
-        <div class="field"><label for="fti">Título</label><input id="fti" class="input" name="title" [(ngModel)]="meta.title" maxlength="150" /></div>
-        <div class="field"><label for="fn">Nota</label><textarea id="fn" class="input" rows="2" name="note" [(ngModel)]="meta.note" maxlength="500"></textarea></div>
+        <div class="field"><label for="fti">Título</label><input id="fti" class="input" name="title" [(ngModel)]="meta.title" maxlength="150" appOnly="text" /></div>
+        <div class="field"><label for="fn">Nota</label><textarea id="fn" class="input" rows="2" name="note" [(ngModel)]="meta.note" maxlength="500" appOnly="text"></textarea></div>
         <label class="check"><input type="checkbox" name="share" [(ngModel)]="meta.share" /> Compartir con el paciente en su app</label>
       </form>
       <ng-container modal-actions>
@@ -103,9 +104,9 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
         <div class="seg">
           @for (k of docKinds; track k) { <button type="button" [class.on]="doc.kind === k" (click)="setDocKind(k)">{{ kindLabel(k) }}</button> }
         </div>
-        <div class="field"><label for="dt">Título</label><input id="dt" class="input" [(ngModel)]="doc.title" maxlength="150" /></div>
-        <div class="field"><label for="db">Contenido</label><textarea id="db" class="input" rows="8" [(ngModel)]="doc.body"></textarea></div>
-        <div class="field"><label for="ds">Nombre de quien firma</label><input id="ds" class="input" [(ngModel)]="doc.signerName" maxlength="120" /></div>
+        <div class="field"><label for="dt">Título</label><input id="dt" class="input" [(ngModel)]="doc.title" maxlength="150" appOnly="text" /></div>
+        <div class="field"><label for="db">Contenido</label><textarea id="db" class="input" rows="8" [(ngModel)]="doc.body" appOnly="text" maxlength="5000"></textarea></div>
+        <div class="field"><label for="ds">Nombre de quien firma</label><input id="ds" class="input" [(ngModel)]="doc.signerName" maxlength="120" appOnly="letters" /></div>
         <div class="field">
           <div class="spread"><label>Firma {{ doc.kind === 'CONSENTIMIENTO' ? '(obligatoria)' : '(opcional)' }}</label>
             <button type="button" class="btn ghost sm" (click)="clearPad()">Borrar firma</button></div>

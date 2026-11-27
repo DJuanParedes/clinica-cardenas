@@ -6,11 +6,12 @@ import { ToastService } from '../core/toast.service';
 import { ModalComponent } from './modal.component';
 import { PatientPickerComponent } from './patient-picker.component';
 
+import { OnlyDirective } from './only.directive';
 /** v2.7: crear o editar una tarea (llamar, cobrar, recordar…) con responsable y fecha. */
 @Component({
   selector: 'app-task-form',
   standalone: true,
-  imports: [FormsModule, ModalComponent, PatientPickerComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent, PatientPickerComponent],
   template: `
     <app-modal [open]="open" [title]="task ? 'Editar tarea' : 'Nueva tarea'" [subtitle]="subtitle" [width]="560" (close)="close.emit()">
       <form class="grid" (ngSubmit)="save()" id="taskForm">
@@ -22,7 +23,7 @@ import { PatientPickerComponent } from './patient-picker.component';
           @if (e['kind']) { <span class="err">{{ e['kind'] }}</span> }
         </div>
         <div class="field"><label class="req" for="tt">Qué hay que hacer</label>
-          <input id="tt" name="tt" class="input" [(ngModel)]="f.title" maxlength="150" [class.invalid]="e['title']" placeholder="Ej.: Llamar para agendar su control" />
+          <input id="tt" name="tt" class="input" [(ngModel)]="f.title" maxlength="150" [class.invalid]="e['title']" placeholder="Ej.: Llamar para agendar su control" appOnly="text" />
           @if (e['title']) { <span class="err">{{ e['title'] }}</span> }
         </div>
         <div class="cols-3">
@@ -38,7 +39,7 @@ import { PatientPickerComponent } from './patient-picker.component';
           </select>
           @if (e['assigneeId']) { <span class="err">{{ e['assigneeId'] }}</span> }
         </div>
-        <div class="field"><label for="tn">Notas (opcional)</label><textarea id="tn" name="tn" class="input" rows="2" [(ngModel)]="f.notes" maxlength="1000"></textarea></div>
+        <div class="field"><label for="tn">Notas (opcional)</label><textarea id="tn" name="tn" class="input" rows="2" [(ngModel)]="f.notes" maxlength="1000" appOnly="text"></textarea></div>
         @if (error) { <div class="err">{{ error }}</div> }
       </form>
       <div modal-actions>

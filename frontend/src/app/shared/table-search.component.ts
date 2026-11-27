@@ -2,15 +2,16 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IconComponent } from './icon.component';
 
+import { OnlyDirective } from './only.directive';
 /** Caja de búsqueda estándar sobre una tabla (filtra en el navegador, sin recargar). */
 @Component({
   selector: 'app-table-search',
   standalone: true,
-  imports: [FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent],
   template: `
     <div class="ts">
       <app-icon name="search" [size]="16" />
-      <input class="input" type="search" [ngModel]="q" (ngModelChange)="q = $event; qChange.emit($event)" [placeholder]="placeholder" [attr.aria-label]="placeholder" />
+      <input class="input" type="search" [ngModel]="q" (ngModelChange)="q = $event; qChange.emit($event)" [placeholder]="placeholder" [attr.aria-label]="placeholder" appOnly="search" maxlength="100" />
       @if (total != null) { <span class="muted small">{{ shown }} de {{ total }}</span> }
     </div>
   `,

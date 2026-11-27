@@ -8,11 +8,12 @@ import { Page, Patient } from '../core/models';
 import { hhmm, initials, parseLocal, shortDate, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** HU-02: búsqueda por documento (exacta / prefijo) o por nombre (parcial). */
 @Component({
   selector: 'app-patients',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -28,7 +29,7 @@ import { IconComponent } from '../shared/icon.component';
       <div class="search-box">
         <app-icon class="ico" name="search" [size]="20" />
         <input class="input" [(ngModel)]="q" (ngModelChange)="search$.next($event)" placeholder="Ej. 45872196 o Quispe Huamán"
-               aria-label="Buscar paciente" autofocus />
+               aria-label="Buscar paciente" autofocus appOnly="search" maxlength="100" />
       </div>
       <div class="filters row wrap">
         <select class="input" aria-label="Filtrar por fuente de captación" [(ngModel)]="source" (ngModelChange)="go(0)">

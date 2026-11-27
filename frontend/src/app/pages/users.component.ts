@@ -10,6 +10,7 @@ import { apiError, dateTime, initials } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 const ROLE_TONE: Record<string, string> = { ADMIN: 'gum', RECEPCION: 'teal', ODONTOLOGO: 'blue', CAJA: 'amber', DIRECTOR: 'grey' };
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -25,7 +26,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, RouterLink],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, RouterLink],
   template: `
     <div class="page">
       <div class="page-head">
@@ -39,7 +40,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
       <div class="layout">
         <section class="panel">
           <div class="panel-head spread">
-            <input class="input search" type="search" [(ngModel)]="q" placeholder="Buscar por nombre, usuario, correo o puesto" aria-label="Buscar personal" />
+            <input class="input search" type="search" [(ngModel)]="q" placeholder="Buscar por nombre, usuario, correo o puesto" aria-label="Buscar personal" appOnly="search" maxlength="100" />
             <span class="muted small">{{ shown.length }} de {{ users.length }}</span>
           </div>
           <table class="table">
@@ -115,17 +116,17 @@ const PERMISSIONS: { role: string; can: string }[] = [
       <form class="grid cols-2" (ngSubmit)="save()" autocomplete="off">
         <div class="field span-2">
           <label class="req" for="fn">Nombres y apellidos</label>
-          <input id="fn" name="fn" class="input" [class.invalid]="e['fullName']" [(ngModel)]="f.fullName" />
+          <input id="fn" name="fn" class="input" [class.invalid]="e['fullName']" [(ngModel)]="f.fullName" appOnly="letters" maxlength="120" />
           @if (e['fullName']) { <span class="err">{{ e['fullName'] }}</span> }
         </div>
         <div class="field">
           <label class="req" for="un">Usuario</label>
-          <input id="un" name="un" class="input" [class.invalid]="e['username']" [(ngModel)]="f.username" [disabled]="!!editing" autocapitalize="none" />
+          <input id="un" name="un" class="input" [class.invalid]="e['username']" [(ngModel)]="f.username" [disabled]="!!editing" autocapitalize="none" appOnly="username" maxlength="40" />
           @if (e['username']) { <span class="err">{{ e['username'] }}</span> }
         </div>
         <div class="field">
           <label class="req" for="em">Correo</label>
-          <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" />
+          <input id="em" name="em" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" appOnly="email" maxlength="120" />
           @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
         </div>
         <div class="field span-2">
@@ -153,26 +154,26 @@ const PERMISSIONS: { role: string; can: string }[] = [
         </div>
         <div class="field">
           <label for="ph">Celular</label>
-          <input id="ph" name="ph" class="input" [class.invalid]="e['phone']" [(ngModel)]="f.phone" maxlength="9" inputmode="numeric" placeholder="9XXXXXXXX" />
+          <input id="ph" name="ph" class="input" [class.invalid]="e['phone']" [(ngModel)]="f.phone" maxlength="9" inputmode="numeric" placeholder="9XXXXXXXX" appOnly="phone" />
           @if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }
         </div>
         @if (!editing) {
           <div class="field">
             <label class="req" for="pw">Contraseña inicial</label>
-            <input id="pw" name="pw" class="input" [class.invalid]="e['password']" [(ngModel)]="f.password" autocomplete="new-password" />
+            <input id="pw" name="pw" class="input" [class.invalid]="e['password']" [(ngModel)]="f.password" autocomplete="new-password" appOnly="nospace" maxlength="72" />
             @if (e['password']) { <span class="err">{{ e['password'] }}</span> } @else { <span class="hint">Mínimo 8 caracteres, una letra y un número.</span> }
           </div>
         } @else { <div></div> }
         @if (f.role === 'ODONTOLOGO') {
           <div class="field">
             <label class="req" for="sp">Especialidad</label>
-            <input id="sp" name="sp" class="input" [class.invalid]="e['specialty']" [(ngModel)]="f.specialty" list="specs" />
+            <input id="sp" name="sp" class="input" [class.invalid]="e['specialty']" [(ngModel)]="f.specialty" list="specs" appOnly="letters" maxlength="80" />
             <datalist id="specs"><option value="Odontología general"></option><option value="Ortodoncia"></option><option value="Endodoncia"></option><option value="Periodoncia"></option><option value="Rehabilitación oral"></option><option value="Odontopediatría"></option><option value="Cirugía bucal"></option></datalist>
             @if (e['specialty']) { <span class="err">{{ e['specialty'] }}</span> }
           </div>
           <div class="field">
             <label for="cop">Colegiatura (COP)</label>
-            <input id="cop" name="cop" class="input" [(ngModel)]="f.cop" />
+            <input id="cop" name="cop" class="input" [(ngModel)]="f.cop" appOnly="digits" maxlength="6" inputmode="numeric" />
           </div>
         }
       </form>
@@ -200,7 +201,7 @@ const PERMISSIONS: { role: string; can: string }[] = [
           <div class="dz-row">
             <div><div class="strong small">Contraseña temporal</div><div class="muted small">Desbloquea la cuenta y reemplaza la contraseña.</div></div>
             <div class="row">
-              <input class="input pwi" [(ngModel)]="tempPassword" placeholder="Nueva contraseña" aria-label="Contraseña temporal" />
+              <input class="input pwi" [(ngModel)]="tempPassword" placeholder="Nueva contraseña" aria-label="Contraseña temporal" appOnly="nospace" maxlength="72" />
               <button class="btn sm" type="button" (click)="setPassword()" [disabled]="tempPassword.length < 8">Asignar</button>
             </div>
           </div>

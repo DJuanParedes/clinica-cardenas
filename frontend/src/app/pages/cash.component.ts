@@ -11,11 +11,12 @@ import { PagerComponent, filterRows, pageOf } from '../shared/pager.component';
 import { TableSearchComponent } from '../shared/table-search.component';
 import { ModalComponent } from '../shared/modal.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** Caja del día: cobros (HU-13) y egresos (HU-15) del turno. */
 @Component({
   selector: 'app-cash',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, RouterLink, IconComponent, ModalComponent, PagerComponent, TableSearchComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -128,12 +129,12 @@ import { ModalComponent } from '../shared/modal.component';
         </div>
         <div class="field span-2">
           <label class="req" for="eco">Concepto</label>
-          <input id="eco" name="eco" class="input" [class.invalid]="e['concept']" [(ngModel)]="x.concept" placeholder="Ej. compra de anestésicos y guantes" />
+          <input id="eco" name="eco" class="input" [class.invalid]="e['concept']" [(ngModel)]="x.concept" placeholder="Ej. compra de anestésicos y guantes" appOnly="text" maxlength="200" />
           @if (e['concept']) { <span class="err">{{ e['concept'] }}</span> }
         </div>
         <div class="field">
           <label class="req" for="ea">Importe (S/)</label>
-          <input id="ea" name="ea" type="number" min="0" step="0.01" class="input tabular" [class.invalid]="e['amount']" [(ngModel)]="x.amount" />
+          <input id="ea" name="ea" type="number" min="0" step="0.01" class="input tabular" [class.invalid]="e['amount']" [(ngModel)]="x.amount" appOnly="decimal" />
           @if (e['amount']) { <span class="err">{{ e['amount'] }}</span> }
         </div>
         <div class="field">
@@ -145,11 +146,11 @@ import { ModalComponent } from '../shared/modal.component';
         </div>
         <div class="field">
           <label for="es">Proveedor</label>
-          <input id="es" name="es" class="input" [(ngModel)]="x.supplier" />
+          <input id="es" name="es" class="input" [(ngModel)]="x.supplier" appOnly="text" maxlength="200" />
         </div>
         <div class="field">
           <label for="er">N.° de comprobante u operación</label>
-          <input id="er" name="er" class="input" [(ngModel)]="x.reference" />
+          <input id="er" name="er" class="input" [(ngModel)]="x.reference" appOnly="text" maxlength="200" />
         </div>
       </form>
       <ng-container modal-actions>
@@ -161,7 +162,7 @@ import { ModalComponent } from '../shared/modal.component';
     <app-modal [open]="!!voiding" title="Anular movimiento" [subtitle]="voiding ? voiding.concept + ' · ' + money(voiding.amount) : ''" (close)="voiding = null">
       <div class="field">
         <label class="req" for="vr">Motivo de la anulación</label>
-        <input id="vr" class="input" [(ngModel)]="voidReason" placeholder="Ej. se registró dos veces" />
+        <input id="vr" class="input" [(ngModel)]="voidReason" placeholder="Ej. se registró dos veces" appOnly="text" maxlength="200" />
         <span class="hint">El movimiento queda en el historial como anulado y no se suma en caja.</span>
       </div>
       <ng-container modal-actions>

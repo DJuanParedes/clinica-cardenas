@@ -5,11 +5,12 @@ import { apiError, longDay } from '../core/format';
 import { LogoComponent } from '../shared/logo.component';
 import { PUBLIC_STYLES } from './public-styles';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.6: encuesta de satisfacción desde el enlace del mensaje (sin iniciar sesión). */
 @Component({
   selector: 'app-public-survey',
   standalone: true,
-  imports: [FormsModule, LogoComponent],
+  imports: [OnlyDirective, FormsModule, LogoComponent],
   template: `
     <header class="top"><app-logo [size]="44" /><div><div class="name">{{ s?.clinic || 'Clínica Dental' }}</div></div></header>
     <main>
@@ -24,7 +25,7 @@ import { PUBLIC_STYLES } from './public-styles';
             @for (n of [1,2,3,4,5]; track n) { <button type="button" [class.on]="score >= n" (click)="score = n" [attr.aria-label]="n + ' estrellas'">★</button> }
           </div>
           <p class="center muted">{{ ['', 'Muy mala', 'Mala', 'Regular', 'Buena', '¡Excelente!'][score] }}</p>
-          <textarea class="input" rows="3" [(ngModel)]="comment" maxlength="500" placeholder="¿Algo que quieras contarnos? (opcional)" aria-label="Comentario"></textarea>
+          <textarea class="input" rows="3" [(ngModel)]="comment" maxlength="500" placeholder="¿Algo que quieras contarnos? (opcional)" aria-label="Comentario" appOnly="text"></textarea>
           @if (error) { <div class="err">{{ error }}</div> }
           <button class="btn primary block" type="button" [disabled]="!score || busy" (click)="send()">Enviar calificación</button>
         </div>

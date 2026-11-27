@@ -8,6 +8,7 @@ import { ToastService } from '../core/toast.service';
 import { DOC_TYPES, apiError, dateTime, isoDate } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 interface Form {
   docType: string; docNumber: string; firstName: string; lastName: string; birthDate: string; sex: string;
   phone: string; email: string; address: string; district: string; ubigeo: string;
@@ -19,7 +20,7 @@ interface Form {
 @Component({
   selector: 'app-patient-form',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, LegalModalComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, LegalModalComponent],
   template: `
     <div class="page narrow">
       <a class="back" [routerLink]="id ? ['/pacientes', id] : '/pacientes'"><app-icon name="chevronLeft" [size]="16" /> {{ id ? 'Volver a la ficha' : 'Pacientes' }}</a>
@@ -48,7 +49,7 @@ interface Form {
           <div class="panel-body grid cols-3">
             <div class="field">
               <label class="req" for="dt">Tipo de documento</label>
-              <select id="dt" name="docType" class="input" [(ngModel)]="f.docType" (ngModelChange)="checkDoc()" [disabled]="!!id">
+              <select id="dt" name="docType" class="input" [(ngModel)]="f.docType" (ngModelChange)="f.docNumber = cleanDoc(f.docType, f.docNumber); checkDoc()" [disabled]="!!id">
                 @for (d of docTypes; track d.code) { <option [value]="d.code">{{ d.label }}</option> }
               </select>
             </div>
@@ -56,7 +57,8 @@ interface Form {
               <label class="req" for="dn">Número de documento</label>
               <input id="dn" name="docNumber" class="input tabular" [class.invalid]="e['docNumber']" [(ngModel)]="f.docNumber"
                      (ngModelChange)="checkDoc()" [disabled]="!!id" [attr.maxlength]="f.docType === 'DNI' ? 8 : 12"
-                     [attr.inputmode]="f.docType === 'DNI' ? 'numeric' : 'text'" autocomplete="off" />
+                     [attr.inputmode]="f.docType === 'DNI' ? 'numeric' : 'text'" autocomplete="off"
+                     [appOnly]="f.docType === 'DNI' ? 'digits' : 'alnum'" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }
               @else if (id) { <span class="hint">El documento no se modifica después del registro.</span> }
               @else if (f.docType === 'DNI') {
@@ -72,12 +74,12 @@ interface Form {
             </div>
             <div class="field">
               <label class="req" for="fn">Nombres</label>
-              <input id="fn" name="firstName" class="input" [class.invalid]="e['firstName']" [(ngModel)]="f.firstName" autocomplete="off" />
+              <input id="fn" name="firstName" class="input" [class.invalid]="e['firstName']" [(ngModel)]="f.firstName" autocomplete="off" appOnly="letters" maxlength="80" />
               @if (e['firstName']) { <span class="err">{{ e['firstName'] }}</span> }
             </div>
             <div class="field span-2">
               <label class="req" for="ln">Apellidos</label>
-              <input id="ln" name="lastName" class="input" [class.invalid]="e['lastName']" [(ngModel)]="f.lastName" autocomplete="off" />
+              <input id="ln" name="lastName" class="input" [class.invalid]="e['lastName']" [(ngModel)]="f.lastName" autocomplete="off" appOnly="letters" maxlength="80" />
               @if (e['lastName']) { <span class="err">{{ e['lastName'] }}</span> }
             </div>
             <div class="field">
@@ -102,17 +104,17 @@ interface Form {
           <div class="panel-body grid cols-3">
             <div class="field">
               <label class="req" for="ph">Celular o teléfono</label>
-              <input id="ph" name="phone" class="input tabular" [class.invalid]="e['phone']" [(ngModel)]="f.phone" inputmode="tel" placeholder="987 654 321" />
+              <input id="ph" name="phone" class="input tabular" [class.invalid]="e['phone']" [(ngModel)]="f.phone" inputmode="tel" placeholder="987 654 321" appOnly="phone" maxlength="13" />
               @if (e['phone']) { <span class="err">{{ e['phone'] }}</span> }
             </div>
             <div class="field span-2">
               <label for="em">Correo electrónico</label>
-              <input id="em" name="email" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" placeholder="Para recordatorios de cita" />
+              <input id="em" name="email" type="email" class="input" [class.invalid]="e['email']" [(ngModel)]="f.email" placeholder="Para recordatorios de cita" appOnly="email" maxlength="120" />
               @if (e['email']) { <span class="err">{{ e['email'] }}</span> }
             </div>
             <div class="field span-2">
               <label for="ad">Dirección</label>
-              <input id="ad" name="address" class="input" [(ngModel)]="f.address" />
+              <input id="ad" name="address" class="input" [(ngModel)]="f.address" appOnly="text" maxlength="200" />
             </div>
             <div class="field">
               <label for="dep">Departamento</label>
@@ -155,24 +157,24 @@ interface Form {
               </div>
               <div class="field span-2">
                 <label class="req" for="gname">Nombres y apellidos</label>
-                <input id="gname" name="gname" class="input" [class.invalid]="e['guardianName']" [(ngModel)]="f.guardianName" />
+                <input id="gname" name="gname" class="input" [class.invalid]="e['guardianName']" [(ngModel)]="f.guardianName" appOnly="letters" maxlength="120" />
                 @if (e['guardianName']) { <span class="err">{{ e['guardianName'] }}</span> }
               </div>
               <div class="field">
                 <label class="req" for="gdt">Documento</label>
-                <select id="gdt" name="gdt" class="input" [(ngModel)]="f.guardianDocType">
+                <select id="gdt" name="gdt" class="input" [(ngModel)]="f.guardianDocType" (ngModelChange)="f.guardianDocNumber = cleanDoc(f.guardianDocType, f.guardianDocNumber)">
                   @for (d of docTypes; track d.code) { <option [value]="d.code">{{ d.label }}</option> }
                 </select>
               </div>
               <div class="field">
                 <label class="req" for="gdn">Número</label>
-                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" />
+                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" [appOnly]="f.guardianDocType === 'DNI' ? 'digits' : 'alnum'" />
                 @if (guardianInfo && !e['guardianDocNumber']) { <span class="hint reniec" [class.ok]="guardianInfo.startsWith('✓')">{{ guardianInfo }}</span> }
                 @if (e['guardianDocNumber']) { <span class="err">{{ e['guardianDocNumber'] }}</span> }
               </div>
               <div class="field">
                 <label class="req" for="gph">Celular</label>
-                <input id="gph" name="gph" class="input tabular" [class.invalid]="e['guardianPhone']" [(ngModel)]="f.guardianPhone" inputmode="tel" />
+                <input id="gph" name="gph" class="input tabular" [class.invalid]="e['guardianPhone']" [(ngModel)]="f.guardianPhone" inputmode="tel" appOnly="phone" maxlength="13" />
                 @if (e['guardianPhone']) { <span class="err">{{ e['guardianPhone'] }}</span> }
               </div>
             </div>
@@ -185,7 +187,7 @@ interface Form {
             @if (!minor) {
               <div class="field">
                 <label for="ecn">Contacto de emergencia</label>
-                <input id="ecn" name="ecn" class="input" [(ngModel)]="f.emergencyContactName" placeholder="Nombre completo" />
+                <input id="ecn" name="ecn" class="input" [(ngModel)]="f.emergencyContactName" placeholder="Nombre completo" appOnly="letters" maxlength="120" />
               </div>
               <div class="field">
                 <label for="ecr">Parentesco o relación</label>
@@ -196,7 +198,7 @@ interface Form {
               </div>
               <div class="field">
                 <label for="ecp">Teléfono del contacto</label>
-                <input id="ecp" name="ecp" class="input tabular" [class.invalid]="e['emergencyContactPhone']" [(ngModel)]="f.emergencyContactPhone" inputmode="tel" />
+                <input id="ecp" name="ecp" class="input tabular" [class.invalid]="e['emergencyContactPhone']" [(ngModel)]="f.emergencyContactPhone" inputmode="tel" appOnly="phone" maxlength="13" />
                 @if (e['emergencyContactPhone']) { <span class="err">{{ e['emergencyContactPhone'] }}</span> }
               </div>
               <p class="span-all muted small">Persona a quien avisar si el paciente sufre una complicación durante la atención. Es opcional para adultos.</p>
@@ -212,13 +214,13 @@ interface Form {
               <div class="field">
                 @if (source) {
                   <label for="srcd">{{ source === 'RECOMENDACION' ? '¿Quién lo recomendó?' : 'Detalle (opcional)' }}</label>
-                  <input id="srcd" name="sourceDetail" class="input" [(ngModel)]="sourceDetail" maxlength="120" />
+                  <input id="srcd" name="sourceDetail" class="input" [(ngModel)]="sourceDetail" maxlength="120" appOnly="text" />
                 }
               </div>
             }
             <div class="field span-all">
               <label for="nt">Notas administrativas</label>
-              <textarea id="nt" name="notes" class="input" [(ngModel)]="f.notes" maxlength="500" placeholder="Preferencias de horario, seguro, referido por…"></textarea>
+              <textarea id="nt" name="notes" class="input" [(ngModel)]="f.notes" maxlength="500" placeholder="Preferencias de horario, seguro, referido por…" appOnly="text"></textarea>
             </div>
             <div class="field span-all">
               <div class="consent" [class.ok]="f.dataConsent" [class.invalid]="e['dataConsent']">
@@ -452,6 +454,12 @@ export class PatientFormComponent implements OnInit {
       this.lastLooked = '';
     }
     this.check$.next();
+  }
+
+  /** Al cambiar el tipo de documento se limpia el número para no dejar letras en un DNI. */
+  cleanDoc(type: string, v: string): string {
+    const n = (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return type === 'DNI' ? n.replace(/\D/g, '').slice(0, 8) : n.slice(0, 12);
   }
 
   private validate(): boolean {

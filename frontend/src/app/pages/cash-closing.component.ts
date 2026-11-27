@@ -7,6 +7,7 @@ import { ToastService } from '../core/toast.service';
 import { apiError, dateTime, isoDate, longDay, saveBlob, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /**
  * v2.10: cuadre y cierre de caja. El sistema calcula lo esperado por medio de pago; el cajero cuenta el efectivo
  * (con ayuda de billetes y monedas) y anota lo que muestran Yape, Plin, el POS y el banco. Con diferencia, se explica.
@@ -14,7 +15,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-cash-closing',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/caja"><app-icon name="chevronLeft" [size]="16" /> Caja del día</a>
@@ -70,7 +71,7 @@ import { IconComponent } from '../shared/icon.component';
             @if (c.notes) { <p class="small"><b>Observaciones:</b> {{ c.notes }}</p> }
             @if (reopenOpen) {
               <div class="reopen">
-                <label>Motivo de la reapertura<input class="input" [(ngModel)]="reopenReason" placeholder="Ej.: faltó registrar un cobro en efectivo" /></label>
+                <label>Motivo de la reapertura<input class="input" [(ngModel)]="reopenReason" placeholder="Ej.: faltó registrar un cobro en efectivo" appOnly="text" maxlength="200" /></label>
                 <button class="btn" type="button" (click)="reopen()">Reabrir caja</button>
               </div>
             }
@@ -85,7 +86,7 @@ import { IconComponent } from '../shared/icon.component';
             <div class="panel-head"><h3><span class="n">1</span> Efectivo</h3></div>
             <div class="panel-body stack">
               <div class="grid cols-2">
-                <label class="field">Fondo inicial (sencillo con que se abrió)<input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="openingFloat" /></label>
+                <label class="field">Fondo inicial (sencillo con que se abrió)<input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="openingFloat" appOnly="decimal" /></label>
                 <div class="field"><span class="label">Efectivo esperado</span><b class="big tabular">{{ money(expectedCash) }}</b>
                   <span class="muted small">fondo {{ money(openingFloat) }} + cobros {{ money(line('EFECTIVO')?.income) }} − egresos {{ money(line('EFECTIVO')?.outgo) }}</span></div>
               </div>
@@ -94,12 +95,12 @@ import { IconComponent } from '../shared/icon.component';
                 <div class="denoms">
                   @for (d of s.denominations; track d) {
                     <label><span>{{ d >= 10 ? 'Billete' : 'Moneda' }} S/ {{ d }}</span>
-                      <input class="input tabular" type="number" min="0" step="1" [(ngModel)]="den[d]" (ngModelChange)="sumDenoms()" [attr.aria-label]="'Cantidad de S/ ' + d" /></label>
+                      <input class="input tabular" type="number" min="0" step="1" [(ngModel)]="den[d]" (ngModelChange)="sumDenoms()" [attr.aria-label]="'Cantidad de S/ ' + d" appOnly="int" /></label>
                   }
                 </div>
               </details>
               <div class="grid cols-2">
-                <label class="field">Efectivo contado<input class="input tabular big" type="number" min="0" step="0.1" [(ngModel)]="counted" [readonly]="useDenoms && denTotal > 0" />
+                <label class="field">Efectivo contado<input class="input tabular big" type="number" min="0" step="0.1" [(ngModel)]="counted" [readonly]="useDenoms && denTotal > 0" appOnly="decimal" />
                   @if (e['countedCash']) { <span class="err">{{ e['countedCash'] }}</span> }</label>
                 <div class="field"><span class="label">Diferencia en efectivo</span>
                   <b class="big tabular" [class.gum]="cashDiff < 0" [class.green-ink]="cashDiff > 0">{{ counted === null ? '—' : signed(cashDiff) }}</b>
@@ -115,7 +116,7 @@ import { IconComponent } from '../shared/icon.component';
               @for (l of others; track l.method) {
                 <div class="om">
                   <span><b>{{ l.label }}</b><small class="muted">esperado {{ money(l.expected) }}</small></span>
-                  <input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="declared[l.method]" [attr.aria-label]="'Total ' + l.label" />
+                  <input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="declared[l.method]" appOnly="decimal" [attr.aria-label]="'Total ' + l.label" />
                   <span class="tabular" [class.gum]="diffOf(l) < 0" [class.green-ink]="diffOf(l) > 0">{{ signed(diffOf(l)) }}</span>
                 </div>
               }
@@ -131,11 +132,11 @@ import { IconComponent } from '../shared/icon.component';
                 <div><span>Diferencia total</span><b [class.gum]="totalDiff < 0" [class.green-ink]="totalDiff > 0">{{ signed(totalDiff) }}</b></div>
               </div>
               <div class="grid cols-2">
-                <label class="field">Dejar de fondo para mañana<input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="nextFloat" />
+                <label class="field">Dejar de fondo para mañana<input class="input tabular" type="number" min="0" step="0.1" [(ngModel)]="nextFloat" appOnly="decimal" />
                   @if (e['nextFloat']) { <span class="err">{{ e['nextFloat'] }}</span> }
                   <span class="muted small">Se deposita o retira: {{ money(deposit) }}</span></label>
                 <label class="field">Observaciones @if (totalDiff !== 0) { <span class="req-mark">(obligatorio si hay diferencia)</span> }
-                  <input class="input" [(ngModel)]="notes" maxlength="500" placeholder="Ej.: faltan S/ 2.00 de vuelto" />
+                  <input class="input" [(ngModel)]="notes" maxlength="500" placeholder="Ej.: faltan S/ 2.00 de vuelto" appOnly="text" />
                   @if (e['notes']) { <span class="err">{{ e['notes'] }}</span> }</label>
               </div>
               @if (error) { <div class="err">{{ error }}</div> }

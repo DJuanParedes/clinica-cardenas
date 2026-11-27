@@ -6,11 +6,12 @@ import { Invoice, Page } from '../core/models';
 import { INVOICE_LABEL, INVOICE_TONE, shortDate, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** HU-12: consultar comprobantes por número, cliente, estado y fecha. */
 @Component({
   selector: 'app-invoices',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -24,7 +25,7 @@ import { IconComponent } from '../shared/icon.component';
       <form class="filters panel" (ngSubmit)="search(0)">
         <div class="field grow">
           <label for="q">Número, cliente o documento</label>
-          <input id="q" name="q" class="input" [(ngModel)]="q" placeholder="B001-12, RUC, DNI o nombre" />
+          <input id="q" name="q" class="input" [(ngModel)]="q" placeholder="B001-12, RUC, DNI o nombre" appOnly="search" maxlength="100" />
         </div>
         <div class="field">
           <label for="st">Estado</label>

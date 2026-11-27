@@ -61,9 +61,39 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
-        log.warn("Violación de integridad: {}", ex.getMostSpecificCause().getMessage());
+        String cause = String.valueOf(ex.getMostSpecificCause().getMessage());
+        log.warn("Violación de integridad: {}", cause);
+        // Texto más largo que la columna (MySQL: "Data too long for column 'x'") o valor fuera de rango:
+        // es un dato inválido del usuario, no un conflicto; se responde 400 indicando el campo.
+        java.util.regex.Matcher m = TOO_LONG.matcher(cause);
+        if (m.find()) {
+            String field = toCamel(m.group(1));
+            return build(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", req,
+                    Map.of(field, "El texto es demasiado largo para este campo."));
+        }
+        m = OUT_OF_RANGE.matcher(cause);
+        if (m.find()) {
+            String field = toCamel(m.group(1));
+            return build(HttpStatus.BAD_REQUEST, "VALIDACION", "Revisa los campos marcados.", req,
+                    Map.of(field, "El valor está fuera del rango permitido."));
+        }
         return build(HttpStatus.CONFLICT, "CONFLICTO_DATOS",
                 "El registro entra en conflicto con otro ya existente.", req, null);
+    }
+
+    private static final java.util.regex.Pattern TOO_LONG = java.util.regex.Pattern.compile("Data too long for column '([^']+)'");
+    private static final java.util.regex.Pattern OUT_OF_RANGE = java.util.regex.Pattern.compile("Out of range value for column '([^']+)'");
+
+    /** first_name -> firstName, para que el frontend marque la casilla correcta. */
+    static String toCamel(String column) {
+        StringBuilder sb = new StringBuilder();
+        boolean up = false;
+        for (char c : column.toCharArray()) {
+            if (c == '_') { up = true; continue; }
+            sb.append(up ? Character.toUpperCase(c) : c);
+            up = false;
+        }
+        return sb.toString();
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

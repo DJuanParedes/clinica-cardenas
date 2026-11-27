@@ -10,6 +10,7 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 export const REL_LABEL: Record<string, string> = {
   PADRE: 'Padre', MADRE: 'Madre', HIJO: 'Hijo', HIJA: 'Hija', CONYUGE: 'Cónyuge', HERMANO: 'Hermano(a)', ABUELO: 'Abuelo(a)',
   NIETO: 'Nieto(a)', TIO: 'Tío(a)', TUTOR: 'Tutor(a)', OTRO: 'Otro',
@@ -19,7 +20,7 @@ export const REL_LABEL: Record<string, string> = {
 @Component({
   selector: 'app-patient-profile-panels',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, ModalComponent, PatientPickerComponent],
   template: `
     <section class="panel">
       <div class="panel-head">
@@ -46,7 +47,7 @@ export const REL_LABEL: Record<string, string> = {
           <div class="grid cols-2">
             <div class="field">
               <label for="hc">N° de historia clínica</label>
-              <input id="hc" name="hc" class="input tabular" [class.invalid]="e['hcNumber']" [(ngModel)]="d.hcNumber" maxlength="20" />
+              <input id="hc" name="hc" class="input tabular" [class.invalid]="e['hcNumber']" [(ngModel)]="d.hcNumber" maxlength="20" appOnly="text" />
               @if (e['hcNumber']) { <span class="err">{{ e['hcNumber'] }}</span> } @else { <span class="hint">Cámbialo si el paciente ya tenía una ficha en papel.</span> }
             </div>
             <div class="field">
@@ -60,7 +61,7 @@ export const REL_LABEL: Record<string, string> = {
             @if (d.source) {
               <div class="field span2">
                 <label for="srcd">{{ d.source === 'RECOMENDACION' ? '¿Quién lo recomendó?' : 'Detalle (campaña, publicación, empresa…)' }}</label>
-                <input id="srcd" name="srcd" class="input" [(ngModel)]="d.sourceDetail" maxlength="120" />
+                <input id="srcd" name="srcd" class="input" [(ngModel)]="d.sourceDetail" maxlength="120" appOnly="text" />
               </div>
             }
             <div class="field span2">
@@ -68,7 +69,7 @@ export const REL_LABEL: Record<string, string> = {
               <div class="chips">
                 @for (t of d.tags; track t) { <span class="tag teal plain chip">{{ t }} <button type="button" (click)="removeTag(t)" [attr.aria-label]="'Quitar ' + t">×</button></span> }
                 <input id="tg" name="tg" class="input tag-input" [(ngModel)]="newTag" list="tag-list" placeholder="Escribe y presiona Enter"
-                       (keydown.enter)="$event.preventDefault(); addTag()" (blur)="addTag()" maxlength="40" />
+                       (keydown.enter)="$event.preventDefault(); addTag()" (blur)="addTag()" maxlength="40" appOnly="text" />
                 <datalist id="tag-list">@for (t of options?.tags || []; track t.tag) { <option [value]="t.tag">{{ t.patients }} pacientes</option> }</datalist>
               </div>
               @if (e['tags']) { <span class="err">{{ e['tags'] }}</span> } @else { <span class="hint">Ej.: VIP, Ortodoncia, Convenio ABC, Paga en cuotas. Sirven para filtrar y para campañas.</span> }
@@ -80,19 +81,19 @@ export const REL_LABEL: Record<string, string> = {
               <div class="field">
                 <label for="ruc">RUC</label>
                 <div class="row">
-                  <input id="ruc" name="ruc" class="input tabular" [class.invalid]="e['fiscalRuc']" [(ngModel)]="d.fiscalRuc" maxlength="11" inputmode="numeric" />
+                  <input id="ruc" name="ruc" class="input tabular" [class.invalid]="e['fiscalRuc']" [(ngModel)]="d.fiscalRuc" maxlength="11" inputmode="numeric" appOnly="digits" />
                   <button type="button" class="btn sm" (click)="lookupRuc()" [disabled]="(d.fiscalRuc || '').length !== 11 || looking">{{ looking ? '…' : 'Buscar' }}</button>
                 </div>
                 @if (e['fiscalRuc']) { <span class="err">{{ e['fiscalRuc'] }}</span> } @else if (rucMsg) { <span class="hint">{{ rucMsg }}</span> }
               </div>
               <div class="field">
                 <label for="rs">Razón social</label>
-                <input id="rs" name="rs" class="input" [class.invalid]="e['fiscalName']" [(ngModel)]="d.fiscalName" maxlength="200" />
+                <input id="rs" name="rs" class="input" [class.invalid]="e['fiscalName']" [(ngModel)]="d.fiscalName" maxlength="200" appOnly="text" />
                 @if (e['fiscalName']) { <span class="err">{{ e['fiscalName'] }}</span> }
               </div>
               <div class="field span2">
                 <label for="fa">Dirección fiscal</label>
-                <input id="fa" name="fa" class="input" [(ngModel)]="d.fiscalAddress" maxlength="250" />
+                <input id="fa" name="fa" class="input" [(ngModel)]="d.fiscalAddress" maxlength="250" appOnly="text" />
               </div>
             </div>
           </fieldset>
@@ -157,25 +158,25 @@ export const REL_LABEL: Record<string, string> = {
           <div class="grid cols-2">
             <div class="field span2">
               <label for="rn" class="req">Nombre completo</label>
-              <input id="rn" name="rn" class="input" [class.invalid]="re['fullName']" [(ngModel)]="r.fullName" maxlength="150" />
+              <input id="rn" name="rn" class="input" [class.invalid]="re['fullName']" [(ngModel)]="r.fullName" maxlength="150" appOnly="letters" />
               @if (re['fullName']) { <span class="err">{{ re['fullName'] }}</span> }
             </div>
             <div class="field">
               <label for="rdt">Documento</label>
               <div class="row">
                 <select id="rdt" name="rdt" class="input narrow" [(ngModel)]="r.docType"><option value="DNI">DNI</option><option value="CE">CE</option><option value="PAS">Pasaporte</option></select>
-                <input name="rdn" class="input tabular" [class.invalid]="re['docNumber']" [(ngModel)]="r.docNumber" maxlength="12" aria-label="Número de documento" />
+                <input name="rdn" class="input tabular" [class.invalid]="re['docNumber']" [(ngModel)]="r.docNumber" maxlength="12" appOnly="alnum" aria-label="Número de documento" />
               </div>
               @if (re['docNumber']) { <span class="err">{{ re['docNumber'] }}</span> }
             </div>
             <div class="field">
               <label for="rp">Celular</label>
-              <input id="rp" name="rp" class="input tabular" [class.invalid]="re['phone']" [(ngModel)]="r.phone" maxlength="9" inputmode="numeric" />
+              <input id="rp" name="rp" class="input tabular" [class.invalid]="re['phone']" [(ngModel)]="r.phone" maxlength="9" inputmode="numeric" appOnly="phone" />
               @if (re['phone']) { <span class="err">{{ re['phone'] }}</span> }
             </div>
             <div class="field span2">
               <label for="re">Correo</label>
-              <input id="re" name="re" class="input" [class.invalid]="re['email']" [(ngModel)]="r.email" maxlength="120" />
+              <input id="re" name="re" class="input" [class.invalid]="re['email']" [(ngModel)]="r.email" maxlength="120" appOnly="email" />
               @if (re['email']) { <span class="err">{{ re['email'] }}</span> }
             </div>
           </div>
@@ -195,7 +196,7 @@ export const REL_LABEL: Record<string, string> = {
           </div>
           <div class="field span2">
             <label for="rno">Nota</label>
-            <input id="rno" name="rno" class="input" [(ngModel)]="r.notes" maxlength="200" />
+            <input id="rno" name="rno" class="input" [(ngModel)]="r.notes" maxlength="200" appOnly="text" />
           </div>
         </div>
       </form>

@@ -8,6 +8,7 @@ import { apiError, patientDocToSunat, soles, validRuc } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { PatientPickerComponent } from '../shared/patient-picker.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 interface Line { description: string; quantity: number; unitPrice: number; treatmentItemId?: number | null; }
 
 const IGV = 0.18;
@@ -17,7 +18,7 @@ const BOLETA_LIMIT = 700;
 @Component({
   selector: 'app-invoice-new',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent, PatientPickerComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, PatientPickerComponent],
   template: `
     <div class="page">
       <a class="back" routerLink="/comprobantes"><app-icon name="chevronLeft" [size]="16" /> Comprobantes</a>
@@ -60,7 +61,7 @@ const BOLETA_LIMIT = 700;
             <div class="panel-body grid cols-3">
               <div class="field">
                 <label class="req" for="cdt">Documento</label>
-                <select id="cdt" class="input" [(ngModel)]="customer.docType" [disabled]="docType === '01'">
+                <select id="cdt" class="input" [(ngModel)]="customer.docType" (ngModelChange)="cleanCustomerDoc()" [disabled]="docType === '01'">
                   @if (docType === '01') { <option value="6">RUC</option> }
                   @else {
                     <option value="1">DNI</option><option value="4">Carné de extranjería</option>
@@ -74,7 +75,8 @@ const BOLETA_LIMIT = 700;
                   <label class="req" for="cdn">Número</label>
                   <input id="cdn" class="input tabular" [class.invalid]="e['customerDocNumber']" [(ngModel)]="customer.docNumber"
                          (ngModelChange)="onDocNumber($event)"
-                         [attr.maxlength]="customer.docType === '6' ? 11 : customer.docType === '1' ? 8 : 12" inputmode="numeric" />
+                         [attr.maxlength]="customer.docType === '6' ? 11 : customer.docType === '1' ? 8 : 12" inputmode="numeric"
+                         [appOnly]="customer.docType === '1' || customer.docType === '6' ? 'digits' : 'alnum'" />
                   @if (e['customerDocNumber']) { <span class="err">{{ e['customerDocNumber'] }}</span> }
                   @else if (customer.docType === '6' && customer.docNumber.length === 11) {
                     @if (!rucOk) { <span class="hint">Dígito verificador incorrecto</span> }
@@ -89,7 +91,7 @@ const BOLETA_LIMIT = 700;
                 </div>
                 <div class="field">
                   <label class="req" for="cn">{{ customer.docType === '6' ? 'Razón social' : 'Nombre completo' }}</label>
-                  <input id="cn" class="input" [class.invalid]="e['customerName']" [(ngModel)]="customer.name" />
+                  <input id="cn" class="input" [class.invalid]="e['customerName']" [(ngModel)]="customer.name" maxlength="200" [appOnly]="customer.docType === '6' ? 'text' : 'letters'" />
                   @if (e['customerName']) { <span class="err">{{ e['customerName'] }}</span> }
                 </div>
               } @else {
@@ -105,7 +107,7 @@ const BOLETA_LIMIT = 700;
               @if (docType === '01' || customer.docType === '6') {
                 <div class="field span-all">
                   <label [class.req]="docType === '01'" for="ca">Dirección fiscal</label>
-                  <input id="ca" class="input" [class.invalid]="e['customerAddress']" [(ngModel)]="customer.address" />
+                  <input id="ca" class="input" [class.invalid]="e['customerAddress']" [(ngModel)]="customer.address" appOnly="text" maxlength="200" />
                   @if (e['customerAddress']) { <span class="err">{{ e['customerAddress'] }}</span> }
                 </div>
               }
@@ -125,9 +127,9 @@ const BOLETA_LIMIT = 700;
               <tbody>
                 @for (l of lines; track $index) {
                   <tr>
-                    <td><input class="input" [(ngModel)]="l.description" [disabled]="!!l.treatmentItemId" aria-label="Descripción" /></td>
-                    <td class="num"><input class="input tabular qty" type="number" min="1" step="1" [(ngModel)]="l.quantity" aria-label="Cantidad" /></td>
-                    <td class="num"><input class="input tabular price" type="number" min="0" step="0.5" [(ngModel)]="l.unitPrice" [disabled]="!!l.treatmentItemId" aria-label="Precio" /></td>
+                    <td><input class="input" [(ngModel)]="l.description" [disabled]="!!l.treatmentItemId" aria-label="Descripción" appOnly="text" maxlength="200" /></td>
+                    <td class="num"><input class="input tabular qty" type="number" min="1" step="1" [(ngModel)]="l.quantity" aria-label="Cantidad" appOnly="int" /></td>
+                    <td class="num"><input class="input tabular price" type="number" min="0" step="0.5" [(ngModel)]="l.unitPrice" [disabled]="!!l.treatmentItemId" aria-label="Precio" appOnly="decimal" /></td>
                     <td class="num tabular strong">{{ money((l.quantity || 0) * (l.unitPrice || 0)) }}</td>
                     <td><button type="button" class="btn ghost sm" (click)="lines.splice($index, 1)" aria-label="Quitar"><app-icon name="x" [size]="15" /></button></td>
                   </tr>
@@ -299,6 +301,14 @@ export class InvoiceNewComponent implements OnInit {
         this.rucMsg = a.status === 404 ? 'RUC válido · no figura en el padrón: escribe los datos' : 'Consulta RUC no disponible: escribe los datos';
       },
     });
+  }
+
+
+  /** Al cambiar el tipo de documento del cliente se limpia el número (DNI y RUC solo números). */
+  cleanCustomerDoc() {
+    const c = this.customer, t = c.docType;
+    const v = (c.docNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    c.docNumber = (t === '1' || t === '6' ? v.replace(/\D/g, '') : v).slice(0, t === '6' ? 11 : t === '1' ? 8 : 12);
   }
 
   private validate(): boolean {

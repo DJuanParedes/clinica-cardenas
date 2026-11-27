@@ -7,11 +7,12 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { PagerComponent, pageOf } from '../shared/pager.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** El odontólogo pide materiales; recepción los entrega desde Inventario. No ve costos ni proveedores. */
 @Component({
   selector: 'app-supply-requests',
   standalone: true,
-  imports: [FormsModule, IconComponent, ModalComponent, PagerComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent, ModalComponent, PagerComponent],
   template: `
     <div class="page">
       <div class="page-head spread">
@@ -20,7 +21,7 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
       </div>
       <section class="panel">
         <div class="panel-head spread"><h3>Mis solicitudes</h3>
-          <input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pg = 1" placeholder="Buscar material" /></div>
+          <input class="input search" type="search" [(ngModel)]="q" (ngModelChange)="pg = 1" placeholder="Buscar material" appOnly="search" maxlength="100" /></div>
         <table class="table">
           <thead><tr><th>Fecha</th><th>Material</th><th class="num">Cantidad</th><th>Estado</th><th>Respuesta</th><th></th></tr></thead>
           <tbody>
@@ -48,12 +49,12 @@ import { PagerComponent, pageOf } from '../shared/pager.component';
             @for (i of catalog; track i.id) { <option [ngValue]="i.id">{{ i.name }}{{ i.available ? '' : ' (sin stock)' }}</option> }
             <option [ngValue]="0">Otro (no está en la lista)</option>
           </select></div>
-        @if (f.itemId === 0) { <div class="field"><label class="req" for="st">¿Qué necesitas?</label><input id="st" class="input" name="st" [(ngModel)]="f.itemText" maxlength="160" /></div> }
+        @if (f.itemId === 0) { <div class="field"><label class="req" for="st">¿Qué necesitas?</label><input id="st" class="input" name="st" [(ngModel)]="f.itemText" maxlength="160" appOnly="text" /></div> }
         <div class="grid two">
-          <div class="field"><label class="req" for="sq">Cantidad</label><input id="sq" class="input" type="number" min="1" name="sq" [(ngModel)]="f.quantity" /></div>
+          <div class="field"><label class="req" for="sq">Cantidad</label><input id="sq" class="input" type="number" min="1" name="sq" [(ngModel)]="f.quantity" appOnly="int" /></div>
           <div class="field"><label for="su">Urgencia</label><select id="su" class="input" name="su" [(ngModel)]="f.urgency"><option value="NORMAL">Normal</option><option value="URGENTE">Urgente (paciente en sillón)</option></select></div>
         </div>
-        <div class="field"><label for="sn">Nota</label><input id="sn" class="input" name="sn" [(ngModel)]="f.note" maxlength="255" placeholder="Para qué paciente o procedimiento" /></div>
+        <div class="field"><label for="sn">Nota</label><input id="sn" class="input" name="sn" [(ngModel)]="f.note" maxlength="255" placeholder="Para qué paciente o procedimiento" appOnly="text" /></div>
       </form>
       <ng-container modal-actions>
         <button class="btn" type="button" (click)="open = false">Cancelar</button>

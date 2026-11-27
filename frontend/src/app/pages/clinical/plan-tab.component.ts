@@ -10,13 +10,14 @@ import { IconComponent } from '../../shared/icon.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { InstallmentsComponent } from './installments.component';
 
+import { OnlyDirective } from '../../shared/only.directive';
 interface DraftItem { procedureId: number | null; tooth: number | null; price: number | null; }
 
 /** HU-06: plan de tratamiento y evolución por sesión. */
 @Component({
   selector: 'app-plan-tab',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
   template: `
     <div class="spread head">
       <p class="muted small">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }} · los procedimientos realizados quedan disponibles para facturar en caja.</p>
@@ -80,7 +81,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                     @for (i of v.items; track i.id) { @if (i.status !== 'REALIZADO') { <option [ngValue]="i.id">{{ i.procedure.name }}{{ i.tooth ? ' · ' + i.tooth : '' }}</option> } }
                   </select>
                 </div>
-                <textarea class="input" rows="2" name="n{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].notes" placeholder="Qué se realizó, materiales, indicaciones…"></textarea>
+                <textarea class="input" rows="2" name="n{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].notes" placeholder="Qué se realizó, materiales, indicaciones…" appOnly="text" maxlength="1000"></textarea>
                 <div class="spread">
                   <label class="check">
                     <input type="checkbox" name="m{{ v.plan.id }}" [(ngModel)]="evo[v.plan.id].markDone" [disabled]="!evo[v.plan.id].itemId" />
@@ -134,7 +135,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                       <option [ngValue]="null">Elige un material…</option>
                       @for (c of use.catalog; track c.itemId) { <option [ngValue]="c.itemId">{{ c.name }}</option> }
                     </select></td>
-                    <td class="right"><input class="input qty tabular" type="number" min="0" step="0.5" [(ngModel)]="r.quantity" [attr.aria-label]="'Cantidad ' + ($index + 1)" /> <span class="muted small">{{ r.unit }}</span></td>
+                    <td class="right"><input class="input qty tabular" type="number" min="0" step="0.5" [(ngModel)]="r.quantity" [attr.aria-label]="'Cantidad ' + ($index + 1)" appOnly="decimal" /> <span class="muted small">{{ r.unit }}</span></td>
                     <td class="right tabular" [class.gum]="r.stock != null && r.quantity > r.stock">{{ r.stock ?? '—' }}</td>
                     <td class="right"><button class="btn sm ghost" type="button" (click)="use.rows.splice($index, 1)" aria-label="Quitar">✕</button></td>
                   </tr>
@@ -156,7 +157,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
         @if (!addTo) {
           <div class="field">
             <label class="req" for="pt">Nombre del plan</label>
-            <input id="pt" name="pt" class="input" [(ngModel)]="title" placeholder="Ej. Rehabilitación sector posterior" />
+            <input id="pt" name="pt" class="input" [(ngModel)]="title" placeholder="Ej. Rehabilitación sector posterior" appOnly="text" maxlength="200" />
           </div>
         }
         <div class="items">
@@ -171,8 +172,8 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
                   </optgroup>
                 }
               </select>
-              <input class="input tabular" type="number" [name]="'t' + $index" [(ngModel)]="it.tooth" min="11" max="85" placeholder="—" aria-label="Pieza" />
-              <input class="input tabular" type="number" [name]="'pr' + $index" [(ngModel)]="it.price" min="0" step="0.5" aria-label="Precio" />
+              <input class="input tabular" type="number" [name]="'t' + $index" [(ngModel)]="it.tooth" min="11" max="85" placeholder="—" aria-label="Pieza" appOnly="digits" />
+              <input class="input tabular" type="number" [name]="'pr' + $index" [(ngModel)]="it.price" min="0" step="0.5" aria-label="Precio" appOnly="decimal" />
               <button type="button" class="btn ghost sm" (click)="draft.splice($index, 1)" [disabled]="draft.length === 1" aria-label="Quitar fila"><app-icon name="x" [size]="15" /></button>
             </div>
           }
@@ -181,7 +182,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
         @if (!addTo) {
           <div class="field">
             <label for="pn">Indicaciones</label>
-            <textarea id="pn" name="pn" class="input" rows="2" [(ngModel)]="notes"></textarea>
+            <textarea id="pn" name="pn" class="input" rows="2" [(ngModel)]="notes" appOnly="text" maxlength="1000"></textarea>
           </div>
         }
         <div class="spread">

@@ -7,11 +7,12 @@ import { apiError, dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
 
+import { OnlyDirective } from '../shared/only.directive';
 /** v2.5: la clínica arma sus propias plantillas de anamnesis (preguntas, secciones, opciones y alertas). */
 @Component({
   selector: 'app-anamnesis-templates',
   standalone: true,
-  imports: [DeleteButtonComponent, FormsModule, IconComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -36,9 +37,9 @@ import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
           @else {
             <form class="panel-body" (ngSubmit)="save()">
               <div class="grid cols-2">
-                <div class="field"><label class="req" for="tn">Nombre</label><input id="tn" name="tn" class="input" [(ngModel)]="d.name" maxlength="80" [class.invalid]="e['name']" />
+                <div class="field"><label class="req" for="tn">Nombre</label><input id="tn" name="tn" class="input" [(ngModel)]="d.name" maxlength="80" [class.invalid]="e['name']" appOnly="text" />
                   @if (e['name']) { <span class="err">{{ e['name'] }}</span> }</div>
-                <div class="field"><label for="ts">Especialidad</label><input id="ts" name="ts" class="input" [(ngModel)]="d.specialty" maxlength="60" /></div>
+                <div class="field"><label for="ts">Especialidad</label><input id="ts" name="ts" class="input" [(ngModel)]="d.specialty" maxlength="60" appOnly="letters" /></div>
               </div>
               <label class="check"><input type="checkbox" name="ta" [(ngModel)]="d.active" /> Activa (aparece para llenar)</label>
               @if (e['questions']) { <div class="notice gum"><app-icon name="alert" /> {{ e['questions'] }}</div> }
@@ -46,7 +47,7 @@ import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
               @for (q of d.questions; track $index; let i = $index) {
                 <div class="q">
                   <div class="qtop">
-                    <input class="input sec" [name]="'s' + i" [(ngModel)]="q.section" placeholder="Sección" maxlength="60" aria-label="Sección" />
+                    <input class="input sec" [name]="'s' + i" [(ngModel)]="q.section" placeholder="Sección" maxlength="60" aria-label="Sección" appOnly="text" />
                     <select class="input type" [name]="'t' + i" [(ngModel)]="q.type" aria-label="Tipo de respuesta">
                       <option value="YES_NO">Sí / No</option><option value="CHOICE">Opciones</option><option value="TEXT">Texto</option>
                     </select>
@@ -56,9 +57,9 @@ import { AnamQuestion, AnamTemplate } from './clinical/anamnesis-tab.component';
                       <button type="button" class="btn ghost sm" (click)="d.questions.splice(i, 1)" aria-label="Quitar pregunta"><app-icon name="x" [size]="14" /></button>
                     </div>
                   </div>
-                  <input class="input" [name]="'l' + i" [(ngModel)]="q.label" placeholder="Pregunta" maxlength="150" aria-label="Pregunta" />
+                  <input class="input" [name]="'l' + i" [(ngModel)]="q.label" placeholder="Pregunta" maxlength="150" aria-label="Pregunta" appOnly="text" />
                   @if (q.type === 'CHOICE') {
-                    <input class="input" [name]="'o' + i" [ngModel]="(q.options || []).join(', ')" (ngModelChange)="q.options = splitOpts($event)" placeholder="Opciones separadas por coma: Leve, Moderado, Severo" aria-label="Opciones" />
+                    <input class="input" [name]="'o' + i" [ngModel]="(q.options || []).join(', ')" (ngModelChange)="q.options = splitOpts($event)" placeholder="Opciones separadas por coma: Leve, Moderado, Severo" aria-label="Opciones" appOnly="text" maxlength="200" />
                   }
                   @if (q.type === 'YES_NO') { <label class="check small"><input type="checkbox" [name]="'a' + i" [(ngModel)]="q.alert" /> Si responde "Sí", mostrar como alerta clínica</label> }
                 </div>
