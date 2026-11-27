@@ -399,6 +399,7 @@ export class Api {
   }
   fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
   shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
+  updateFile(id: number, body: { title?: string; kind?: string; note?: string; tooth?: number | null }): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, body); }
   deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }
 
   // ---------- inventario

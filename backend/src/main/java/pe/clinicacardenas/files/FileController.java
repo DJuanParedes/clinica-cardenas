@@ -54,8 +54,14 @@ public class FileController {
 
     @PatchMapping("/files/{id}")
     @PreAuthorize(UPLOAD)
-    public PatientFile share(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
-        return service.share(id, Boolean.TRUE.equals(body.get("sharedWithPatient")));
+    public PatientFile share(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        PatientFile f = null;
+        if (body.containsKey("title") || body.containsKey("kind") || body.containsKey("note") || body.containsKey("tooth")) {
+            f = service.edit(id, (String) body.get("title"), (String) body.get("kind"), (String) body.get("note"),
+                    body.get("tooth") == null ? null : Integer.valueOf(String.valueOf(body.get("tooth"))), body.containsKey("tooth"));
+        }
+        if (body.containsKey("sharedWithPatient")) f = service.share(id, Boolean.TRUE.equals(body.get("sharedWithPatient")));
+        return f != null ? f : service.get(id);
     }
 
     @DeleteMapping("/files/{id}")

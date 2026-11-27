@@ -68,7 +68,8 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
             } @else if (f.sharedWithPatient) { <span class="tag teal">En la app</span> }
             <span class="grow"></span>
             <button class="btn ghost sm" type="button" (click)="download(f)" aria-label="Descargar"><app-icon name="download" [size]="16" /></button>
-            @if (canDelete) { <button class="btn ghost sm" type="button" (click)="remove(f)" aria-label="Eliminar"><app-icon name="x" [size]="16" /></button> }
+            @if (canUpload) { <button class="btn ghost sm" type="button" (click)="startEdit(f)" aria-label="Editar" title="Editar datos"><app-icon name="edit" [size]="16" /></button> }
+            @if (canDelete) { <button class="btn ghost sm" type="button" (click)="remove(f)" aria-label="Eliminar" title="Eliminar (solo administrador)"><app-icon name="x" [size]="16" /></button> }
           </div>
         </article>
       }
@@ -123,6 +124,23 @@ const TEMPLATES: Record<string, { title: string; body: string }> = {
     </app-modal>
 
     <!-- visor de imagen -->
+    <app-modal [open]="!!editing" title="Editar archivo" [subtitle]="editing?.title || ''" (close)="editing = null">
+      @if (editing) {
+        <form class="stack" (ngSubmit)="saveEdit()">
+          <div class="field"><label for="et">Título</label><input id="et" name="et" class="input" [(ngModel)]="ef.title" maxlength="150" appOnly="text" required /></div>
+          <div class="grid two">
+            <div class="field"><label for="ek">Tipo</label>
+              <select id="ek" name="ek" class="input" [(ngModel)]="ef.kind">@for (k of kinds; track k) { <option [value]="k">{{ kindLabel(k) }}</option> }</select></div>
+            <div class="field"><label for="eth">Pieza (FDI, opcional)</label><input id="eth" name="eth" class="input" [(ngModel)]="ef.tooth" maxlength="2" appOnly="digits" inputmode="numeric" /></div>
+          </div>
+          <div class="field"><label for="en">Nota</label><textarea id="en" name="en" class="input" rows="2" [(ngModel)]="ef.note" maxlength="500" appOnly="text"></textarea></div>
+          <p class="muted small">Para cambiar el contenido del archivo, súbelo de nuevo y elimina el anterior.</p>
+        </form>
+      }
+      <div modal-actions><button class="btn ghost" type="button" (click)="editing = null">Cancelar</button>
+        <button class="btn primary" type="button" (click)="saveEdit()" [disabled]="savingEdit || !ef.title.trim()">Guardar</button></div>
+    </app-modal>
+
     <app-modal [open]="!!viewing" [title]="viewing?.title || ''" [width]="980" (close)="closeViewer()">
       @if (viewUrl) { <img class="full" [src]="viewUrl" [alt]="viewing?.title || ''" /> }
     </app-modal>
@@ -226,6 +244,24 @@ export class FilesTabComponent implements OnInit, OnDestroy {
     this.api.shareFile(f.id, on).subscribe({
       next: (r) => { f.sharedWithPatient = r.sharedWithPatient; this.toast.ok(on ? 'El paciente ya lo ve en su app.' : 'Se dejó de compartir.'); },
       error: (e) => this.toast.error(apiError(e).message),
+    });
+  }
+
+  editing: PatientFile | null = null;
+  ef = { title: '', kind: '', note: '', tooth: '' };
+  savingEdit = false;
+  kinds = Object.keys(FILE_KIND);
+  startEdit(f: PatientFile) {
+    this.editing = f;
+    this.ef = { title: f.title, kind: f.kind, note: f.note || '', tooth: f.tooth ? String(f.tooth) : '' };
+  }
+  saveEdit() {
+    const f = this.editing;
+    if (!f || !this.ef.title.trim()) return;
+    this.savingEdit = true;
+    this.api.updateFile(f.id, { title: this.ef.title.trim(), kind: this.ef.kind, note: this.ef.note.trim(), tooth: this.ef.tooth ? Number(this.ef.tooth) : null }).subscribe({
+      next: (u) => { this.savingEdit = false; Object.assign(f, u); this.editing = null; this.toast.ok('Archivo actualizado.'); },
+      error: (e) => { this.savingEdit = false; this.toast.error(apiError(e).message); },
     });
   }
 
