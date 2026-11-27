@@ -5,6 +5,7 @@ import { AuthService } from '../core/auth.service';
 import { apiError, dateTime } from '../core/format';
 import { ToastService } from '../core/toast.service';
 import { LegalModalComponent } from './legal-modal.component';
+import { CLINIC, esc, openPrintWindow, paragraphs, writePrintDoc } from '../core/print-doc';
 
 /** v2.7: consentimiento aparte para recibir promociones (campañas y cumpleaños). */
 @Component({
@@ -23,9 +24,10 @@ import { LegalModalComponent } from './legal-modal.component';
         </p>
         @if (auth.can('PACIENTES_EDITAR')) {
           <div class="row wrap">
-            <select class="input sm" [(ngModel)]="channel" aria-label="Cómo lo indicó"><option value="PRESENCIAL">En la clínica</option><option value="TELEFONO">Por teléfono</option><option value="WHATSAPP">Por WhatsApp</option></select>
+            <select class="input sm" [(ngModel)]="channel" aria-label="Cómo lo indicó" title="Por dónde dio el paciente su respuesta; queda registrado como prueba del consentimiento"><option value="PRESENCIAL">En la clínica</option><option value="TELEFONO">Por teléfono</option><option value="WHATSAPP">Por WhatsApp</option></select>
             @if (state !== true) { <button class="btn sm" type="button" (click)="legal = true">Registrar que acepta</button> }
             @if (state !== false) { <button class="btn sm ghost" type="button" (click)="set(false)">Registrar que no acepta</button> }
+            <button class="btn sm ghost" type="button" (click)="print()" title="Constancia para firmar y archivar">Imprimir constancia</button>
           </div>
         }
       </div>
@@ -52,4 +54,37 @@ export class MarketingConsentComponent {
     });
   }
   dt = dateTime;
+
+  /** Constancia del consentimiento de promociones (Ley 29733: finalidad adicional, aceptación aparte). */
+  print() {
+    const p = this._p;
+    if (!p) return;
+    const w = openPrintWindow();
+    if (!w) { this.toast.error('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.'); return; }
+    const via: Record<string, string> = { PRESENCIAL: 'En la clínica', TELEFONO: 'Por teléfono', WHATSAPP: 'Por WhatsApp' };
+    const today = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+    const name = esc(p.fullName || `${p.firstName ?? ''} ${p.lastName ?? ''}`);
+    this.api.legal('PUBLICIDAD').subscribe({
+      next: (doc: any) => writePrintDoc(w, {
+        title: 'Consentimiento para envío de promociones y novedades',
+        subtitle: `Finalidad adicional según la Ley N.° 29733 · ${esc(doc.title)}`,
+        code: `CDC-PUBL<br>Versión ${esc(doc.version)}`,
+        body: `
+<h2>1. Datos del paciente</h2>
+<table><tr><td class="k">Paciente</td><td>${name}</td></tr>
+<tr><td class="k">Documento de identidad</td><td>${esc(p.docType)} ${esc(p.docNumber)}</td></tr>
+<tr><td class="k">Celular / correo</td><td>${esc(p.phone)}${p.email ? ' · ' + esc(p.email) : ''}</td></tr>
+<tr><td class="k">Estado registrado</td><td>${this.state === true ? 'Acepta' : this.state === false ? 'No acepta' : 'Sin respuesta'}${this.at ? ' · desde el ' + esc(this.dt(this.at)) : ''}</td></tr>
+</table>
+<h2>2. Texto informado al paciente</h2>${paragraphs(doc.body)}
+<h2>3. Decisión del paciente</h2>
+<table><tr><td class="k">Marque una opción</td><td>☐ Sí acepto recibir promociones, campañas y saludos &nbsp;&nbsp; ☐ No acepto</td></tr>
+<tr><td class="k">Medio por el que respondió</td><td>${esc(via[this.channel] || this.channel)}</td></tr></table>
+<p>Esta autorización es voluntaria: no aceptarla no afecta la atención ni los avisos de citas. Puede retirarla en cualquier momento respondiendo BAJA o en recepción.</p>
+<p>${CLINIC.city}, ${today}.</p>
+<div class="firmas"><div class="f">Firma del paciente o representante<br>${name}<br>${esc(p.docType)} ${esc(p.docNumber)}</div><div class="f">Firma y sello de la clínica<br>Recibido por</div></div>`,
+      }),
+      error: () => { w.close(); this.toast.error('No se pudo cargar el texto vigente.'); },
+    });
+  }
 }
