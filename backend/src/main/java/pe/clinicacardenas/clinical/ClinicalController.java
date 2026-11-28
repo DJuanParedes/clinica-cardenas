@@ -108,6 +108,12 @@ public class ClinicalController {
         return service.addEvolution(planId, r);
     }
 
+    @PostMapping("/plans/{planId}/accept")
+    @PreAuthorize(PLAN)
+    public TreatmentPlan acceptPlan(@PathVariable Long planId, @RequestBody(required = false) Map<String, String> body) {
+        return service.acceptPlan(planId, body == null ? null : body.get("via"));
+    }
+
     @PostMapping("/plans/{planId}/cancel")
     @PreAuthorize(PLAN)
     public Map<String, Object> cancel(@PathVariable Long planId) {
