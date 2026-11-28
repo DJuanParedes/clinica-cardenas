@@ -32,6 +32,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class PublicPatientService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pe.clinicacardenas.portal.SurveyFollowUp followUp;
+
     private static final String CLINIC = "clinic";
     private static final String FIRSTNAME = "firstName";
     private static final String MESSAGE = "message";
@@ -270,6 +273,7 @@ public class PublicPatientService {
         s.comment = clean(r.comment(), 500);
         s.createdAt = Dates.now();
         surveys.save(s);
+        if (followUp != null) followUp.afterRating(s);
         audit.register("CITA", a.id, "ENCUESTA", r.score() + " estrellas desde el enlace del mensaje");
         return Map.of(MESSAGE, r.score() >= 4 ? "¡Gracias! Nos alegra que te haya gustado tu atención." : "Gracias por contarnos. Revisaremos tu comentario para mejorar.");
     }
