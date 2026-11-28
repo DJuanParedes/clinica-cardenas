@@ -114,6 +114,12 @@ public class BillingController {
                 .body(mailer.pdf(id));
     }
 
+    /** v2.19: anula un comprobante aceptado emitiendo y enviando una nota de crédito. */
+    @PostMapping("/invoices/{id}/credit-note")
+    public Map<String, Object> creditNote(@PathVariable Long id, @RequestBody BillingService.CreditNoteRequest r) {
+        return service.creditNote(id, r);
+    }
+
     @PostMapping("/invoices/{id}/status")
     public Map<String, Object> checkStatus(@PathVariable Long id) {
         return service.checkStatus(id);

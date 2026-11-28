@@ -181,10 +181,11 @@ function cdrXml({ id, emisor, receptor, code, description, notes, docId }) {
 function validar(fileName, xml) {
   const [ruc, tipo, serie, numero] = fileName.replace(/\.(zip|xml)$/i, '').split('-');
   const docId = `${serie}-${Number(numero)}`;
-  const etiqueta = tipo === '01' ? 'Factura' : 'Boleta';
+  const etiqueta = tipo === '07' ? 'Nota de crédito' : tipo === '01' ? 'Factura' : 'Boleta';
 
   // Excepciones (0100-1999): el comprobante no se registra.
-  if (!xml.includes('<Invoice')) return { exception: ['0306', 'No se puede leer (parsear) el archivo XML'] };
+  const esNota = tipo === '07';
+  if (!xml.includes(esNota ? '<CreditNote' : '<Invoice')) return { exception: ['0306', 'No se puede leer (parsear) el archivo XML'] };
   const xmlId = tag(xml, 'ID');
   const supplier = block(xml, 'AccountingSupplierParty');
   const supplierRuc = tag(supplier, 'ID');
@@ -192,7 +193,7 @@ function validar(fileName, xml) {
   const idSinUbl = (xml.split('</cbc:CustomizationID>')[1] || '');
   const docInXml = tag(idSinUbl, 'ID');
   if (docInXml !== docId) return { exception: ['1035', 'Número de serie del nombre del archivo no coincide con el consignado en el contenido del archivo XML'] };
-  if (tag(xml, 'InvoiceTypeCode') !== tipo) return { exception: ['1003', 'El tipo de comprobante del nombre del archivo no coincide con el del XML'] };
+  if (!esNota && tag(xml, 'InvoiceTypeCode') !== tipo) return { exception: ['1003', 'El tipo de comprobante del nombre del archivo no coincide con el del XML'] };
   const sig = block(xml, 'Signature');
   const sigOk = /<ds:Signature[\s\S]*<ds:DigestValue>[^<]{20,}<\/ds:DigestValue>[\s\S]*<ds:SignatureValue>[\s\S]{100,}?<\/ds:SignatureValue>[\s\S]*<ds:X509Certificate>/.test(xml);
   if (!sigOk) return { exception: ['2335', 'El documento electrónico ingresado ha sido alterado (no tiene firma digital válida)'] };
@@ -205,6 +206,20 @@ function validar(fileName, xml) {
   const custType = custIdMatch ? custIdMatch[1] : '';
   const custDoc = custIdMatch ? custIdMatch[2].trim() : '';
   const reject = (code, msg) => ({ reject: [code, msg], docId, etiqueta, receptor: custDoc });
+  // Nota de crédito (07): debe referir a un comprobante aceptado y su serie empieza con la letra de ese comprobante.
+  if (esNota) {
+    const ref = block(xml, 'BillingReference');
+    const refId = tag(ref, 'ID') || '';
+    const refTipo = tag(ref, 'DocumentTypeCode') || '';
+    const motivo = tag(block(xml, 'DiscrepancyResponse'), 'ResponseCode');
+    if (!refId || !['01', '03'].includes(refTipo)) return reject('2204', 'Debe indicar el comprobante que modifica (factura o boleta)');
+    if (!motivo) return reject('2128', 'Debe consignar el código del motivo de la nota de crédito (catálogo 09)');
+    if (serie[0] !== (refTipo === '01' ? 'F' : 'B')) return reject('2116', 'La serie de la nota de crédito debe empezar con la misma letra que el comprobante que modifica');
+    const [rs, rn] = refId.split('-');
+    const previo = registro.comprobantes[`${ruc}-${refTipo}-${rs}-${Number(rn)}`];
+    if (previo && !['ACEPTADO', 'OBSERVADO'].includes(previo.estado)) return reject('2524', `El comprobante ${refId} no está aceptado; no se puede modificar`);
+    if (previo && previo.anuladoPor) return reject('2524', `El comprobante ${refId} ya fue anulado con ${previo.anuladoPor}`);
+  }
   if (tipo === '01' && serie[0] !== 'F') return reject('2116', 'El tipo de documento modificado por la factura debe tener serie que empiece con F');
   if (tipo === '03' && serie[0] !== 'B') return reject('2116', 'La serie de la boleta de venta debe empezar con B');
   if (tipo === '01' && custType !== '6') return reject('2800', 'El dato ingresado en el tipo de documento de identidad del receptor no está permitido para facturas');
@@ -278,6 +293,13 @@ function sendBill(body) {
     archivo: key, estado, codigo: code, descripcion: description, notas: v.notes || [],
     recibido: new Date().toISOString(), cdr: cdrZip, total: tag(block(xml, 'LegalMonetaryTotal'), 'PayableAmount'), receptor: v.receptor,
   };
+  // Una nota de crédito aceptada deja anulado el comprobante que modifica.
+  if (key.split('-')[1] === '07' && ['ACEPTADO', 'OBSERVADO'].includes(estado)) {
+    const ref = block(xml, 'BillingReference');
+    const [rs, rn] = (tag(ref, 'ID') || '').split('-');
+    const refKey = `${key.split('-')[0]}-${tag(ref, 'DocumentTypeCode')}-${rs}-${Number(rn)}`;
+    if (registro.comprobantes[refKey]) registro.comprobantes[refKey].anuladoPor = v.docId;
+  }
   guardar();
   return {
     status: 200,

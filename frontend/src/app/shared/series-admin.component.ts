@@ -18,7 +18,7 @@ import { DeleteButtonComponent } from './delete-button.component';
       <tbody>
         @for (s of list; track s.id) {
           <tr>
-            <td>{{ s.docType === '01' ? 'Factura' : 'Boleta' }}</td>
+            <td>{{ s.docType === '07' ? 'Nota de crédito' : s.docType === '01' ? 'Factura' : 'Boleta' }}</td>
             <td class="tabular strong">
               @if (edit?.id === s.id && !s.lastNumber) { <input class="input sm" [(ngModel)]="edit.series" maxlength="4" appOnly="alnum" /> } @else { {{ s.series }} }
             </td>
@@ -39,8 +39,8 @@ import { DeleteButtonComponent } from './delete-button.component';
       </tbody>
     </table>
     <div class="row add">
-      <select class="input sm" [(ngModel)]="nw.docType" (ngModelChange)="nw.series = ($event === '01' ? 'F' : 'B')">
-        <option value="03">Boleta</option><option value="01">Factura</option>
+      <select class="input sm" [(ngModel)]="nw.docType" (ngModelChange)="nw.series = ($event === '01' ? 'F' : $event === '07' ? 'BC' : 'B')">
+        <option value="03">Boleta</option><option value="01">Factura</option><option value="07">Nota de crédito</option>
       </select>
       <input class="input sm" [(ngModel)]="nw.series" maxlength="4" appOnly="alnum" placeholder="B002" />
       <button class="btn sm primary" type="button" (click)="save(nw, true)" [disabled]="nw.series.length !== 4">Crear serie</button>
