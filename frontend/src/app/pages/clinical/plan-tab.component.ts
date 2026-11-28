@@ -309,7 +309,13 @@ export class PlanTabComponent implements OnInit {
   setStatus(v: PlanView, itemId: number, status: string) {
     const item = v.items.find((i) => i.id === itemId);
     if (status === 'REALIZADO' && item?.status !== 'REALIZADO') {
-      this.askUsage(itemId, item ? item.procedure.name + (item.tooth ? ' · pieza ' + item.tooth : '') : '', (supplies) => this.saveStatus(itemId, status, supplies));
+      // v2.17: para marcarlo como realizado se escribe su evolución (nota clínica) en el formulario de sesión.
+      const f = this.evo[v.plan.id] || (this.evo[v.plan.id] = { sessionDate: this.today, itemId: null, notes: '', markDone: false });
+      f.itemId = itemId;
+      f.markDone = true;
+      this.toast.warn('Escribe la evolución de la sesión y guárdala: así queda marcado como realizado.');
+      this.load();
+      setTimeout(() => document.querySelector<HTMLTextAreaElement>(`textarea[name="n${v.plan.id}"]`)?.focus(), 300);
       return;
     }
     this.saveStatus(itemId, status, null);

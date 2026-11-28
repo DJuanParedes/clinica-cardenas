@@ -404,6 +404,10 @@ export class Api {
   fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
   shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
   updateFile(id: number, body: { title?: string; kind?: string; note?: string; tooth?: number | null }): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, body); }
+  appointmentAttention(id: number): Observable<any> { return this.http.get(`/api/appointments/${id}/attention`); }
+  prescriptions(patientId: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${patientId}/prescriptions`); }
+  createPrescription(patientId: number, body: any): Observable<any> { return this.http.post(`/api/patients/${patientId}/prescriptions`, body); }
+  voidPrescription(id: number, reason: string): Observable<any> { return this.http.post(`/api/prescriptions/${id}/void`, { reason }); }
   voidDiagnosis(id: number, reason: string): Observable<any> { return this.http.post(`/api/diagnoses/${id}/void`, { reason }); }
   voidEvolution(id: number, reason: string): Observable<any> { return this.http.post(`/api/evolutions/${id}/void`, { reason }); }
   deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }

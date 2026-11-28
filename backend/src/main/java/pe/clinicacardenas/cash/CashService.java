@@ -255,6 +255,7 @@ public class CashService {
         pay.paidAt = Dates.now();
         pay.cashier = CurrentUser.usernameOrSystem();
         pay.status = VALIDO;
+        pay.appointmentId = pe.clinicacardenas.agenda.AttentionLink.current(jdbc, pay.patientId);
         payments.save(pay);
         audit.register("PAGO", pay.id, "REGISTRAR", p.getFullName() + " · S/ " + amount.toPlainString() + " · "
                 + METHOD_LABEL.get(method) + " · " + concept);

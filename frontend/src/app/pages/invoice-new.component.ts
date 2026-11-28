@@ -39,6 +39,13 @@ const BOLETA_LIMIT = 700;
             <div class="panel-head"><h3>Paciente atendido</h3><span class="muted small">Opcional · permite facturar procedimientos realizados</span></div>
             <div class="panel-body">
               <app-patient-picker [value]="patient" (valueChange)="onPatient($event)" />
+              @if (payer && docType === '03') {
+                <div class="payer small">
+                  Responsable de pago: <b>{{ payer.fullName }}</b>@if (payer.relationship) { ({{ payer.relationship.toLowerCase() }}) }
+                  @if (customerIsPayer) { · <a (click)="fillFromPatient(patient!); customerIsPayer = false">Emitir a nombre del paciente</a> }
+                  @else { · <a (click)="fillFromPayer()">Emitir a su nombre</a> }
+                </div>
+              }
               @if (billable.length) {
                 <div class="billable">
                   <p class="small strong">Procedimientos realizados sin facturar</p>
@@ -167,7 +174,8 @@ const BOLETA_LIMIT = 700;
       </div>
     </div>
   `,
-  styles: [`
+  styles: [`.payer { margin-top: 8px; padding: 6px 10px; background: #fff7e6; border-radius: 6px; } .payer a { cursor: pointer; text-decoration: underline; }
+
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
     .stack-l { display: flex; flex-direction: column; gap: 16px; }
     .seg.big button { height: 40px; padding: 0 18px; font-size: 14px; }
@@ -233,7 +241,19 @@ export class InvoiceNewComponent implements OnInit {
     }
   }
 
-  private fillFromPatient(p: Patient) {
+  payer: any = null;
+  customerIsPayer = false;
+
+  /** v2.17: el familiar marcado como "Responsable de pago" puede figurar como cliente del comprobante. */
+  fillFromPayer() {
+    const r = this.payer;
+    if (!r) return;
+    const t = r.docType === 'RUC' ? '6' : r.docType ? patientDocToSunat(r.docType) : '1';
+    this.customer = { docType: t, docNumber: r.docNumber || '', name: (r.fullName || '').toUpperCase(), address: '' };
+    this.customerIsPayer = true;
+  }
+
+  fillFromPatient(p: Patient) {
     this.customer = { docType: patientDocToSunat(p.docType), docNumber: p.docNumber, name: p.fullName.toUpperCase(), address: p.address || '' };
   }
 
@@ -242,9 +262,15 @@ export class InvoiceNewComponent implements OnInit {
     this.lines = this.lines.filter((l) => !l.treatmentItemId);
     this.billable = [];
     this.loadedBillable = false;
+    this.payer = null;
+    this.customerIsPayer = false;
     if (!p) return;
     if (this.docType === '03') this.fillFromPatient(p);
     else this.setType('01');
+    this.api.patientProfile(p.id).subscribe((pr: any) => {
+      this.payer = (pr?.relations || []).find((r: any) => r.pays && !r.inverse) || null;
+      if (this.payer && this.docType === '03' && this.payer.docNumber) this.fillFromPayer();
+    });
     this.api.billableItems(p.id).subscribe((b) => {
       this.billable = b;
       this.loadedBillable = true;

@@ -108,6 +108,12 @@ import { OnlyDirective } from '../shared/only.directive';
           <div class="field"><label class="req" for="pp">Precio de lista (S/)</label><input id="pp" class="input" type="number" min="0" step="0.5" name="pp" [(ngModel)]="pf.price" appOnly="decimal" /></div>
           <div class="field"><label for="pd">Duración (min)</label><input id="pd" class="input" type="number" min="5" step="5" name="pd" [(ngModel)]="pf.durationMin" appOnly="int" /></div>
         </div>
+        <div class="field"><label for="pct">Consentimiento informado obligatorio</label>
+          <select id="pct" class="input" name="pct" [(ngModel)]="pf.consentTemplateId">
+            <option [ngValue]="null">No requiere</option>
+            @for (t of consentTpls; track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
+          </select>
+          <span class="hint">Si lo exige, no se podrá empezar ni marcar como realizado sin ese consentimiento firmado por el paciente.</span></div>
         <div class="field"><label for="pds">Descripción para el paciente</label><input id="pds" class="input" name="pds" [(ngModel)]="pf.description" maxlength="255" appOnly="text" /></div>
         @if (pf.id) { <label class="check"><input type="checkbox" name="pa" [(ngModel)]="pf.active" /> Activo (se puede agregar a planes)</label> }
       </form>
@@ -196,8 +202,10 @@ export class CatalogComponent implements OnInit {
   promoText(p: any) { return p.discountType === 'PORCENTAJE' ? `${+p.value} % de descuento` : p.discountType === 'MONTO' ? `${soles(p.value)} de descuento` : `Precio especial ${soles(p.value)}`; }
   stateLabel(s: string) { return ({ VIGENTE: 'Vigente', PROGRAMADA: 'Programada', VENCIDA: 'Vencida', INACTIVA: 'Inactiva' } as any)[s] || s; }
 
-  newProc() { this.pf = { id: null, code: '', name: '', category: '', family: '', price: null, description: '', durationMin: 30, active: true }; this.procOpen = true; }
-  editProc(p: any) { this.pf = { ...p, price: +p.price }; this.procOpen = true; }
+  consentTpls: any[] = [];
+  private loadTpls() { if (!this.consentTpls.length) this.api.consentTemplates().subscribe((t) => (this.consentTpls = t)); }
+  newProc() { this.pf = { id: null, code: '', name: '', category: '', family: '', price: null, description: '', durationMin: 30, active: true, consentTemplateId: null }; this.procOpen = true; this.loadTpls(); }
+  editProc(p: any) { this.pf = { ...p, price: +p.price, consentTemplateId: p.consentTemplateId ?? null }; this.procOpen = true; this.loadTpls(); }
   saveProc() {
     this.busy = true;
     this.api.saveProcedure(this.pf.id, { ...this.pf, price: this.pf.price == null ? null : +this.pf.price }).subscribe({

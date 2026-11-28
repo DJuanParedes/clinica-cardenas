@@ -47,7 +47,7 @@ public class PromotionService {
                                LocalDate validFrom, LocalDate validTo, String conditions, Boolean active) {}
 
     public record ProcedureRequest(String code, String name, String category, String family, BigDecimal price,
-                                   String description, Integer durationMin, Boolean active) {}
+                                   String description, Integer durationMin, Boolean active, Long consentTemplateId) {}
 
     public record Applied(BigDecimal price, BigDecimal listPrice, Long promotionId, String promotionName) {}
 
@@ -184,6 +184,7 @@ public class PromotionService {
         p.price = r.price().setScale(2, RoundingMode.HALF_UP);
         p.description = blank(r.description());
         p.durationMin = r.durationMin();
+        p.consentTemplateId = r.consentTemplateId();
         if (r.active() != null) p.active = r.active();
         procedures.save(p);
         audit.register("PROCEDIMIENTO", p.id, id == null ? "CREAR" : "EDITAR", p.code + " " + p.name + " · S/ " + p.price);

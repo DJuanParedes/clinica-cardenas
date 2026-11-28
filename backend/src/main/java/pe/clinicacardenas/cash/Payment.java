@@ -16,6 +16,8 @@ public class Payment {
     public Long patientId;
     @Column(name = "treatment_item_id")
     public Long treatmentItemId;
+    @jakarta.persistence.Column(name = "appointment_id")
+    public Long appointmentId;
     public BigDecimal amount;
     public String method;
     public String reference;
