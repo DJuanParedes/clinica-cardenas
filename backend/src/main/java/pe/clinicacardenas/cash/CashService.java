@@ -270,6 +270,12 @@ public class CashService {
     public Payment voidPayment(Long id, String reason) {
         Payment pay = payments.findById(id).orElseThrow(() -> ApiException.notFound("El pago"));
         if (!VALIDO.equals(pay.status)) throw ApiException.conflict("PAGO_ANULADO", "El pago ya fue anulado.");
+        // v2.18: un cobro con comprobante aceptado no se anula a escondidas: primero se anula el comprobante.
+        List<String> inv = jdbc.queryForList("""
+                select concat(i.series, '-', i.number) from invoices i join payments p on p.invoice_id = i.id
+                 where p.id = ? and i.status not in ('RECHAZADO','ANULADO')""", String.class, id);
+        if (!inv.isEmpty()) throw ApiException.conflict("PAGO_CON_COMPROBANTE",
+                "Este cobro tiene el comprobante " + inv.get(0) + ". Anula primero el comprobante (nota de crédito) y luego el cobro.");
         if (reason == null || reason.trim().length() < 5) throw ApiException.field("reason", "Explica el motivo de la anulación.");
         Long settled = jdbc.queryForObject("""
                 select count(*) from commission_lines cl join commission_rules r on r.id = cl.rule_id

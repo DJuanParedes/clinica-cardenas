@@ -95,7 +95,11 @@ public class ClinicalService {
     private void applyItemStatus(TreatmentItem i, String status, TreatmentPlan p, List<TreatmentItemDone.Used> used) {
         boolean wasDone = REALIZADO.equals(i.status);
         boolean nowDone = REALIZADO.equals(status);
-        if (PENDIENTE.equals(i.status) && !PENDIENTE.equals(status)) requireConsent(i, p);
+        if (PENDIENTE.equals(i.status) && !PENDIENTE.equals(status)) {
+            if (p.acceptedAt == null) throw ApiException.badRequest("PRESUPUESTO_SIN_ACEPTAR",
+                    "El paciente aún no aceptó el presupuesto del plan «" + p.title + "». Regístralo con «Presupuesto aceptado» antes de empezar.");
+            requireConsent(i, p);
+        }
         if (nowDone && !wasDone) i.doneAppointmentId = pe.clinicacardenas.agenda.AttentionLink.current(jdbc, p.patientId);
         if (wasDone && !nowDone) i.doneAppointmentId = null;
         if (wasDone && !nowDone) {
@@ -433,6 +437,22 @@ public class ClinicalService {
         refreshPlanStatus(p);
         audit.register(HISTORIA, p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
         return planView(p);
+    }
+
+    /** v2.18: el paciente acepta el presupuesto (en la clínica, por WhatsApp o firmado). */
+    @Transactional
+    public TreatmentPlan acceptPlan(Long planId, String via) {
+        TreatmentPlan p = plan(planId);
+        if (ANULADO.equals(p.status)) throw ApiException.badRequest(PLAN_CERRADO, "El plan está anulado.");
+        if (p.acceptedAt != null) return p;
+        String v = via == null ? "PRESENCIAL" : via.trim().toUpperCase();
+        if (!java.util.Set.of("PRESENCIAL", "WHATSAPP", "TELEFONO", "FIRMADO").contains(v)) throw ApiException.field("via", "Medio inválido.");
+        p.acceptedAt = Dates.now();
+        p.acceptedBy = CurrentUser.usernameOrSystem();
+        p.acceptedVia = v;
+        plans.save(p);
+        audit.register(HISTORIA, p.patientId, "PRESUPUESTO_ACEPTADO", p.title + " · " + v);
+        return p;
     }
 
     /** v2.17: si el procedimiento exige un consentimiento informado, debe estar firmado (último año) antes de empezar. */

@@ -103,7 +103,7 @@ public class DeletionService {
                 e("segments", "Segmento", "segments", T_NAME),
                 e("promotions", "Promoción", "promotions", T_NAME),
                 e("inventory_items", "Material de inventario", "inventory_items", T_NAME),
-                e("inventory_purchases", "Compra de inventario", "inventory_purchases", "concat_ws(' · ', t.supplier, t.doc_number, date_format(t.purchase_date, '%d/%m/%Y'))"),
+                new Entity("inventory_purchases", "Compra de inventario", "inventory_purchases", "id", "concat_ws(' · ', t.supplier, t.doc_number, date_format(t.purchase_date, '%d/%m/%Y'))", Set.of(), this::checkPurchase),
                 e("supply_requests", "Pedido de material", "supply_requests", "coalesce(t.item_text, concat('Pedido ', t.id))"),
                 new Entity("expenses", "Egreso de caja", "expenses", "id", "concat_ws(' · ', t.concept, date_format(t.expense_date, '%d/%m/%Y'), concat('S/ ', t.amount))", Set.of(), this::checkExpense),
                 e("waitlist", "Lista de espera", "waitlist", "coalesce((select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), concat('Registro ', t.id))"),
@@ -271,6 +271,36 @@ public class DeletionService {
         }
     }
 
+    /** v2.18: una compra se puede eliminar solo si su material no se usó; al eliminarla se descuenta el stock y se anula su egreso. */
+    private void checkPurchase(Object id, Plan p) {
+        if (count("select count(*) from inventory_lots where purchase_id = ? and remaining < quantity", id) > 0) {
+            p.block("Parte del material de esta compra ya se usó. Registra un ajuste de stock en lugar de eliminarla.");
+        }
+        if (count("""
+                select count(*) from inventory_purchases ip join expenses e on e.id = ip.expense_id
+                  join cash_closings c on c.day = e.expense_date and c.status = 'CERRADA' where ip.id = ?""", id) > 0) {
+            p.block("Su egreso es de un día de caja ya cerrado. Reabre ese día en Cierre de caja para poder eliminarla.");
+        }
+        p.warn("Se descontará del stock lo que entró con esta compra y se anulará su egreso de caja.");
+    }
+
+    /** Revierte el efecto de una compra antes de borrarla: stock, lotes y egreso. */
+    private void reversePurchase(Object id) {
+        for (Map<String, Object> lot : jdbc.queryForList("select id, item_id, quantity from inventory_lots where purchase_id = ?", id)) {
+            Object itemId = lot.get("item_id");
+            jdbc.update("update inventory_items set stock = stock - ?, updated_at = ? where id = ?", lot.get("quantity"), Dates.now(), itemId);
+            jdbc.update("""
+                    insert into inventory_moves (item_id, kind, quantity, stock_after, reason, created_at, created_by)
+                    select id, 'AJUSTE', ?, stock, 'Compra eliminada', ?, ? from inventory_items where id = ?""",
+                    lot.get("quantity"), Dates.now(), CurrentUser.usernameOrSystem(), itemId);
+            jdbc.update("update inventory_moves set lot_id = null where lot_id = ?", lot.get("id"));
+            jdbc.update("delete from inventory_lots where id = ?", lot.get("id"));
+        }
+        jdbc.update("""
+                update expenses set status = 'ANULADO', void_reason = 'Compra de inventario eliminada'
+                 where status = 'VALIDO' and id = (select expense_id from inventory_purchases where id = ?)""", id);
+    }
+
     private void checkSeries(Object id, Plan p) {
         if (count("select count(*) from invoice_series where id = ? and last_number > 0", id) > 0) {
             p.block("Ya se emitieron comprobantes con esta serie: ante SUNAT no se puede borrar, solo desactivar.");
@@ -328,6 +358,7 @@ public class DeletionService {
             @SuppressWarnings("unchecked") List<Map<String, Object>> rows = (List<Map<String, Object>>) copy.get(d[0]);
             rows.addAll(jdbc.queryForList("select * from " + d[0] + WHERE + d[1], params(d[2])));
         }
+        if ("inventory_purchases".equals(x.table())) reversePurchase(id);
         Map<String, Object> nulled = new LinkedHashMap<>();
         for (String[] n : p.nulls) {
             nulled.put(n[0] + "." + n[1], n[3]);

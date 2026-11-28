@@ -283,6 +283,7 @@ public class LabService {
         }
         jdbc.update("update lab_orders set updated_at=?, updated_by=? where id=?", Dates.now(), CurrentUser.usernameOrSystem(), id);
         event(id, to, note);
+        if (RECIBIDA_2.equals(to)) taskToSchedule(id);
         audit.register(LABORATORIO_2, id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
         return get(id);
     }
@@ -376,4 +377,25 @@ public class LabService {
         return t.length() > max ? t.substring(0, max) : t;
     }
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
+
+    /**
+     * v2.18: cuando el trabajo llega del laboratorio se crea una tarea para llamar al paciente y citarlo
+     * para la prueba o instalación. Se asigna a quien creó la orden (o queda sin responsable).
+     */
+    private void taskToSchedule(Long orderId) {
+        List<Map<String, Object>> o = jdbc.queryForList("""
+                select o.patient_id, o.description, u.id as user_id from lab_orders o
+                  left join users u on u.username = o.created_by where o.id = ?""", orderId);
+        if (o.isEmpty()) return;
+        Long open = jdbc.queryForObject("select count(*) from tasks where origin = 'LABORATORIO' and origin_ref = ? and status = 'PENDIENTE'",
+                Long.class, String.valueOf(orderId));
+        if (open != null && open > 0) return;
+        Map<String, Object> r = o.get(0);
+        jdbc.update("""
+                insert into tasks (patient_id, kind, title, notes, assignee_id, due_date, priority, status, origin, origin_ref, created_by, created_at)
+                values (?, 'LLAMAR', ?, ?, ?, ?, 'ALTA', 'PENDIENTE', 'LABORATORIO', ?, ?, ?)""",
+                r.get("patient_id"), "Citar para prueba/instalación del trabajo de laboratorio",
+                "Llegó del laboratorio: " + r.get("description") + " (LAB-" + String.format("%05d", orderId) + ").",
+                r.get("user_id"), Dates.today(), String.valueOf(orderId), CurrentUser.usernameOrSystem(), Dates.now());
+    }
 }

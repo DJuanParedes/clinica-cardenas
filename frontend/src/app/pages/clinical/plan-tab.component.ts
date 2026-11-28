@@ -39,6 +39,19 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
           <div>
             <div class="row"><h3>{{ v.plan.title }}</h3><span class="tag" [class]="'tag ' + planTone(v.plan.status)">{{ planLabel(v.plan.status) }}</span> <app-delete-button entity="treatment_plans" [recordId]="v.plan.id" what="Plan de tratamiento" [iconOnly]="true" [ghost]="true" (deleted)="load()" /></div>
             <p class="muted small">{{ v.plan.dentist?.fullName || v.plan.createdBy }} · creado {{ date(v.plan.createdAt) }}@if (v.plan.notes) { · {{ v.plan.notes }} }</p>
+            @if (v.plan.status !== 'ANULADO') {
+              @if (v.plan.acceptedAt) {
+                <p class="small ok-accept">✔ Presupuesto aceptado el {{ date(v.plan.acceptedAt) }}@if (v.plan.acceptedVia && v.plan.acceptedVia !== 'PREVIO') { · {{ viaLabel(v.plan.acceptedVia) }} }</p>
+              } @else {
+                <div class="accept-bar small">
+                  <span>El paciente aún no aceptó el presupuesto: no se puede empezar el tratamiento.</span>
+                  @if (canEdit) {
+                    <select class="input sm" [(ngModel)]="acceptVia" [name]="'av' + v.plan.id"><option value="PRESENCIAL">En la clínica</option><option value="FIRMADO">Firmado</option><option value="WHATSAPP">Por WhatsApp</option><option value="TELEFONO">Por teléfono</option></select>
+                    <button class="btn sm primary" type="button" (click)="accept(v.plan)">Presupuesto aceptado</button>
+                  }
+                </div>
+              }
+            }
           </div>
           <div class="progress" [attr.aria-label]="'Avance ' + v.doneCount + ' de ' + v.itemCount">
             <div class="spread small"><span class="strong">{{ v.doneCount }} de {{ v.itemCount }} realizados</span><span class="tabular">{{ money(v.doneAmount) }} / {{ money(v.total) }}</span></div>
@@ -218,6 +231,9 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
     .evo-form { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
     .two { grid-template-columns: 150px 1fr; gap: 8px; }
     .evolist { list-style: none; margin: 0; padding: 0; font-size: var(--step--1); }
+    .accept-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #fff7e6; border-radius: 6px; padding: 6px 10px; margin: 4px 0 8px; }
+    .accept-bar .input.sm { width: auto; height: 30px; }
+    .ok-accept { color: #1a7f4b; margin: 2px 0 8px; }
     .evolist li { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
     .evolist li:last-child { border-bottom: 0; }
     .evolist .date { color: var(--muted); }
@@ -425,6 +441,15 @@ export class PlanTabComponent implements OnInit {
     this.api.voidEvolution(e.id, reason).subscribe({
       next: (u) => { Object.assign(e, u); this.toast.ok('Evolución anulada.'); },
       error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
+
+  acceptVia = 'PRESENCIAL';
+  viaLabel(v: string) { return ({ PRESENCIAL: 'en la clínica', FIRMADO: 'firmado', WHATSAPP: 'por WhatsApp', TELEFONO: 'por teléfono' } as any)[v] || v; }
+  accept(p: any) {
+    this.api.acceptPlan(p.id, this.acceptVia).subscribe({
+      next: (u) => { Object.assign(p, u); this.toast.ok('Presupuesto aceptado. Ya se puede empezar el tratamiento.'); },
+      error: (e) => this.toast.error(apiError(e).message),
     });
   }
 }
