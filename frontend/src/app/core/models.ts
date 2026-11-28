@@ -45,12 +45,12 @@ export interface ClinicalHistory {
   surgeries?: string; habits?: string; familyBackground?: string; observations?: string; updatedAt?: string; updatedBy?: string;
 }
 
-export interface Diagnosis { id: number; cie10Code?: string; description: string; tooth?: number; createdAt: string; createdBy: string; dentist?: Dentist; }
+export interface Diagnosis { voidedAt?: string; voidedBy?: string; voidReason?: string; id: number; cie10Code?: string; description: string; tooth?: number; createdAt: string; createdBy: string; dentist?: Dentist; }
 
 export interface OdontogramEntry { tooth: number; face: string; condition: string; note?: string; recordedAt?: string; recordedBy?: string; }
 
 export interface TreatmentItem { id: number; planId: number; procedure: Procedure; tooth?: number; price: number; status: string; doneAt?: string; invoiceId?: number; }
-export interface Evolution { id: number; planId: number; itemId?: number; sessionDate: string; notes: string; createdBy: string; dentist?: Dentist; }
+export interface Evolution { voidedAt?: string; voidedBy?: string; voidReason?: string; id: number; planId: number; itemId?: number; sessionDate: string; notes: string; createdBy: string; dentist?: Dentist; }
 export interface TreatmentPlan { id: number; title: string; notes?: string; status: string; createdAt: string; createdBy: string; dentist?: Dentist; }
 export interface PlanView { plan: TreatmentPlan; items: TreatmentItem[]; evolutions: Evolution[]; total: number; doneAmount: number; doneCount: number; itemCount: number; }
 
