@@ -234,6 +234,7 @@ export class Api {
     return this.http.post<any>(`/api/admin/records/${entity}/${id}/delete`, { confirm, reason });
   }
   trash(): Observable<any[]> { return this.http.get<any[]>('/api/admin/records/trash'); }
+  restoreTrash(id: number): Observable<any> { return this.http.post(`/api/admin/records/trash/${id}/restore`, {}); }
   trashData(id: number): Observable<Blob> { return this.http.get(`/api/admin/records/trash/${id}`, { responseType: 'blob' }); }
   start2faEmail(): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/start', {}); }
   enable2faEmail(code: string): Observable<any> { return this.http.post<any>('/api/auth/2fa/email/enable', { code }); }

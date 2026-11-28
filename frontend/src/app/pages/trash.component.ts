@@ -1,6 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api.service';
+import { ToastService } from '../core/toast.service';
+import { apiError } from '../core/format';
 import { dateTime } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
@@ -46,7 +48,13 @@ const TITLES: Record<string, string> = {
                   <td class="muted small">{{ r.summary }}</td>
                   <td class="small">{{ r.reason || '—' }}</td>
                   <td>{{ r.deletedBy }}</td>
-                  <td class="right"><button class="btn sm" type="button" (click)="download(r)"><app-icon name="download" [size]="14" /> Copia</button></td>
+                  <td class="right"><div class="acts">
+                    @if (r.restoredAt) { <span class="tag plain green">Restaurado</span> }
+                    @else if (r.restorable) {
+                      <button class="btn sm" type="button" [disabled]="busy === r.id" (click)="restore(r)">{{ pending === r.id ? '¿Restaurar? Confirmar' : 'Restaurar' }}</button>
+                    }
+                    <button class="btn sm" type="button" (click)="download(r)"><app-icon name="download" [size]="14" /> Copia</button>
+                  </div></td>
                 </tr>
               }
             </tbody>
@@ -55,11 +63,25 @@ const TITLES: Record<string, string> = {
       }
     </div>
   `,
-  styles: [`.search { max-width: 260px; } .empty { text-align: center; padding: 40px; color: var(--muted); }`],
+  styles: [`
+    .acts { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }.search { max-width: 260px; } .empty { text-align: center; padding: 40px; color: var(--muted); }`],
 })
 export class TrashComponent implements OnInit {
   private api = inject(Api);
+  private toast = inject(ToastService);
   rows: any[] | null = null;
+  pending: number | null = null;
+  busy: number | null = null;
+
+  /** v2.20: primer clic pide confirmación; el segundo restaura el registro con lo que se borró junto con él. */
+  restore(r: any) {
+    if (this.pending !== r.id) { this.pending = r.id; return; }
+    this.busy = r.id;
+    this.api.restoreTrash(r.id).subscribe({
+      next: (x) => { this.busy = null; this.pending = null; this.toast.ok(`Restaurado: ${x.label}.`); this.ngOnInit(); },
+      error: (err) => { this.busy = null; this.pending = null; this.toast.error(apiError(err).message); },
+    });
+  }
   q = '';
   dt = dateTime;
 
