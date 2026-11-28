@@ -11,13 +11,14 @@ import { ModalComponent } from '../../shared/modal.component';
 import { InstallmentsComponent } from './installments.component';
 
 import { OnlyDirective } from '../../shared/only.directive';
+import { VoidButtonComponent } from '../../shared/void-button.component';
 interface DraftItem { procedureId: number | null; tooth: number | null; price: number | null; }
 
 /** HU-06: plan de tratamiento y evolución por sesión. */
 @Component({
   selector: 'app-plan-tab',
   standalone: true,
-  imports: [OnlyDirective, DeleteButtonComponent, FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
+  imports: [OnlyDirective, DeleteButtonComponent, VoidButtonComponent, FormsModule, IconComponent, ModalComponent, InstallmentsComponent],
   template: `
     <div class="spread head">
       <p class="muted small">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }} · los procedimientos realizados quedan disponibles para facturar en caja.</p>
@@ -94,13 +95,15 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
             }
             <ol class="evolist">
               @for (e of v.evolutions; track e.id) {
-                <li>
+                <li [class.voided]="e.voidedAt">
                   <span class="date tabular">{{ date(e.sessionDate) }}</span>
-                  <div>
+                  <div class="grow">
                     @if (e.itemId) { <div class="strong small">{{ itemName(v, e.itemId) }}</div> }
-                    <div>{{ e.notes }}</div>
+                    <div class="txt">{{ e.notes }}</div>
                     <div class="muted small">{{ e.dentist?.fullName || e.createdBy }}</div>
+                    @if (e.voidedAt) { <div class="small void-note">Anulada por {{ e.voidedBy }}: {{ e.voidReason }}</div> }
                   </div>
+                  @if (!e.voidedAt && canEdit) { <app-void-button what="evolución" (confirm)="voidEvo(e, $event)" /> }
                 </li>
               } @empty {
                 <li class="muted small">Aún no hay sesiones registradas.</li>
@@ -215,7 +218,7 @@ interface DraftItem { procedureId: number | null; tooth: number | null; price: n
     .evo-form { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
     .two { grid-template-columns: 150px 1fr; gap: 8px; }
     .evolist { list-style: none; margin: 0; padding: 0; font-size: var(--step--1); }
-    .evolist li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+    .evolist li { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
     .evolist li:last-child { border-bottom: 0; }
     .evolist .date { color: var(--muted); }
     .items { display: flex; flex-direction: column; gap: 8px; }
@@ -411,4 +414,11 @@ export class PlanTabComponent implements OnInit {
   itemTone(s: string) { return ITEM_TONE[s] || 'grey'; }
   money = soles;
   date = shortDate;
+
+  voidEvo(e: any, reason: string) {
+    this.api.voidEvolution(e.id, reason).subscribe({
+      next: (u) => { Object.assign(e, u); this.toast.ok('Evolución anulada.'); },
+      error: (err) => this.toast.error(apiError(err).message),
+    });
+  }
 }

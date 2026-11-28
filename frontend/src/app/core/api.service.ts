@@ -299,6 +299,9 @@ export class Api {
     return this.http.get<Page<Invoice>>('/api/billing/invoices', { params: params(f) });
   }
   createInvoice(body: any): Observable<InvoiceDetail> { return this.http.post<InvoiceDetail>('/api/billing/invoices', body); }
+  allSeries(): Observable<any[]> { return this.http.get<any[]>('/api/billing/series/all'); }
+  createSeries(body: any): Observable<any> { return this.http.post('/api/billing/series', body); }
+  updateSeries(id: number, body: any): Observable<any> { return this.http.put(`/api/billing/series/${id}`, body); }
   invoice(id: number): Observable<InvoiceDetail> { return this.http.get<InvoiceDetail>(`/api/billing/invoices/${id}`); }
   sendInvoice(id: number): Observable<InvoiceDetail> { return this.http.post<InvoiceDetail>(`/api/billing/invoices/${id}/send`, {}); }
   invoiceStatus(id: number): Observable<InvoiceDetail> { return this.http.post<InvoiceDetail>(`/api/billing/invoices/${id}/status`, {}); }
@@ -401,6 +404,8 @@ export class Api {
   fileContent(id: number): Observable<Blob> { return this.http.get(`/api/files/${id}/content`, { responseType: 'blob' }); }
   shareFile(id: number, sharedWithPatient: boolean): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, { sharedWithPatient }); }
   updateFile(id: number, body: { title?: string; kind?: string; note?: string; tooth?: number | null }): Observable<PatientFile> { return this.http.patch<PatientFile>(`/api/files/${id}`, body); }
+  voidDiagnosis(id: number, reason: string): Observable<any> { return this.http.post(`/api/diagnoses/${id}/void`, { reason }); }
+  voidEvolution(id: number, reason: string): Observable<any> { return this.http.post(`/api/evolutions/${id}/void`, { reason }); }
   deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }
 
   // ---------- inventario

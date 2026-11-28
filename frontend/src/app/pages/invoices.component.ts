@@ -7,11 +7,14 @@ import { INVOICE_LABEL, INVOICE_TONE, shortDate, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 
 import { OnlyDirective } from '../shared/only.directive';
+import { ModalComponent } from '../shared/modal.component';
+import { SeriesAdminComponent } from '../shared/series-admin.component';
+import { AuthService } from '../core/auth.service';
 /** HU-12: consultar comprobantes por número, cliente, estado y fecha. */
 @Component({
   selector: 'app-invoices',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent],
+  imports: [OnlyDirective, FormsModule, RouterLink, IconComponent, ModalComponent, SeriesAdminComponent],
   template: `
     <div class="page">
       <div class="page-head">
@@ -19,7 +22,7 @@ import { OnlyDirective } from '../shared/only.directive';
           <h1>Comprobantes</h1>
           <p class="sub">Boletas y facturas electrónicas con su estado ante SUNAT.</p>
         </div>
-        <div class="actions"><a class="btn primary" routerLink="/comprobantes/nuevo"><app-icon name="plus" [size]="16" /> Emitir comprobante</a></div>
+        <div class="actions">@if (auth.can('USUARIOS')) { <button class="btn" type="button" (click)="seriesOpen = true">Series</button> }<a class="btn primary" routerLink="/comprobantes/nuevo"><app-icon name="plus" [size]="16" /> Emitir comprobante</a></div>
       </div>
 
       <form class="filters panel" (ngSubmit)="search(0)">
@@ -79,7 +82,11 @@ import { OnlyDirective } from '../shared/only.directive';
         }
       </section>
     </div>
-  `,
+  
+    <app-modal [open]="seriesOpen" title="Series de comprobantes" [width]="640" (close)="seriesOpen = false">
+      @if (seriesOpen) { <app-series-admin /> }
+    </app-modal>
+`,
   styles: [`
     .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 14px 16px; margin-bottom: 16px; }
     .filters .grow { min-width: 220px; }
@@ -122,4 +129,6 @@ export class InvoicesComponent implements OnInit, OnChanges {
   statusTone(s: string) { return INVOICE_TONE[s] || 'grey'; }
   money = soles;
   date = shortDate;
+  auth = inject(AuthService);
+  seriesOpen = false;
 }

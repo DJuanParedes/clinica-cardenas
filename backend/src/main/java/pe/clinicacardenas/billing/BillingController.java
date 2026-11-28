@@ -31,6 +31,26 @@ public class BillingController {
         return service.activeSeries();
     }
 
+    /** v2.16: administración de series (crear, editar, activar/desactivar). Eliminar va por la papelera. */
+    @GetMapping("/series/all")
+    @PreAuthorize("hasAuthority('USUARIOS')")
+    public List<InvoiceSeries> allSeries() {
+        return service.allSeries();
+    }
+
+    @PostMapping("/series")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('USUARIOS')")
+    public InvoiceSeries createSeries(@RequestBody BillingService.SeriesRequest r) {
+        return service.saveSeries(null, r);
+    }
+
+    @PutMapping("/series/{id}")
+    @PreAuthorize("hasAuthority('USUARIOS')")
+    public InvoiceSeries updateSeries(@PathVariable Long id, @RequestBody BillingService.SeriesRequest r) {
+        return service.saveSeries(id, r);
+    }
+
     @GetMapping("/company")
     public UblBuilder.Company company() {
         return service.company();

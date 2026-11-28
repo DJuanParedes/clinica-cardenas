@@ -7,6 +7,8 @@ import { apiError, dateTime } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
 
 import { OnlyDirective } from '../../shared/only.directive';
+import { VoidButtonComponent } from '../../shared/void-button.component';
+import { AuthService } from '../../core/auth.service';
 const CIE10 = [
   { c: 'K02.0', d: 'Caries limitada al esmalte' },
   { c: 'K02.1', d: 'Caries de la dentina' },
@@ -37,7 +39,7 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
 @Component({
   selector: 'app-history-tab',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent, VoidButtonComponent],
   template: `
     @if (alerts.length) {
       <div class="notice gum alerts" role="alert">
@@ -113,12 +115,14 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
         </form>
         <ul class="dxlist">
           @for (d of diagnoses; track d.id) {
-            <li>
+            <li [class.voided]="d.voidedAt">
               @if (d.cie10Code) { <span class="code tabular">{{ d.cie10Code }}</span> }
               <div class="grow">
-                <div>{{ d.description }}@if (d.tooth) { <span class="muted"> · pieza {{ d.tooth }}</span> }</div>
+                <div class="txt">{{ d.description }}@if (d.tooth) { <span class="muted"> · pieza {{ d.tooth }}</span> }</div>
                 <div class="muted small">{{ dt(d.createdAt) }} · {{ d.dentist?.fullName || d.createdBy }}</div>
+                @if (d.voidedAt) { <div class="small void-note">Anulado por {{ d.voidedBy }} el {{ dt(d.voidedAt) }}: {{ d.voidReason }}</div> }
               </div>
+              @if (!d.voidedAt && auth.can('HISTORIA_CLINICA')) { <app-void-button what="diagnóstico" (confirm)="voidDx(d, $event)" /> }
             </li>
           } @empty {
             <li class="muted small">Sin diagnósticos registrados.</li>
@@ -205,4 +209,12 @@ export class HistoryTabComponent implements OnInit {
   }
 
   dt = dateTime;
+
+  auth = inject(AuthService);
+  voidDx(d: Diagnosis, reason: string) {
+    this.api.voidDiagnosis(d.id, reason).subscribe({
+      next: (u) => { Object.assign(d, u); this.toast.ok('Diagnóstico anulado.'); },
+      error: (e) => this.toast.error(apiError(e).message),
+    });
+  }
 }
