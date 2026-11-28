@@ -118,7 +118,7 @@ public class AnnualReportService {
         s.put(INCOME, income);
         s.put(EXPENSES, expenses);
         s.put(RESULT, income.subtract(expenses));
-        s.put(INVOICED, num("select coalesce(sum(total_amount), 0) from invoices where status = 'ACEPTADO' and doc_type <> '07' and issue_date >= ? and issue_date < ?", a.toLocalDate(), b.toLocalDate()));
+        s.put(INVOICED, num("select coalesce(sum(total_amount), 0) from invoices where status in ('ACEPTADO', 'OBSERVADO') and doc_type <> '07' and issue_date >= ? and issue_date < ?", a.toLocalDate(), b.toLocalDate()));
         s.put(NEWPATIENTS, cnt("select count(*) from patients where created_at >= ? and created_at < ?", a, b));
         s.put(ATTENDEDPATIENTS, cnt("select count(distinct patient_id) from appointments where status = 'ATENDIDA' and start_at >= ? and start_at < ?", a, b));
         long total = cnt("select count(*) from appointments where start_at >= ? and start_at < ?", a, b);

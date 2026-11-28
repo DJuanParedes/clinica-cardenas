@@ -29,6 +29,9 @@ import java.util.*;
  */
 @Service
 public class PortalExtrasService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pe.clinicacardenas.portal.SurveyFollowUp followUp;
+
     private static final String AMOUNT = "amount";
     private static final String DURATIONMIN = "durationMin";
     private static final String LABEL = "label";
@@ -376,6 +379,7 @@ public class PortalExtrasService {
         s.comment = r.comment() == null || r.comment().isBlank() ? null : r.comment().trim().substring(0, Math.min(500, r.comment().trim().length()));
         s.createdAt = Dates.now();
         surveys.save(s);
+        if (followUp != null) followUp.afterRating(s);
         return Map.of(MESSAGE, "¡Gracias por tu calificación!");
     }
 

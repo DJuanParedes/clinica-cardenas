@@ -284,6 +284,14 @@ public class LabService {
         jdbc.update("update lab_orders set updated_at=?, updated_by=? where id=?", Dates.now(), CurrentUser.usernameOrSystem(), id);
         event(id, to, note);
         if (RECIBIDA_2.equals(to)) taskToSchedule(id);
+        if (ENTREGADA_2.equals(to) || ANULADA.equals(to)) {
+            // v2.19.3: si el trabajo ya se instaló (o se anuló la orden), la tarea de citar al paciente deja de estar pendiente.
+            boolean delivered = ENTREGADA_2.equals(to);
+            jdbc.update("update tasks set status = ?, result = ?, completed_at = ?, completed_by = ?, updated_at = ?"
+                            + " where origin = 'LABORATORIO' and origin_ref = ? and status = 'PENDIENTE'",
+                    delivered ? "HECHA" : "CANCELADA", delivered ? "Trabajo entregado al paciente" : "Orden anulada",
+                    Dates.now(), CurrentUser.usernameOrSystem(), Dates.now(), String.valueOf(id));
+        }
         audit.register(LABORATORIO_2, id, "ESTADO", label(from) + " → " + label(to) + (note == null ? "" : " · " + note));
         return get(id);
     }

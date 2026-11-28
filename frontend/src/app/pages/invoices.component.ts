@@ -40,7 +40,7 @@ import { AuthService } from '../core/auth.service';
         <div class="field">
           <label for="dt">Tipo</label>
           <select id="dt" name="dt" class="input" [(ngModel)]="docType" (ngModelChange)="search(0)">
-            <option value="">Todos</option><option value="03">Boletas</option><option value="01">Facturas</option><option value="07">Notas de crédito</option><option value="07">Notas de crédito</option>
+            <option value="">Todos</option><option value="03">Boletas</option><option value="01">Facturas</option><option value="07">Notas de crédito</option>
           </select>
         </div>
         <div class="field"><label for="f">Desde</label><input id="f" name="f" type="date" class="input" [(ngModel)]="from" /></div>
@@ -61,7 +61,7 @@ import { AuthService } from '../core/auth.service';
               @if (!page) { @for (i of [1,2,3,4]; track i) { <tr><td colspan="5"><div class="skeleton" style="height: 20px"></div></td></tr> } }
               @for (inv of page?.content || []; track inv.id) {
                 <tr class="click" (click)="open(inv)" tabindex="0" (keydown.enter)="open(inv)">
-                  <td><span class="strong tabular">{{ inv.series }}-{{ inv.number }}</span><div class="muted small">{{ inv.docType === '01' ? 'Factura' : 'Boleta' }}</div></td>
+                  <td><span class="strong tabular">{{ inv.series }}-{{ inv.number }}</span><div class="muted small">{{ inv.docType === '07' ? 'Nota de crédito' : inv.docType === '01' ? 'Factura' : 'Boleta' }}</div></td>
                   <td class="tabular">{{ date(inv.issueDate) }}<div class="muted small">{{ inv.issueTime.substring(0, 5) }}</div></td>
                   <td>{{ inv.customerName }}<div class="muted small tabular">{{ inv.customerDocNumber }}</div></td>
                   <td class="num tabular strong">{{ money(inv.totalAmount) }}</td>
