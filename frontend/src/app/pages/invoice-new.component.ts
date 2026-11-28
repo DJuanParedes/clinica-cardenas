@@ -76,7 +76,7 @@ const BOLETA_LIMIT = 700;
                   <input id="cdn" class="input tabular" [class.invalid]="e['customerDocNumber']" [(ngModel)]="customer.docNumber"
                          (ngModelChange)="onDocNumber($event)"
                          [attr.maxlength]="customer.docType === '6' ? 11 : customer.docType === '1' ? 8 : 12" inputmode="numeric"
-                         [appOnly]="customer.docType === '1' || customer.docType === '6' ? 'digits' : 'alnum'" />
+                         [appOnly]="customer.docType === '7' ? 'alnum' : 'digits'" />
                   @if (e['customerDocNumber']) { <span class="err">{{ e['customerDocNumber'] }}</span> }
                   @else if (customer.docType === '6' && customer.docNumber.length === 11) {
                     @if (!rucOk) { <span class="hint">Dígito verificador incorrecto</span> }
@@ -308,7 +308,7 @@ export class InvoiceNewComponent implements OnInit {
   cleanCustomerDoc() {
     const c = this.customer, t = c.docType;
     const v = (c.docNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    c.docNumber = (t === '1' || t === '6' ? v.replace(/\D/g, '') : v).slice(0, t === '6' ? 11 : t === '1' ? 8 : 12);
+    c.docNumber = (t === '7' ? v : v.replace(/\D/g, '')).slice(0, t === '6' ? 11 : t === '1' ? 8 : 12);
   }
 
   private validate(): boolean {

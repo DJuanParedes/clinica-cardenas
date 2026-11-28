@@ -165,7 +165,7 @@ export const REL_LABEL: Record<string, string> = {
               <label for="rdt">Documento</label>
               <div class="row">
                 <select id="rdt" name="rdt" class="input narrow" [(ngModel)]="r.docType"><option value="DNI">DNI</option><option value="CE">CE</option><option value="PAS">Pasaporte</option></select>
-                <input name="rdn" class="input tabular" [class.invalid]="re['docNumber']" [(ngModel)]="r.docNumber" maxlength="12" appOnly="alnum" aria-label="Número de documento" />
+                <input name="rdn" class="input tabular" [class.invalid]="re['docNumber']" [(ngModel)]="r.docNumber" maxlength="12" [appOnly]="r.docType === 'PAS' ? 'alnum' : 'digits'" aria-label="Número de documento" />
               </div>
               @if (re['docNumber']) { <span class="err">{{ re['docNumber'] }}</span> }
             </div>

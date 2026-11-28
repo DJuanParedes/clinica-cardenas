@@ -27,7 +27,7 @@ import { OnlyDirective } from '../shared/only.directive';
           <div class="grid2">
             <div class="field"><label class="req" for="sn">Nombre completo de quien firma</label><input id="sn" name="sn" class="input" [(ngModel)]="f.signerName" maxlength="120" autocomplete="name" [class.invalid]="e['signerName']" appOnly="letters" />
               @if (e['signerName']) { <span class="err">{{ e['signerName'] }}</span> }</div>
-            <div class="field"><label class="req" for="sd">DNI o carné de extranjería</label><input id="sd" name="sd" class="input tabular" [(ngModel)]="f.signerDoc" maxlength="12" appOnly="alnum" inputmode="numeric" [class.invalid]="e['signerDoc']" />
+            <div class="field"><label class="req" for="sd">DNI o carné de extranjería</label><input id="sd" name="sd" class="input tabular" [(ngModel)]="f.signerDoc" maxlength="12" appOnly="digits" inputmode="numeric" inputmode="numeric" [class.invalid]="e['signerDoc']" />
               @if (e['signerDoc']) { <span class="err">{{ e['signerDoc'] }}</span> }</div>
             @if (d.minor) {
               <div class="field span2"><label class="req" for="sr">Firmo como</label><select id="sr" name="sr" class="input" [(ngModel)]="f.relationship" [class.invalid]="e['relationship']">

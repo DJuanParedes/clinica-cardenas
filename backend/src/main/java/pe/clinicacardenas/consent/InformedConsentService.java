@@ -298,7 +298,7 @@ public class InformedConsentService {
         String name = s.signerName() == null ? "" : s.signerName().trim().replaceAll("\\s+", " ");
         if (name.length() < 5 || name.length() > 120) e.put("signerName", "Escribe tu nombre completo.");
         String doc = s.signerDoc() == null ? "" : s.signerDoc().trim();
-        if (!doc.matches("\\d{8}|[A-Za-z0-9]{9,12}")) e.put(SIGNERDOC, "Escribe tu DNI (8 dígitos) o carné de extranjería.");
+        if (!doc.matches("\\d{8}|\\d{9,12}")) e.put(SIGNERDOC, "Escribe tu DNI (8 dígitos) o carné de extranjería.");
         String rel = s.relationship() == null || s.relationship().isBlank() ? PACIENTE : s.relationship().trim().toUpperCase();
         if (!REL.containsKey(rel)) e.put(RELATIONSHIP, "Indica quién firma.");
         if (p.isMinor() && PACIENTE.equals(rel)) e.put(RELATIONSHIP, "El paciente es menor de edad: firma su madre, padre o tutor.");
