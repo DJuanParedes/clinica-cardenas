@@ -68,7 +68,7 @@ import { OnlyDirective } from '../shared/only.directive';
               @if (e['fullName']) { <span class="err">{{ e['fullName'] }}</span> }</label>
             <label>Tipo de documento<select class="input" [(ngModel)]="f.docType">
               <option value="DNI">DNI</option><option value="CE">Carné de extranjería</option><option value="PASAPORTE">Pasaporte</option><option value="RUC">RUC</option></select></label>
-            <label>N.° de documento<input class="input" [(ngModel)]="f.docNumber" maxlength="15" appOnly="alnum" inputmode="numeric" [class.invalid]="e['docNumber']" />
+            <label>N.° de documento<input class="input" [(ngModel)]="f.docNumber" maxlength="15" [appOnly]="f.docType === 'PAS' || f.docType === 'PASAPORTE' ? 'alnum' : 'digits'" inputmode="numeric" [class.invalid]="e['docNumber']" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }</label>
             <label class="span2">Domicilio<input class="input" [(ngModel)]="f.address" maxlength="250" autocomplete="street-address" [class.invalid]="e['address']" appOnly="text" />
               @if (e['address']) { <span class="err">{{ e['address'] }}</span> }</label>

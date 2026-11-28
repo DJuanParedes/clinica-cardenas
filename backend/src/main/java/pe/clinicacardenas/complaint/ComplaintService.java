@@ -594,7 +594,7 @@ public class ComplaintService {
         return switch (type) {
             case "DNI" -> doc.matches("\\d{8}");
             case "RUC" -> doc.matches("(10|15|17|20)\\d{9}");
-            case "CE" -> doc.matches("[0-9A-Z]{8,12}");
+            case "CE" -> doc.matches("\\d{9,12}");
             default -> doc.matches("[0-9A-Z]{6,15}");
         };
     }

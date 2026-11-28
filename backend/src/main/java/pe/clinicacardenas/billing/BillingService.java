@@ -122,7 +122,7 @@ public class BillingService {
         } else {
             switch (cdt) {
                 case "1" -> { if (!doc.matches("^\\d{8}$")) e.put(CUSTOMERDOCNUMBER, "El DNI debe tener 8 dígitos."); }
-                case "4" -> { if (!doc.matches("^[A-Za-z0-9]{9,12}$")) e.put(CUSTOMERDOCNUMBER, "Carné de extranjería inválido."); }
+                case "4" -> { if (!doc.matches("^\\d{9,12}$")) e.put(CUSTOMERDOCNUMBER, "Carné de extranjería inválido."); }
                 case "7" -> { if (!doc.matches("^[A-Za-z0-9]{6,12}$")) e.put(CUSTOMERDOCNUMBER, "Pasaporte inválido."); }
                 case "6" -> { if (!RucValidator.isValid(doc)) e.put(CUSTOMERDOCNUMBER, "El RUC no es válido."); }
                 case "0" -> {
