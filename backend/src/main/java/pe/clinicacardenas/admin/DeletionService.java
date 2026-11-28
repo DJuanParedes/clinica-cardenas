@@ -107,6 +107,8 @@ public class DeletionService {
                 e("supply_requests", "Pedido de material", "supply_requests", "coalesce(t.item_text, concat('Pedido ', t.id))"),
                 new Entity("expenses", "Egreso de caja", "expenses", "id", "concat_ws(' · ', t.concept, date_format(t.expense_date, '%d/%m/%Y'), concat('S/ ', t.amount))", Set.of(), this::checkExpense),
                 e("waitlist", "Lista de espera", "waitlist", "coalesce((select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), concat('Registro ', t.id))"),
+                e("ortho_cases", "Caso de ortodoncia", "ortho_cases", "concat_ws(' · ', (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), t.appliance, date_format(t.start_date, '%d/%m/%Y'))"),
+                e("periodontograms", "Periodontograma", "periodontograms", "concat_ws(' · ', (select concat(p.first_name, ' ', p.last_name) from patients p where p.id = t.patient_id), date_format(t.exam_date, '%d/%m/%Y'))"),
                 e("patient_notes", "Nota del paciente", "patient_notes", "left(t.text, 80)"),
                 e("assistant_faq", "Pregunta frecuente del asistente", "assistant_faq", "left(t.question, 80)"),
                 new Entity("invoice_series", "Serie de comprobantes", "invoice_series", "id", "concat(t.doc_type, ' ', t.series)", Set.of(), this::checkSeries)
