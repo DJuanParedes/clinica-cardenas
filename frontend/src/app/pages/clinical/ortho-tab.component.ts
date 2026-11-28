@@ -6,11 +6,12 @@ import { ToastService } from '../../core/toast.service';
 import { ModalComponent } from '../../shared/modal.component';
 
 import { OnlyDirective } from '../../shared/only.directive';
+import { DeleteButtonComponent } from '../../shared/delete-button.component';
 /** v2.8: ortodoncia del paciente: caso, controles y álbumes de fotos por etapa (las fotos son archivos de su ficha). */
 @Component({
   selector: 'app-ortho-tab',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, ModalComponent],
+  imports: [OnlyDirective, FormsModule, ModalComponent, DeleteButtonComponent],
   template: `
     @if (!opts || !cases) { <div class="skeleton" style="height: 200px"></div> }
     @else if (!c) {
@@ -32,6 +33,7 @@ import { OnlyDirective } from '../../shared/only.directive';
           <div><div class="muted small">Etapa actual</div><strong>{{ c.currentStageLabel }}</strong></div>
           <div><div class="muted small">Estado</div><span class="tag" [class.green]="c.status === 'ACTIVO'" [class.blue]="c.status === 'RETENCION'">{{ c.statusLabel }}</span></div>
           <div class="acts"><button class="btn sm" type="button" (click)="openCase(c)">Editar caso</button>
+            <app-delete-button entity="ortho_cases" [recordId]="c.id" what="Caso de ortodoncia" [ghost]="true" (deleted)="load()" />
             @if (c.status === 'ACTIVO' || c.status === 'RETENCION') { <button class="btn sm primary" type="button" (click)="openControl()">+ Control</button> }</div>
         </div>
         @if (c.diagnosis || c.objectives || c.angleClass) {
