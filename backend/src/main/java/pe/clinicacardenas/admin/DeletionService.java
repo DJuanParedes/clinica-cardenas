@@ -387,6 +387,18 @@ public class DeletionService {
         }
         if ("inventory_purchases".equals(x.table())) reversePurchase(id);
         if (LAB_ORDERS.equals(x.table())) voidLabPayments(id);
+        // v2.20: orden exacto del borrado y filas desvinculadas, para poder restaurar desde la papelera.
+        List<Map<String, Object>> order = new ArrayList<>();
+        for (String[] d : p.deletes) {
+            order.add(Map.of("table", d[0], "rows", jdbc.queryForList("select * from " + d[0] + WHERE + d[1], params(d[2]))));
+        }
+        List<Map<String, Object>> relink = new ArrayList<>();
+        for (String[] n : p.nulls) {
+            if (tablesWithId.get().contains(n[0])) {
+                relink.add(Map.of("table", n[0], "column", n[1],
+                        "rows", jdbc.queryForList("select id, " + n[1] + " as value from " + n[0] + WHERE + n[2], params(n[3]))));
+            }
+        }
         Map<String, Object> nulled = new LinkedHashMap<>();
         for (String[] n : p.nulls) {
             nulled.put(n[0] + "." + n[1], n[3]);
@@ -400,7 +412,7 @@ public class DeletionService {
                 .map(en -> en.getValue() + " " + en.getKey()).reduce((a, b) -> a + ", " + b).orElse("");
         String data;
         try {
-            data = json.writeValueAsString(Map.of("deleted", copy, "unlinked", nulled));
+            data = json.writeValueAsString(Map.of("deleted", copy, "unlinked", nulled, "order", order, "relink", relink));
         } catch (Exception ex) {
             throw new IllegalStateException("No se pudo guardar la copia de lo eliminado", ex);
         }
@@ -459,7 +471,133 @@ public class DeletionService {
     }
 
     public List<Map<String, Object>> trash() {
-        return jdbc.queryForList("select id, entity, entity_id as entityId, label, summary, reason, deleted_by as deletedBy, deleted_at as deletedAt, length(data) as bytes from deleted_records order by deleted_at desc, id desc limit 300");
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                select id, entity, entity_id as entityId, label, summary, reason, deleted_by as deletedBy, deleted_at as deletedAt,
+                       length(data) as bytes, restored_at as restoredAt, restored_by as restoredBy
+                  from deleted_records order by deleted_at desc, id desc limit 300""");
+        for (Map<String, Object> r : rows) r.put("restorable", r.get("restoredAt") == null && !NOT_RESTORABLE.contains(String.valueOf(r.get("entity"))));
+        return rows;
+    }
+
+    /** Borrados que además revirtieron otras cosas (stock, egresos de caja): restaurarlos dejaría cifras dobles. */
+    private static final Set<String> NOT_RESTORABLE = Set.of("inventory_purchases", "lab_orders");
+
+    /**
+     * v2.20: devuelve a su lugar lo que se eliminó (con sus mismos identificadores) y vuelve a enlazar lo que había
+     * quedado desvinculado. Si algo ya no cabe (por ejemplo, otro paciente tomó el mismo documento), no restaura nada.
+     */
+    @Transactional
+    public Map<String, Object> restore(long trashId) {
+        List<Map<String, Object>> found = jdbc.queryForList("select * from deleted_records where id = ? for update", trashId);
+        if (found.isEmpty()) throw ApiException.notFound("El registro eliminado");
+        Map<String, Object> rec = found.get(0);
+        if (rec.get("restored_at") != null) throw ApiException.conflict("YA_RESTAURADO", "Este registro ya se restauró.");
+        String entity = String.valueOf(rec.get("entity"));
+        if (NOT_RESTORABLE.contains(entity)) {
+            throw ApiException.conflict("NO_RESTAURABLE", "Al eliminarlo se revirtieron stock o egresos de caja: vuelve a registrarlo en lugar de restaurarlo.");
+        }
+        Map<String, Object> data;
+        try {
+            data = json.readValue((String) rec.get("data"), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw ApiException.badRequest("COPIA_ILEGIBLE", "La copia guardada no se puede leer.");
+        }
+        List<Map<String, Object>> blocks = new ArrayList<>();
+        Object order = data.get("order");
+        if (order instanceof List<?> l && !l.isEmpty()) {
+            for (Object o : l) blocks.add(castMap(o));
+        } else {
+            for (Map.Entry<String, Object> en : castMap(data.get("deleted")).entrySet()) blocks.add(Map.of("table", en.getKey(), "rows", en.getValue()));
+        }
+        Collections.reverse(blocks); // se borró de los hijos al padre: se restaura del padre a los hijos
+        int inserted = 0;
+        try {
+            for (Map<String, Object> b : blocks) {
+                String table = String.valueOf(b.get("table"));
+                if (!table.matches("[a-z0-9_]+")) throw ApiException.badRequest("COPIA_ILEGIBLE", "La copia guardada no es válida.");
+                Map<String, String> types = columnTypes(table);
+                for (Object ro : (List<?>) b.get("rows")) {
+                    Map<String, Object> row = castMap(ro);
+                    List<String> cols = new ArrayList<>();
+                    List<Object> vals = new ArrayList<>();
+                    for (Map.Entry<String, Object> c : row.entrySet()) {
+                        String type = types.get(c.getKey().toLowerCase(Locale.ROOT));
+                        if (type == null) continue; // columna que ya no existe
+                        cols.add("`" + c.getKey() + "`");
+                        vals.add(toDb(c.getValue(), type));
+                    }
+                    jdbc.update("insert into " + table + " (" + String.join(", ", cols) + ") values (" + String.join(", ", Collections.nCopies(cols.size(), "?")) + ")", vals.toArray());
+                    inserted++;
+                }
+            }
+            Object relink = data.get("relink");
+            if (relink instanceof List<?> rl) {
+                for (Object o : rl) {
+                    Map<String, Object> r = castMap(o);
+                    String table = String.valueOf(r.get("table"));
+                    String column = String.valueOf(r.get("column"));
+                    if (!table.matches("[a-z0-9_]+") || !column.matches("[a-z0-9_]+")) continue;
+                    for (Object ro : (List<?>) r.get("rows")) {
+                        Map<String, Object> row = castMap(ro);
+                        jdbc.update("update " + table + " set " + column + " = ? where id = ? and " + column + " is null", row.get("value"), row.get("id"));
+                    }
+                }
+            }
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw ApiException.conflict("NO_SE_PUEDE_RESTAURAR",
+                    "No se puede restaurar: ya existe un registro con los mismos datos (por ejemplo, el mismo documento o número) o falta algo de lo que dependía.");
+        }
+        jdbc.update("update deleted_records set restored_at = ?, restored_by = ? where id = ?", Dates.now(), CurrentUser.usernameOrSystem(), trashId);
+        audit.register("PAPELERA", trashId, "RESTAURAR", rec.get("label") + " · " + inserted + " registros");
+        return Map.of("ok", true, "label", rec.get("label"), "restored", inserted);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Object o) {
+        return o instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    private Map<String, String> columnTypes(String table) {
+        Map<String, String> m = new HashMap<>();
+        jdbc.query("select column_name, data_type from information_schema.columns where table_schema = database() and table_name = ?",
+                rs -> { m.put(rs.getString(1).toLowerCase(Locale.ROOT), rs.getString(2).toLowerCase(Locale.ROOT)); }, table);
+        return m;
+    }
+
+    /** Convierte lo que Jackson guardó (texto, número de milisegundos o arreglo) al tipo de la columna. */
+    static Object toDb(Object v, String type) {
+        if (v == null) return null;
+        switch (type) {
+            case "datetime", "timestamp" -> {
+                if (v instanceof Number n) return new java.sql.Timestamp(n.longValue());
+                if (v instanceof List<?> l) return java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(i(l, 0), i(l, 1), i(l, 2), i(l, 3), i(l, 4), l.size() > 5 ? i(l, 5) : 0));
+                String s = v.toString();
+                try { return java.sql.Timestamp.from(java.time.OffsetDateTime.parse(s).toInstant()); } catch (Exception ignored) { }
+                return java.sql.Timestamp.valueOf(java.time.LocalDateTime.parse(s.replace(' ', 'T')));
+            }
+            case "date" -> {
+                if (v instanceof Number n) return new java.sql.Date(n.longValue()).toLocalDate();
+                if (v instanceof List<?> l) return java.time.LocalDate.of(i(l, 0), i(l, 1), i(l, 2));
+                return java.time.LocalDate.parse(v.toString().substring(0, 10));
+            }
+            case "time" -> {
+                if (v instanceof List<?> l) return java.time.LocalTime.of(i(l, 0), i(l, 1), l.size() > 2 ? i(l, 2) : 0);
+                return java.time.LocalTime.parse(v.toString());
+            }
+            case "blob", "longblob", "mediumblob", "tinyblob", "binary", "varbinary" -> {
+                return v instanceof String s ? Base64.getDecoder().decode(s) : v;
+            }
+            default -> {
+                if (v instanceof Map<?, ?> || v instanceof List<?>) {
+                    try { return new ObjectMapper().writeValueAsString(v); } catch (Exception e) { return v.toString(); }
+                }
+                return v;
+            }
+        }
+    }
+
+    private static int i(List<?> l, int k) {
+        return ((Number) l.get(k)).intValue();
     }
 
     public String trashData(long id) {

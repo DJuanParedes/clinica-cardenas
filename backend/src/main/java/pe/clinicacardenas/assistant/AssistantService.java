@@ -86,6 +86,26 @@ public class AssistantService {
         return "OTRO";
     }
 
+    private static final String RX_HORARIO = ".*\\b(horario\\w*|abren|cierran|hasta que hora|a que hora atienden|que dias atienden)\\b.*";
+    private static final String RX_UBICACION = ".*\\b(donde (estan|quedan|queda)|direccion|ubicacion|ubicados|como llego)\\b.*";
+    private static final String RX_PRECIO = ".*\\b(cuanto|precio\\w*|costo\\w*|cuesta|tarifa\\w*|cobran)\\b.*";
+
+    /**
+     * v2.20: un mismo mensaje puede traer varias preguntas informativas ("¿horario y cuánto cuesta una limpieza?").
+     * Se responde la principal y se agregan las demás, en vez de ignorarlas.
+     */
+    void extras(String intent, Turn t) {
+        if (!Set.of(PRECIO, "HORARIO", "UBICACION", "PAGO", "SALUDO").contains(intent)) return;
+        String n = TextSearch.normalize(t.text);
+        boolean horarioDado = "HORARIO".equals(intent) || "UBICACION".equals(intent);
+        if (!PRECIO.equals(intent) && n.matches(RX_PRECIO)) {
+            t.out.append("\n\n");
+            precio(t);
+        }
+        if (!horarioDado && n.matches(RX_HORARIO)) t.out.append("\n\n🕘 ").append(doc(HORARIO));
+        if (!"UBICACION".equals(intent) && n.matches(RX_UBICACION)) t.out.append("\n\n📍 Estamos en *").append(kb.address).append("*.");
+    }
+
     // ------------------------------------------------------------------ 2-4. respuesta
 
     /** Datos de un mensaje mientras se arma la respuesta. */
@@ -144,6 +164,7 @@ public class AssistantService {
             }
             default -> otraConsulta(t);
         }
+        extras(intent, t);
         String base = t.out.toString().trim();
         String finalText = base;
         String engine = "local";
