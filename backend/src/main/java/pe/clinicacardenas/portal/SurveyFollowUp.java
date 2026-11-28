@@ -17,7 +17,7 @@ public class SurveyFollowUp {
     }
 
     public void afterRating(Survey s) {
-        if (s == null || s.score == null || s.score > 3) return;
+        if (s == null || s.score > 3) return;
         jdbc.update("""
                 insert into tasks (patient_id, kind, title, notes, due_date, priority, status, origin, origin_ref, created_by, created_at)
                 values (?, 'LLAMAR', ?, ?, ?, 'ALTA', 'PENDIENTE', 'ENCUESTA', ?, 'sistema', ?)""",
