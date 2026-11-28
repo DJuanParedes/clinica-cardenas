@@ -40,7 +40,7 @@ public class SimulatedSunatGateway implements SunatGateway {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        String docLabel = "01".equals(inv.docType) ? "Factura" : "Boleta";
+        String docLabel = "07".equals(inv.docType) ? "Nota de crédito" : "01".equals(inv.docType) ? "Factura" : "Boleta";
         String id = inv.series + "-" + inv.number;
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();

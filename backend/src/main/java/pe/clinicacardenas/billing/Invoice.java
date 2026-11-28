@@ -62,12 +62,24 @@ public class Invoice {
     public LocalDateTime createdAt;
     @Column(name = "created_by")
     public String createdBy;
+    /** v2.19: nota de crédito → comprobante que modifica, motivo (catálogo 09 SUNAT) y descripción. */
+    @Column(name = "ref_invoice_id")
+    public Long refInvoiceId;
+    @Column(name = "note_code")
+    public String noteCode;
+    @Column(name = "note_reason")
+    public String noteReason;
+    @jakarta.persistence.Transient
+    public String refFullNumber;
+    @jakarta.persistence.Transient
+    public String refDocType;
 
     public String getFullNumber() {
         return series + "-" + String.format("%08d", number);
     }
 
     public String getDocTypeLabel() {
+        if ("07".equals(docType)) return "Nota de crédito electrónica";
         return "01".equals(docType) ? "Factura electrónica" : "Boleta de venta electrónica";
     }
 

@@ -43,6 +43,8 @@ public class BillingService {
     private final UblBuilder.Company company;
     private final BigDecimal igvRate;
     private final BigDecimal boletaLimit;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public BillingService(InvoiceRepository invoices, InvoiceItemRepository invoiceItems, InvoiceSeriesRepository series,
                           SunatSubmissionRepository submissions, PatientRepository patients,
@@ -94,8 +96,10 @@ public class BillingService {
         InvoiceSeries s = id == null ? new InvoiceSeries() : series.findById(id).orElseThrow(() -> ApiException.notFound("La serie"));
         String type = r.docType() == null ? s.docType : r.docType().trim();
         String code = r.series() == null ? s.series : r.series().trim().toUpperCase();
-        if (!"01".equals(type) && !"03".equals(type)) throw ApiException.field("docType", "Elige factura o boleta.");
-        String prefix = "01".equals(type) ? "F" : "B";
+        if (!"01".equals(type) && !"03".equals(type) && !"07".equals(type)) throw ApiException.field("docType", "Elige factura, boleta o nota de crédito.");
+        String prefix = "01".equals(type) ? "F" : "03".equals(type) ? "B" : "[BF]";
+        if ("07".equals(type) && (code == null || !code.matches("^[BF][A-Z0-9]{3}$")))
+            throw ApiException.field("series", "La serie de notas de crédito tiene 4 caracteres y empieza con B (para boletas) o F (para facturas), ej. BC01.");
         if (code == null || !code.matches("^" + prefix + "[A-Z0-9]{3}$"))
             throw ApiException.field("series", ("01".equals(type) ? "La serie de facturas" : "La serie de boletas") + " debe tener 4 caracteres y empezar con " + prefix + " (ej. " + prefix + "001).");
         if (id != null && s.lastNumber > 0 && (!code.equals(s.series) || !type.equals(s.docType)))
@@ -361,6 +365,8 @@ public class BillingService {
         if (res.cdrXml() != null) inv.cdrContent = res.cdrXml();
         inv.sentAt = sub.attemptAt;
         invoices.save(inv);
+        boolean nowAccepted = "ACEPTADO".equals(inv.status) || "OBSERVADO".equals(inv.status);
+        if ("07".equals(inv.docType) && nowAccepted && inv.refInvoiceId != null) annulReferenced(inv);
         if (RECHAZADO.equals(inv.status) && !RECHAZADO.equals(previous)) {
             // libera los procedimientos para que puedan facturarse en un comprobante corregido
             for (InvoiceItem it : invoiceItems.findByInvoiceIdOrderByLineNumberAsc(inv.id)) {
@@ -373,10 +379,116 @@ public class BillingService {
                 + (res.code() == null ? "" : " (" + res.code() + ")"));
     }
 
+    // ------------------------------------------------------------------ v2.19 nota de crédito
+
+    /** Catálogo 09 de SUNAT: motivos de nota de crédito que anulan todo el comprobante. */
+    public static final Map<String, String> NOTE_CODES = Map.of(
+            "01", "Anulación de la operación",
+            "02", "Anulación por error en el RUC",
+            "06", "Devolución total");
+
+    public record CreditNoteRequest(String code, String reason) {}
+
+    /**
+     * Emite una nota de crédito (tipo 07) que anula por completo un comprobante aceptado por SUNAT y la envía.
+     * Cuando SUNAT la acepta, el comprobante original queda ANULADO y se liberan sus procedimientos y cobros.
+     */
+    @Transactional
+    public Map<String, Object> creditNote(Long invoiceId, CreditNoteRequest r) {
+        Invoice orig = get(invoiceId);
+        if ("07".equals(orig.docType)) throw ApiException.badRequest("NOTA_SOBRE_NOTA", "No se emite una nota de crédito sobre otra nota de crédito.");
+        if (!"ACEPTADO".equals(orig.status) && !"OBSERVADO".equals(orig.status))
+            throw ApiException.conflict("NO_ACEPTADO", "Solo se anula con nota de crédito un comprobante aceptado por SUNAT. "
+                    + ("ANULADO".equals(orig.status) ? "Este ya está anulado." : "Si no se envió o fue rechazado, no hace falta anularlo."));
+        String code = r == null || r.code() == null ? "01" : r.code().trim();
+        if (!NOTE_CODES.containsKey(code)) throw ApiException.field("code", "Elige el motivo de la nota de crédito.");
+        String reason = r.reason() == null ? "" : r.reason().trim();
+        if (reason.length() < 5) throw ApiException.field("reason", "Describe el motivo (mínimo 5 caracteres).");
+        if (reason.length() > 250) throw ApiException.field("reason", "El motivo admite hasta 250 caracteres.");
+        if ("02".equals(code) && !"01".equals(orig.docType)) throw ApiException.field("code", "«Error en el RUC» solo aplica a facturas.");
+        Long pending = jdbc.queryForObject("""
+                select count(*) from invoices where ref_invoice_id = ? and doc_type = '07' and status not in ('RECHAZADO')""", Long.class, invoiceId);
+        if (pending != null && pending > 0) throw ApiException.conflict("YA_TIENE_NOTA", "Este comprobante ya tiene una nota de crédito emitida.");
+
+        String prefix = "01".equals(orig.docType) ? "F" : "B";
+        InvoiceSeries s = series.findAll().stream().filter(x -> "07".equals(x.docType) && x.active && x.series.startsWith(prefix))
+                .findFirst().map(x -> series.lockBySeries(x.series).orElse(x))
+                .orElseThrow(() -> ApiException.badRequest("SERIE_INACTIVA", "No hay una serie de notas de crédito activa que empiece con " + prefix + " (ej. " + prefix + "C01)."));
+        s.lastNumber = s.lastNumber + 1;
+        series.save(s);
+
+        LocalDateTime now = Dates.now();
+        Invoice nc = new Invoice();
+        nc.docType = "07";
+        nc.series = s.series;
+        nc.number = s.lastNumber;
+        nc.issueDate = now.toLocalDate();
+        nc.issueTime = now.toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+        nc.patientId = orig.patientId;
+        nc.customerDocType = orig.customerDocType;
+        nc.customerDocNumber = orig.customerDocNumber;
+        nc.customerName = orig.customerName;
+        nc.customerAddress = orig.customerAddress;
+        nc.currency = orig.currency;
+        nc.taxableAmount = orig.taxableAmount;
+        nc.igvAmount = orig.igvAmount;
+        nc.totalAmount = orig.totalAmount;
+        nc.status = "GENERADO";
+        nc.createdAt = now;
+        nc.createdBy = CurrentUser.usernameOrSystem();
+        nc.refInvoiceId = orig.id;
+        nc.noteCode = code;
+        nc.noteReason = reason;
+        nc.refFullNumber = orig.getFullNumber();
+        nc.refDocType = orig.docType;
+        invoices.save(nc);
+        List<InvoiceItem> saved = new ArrayList<>();
+        for (InvoiceItem o : invoiceItems.findByInvoiceIdOrderByLineNumberAsc(orig.id)) {
+            InvoiceItem it = new InvoiceItem();
+            it.invoiceId = nc.id;
+            it.lineNumber = o.lineNumber;
+            it.description = o.description;
+            it.quantity = o.quantity;
+            it.unitPrice = o.unitPrice;
+            it.unitValue = o.unitValue;
+            it.lineValue = o.lineValue;
+            it.lineIgv = o.lineIgv;
+            it.lineTotal = o.lineTotal;
+            saved.add(invoiceItems.save(it));
+        }
+        XmlSigner.Signed signed = signer.sign(UblBuilder.build(company, nc, saved));
+        nc.xmlContent = signed.xml();
+        nc.hash = signed.digestValue();
+        invoices.save(nc);
+        audit.register("COMPROBANTE", nc.id, "NOTA_CREDITO", nc.getFullNumber() + " anula " + orig.getFullNumber() + " · " + reason);
+        return send(nc.id);
+    }
+
+    /** La nota de crédito fue aceptada: el comprobante original queda anulado y libera procedimientos y cobros. */
+    private void annulReferenced(Invoice nc) {
+        invoices.findById(nc.refInvoiceId).ifPresent(orig -> {
+            if ("ANULADO".equals(orig.status)) return;
+            orig.status = "ANULADO";
+            orig.sunatDescription = "Anulado con la nota de crédito " + nc.getFullNumber();
+            invoices.save(orig);
+            for (InvoiceItem it : invoiceItems.findByInvoiceIdOrderByLineNumberAsc(orig.id)) {
+                if (it.treatmentItemId != null) {
+                    treatmentItems.findById(it.treatmentItemId).ifPresent(ti -> { ti.invoiceId = null; treatmentItems.save(ti); });
+                }
+            }
+            jdbc.update("update payments set invoice_id = null where invoice_id = ?", orig.id);
+            audit.register("COMPROBANTE", orig.id, "ANULADO", orig.getFullNumber() + " anulado por " + nc.getFullNumber());
+        });
+    }
+
     // ------------------------------------------------------------------ HU-12 consulta
 
     public Invoice get(Long id) {
-        return invoices.findById(id).orElseThrow(() -> ApiException.notFound("El comprobante"));
+        Invoice inv = invoices.findById(id).orElseThrow(() -> ApiException.notFound("El comprobante"));
+        if (inv.refInvoiceId != null && inv.refFullNumber == null) {
+            invoices.findById(inv.refInvoiceId).ifPresent(o -> { inv.refFullNumber = o.getFullNumber(); inv.refDocType = o.docType; });
+        }
+        return inv;
     }
 
     @Transactional(readOnly = true)
@@ -392,6 +504,14 @@ public class BillingService {
         m.put("submissions", submissions.findByInvoiceIdOrderByAttemptAtDesc(id));
         m.put("amountInWords", AmountInWords.of(inv.totalAmount));
         m.put("company", company);
+        if (inv.refInvoiceId != null) {
+            invoices.findById(inv.refInvoiceId).ifPresent(o -> { inv.refFullNumber = o.getFullNumber(); inv.refDocType = o.docType;
+                m.put("reference", Map.of("id", o.id, "fullNumber", o.getFullNumber(), "docType", o.docType)); });
+            m.put("noteLabel", NOTE_CODES.getOrDefault(inv.noteCode, inv.noteCode));
+        }
+        m.put("creditNotes", jdbc.queryForList("""
+                select id, concat(series, '-', lpad(number, 8, '0')) as fullNumber, status, note_reason as reason
+                  from invoices where ref_invoice_id = ? order by id""", id));
         if (inv.patientId != null) {
             patients.findById(inv.patientId).ifPresent(p -> m.put("patient", Map.of("id", p.id, "fullName", p.getFullName())));
         }

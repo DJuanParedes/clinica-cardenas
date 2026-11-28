@@ -10,10 +10,10 @@ export const STATUS_TONE: Record<string, string> = {
   ATENDIDA: 'green', CANCELADA: 'gum', NO_ASISTIO: 'gum',
 };
 export const INVOICE_LABEL: Record<string, string> = {
-  GENERADO: 'Por enviar', ACEPTADO: 'Aceptado', OBSERVADO: 'Aceptado con observaciones', RECHAZADO: 'Rechazado', ERROR: 'Error de envío',
+  GENERADO: 'Por enviar', ANULADO: 'Anulado (nota de crédito)', ACEPTADO: 'Aceptado', OBSERVADO: 'Aceptado con observaciones', RECHAZADO: 'Rechazado', ERROR: 'Error de envío',
 };
 export const INVOICE_TONE: Record<string, string> = {
-  GENERADO: 'amber', ACEPTADO: 'green', OBSERVADO: 'teal', RECHAZADO: 'gum', ERROR: 'gum',
+  GENERADO: 'amber', ANULADO: 'grey', ACEPTADO: 'green', OBSERVADO: 'teal', RECHAZADO: 'gum', ERROR: 'gum',
 };
 export const ITEM_LABEL: Record<string, string> = { PENDIENTE: 'Pendiente', EN_PROCESO: 'En proceso', REALIZADO: 'Realizado' };
 export const ITEM_TONE: Record<string, string> = { PENDIENTE: 'grey', EN_PROCESO: 'amber', REALIZADO: 'green' };
