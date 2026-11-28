@@ -8,6 +8,7 @@ import { IconComponent } from '../../shared/icon.component';
 
 import { OnlyDirective } from '../../shared/only.directive';
 import { VoidButtonComponent } from '../../shared/void-button.component';
+import { ModalComponent } from '../../shared/modal.component';
 import { AuthService } from '../../core/auth.service';
 const CIE10 = [
   { c: 'K02.0', d: 'Caries limitada al esmalte' },
@@ -39,7 +40,7 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
 @Component({
   selector: 'app-history-tab',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, IconComponent, VoidButtonComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent, VoidButtonComponent, ModalComponent],
   template: `
     @if (alerts.length) {
       <div class="notice gum alerts" role="alert">
@@ -129,6 +130,49 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
           }
         </ul>
       </section>
+
+      <section class="panel">
+        <div class="panel-head"><h3>Recetas</h3><span class="muted small">{{ rxs.length }}</span>
+          @if (auth.can('HISTORIA_CLINICA')) { <button class="btn sm primary" type="button" (click)="newRx()">Nueva receta</button> }</div>
+        <ul class="dxlist">
+          @for (r of rxs; track r.id) {
+            <li [class.voided]="r.voidedAt">
+              <div class="grow">
+                <div class="txt">@for (i of r.items; track $index) { <div><b>{{ i.drug }}</b>@if (i.presentation) { {{ i.presentation }} } — {{ i.dose }}, {{ i.frequency }}@if (i.days) { , {{ i.days }} días }@if (i.route) { · vía {{ i.route }} }</div> }</div>
+                @if (r.indications) { <div class="small">{{ r.indications }}</div> }
+                <div class="muted small">{{ dt(r.createdAt) }} · {{ r.dentist || r.createdBy }}</div>
+                @if (r.voidedAt) { <div class="small void-note">Anulada por {{ r.voidedBy }}: {{ r.voidReason }}</div> }
+              </div>
+              @if (r.fileId) { <button class="btn sm ghost" type="button" (click)="openRx(r)">PDF</button> }
+              @if (!r.voidedAt && auth.can('HISTORIA_CLINICA')) { <app-void-button what="receta" (confirm)="voidRx(r, $event)" /> }
+            </li>
+          } @empty { <li class="muted small">Sin recetas registradas.</li> }
+        </ul>
+      </section>
+
+      <app-modal [open]="rxOpen" title="Nueva receta" [width]="760" (close)="rxOpen = false">
+        <div class="stack">
+          @for (i of rx.items; track $index) {
+            <div class="rxrow">
+              <input class="input" [(ngModel)]="i.drug" placeholder="Medicamento (ej. Amoxicilina)" maxlength="120" appOnly="text" />
+              <input class="input" [(ngModel)]="i.presentation" placeholder="Presentación (500 mg tab.)" maxlength="80" appOnly="text" />
+              <input class="input" [(ngModel)]="i.dose" placeholder="Dosis (1 tableta)" maxlength="60" appOnly="text" />
+              <input class="input" [(ngModel)]="i.frequency" placeholder="Frecuencia (cada 8 h)" maxlength="60" appOnly="text" />
+              <input class="input" [(ngModel)]="i.days" placeholder="Días" maxlength="3" appOnly="digits" inputmode="numeric" />
+              <select class="input" [(ngModel)]="i.route"><option value="">Vía</option><option>Oral</option><option>Sublingual</option><option>Tópica</option><option>Enjuague</option><option>Intramuscular</option></select>
+              <button class="btn sm ghost" type="button" (click)="rx.items.splice($index, 1)" [disabled]="rx.items.length === 1" aria-label="Quitar">✕</button>
+              <input class="input span-all" [(ngModel)]="i.instructions" placeholder="Indicación (ej. después de las comidas)" maxlength="200" appOnly="text" />
+            </div>
+          }
+          <button class="btn sm" type="button" (click)="rx.items.push(emptyRxItem())" [disabled]="rx.items.length >= 15">+ Agregar medicamento</button>
+          <div class="field"><label>Indicaciones generales</label><textarea class="input" rows="2" [(ngModel)]="rx.indications" maxlength="1000" appOnly="text" placeholder="Reposo, dieta blanda, control en 7 días…"></textarea></div>
+          <label class="check"><input type="checkbox" [(ngModel)]="rx.share" /> Compartir con el paciente en su app</label>
+        </div>
+        <ng-container modal-actions>
+          <button class="btn" type="button" (click)="rxOpen = false">Cancelar</button>
+          <button class="btn primary" type="button" (click)="saveRx()" [disabled]="rxBusy">Guardar y generar PDF</button>
+        </ng-container>
+      </app-modal>
     </div>
   `,
   styles: [`
@@ -141,6 +185,8 @@ const FIELDS: { key: keyof ClinicalHistory; label: string; hint?: string }[] = [
     .dxlist { list-style: none; margin: 0; padding: 6px 18px 14px; }
     .dxlist li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
     .dxlist li:last-child { border-bottom: 0; }
+    .rxrow { display: grid; grid-template-columns: 2fr 1.6fr 1.2fr 1.2fr 60px 110px 32px; gap: 6px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+    .rxrow .span-all { grid-column: 1 / -1; }
     .code { flex: none; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--restore-soft); color: var(--restore); font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; }
     @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
   `],
@@ -170,6 +216,7 @@ export class HistoryTabComponent implements OnInit {
     this.api.history(this.patientId).subscribe((r) => {
       this.h = r.history;
       this.diagnoses = r.diagnoses;
+      this.loadRx();
       this.alerts = r.alerts;
       if (!this.h) this.editing = false;
     });
@@ -216,5 +263,28 @@ export class HistoryTabComponent implements OnInit {
       next: (u) => { Object.assign(d, u); this.toast.ok('Diagnóstico anulado.'); },
       error: (e) => this.toast.error(apiError(e).message),
     });
+  }
+
+  rxs: any[] = [];
+  rxOpen = false;
+  rxBusy = false;
+  rx: { items: any[]; indications: string; share: boolean } = { items: [], indications: '', share: true };
+  emptyRxItem() { return { drug: '', presentation: '', dose: '', frequency: '', days: '', route: '', instructions: '' }; }
+  loadRx() { if (this.auth.can('HISTORIA_CLINICA')) this.api.prescriptions(this.patientId).subscribe((l) => (this.rxs = l)); }
+  newRx() { this.rx = { items: [this.emptyRxItem()], indications: '', share: true }; this.rxOpen = true; }
+  saveRx() {
+    const items = this.rx.items.filter((i) => i.drug.trim()).map((i) => ({ ...i, days: i.days ? Number(i.days) : null, route: i.route || null }));
+    if (!items.length) { this.toast.warn('Agrega al menos un medicamento.'); return; }
+    this.rxBusy = true;
+    this.api.createPrescription(this.patientId, { items, indications: this.rx.indications, shareWithPatient: this.rx.share }).subscribe({
+      next: () => { this.rxBusy = false; this.rxOpen = false; this.toast.ok('Receta guardada. El PDF quedó en Archivos.'); this.loadRx(); },
+      error: (e) => { this.rxBusy = false; this.toast.error(apiError(e).message); },
+    });
+  }
+  voidRx(r: any, reason: string) {
+    this.api.voidPrescription(r.id, reason).subscribe({ next: () => { this.toast.ok('Receta anulada.'); this.loadRx(); }, error: (e) => this.toast.error(apiError(e).message) });
+  }
+  openRx(r: any) {
+    this.api.fileContent(r.fileId).subscribe({ next: (b) => window.open(URL.createObjectURL(b), '_blank'), error: (e) => this.toast.error(apiError(e).message) });
   }
 }

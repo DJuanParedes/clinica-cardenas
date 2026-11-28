@@ -26,6 +26,8 @@ public class Evolution {
     public LocalDateTime createdAt;
     @Column(name = "created_by")
     public String createdBy;
+    @Column(name = "appointment_id")
+    public Long appointmentId;
     @Column(name = "voided_at")
     public LocalDateTime voidedAt;
     @Column(name = "voided_by")
