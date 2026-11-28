@@ -98,6 +98,29 @@ import { OnlyDirective } from '../shared/only.directive';
                     @if (checking) { <span class="spin"></span> Consultando… } @else { <app-icon name="search" [size]="16" /> Consultar estado en SUNAT }
                   </button>
                 }
+                @if (asAny(d).reference) {
+                  <p class="small">Anula a <a [routerLink]="['/comprobantes', asAny(d).reference.id]">{{ asAny(d).reference.fullNumber }}</a> · {{ asAny(d).noteLabel }}: {{ asAny(d.invoice).noteReason }}</p>
+                }
+                @for (n of asAny(d).creditNotes || []; track n.id) {
+                  <p class="small">Nota de crédito <a [routerLink]="['/comprobantes', n.id]">{{ n.fullNumber }}</a> · {{ label(n.status) }}</p>
+                }
+                @if ((d.invoice.status === 'ACEPTADO' || d.invoice.status === 'OBSERVADO') && d.invoice.docType !== '07' && !(asAny(d).creditNotes || []).length) {
+                  @if (!ncOpen) { <button type="button" class="btn block danger-outline" (click)="ncOpen = true">Anular con nota de crédito</button> }
+                  @else {
+                    <div class="nc stack">
+                      <label class="small strong" for="ncc">Motivo (SUNAT)</label>
+                      <select id="ncc" class="input" [(ngModel)]="nc.code">
+                        <option value="01">01 · Anulación de la operación</option>
+                        @if (d.invoice.docType === '01') { <option value="02">02 · Anulación por error en el RUC</option> }
+                        <option value="06">06 · Devolución total</option>
+                      </select>
+                      <textarea class="input" rows="2" [(ngModel)]="nc.reason" maxlength="250" appOnly="text" placeholder="Describe el motivo (ej. se emitió a nombre de otra persona)"></textarea>
+                      <p class="muted small">Se emite y envía a SUNAT una nota de crédito por el total. Al aceptarse, este comprobante queda anulado y sus procedimientos y cobros quedan libres para corregirse.</p>
+                      <div class="row"><button class="btn sm" type="button" (click)="ncOpen = false">Cancelar</button>
+                        <button class="btn sm primary" type="button" (click)="emitNc()" [disabled]="ncBusy || nc.reason.trim().length < 5">{{ ncBusy ? 'Enviando…' : 'Emitir nota de crédito' }}</button></div>
+                    </div>
+                  }
+                }
                 @if (d.invoice.status === 'RECHAZADO') {
                   <a class="btn block" routerLink="/comprobantes/nuevo" [queryParams]="{ paciente: d.patient?.id }">Emitir comprobante corregido</a>
                 }
@@ -153,6 +176,8 @@ import { OnlyDirective } from '../shared/only.directive';
     </div>
   `,
   styles: [`
+    .nc { border: 1px solid #f0c9c4; border-radius: 8px; padding: 10px; margin: 8px 0; }
+    .danger-outline { color: #b42318; border-color: #f0c9c4; }
     .mail { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
     .tech { margin-top: 8px; } .tech summary { cursor: pointer; color: var(--ink-3); }
     @media print { .mail, .tech { display: none !important; } }
@@ -252,6 +277,24 @@ export class InvoiceDetailComponent implements OnInit {
   pad(n: number) { return String(n).padStart(8, '0'); }
   fix(v: number, n: number) { return Number(v).toFixed(n); }
   docLabel(c: string) { return CUSTOMER_DOC[c] || 'Documento'; }
+  asAny(x: any) { return x; }
+  ncOpen = false;
+  ncBusy = false;
+  nc = { code: '01', reason: '' };
+  emitNc() {
+    if (!this.d) return;
+    this.ncBusy = true;
+    this.api.creditNote(this.d.invoice.id, this.nc.code, this.nc.reason).subscribe({
+      next: (r: any) => {
+        this.ncBusy = false; this.ncOpen = false;
+        const st = r?.invoice?.status;
+        if (st === 'ACEPTADO' || st === 'OBSERVADO') this.toast.ok('Nota de crédito ' + r.invoice.series + '-' + r.invoice.number + ' aceptada. Comprobante anulado.');
+        else this.toast.warn('La nota de crédito quedó ' + this.label(st) + '. Revísala en su detalle.');
+        this.ngOnInit();
+      },
+      error: (e) => { this.ncBusy = false; this.toast.error(apiError(e).message); },
+    });
+  }
   label(s: string) { return INVOICE_LABEL[s] || s; }
   tone(s: string) { return INVOICE_TONE[s] || 'grey'; }
   money = soles;

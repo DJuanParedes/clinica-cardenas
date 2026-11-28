@@ -134,7 +134,7 @@ public class ReportService {
                 BigDecimal.class, pFrom.atStartOfDay(), pTo.plusDays(1).atStartOfDay()));
         BigDecimal invoiced = money(jdbc.queryForObject("""
                 select coalesce(sum(total_amount), 0) from invoices
-                 where status in ('ACEPTADO', 'OBSERVADO') and issue_date >= ? and issue_date <= ?
+                 where status in ('ACEPTADO', 'OBSERVADO') and doc_type <> '07' and issue_date >= ? and issue_date <= ?
                 """, BigDecimal.class, from, to));
         BigDecimal expenses = money(jdbc.queryForObject("select coalesce(sum(amount), 0) from expenses where status = 'VALIDO' and expense_date >= ? and expense_date <= ?",
                 BigDecimal.class, from, to));

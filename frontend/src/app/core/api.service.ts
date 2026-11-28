@@ -409,6 +409,7 @@ export class Api {
   createPrescription(patientId: number, body: any): Observable<any> { return this.http.post(`/api/patients/${patientId}/prescriptions`, body); }
   voidPrescription(id: number, reason: string): Observable<any> { return this.http.post(`/api/prescriptions/${id}/void`, { reason }); }
   acceptPlan(planId: number, via: string): Observable<any> { return this.http.post(`/api/plans/${planId}/accept`, { via }); }
+  creditNote(invoiceId: number, code: string, reason: string): Observable<any> { return this.http.post(`/api/billing/invoices/${invoiceId}/credit-note`, { code, reason }); }
   voidDiagnosis(id: number, reason: string): Observable<any> { return this.http.post(`/api/diagnoses/${id}/void`, { reason }); }
   voidEvolution(id: number, reason: string): Observable<any> { return this.http.post(`/api/evolutions/${id}/void`, { reason }); }
   deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }

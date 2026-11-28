@@ -66,7 +66,8 @@ public final class InvoicePdf {
         float pageH = SimplePdf.pageHeight();
         float left = 40;
         float right = pageW - 40;
-        boolean factura = "01".equals(i.docType);
+        boolean nc = "07".equals(i.docType);
+        boolean factura = nc ? "01".equals(i.refDocType) : "01".equals(i.docType);
 
         // Emisor
         float y = pageH - 58;
@@ -83,7 +84,7 @@ public final class InvoicePdf {
         pdf.rect(bx, by, bw, bh, null, BRAND, 1.4f);
         pdf.text("R.U.C. N.° " + c.ruc(), bx + bw / 2, by + bh - 20, 11, true, INK, 'C');
         pdf.rect(bx, by + 24, bw, 22, BRAND, null, 0);
-        pdf.text(factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", bx + bw / 2, by + 31, 9.5f, true, V_1_1_1, 'C');
+        pdf.text(nc ? "NOTA DE CRÉDITO ELECTRÓNICA" : factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", bx + bw / 2, by + 31, 9.5f, true, V_1_1_1, 'C');
         pdf.text(i.series + " - " + String.format("%08d", i.number), bx + bw / 2, by + 8, 12, true, INK, 'C');
 
         // Adquiriente
@@ -95,8 +96,9 @@ public final class InvoicePdf {
         pdf.text(i.customerDocNumber, left + 90, cy + 41, 9, false, INK, 'L');
         pdf.text("Dirección:", left + 10, cy + 26, 9, true, INK, 'L');
         pdf.text(i.customerAddress == null || i.customerAddress.isBlank() ? "-" : i.customerAddress, left + 90, cy + 26, 9, false, INK, 'L');
-        pdf.text("Forma de pago:", left + 10, cy + 11, 9, true, INK, 'L');
-        pdf.text("Contado", left + 90, cy + 11, 9, false, INK, 'L');
+        pdf.text(nc ? "Modifica a:" : "Forma de pago:", left + 10, cy + 11, 9, true, INK, 'L');
+        pdf.text(nc ? (factura ? "Factura " : "Boleta ") + i.refFullNumber + " · Motivo " + i.noteCode + ": " + i.noteReason : "Contado",
+                left + 90, cy + 11, 9, false, INK, 'L');
         float rx = left + 330;
         pdf.text("Fecha de emisión:", rx, cy + 56, 9, true, INK, 'L');
         pdf.text(i.issueDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), rx + 95, cy + 56, 9, false, INK, 'L');
@@ -160,7 +162,7 @@ public final class InvoicePdf {
         boolean[][] q = qr(qrText(i, c));
         if (q != null) pdf.modules(q, left, qy, 92);
         float lx = left + 108;
-        pdf.text("Representación impresa de la " + (factura ? "Factura" : "Boleta de Venta") + " Electrónica.", lx, qy + 78, 9, true, INK, 'L');
+        pdf.text("Representación impresa de la " + (nc ? "Nota de Crédito" : factura ? "Factura" : "Boleta de Venta") + " Electrónica.", lx, qy + 78, 9, true, INK, 'L');
         pdf.text("Puede consultarla en www.sunat.gob.pe (Consulta de validez del comprobante).", lx, qy + 64, 8.5f, false, MUTED, 'L');
         pdf.text("Valor resumen (hash): " + (i.hash == null ? "-" : i.hash), lx, qy + 50, 8, false, MUTED, 'L');
         String estado = i.status == null ? "" : i.status;

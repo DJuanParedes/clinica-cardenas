@@ -40,7 +40,7 @@ import { AuthService } from '../core/auth.service';
         <div class="field">
           <label for="dt">Tipo</label>
           <select id="dt" name="dt" class="input" [(ngModel)]="docType" (ngModelChange)="search(0)">
-            <option value="">Todos</option><option value="03">Boletas</option><option value="01">Facturas</option>
+            <option value="">Todos</option><option value="03">Boletas</option><option value="01">Facturas</option><option value="07">Notas de crédito</option><option value="07">Notas de crédito</option>
           </select>
         </div>
         <div class="field"><label for="f">Desde</label><input id="f" name="f" type="date" class="input" [(ngModel)]="from" /></div>

@@ -31,9 +31,11 @@ public final class UblBuilder {
 
     public static String build(Company c, Invoice inv, List<InvoiceItem> items) {
         String cur = inv.currency;
+        boolean nc = "07".equals(inv.docType);
+        String root = nc ? "CreditNote" : "Invoice";
         StringBuilder x = new StringBuilder(4096);
         x.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        x.append("<Invoice xmlns=\"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2\"\n")
+        x.append("<").append(root).append(" xmlns=\"urn:oasis:names:specification:ubl:schema:xsd:").append(root).append("-2\"\n")
          .append("         xmlns:cac=\"urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2\"\n")
          .append("         xmlns:cbc=\"urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2\"\n")
          .append("         xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"\n")
@@ -44,9 +46,17 @@ public final class UblBuilder {
         x.append("  <cbc:ID>").append(inv.getFullNumber().replaceFirst("-0+", "-")).append("</cbc:ID>\n");
         x.append("  <cbc:IssueDate>").append(inv.issueDate).append("</cbc:IssueDate>\n");
         x.append("  <cbc:IssueTime>").append(inv.issueTime).append("</cbc:IssueTime>\n");
-        x.append("  <cbc:InvoiceTypeCode listID=\"0101\">").append(inv.docType).append("</cbc:InvoiceTypeCode>\n");
+        if (!nc) x.append("  <cbc:InvoiceTypeCode listID=\"0101\">").append(inv.docType).append("</cbc:InvoiceTypeCode>\n");
         x.append("  <cbc:Note languageLocaleID=\"1000\">").append(esc(AmountInWords.of(inv.totalAmount))).append("</cbc:Note>\n");
         x.append("  <cbc:DocumentCurrencyCode>").append(cur).append("</cbc:DocumentCurrencyCode>\n");
+        if (nc) {
+            String ref = inv.refFullNumber.replaceFirst("-0+", "-");
+            x.append("  <cac:DiscrepancyResponse><cbc:ReferenceID>").append(ref).append("</cbc:ReferenceID>")
+             .append("<cbc:ResponseCode>").append(inv.noteCode).append("</cbc:ResponseCode>")
+             .append("<cbc:Description>").append(esc(inv.noteReason)).append("</cbc:Description></cac:DiscrepancyResponse>\n");
+            x.append("  <cac:BillingReference><cac:InvoiceDocumentReference><cbc:ID>").append(ref).append("</cbc:ID>")
+             .append("<cbc:DocumentTypeCode>").append(inv.refDocType).append("</cbc:DocumentTypeCode></cac:InvoiceDocumentReference></cac:BillingReference>\n");
+        }
 
         x.append("  <cac:Signature><cbc:ID>").append(c.ruc()).append("</cbc:ID>")
          .append("<cac:SignatoryParty><cac:PartyIdentification><cbc:ID>").append(c.ruc()).append(CBC_ID_CAC_PARTYIDENTIFICATION)
@@ -73,7 +83,7 @@ public final class UblBuilder {
         }
         x.append("</cac:PartyLegalEntity></cac:Party></cac:AccountingCustomerParty>\n");
 
-        x.append("  <cac:PaymentTerms><cbc:ID>FormaPago</cbc:ID><cbc:PaymentMeansID>Contado</cbc:PaymentMeansID></cac:PaymentTerms>\n");
+        if (!nc) x.append("  <cac:PaymentTerms><cbc:ID>FormaPago</cbc:ID><cbc:PaymentMeansID>Contado</cbc:PaymentMeansID></cac:PaymentTerms>\n");
 
         x.append("  <cac:TaxTotal><cbc:TaxAmount currencyID=\"").append(cur).append("\">").append(amt(inv.igvAmount)).append(CBC_TAXAMOUNT)
          .append("<cac:TaxSubtotal><cbc:TaxableAmount currencyID=\"").append(cur).append("\">").append(amt(inv.taxableAmount)).append("</cbc:TaxableAmount>")
@@ -88,9 +98,10 @@ public final class UblBuilder {
          .append("</cac:LegalMonetaryTotal>\n");
 
         for (InvoiceItem it : items) {
-            x.append("  <cac:InvoiceLine>")
+            String lineTag = nc ? "CreditNoteLine" : "InvoiceLine", qtyTag = nc ? "CreditedQuantity" : "InvoicedQuantity";
+            x.append("  <cac:").append(lineTag).append(">")
              .append("<cbc:ID>").append(it.lineNumber).append("</cbc:ID>")
-             .append("<cbc:InvoicedQuantity unitCode=\"ZZ\">").append(it.quantity.toPlainString()).append("</cbc:InvoicedQuantity>")
+             .append("<cbc:").append(qtyTag).append(" unitCode=\"ZZ\">").append(it.quantity.toPlainString()).append("</cbc:").append(qtyTag).append(">")
              .append("<cbc:LineExtensionAmount currencyID=\"").append(cur).append("\">").append(amt(it.lineValue)).append("</cbc:LineExtensionAmount>")
              .append("<cac:PricingReference><cac:AlternativeConditionPrice><cbc:PriceAmount currencyID=\"").append(cur).append("\">")
              .append(amt(it.unitPrice)).append("</cbc:PriceAmount><cbc:PriceTypeCode>01</cbc:PriceTypeCode></cac:AlternativeConditionPrice></cac:PricingReference>")
@@ -102,9 +113,9 @@ public final class UblBuilder {
              .append("</cac:TaxSubtotal></cac:TaxTotal>")
              .append("<cac:Item><cbc:Description>").append(esc(it.description)).append("</cbc:Description></cac:Item>")
              .append("<cac:Price><cbc:PriceAmount currencyID=\"").append(cur).append("\">").append(it.unitValue.toPlainString()).append("</cbc:PriceAmount></cac:Price>")
-             .append("</cac:InvoiceLine>\n");
+             .append("</cac:").append(lineTag).append(">\n");
         }
-        x.append("</Invoice>\n");
+        x.append("</").append(root).append(">\n");
         return x.toString();
     }
 
