@@ -20,6 +20,8 @@ public class Procedure {
     public String description;
     @Column(name = "duration_min")
     public Integer durationMin;
+    @jakarta.persistence.Column(name = "consent_template_id")
+    public Long consentTemplateId;
 
     /** Promoción vigente hoy (la calcula PromotionService al listar el catálogo). */
     @Transient

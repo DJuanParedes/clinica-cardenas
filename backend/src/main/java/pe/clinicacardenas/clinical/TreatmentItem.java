@@ -20,6 +20,8 @@ public class TreatmentItem {
     public BigDecimal price;
     /** PENDIENTE, EN_PROCESO, REALIZADO */
     public String status;
+    @jakarta.persistence.Column(name = "done_appointment_id")
+    public Long doneAppointmentId;
     /** Precio de lista cuando se aplicó una promoción (price es el precio final). */
     @Column(name = "list_price")
     public BigDecimal listPrice;

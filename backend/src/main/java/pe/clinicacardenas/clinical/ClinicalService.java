@@ -95,6 +95,9 @@ public class ClinicalService {
     private void applyItemStatus(TreatmentItem i, String status, TreatmentPlan p, List<TreatmentItemDone.Used> used) {
         boolean wasDone = REALIZADO.equals(i.status);
         boolean nowDone = REALIZADO.equals(status);
+        if (PENDIENTE.equals(i.status) && !PENDIENTE.equals(status)) requireConsent(i, p);
+        if (nowDone && !wasDone) i.doneAppointmentId = pe.clinicacardenas.agenda.AttentionLink.current(jdbc, p.patientId);
+        if (wasDone && !nowDone) i.doneAppointmentId = null;
         if (wasDone && !nowDone) {
             Long paid = jdbc.queryForObject("select count(*) from payments where treatment_item_id = ? and status = 'VALIDO'", Long.class, i.id);
             Long settled = jdbc.queryForObject("select count(*) from commission_lines where treatment_item_id = ?", Long.class, i.id);
@@ -419,11 +422,29 @@ public class ClinicalService {
         }
         TreatmentPlan p = plan(i.planId);
         if (ANULADO.equals(p.status)) throw ApiException.badRequest(PLAN_CERRADO, "El plan está anulado.");
+        // v2.17: no se marca como realizado sin su nota clínica (evolución).
+        if (REALIZADO.equals(status) && !REALIZADO.equals(i.status)) {
+            Long evos = jdbc.queryForObject("select count(*) from evolutions where item_id = ? and voided_at is null", Long.class, i.id);
+            if (evos == null || evos == 0) throw ApiException.badRequest("FALTA_EVOLUCION",
+                    "Antes de marcarlo como realizado registra la evolución: qué se hizo en la sesión.");
+        }
         applyItemStatus(i, status, p, used);
         items.save(i);
         refreshPlanStatus(p);
         audit.register(HISTORIA, p.patientId, "PLAN_ESTADO", i.procedure.name + " → " + status.toLowerCase().replace('_', ' '));
         return planView(p);
+    }
+
+    /** v2.17: si el procedimiento exige un consentimiento informado, debe estar firmado (último año) antes de empezar. */
+    private void requireConsent(TreatmentItem i, TreatmentPlan p) {
+        if (i.procedure == null || i.procedure.consentTemplateId == null) return;
+        Long signed = jdbc.queryForObject("""
+                select count(*) from consent_requests where patient_id = ? and template_id = ? and status = 'FIRMADO'
+                   and signed_at >= ?""", Long.class, p.patientId, i.procedure.consentTemplateId, Dates.now().minusDays(365));
+        if (signed != null && signed > 0) return;
+        List<String> name = jdbc.queryForList("select name from consent_templates where id = ?", String.class, i.procedure.consentTemplateId);
+        throw ApiException.badRequest("FALTA_CONSENTIMIENTO", "«" + i.procedure.name + "» necesita el consentimiento firmado «"
+                + (name.isEmpty() ? "informado" : name.get(0)) + "». Envíalo desde la ficha → Consentimientos y vuelve a intentarlo cuando esté firmado.");
     }
 
     private void refreshPlanStatus(TreatmentPlan p) {
@@ -456,6 +477,7 @@ public class ClinicalService {
         e.notes = r.notes().trim();
         e.createdAt = Dates.now();
         e.createdBy = CurrentUser.usernameOrSystem();
+        e.appointmentId = pe.clinicacardenas.agenda.AttentionLink.current(jdbc, p.patientId);
         evolutions.save(e);
         if (item != null) {
             String progress = PENDIENTE.equals(item.status) ? "EN_PROCESO" : item.status;

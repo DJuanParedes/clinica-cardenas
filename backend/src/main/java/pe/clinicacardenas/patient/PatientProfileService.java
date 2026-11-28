@@ -176,6 +176,7 @@ public class PatientProfileService {
                   is_guardian, pays, notes, created_at, created_by) values (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 patientId, v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes,
                 Dates.now(), CurrentUser.usernameOrSystem());
+        syncGuardian(patientId, v);
         audit.register(PACIENTE, patientId, FAMILIAR, "Vinculó a " + v.name + " (" + v.relationship.toLowerCase() + ") con " + p.getFullName());
         return profileInternal(patientId);
     }
@@ -188,8 +189,22 @@ public class PatientProfileService {
                 update patient_relations set related_patient_id=?, full_name=?, doc_type=?, doc_number=?, relationship=?, phone=?, email=?,
                   is_guardian=?, pays=?, notes=? where id = ?""",
                 v.relatedId, v.name, v.docType, v.docNumber, v.relationship, v.phone, v.email, v.guardian, v.pays, v.notes, relationId);
+        syncGuardian(patientId, v);
         audit.register(PACIENTE, patientId, FAMILIAR, "Actualizó el familiar " + v.name);
         return profileInternal(patientId);
+    }
+
+    /**
+     * v2.17: si el familiar se marca como apoderado, pasa a ser el representante legal del paciente
+     * (es quien firma consentimientos y figura en los documentos del menor).
+     */
+    private void syncGuardian(Long patientId, Values v) {
+        if (!v.guardian()) return;
+        String rel = switch (String.valueOf(v.relationship())) { case "PADRE" -> "PADRE"; case "MADRE" -> "MADRE"; default -> "TUTOR_LEGAL"; };
+        jdbc.update("""
+                update patients set guardian_name = ?, guardian_doc_type = coalesce(?, guardian_doc_type), guardian_doc_number = coalesce(?, guardian_doc_number),
+                       guardian_phone = coalesce(?, guardian_phone), guardian_relationship = ? where id = ?""",
+                v.name(), v.docType(), v.docNumber(), v.phone(), rel, patientId);
     }
 
     @Transactional

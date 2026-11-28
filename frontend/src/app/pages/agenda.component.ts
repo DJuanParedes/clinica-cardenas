@@ -6,7 +6,7 @@ import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { Appointment, AuditEntry, Block, Dentist } from '../core/models';
-import { STATUS_LABEL, STATUS_TONE, apiError, dateTime, hhmm, isoDate, longDay, parseLocal } from '../core/format';
+import { STATUS_LABEL, STATUS_TONE, apiError, dateTime, hhmm, isoDate, longDay, parseLocal, soles } from '../core/format';
 import { IconComponent } from '../shared/icon.component';
 import { categoryColor } from '../core/categories';
 import { ModalComponent } from '../shared/modal.component';
@@ -238,6 +238,16 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
 
           <div class="row"><a class="small" [routerLink]="['/pacientes', sel.patient.id]">Abrir ficha del paciente</a></div>
 
+          @if (att && (att.procedures.length || att.evolutions.length || att.payments.length || att.prescriptions.length)) {
+            <div class="attention">
+              <div class="small strong">En esta cita</div>
+              @for (x of att.procedures; track x.id) { <div class="small">✔ {{ x.procedure }}@if (x.tooth) { · pieza {{ x.tooth }} } <span class="muted">· {{ money(x.price) }}</span></div> }
+              @for (x of att.evolutions; track x.id) { <div class="small" [class.muted]="x.voidedAt">📝 {{ x.notes }}@if (x.voidedAt) { (anulada) }</div> }
+              @for (x of att.prescriptions; track x.id) { <div class="small" [class.muted]="x.voidedAt">💊 Receta: {{ x.drugs }}@if (x.voidedAt) { (anulada) }</div> }
+              @for (x of att.payments; track x.id) { <div class="small" [class.muted]="x.status !== 'VALIDO'">💵 Cobro {{ money(x.amount) }} · {{ x.method }}@if (x.status !== 'VALIDO') { (anulado) }</div> }
+            </div>
+          } @else if (sel.status === 'ATENDIDA') { <p class="muted small">No se registraron procedimientos, evoluciones ni cobros en esta cita.</p> }
+
           @if (history.length) {
             <details>
               <summary class="small strong">Historial de la cita</summary>
@@ -336,6 +346,7 @@ interface Column { dentist: Dentist; blocks: Block[]; appts: Appointment[]; }
     .now { position: absolute; left: 56px; right: 0; border-top: 2px solid var(--gum); z-index: 5; pointer-events: none; }
     .now span { position: absolute; left: -54px; top: -10px; font-size: 11px; font-weight: 700; color: var(--gum); background: var(--surface); padding: 0 3px; }
     .actions-row { padding-top: 6px; }
+    .attention { background: var(--surface-2, #f4f8fa); border-radius: 8px; padding: 8px 10px; margin: 8px 0; display: flex; flex-direction: column; gap: 3px; }
     .hist { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
   `],
 })
@@ -624,6 +635,9 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
   selInfo: any = null;
   mine(a: Appointment) { const me = this.auth.user(); return me?.role === 'ODONTOLOGO' && me.dentistId === a.dentist.id; }
 
+  att: any = null;
+  money = soles;
+
   open(a: Appointment) {
     this.sel = a;
     this.selInfo = null;
@@ -633,7 +647,9 @@ export class AgendaComponent implements OnInit, OnChanges, OnDestroy {
     this.cancelling = false;
     this.reason = '';
     this.history = [];
+    this.att = null;
     this.api.appointmentAudit(a.id).subscribe((h) => (this.history = h));
+    if (['EN_ATENCION', 'ATENDIDA'].includes(a.status)) this.api.appointmentAttention(a.id).subscribe((r) => (this.att = r));
   }
 
   change(status: string) {

@@ -59,6 +59,16 @@ public class AgendaController {
         return service.get(id);
     }
 
+    /** v2.17: lo que se hizo y se cobró en la cita. */
+    @GetMapping("/appointments/{id}/attention")
+    @PreAuthorize("hasAuthority('AGENDA_VER')")
+    public Map<String, Object> attention(@PathVariable Long id) {
+        return attentionLink.summary(id);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private AttentionLink attentionLink;
+
     @GetMapping("/appointments/{id}/audit")
     @PreAuthorize("hasAuthority('AGENDA_VER')")
     public List<AuditLog> history(@PathVariable Long id) {
