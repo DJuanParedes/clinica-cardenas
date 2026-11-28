@@ -94,7 +94,7 @@ public class DeletionService {
                 e(TREATMENT_ITEMS, "Tratamiento del plan", TREATMENT_ITEMS, "concat_ws(' · ', (select pr.name from procedures pr where pr.id = t.procedure_id), concat('pieza ', t.tooth))"),
                 e("tasks", "Tarea", "tasks", "t.title"),
                 e("leads", "Oportunidad (CRM)", "leads", "t.full_name"),
-                e(LAB_ORDERS, "Orden de laboratorio", LAB_ORDERS, "concat_ws(' · ', t.work_type, t.description)"),
+                new Entity(LAB_ORDERS, "Orden de laboratorio", LAB_ORDERS, "id", "concat_ws(' · ', t.work_type, t.description)", Set.of(), this::checkLabOrder),
                 e("laboratories", "Laboratorio", "laboratories", T_NAME, LAB_ORDERS),
                 e("commission_rules", "Regla de comisión", "commission_rules", "concat_ws(' · ', coalesce(t.category, 'General'), t.calc_type, t.value)", "commission_lines"),
                 e("consent_templates", "Plantilla de consentimiento", "consent_templates", T_NAME, "consent_requests"),
@@ -102,7 +102,7 @@ public class DeletionService {
                 e("campaigns", "Campaña", "campaigns", T_NAME),
                 e("segments", "Segmento", "segments", T_NAME),
                 e("promotions", "Promoción", "promotions", T_NAME),
-                e("inventory_items", "Material de inventario", "inventory_items", T_NAME),
+                new Entity("inventory_items", "Material de inventario", "inventory_items", "id", T_NAME, Set.of(), this::checkItem),
                 new Entity("inventory_purchases", "Compra de inventario", "inventory_purchases", "id", "concat_ws(' · ', t.supplier, t.doc_number, date_format(t.purchase_date, '%d/%m/%Y'))", Set.of(), this::checkPurchase),
                 e("supply_requests", "Pedido de material", "supply_requests", "coalesce(t.item_text, concat('Pedido ', t.id))"),
                 new Entity("expenses", "Egreso de caja", "expenses", "id", "concat_ws(' · ', t.concept, date_format(t.expense_date, '%d/%m/%Y'), concat('S/ ', t.amount))", Set.of(), this::checkExpense),
@@ -303,6 +303,31 @@ public class DeletionService {
                  where status = 'VALIDO' and id = (select expense_id from inventory_purchases where id = ?)""", id);
     }
 
+    /** v2.19.4: una orden pagada al laboratorio no deja egresos huérfanos en caja al eliminarse. */
+    private void checkLabOrder(Object id, Plan p) {
+        if (count("""
+                select count(*) from lab_order_payments lp join expenses e on e.id = lp.expense_id
+                  join cash_closings c on c.day = e.expense_date and c.status = 'CERRADA' where lp.order_id = ? and e.status = 'VALIDO'""", id) > 0) {
+            p.block("Tiene pagos al laboratorio en un día de caja ya cerrado. Reabre ese día en Cierre de caja para poder eliminarla.");
+        }
+        if (count("select count(*) from lab_order_payments where order_id = ?", id) > 0) {
+            p.warn("Se anularán en caja los pagos hechos al laboratorio por esta orden.");
+        }
+    }
+
+    private void voidLabPayments(Object id) {
+        jdbc.update("""
+                update expenses set status = 'ANULADO', void_reason = 'Orden de laboratorio eliminada'
+                 where status = 'VALIDO' and id in (select expense_id from lab_order_payments where order_id = ?)""", id);
+    }
+
+    /** v2.19.4: un material con compras registradas no se borra (se perdería el detalle de esas compras): se desactiva. */
+    private void checkItem(Object id, Plan p) {
+        if (count("select count(*) from inventory_lots where item_id = ? and purchase_id is not null", id) > 0) {
+            p.block("Tiene compras registradas. Desactívalo para que no aparezca, o elimina primero esas compras.");
+        }
+    }
+
     private void checkSeries(Object id, Plan p) {
         if (count("select count(*) from invoice_series where id = ? and last_number > 0", id) > 0) {
             p.block("Ya se emitieron comprobantes con esta serie: ante SUNAT no se puede borrar, solo desactivar.");
@@ -361,6 +386,7 @@ public class DeletionService {
             rows.addAll(jdbc.queryForList("select * from " + d[0] + WHERE + d[1], params(d[2])));
         }
         if ("inventory_purchases".equals(x.table())) reversePurchase(id);
+        if (LAB_ORDERS.equals(x.table())) voidLabPayments(id);
         Map<String, Object> nulled = new LinkedHashMap<>();
         for (String[] n : p.nulls) {
             nulled.put(n[0] + "." + n[1], n[3]);
