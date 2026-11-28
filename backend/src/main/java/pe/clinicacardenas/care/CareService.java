@@ -236,6 +236,7 @@ public class CareService {
     public Map<String, Object> createInstallments(Long planId, InstallmentRequest r) {
         TreatmentPlan p = plan(planId);
         if ("ANULADO".equals(p.status)) throw ApiException.badRequest("PLAN_CERRADO", "El plan está anulado.");
+        if (p.acceptedAt == null) throw ApiException.conflict("PRESUPUESTO_SIN_ACEPTAR", "Registra primero que el paciente aceptó el presupuesto; luego arma las cuotas.");
         int count = r.count() == null ? 0 : r.count();
         if (count < 2 || count > 24) throw ApiException.field("count", "Elige de 2 a 24 cuotas.");
         LocalDate first = r.firstDueDate() == null ? Dates.today().plusMonths(1) : r.firstDueDate();

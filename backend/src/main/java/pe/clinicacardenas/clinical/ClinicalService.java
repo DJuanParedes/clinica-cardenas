@@ -119,7 +119,11 @@ public class ClinicalService {
             i.doneAt = Dates.now();
             Dentist d = currentDentist();
             Long planDentist = p.dentist == null ? null : p.dentist.id;
-            i.doneByDentistId = d != null ? d.id : planDentist;
+            Long apptDentist = i.doneAppointmentId == null ? null : jdbc.query(
+                    "select dentist_id from appointments where id = ?", rs -> rs.next() ? (Long) rs.getObject(1, Long.class) : null,
+                    i.doneAppointmentId);
+            // v2.19.3: si lo registra recepción o el administrador, se atribuye al odontólogo de la cita en curso.
+            i.doneByDentistId = d != null ? d.id : apptDentist != null ? apptDentist : planDentist;
         } else if (!nowDone) {
             i.doneAt = null;
             i.doneByDentistId = null;

@@ -132,13 +132,11 @@ public class PortalService {
                     "Demasiados intentos con datos que no coinciden. Espera 15 minutos o comunícate con la clínica al " + clinicPhone + ".");
         }
         Optional<Patient> byDoc = find(r.docType(), r.docNumber());
-        if (byDoc.isEmpty()) {
+        // v2.19.3: un solo mensaje para documento inexistente o fecha distinta, para no revelar quién es paciente de la clínica.
+        if (byDoc.isEmpty() || !r.birthDate().equals(byDoc.get().birthDate)) {
             fails.add(now);
-            throw ApiException.field(DOCNUMBER, "Ese documento no está registrado en la clínica. Verifica el número o acércate a recepción para registrarte.");
-        }
-        if (!r.birthDate().equals(byDoc.get().birthDate)) {
-            fails.add(now);
-            throw ApiException.field("birthDate", "La fecha de nacimiento no coincide con la registrada para ese documento.");
+            throw ApiException.badRequest("DATOS_NO_COINCIDEN",
+                    "El documento y la fecha de nacimiento no coinciden con los de un paciente de la clínica. Verifícalos o acércate a recepción.");
         }
         Patient p = byDoc.get();
         fails.clear();
