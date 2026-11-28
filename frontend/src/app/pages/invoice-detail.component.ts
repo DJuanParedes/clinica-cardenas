@@ -183,10 +183,10 @@ import { OnlyDirective } from '../shared/only.directive';
     @media print { .mail, .tech { display: none !important; } }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
     .doc { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 32px 36px; }
-    .dh { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 3px solid var(--brand); }
-    .issuer { display: flex; gap: 14px; align-items: center; }
+    .dh { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 24px; padding-bottom: 20px; border-bottom: 3px solid var(--brand); }
+    .issuer { display: flex; gap: 14px; align-items: center; min-width: 0; flex: 1 1 240px; }
     .biz { font-family: var(--font-display); font-size: var(--step-2); font-weight: 900; letter-spacing: -.01em; }
-    .rucbox { border: 2px solid var(--brand); border-radius: 8px; padding: 12px 18px; text-align: center; min-width: 230px; }
+    .rucbox { border: 2px solid var(--brand); border-radius: 8px; padding: 12px 18px; text-align: center; flex: 0 1 230px; min-width: 200px; box-sizing: border-box; }
     .dtype { font-size: 12px; font-weight: 700; margin: 4px 0; text-transform: uppercase; letter-spacing: .04em; }
     .cust { display: grid; grid-template-columns: 130px 1fr; gap: 6px 14px; margin: 20px 0; font-size: var(--step--1); }
     .cust dt { color: var(--muted); }
