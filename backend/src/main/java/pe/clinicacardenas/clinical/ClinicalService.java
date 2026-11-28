@@ -166,6 +166,42 @@ public class ClinicalService {
     }
 
     @Transactional
+    /** Anula un diagnóstico registrado por error. No se borra: queda tachado con el motivo (NTS 139-MINSA). */
+    @Transactional
+    public Diagnosis voidDiagnosis(Long id, String reason) {
+        Diagnosis d = diagnoses.findById(id).orElseThrow(() -> ApiException.notFound("El diagnóstico"));
+        if (d.voidedAt != null) throw ApiException.conflict("YA_ANULADO", "El diagnóstico ya está anulado.");
+        String r = checkVoidReason(reason);
+        d.voidedAt = Dates.now();
+        d.voidedBy = CurrentUser.usernameOrSystem();
+        d.voidReason = r;
+        diagnoses.save(d);
+        audit.register("HISTORIA", d.patientId, "ANULAR_DIAGNOSTICO", d.description + " · " + r);
+        return d;
+    }
+
+    /** Anula una evolución registrada por error (queda tachada con el motivo). */
+    @Transactional
+    public Map<String, Object> voidEvolution(Long id, String reason) {
+        Evolution e = evolutions.findById(id).orElseThrow(() -> ApiException.notFound("La evolución"));
+        if (e.voidedAt != null) throw ApiException.conflict("YA_ANULADO", "La evolución ya está anulada.");
+        String r = checkVoidReason(reason);
+        e.voidedAt = Dates.now();
+        e.voidedBy = CurrentUser.usernameOrSystem();
+        e.voidReason = r;
+        evolutions.save(e);
+        Long patientId = jdbc.queryForObject("select patient_id from treatment_plans where id = ?", Long.class, e.planId);
+        audit.register("HISTORIA", patientId, "ANULAR_EVOLUCION", r);
+        return Map.of("id", e.id, "voidedAt", e.voidedAt, "voidReason", r);
+    }
+
+    private static String checkVoidReason(String reason) {
+        String r = reason == null ? "" : reason.trim();
+        if (r.length() < 5) throw ApiException.field("reason", "Explica el motivo de la anulación (mínimo 5 caracteres).");
+        if (r.length() > 300) throw ApiException.field("reason", "El motivo admite hasta 300 caracteres.");
+        return r;
+    }
+
     public Diagnosis addDiagnosis(Long patientId, DiagnosisRequest r) {
         patient(patientId);
         if (r.description() == null || r.description().isBlank()) {

@@ -24,4 +24,10 @@ public class Diagnosis {
     public LocalDateTime createdAt;
     @Column(name = "created_by")
     public String createdBy;
+    @Column(name = "voided_at")
+    public LocalDateTime voidedAt;
+    @Column(name = "voided_by")
+    public String voidedBy;
+    @Column(name = "void_reason")
+    public String voidReason;
 }

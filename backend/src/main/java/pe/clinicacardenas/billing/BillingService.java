@@ -79,6 +79,37 @@ public class BillingService {
         return company;
     }
 
+    public record SeriesRequest(String docType, String series, Boolean active) {}
+
+    public List<InvoiceSeries> allSeries() {
+        return series.findAll(org.springframework.data.domain.Sort.by("docType", "series"));
+    }
+
+    /**
+     * Crea o edita una serie. SUNAT: boletas (03) empiezan con B y facturas (01) con F, 4 caracteres (ej. B001).
+     * Si la serie ya emitió comprobantes no se cambia el código ni el tipo: solo se activa o desactiva.
+     */
+    @Transactional
+    public InvoiceSeries saveSeries(Long id, SeriesRequest r) {
+        InvoiceSeries s = id == null ? new InvoiceSeries() : series.findById(id).orElseThrow(() -> ApiException.notFound("La serie"));
+        String type = r.docType() == null ? s.docType : r.docType().trim();
+        String code = r.series() == null ? s.series : r.series().trim().toUpperCase();
+        if (!"01".equals(type) && !"03".equals(type)) throw ApiException.field("docType", "Elige factura o boleta.");
+        String prefix = "01".equals(type) ? "F" : "B";
+        if (code == null || !code.matches("^" + prefix + "[A-Z0-9]{3}$"))
+            throw ApiException.field("series", ("01".equals(type) ? "La serie de facturas" : "La serie de boletas") + " debe tener 4 caracteres y empezar con " + prefix + " (ej. " + prefix + "001).");
+        if (id != null && s.lastNumber > 0 && (!code.equals(s.series) || !type.equals(s.docType)))
+            throw ApiException.conflict("SERIE_USADA", "La serie ya emitió comprobantes: no se puede cambiar su código ni su tipo. Puedes desactivarla y crear otra.");
+        if (series.findAll().stream().anyMatch(x -> x.series.equals(code) && !x.id.equals(id)))
+            throw ApiException.field("series", "Ya existe la serie " + code + ".");
+        s.docType = type;
+        s.series = code;
+        if (r.active() != null) s.active = r.active();
+        series.save(s);
+        audit.register("SERIE", s.id, id == null ? "CREAR" : "EDITAR", type + " " + code + (s.active ? "" : " (inactiva)"));
+        return s;
+    }
+
     public List<InvoiceSeries> activeSeries() {
         return series.findByActiveTrueOrderBySeriesAsc();
     }

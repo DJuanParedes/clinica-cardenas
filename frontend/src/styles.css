@@ -316,3 +316,7 @@ img, svg, video { max-width: 100%; }
 }
 .teal-ink { color: var(--teal-strong); }
 .input.search { max-width: 360px; }
+
+/* v2.16: registros clínicos anulados (no se borran) */
+li.voided .txt { text-decoration: line-through; color: var(--muted, #6b7a82); }
+.void-note { color: #b42318; }

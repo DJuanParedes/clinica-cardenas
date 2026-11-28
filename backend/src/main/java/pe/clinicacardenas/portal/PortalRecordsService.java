@@ -125,7 +125,7 @@ public class PortalRecordsService {
                     select e.session_date as date, e.notes, u.full_name as dentist, pr.name as `procedure`
                       from evolutions e left join dentists d on d.id = e.dentist_id left join users u on u.id = d.user_id
                       left join treatment_items ti on ti.id = e.item_id left join procedures pr on pr.id = ti.procedure_id
-                     where e.plan_id = ? order by e.session_date desc, e.id desc""", planId));
+                     where e.plan_id = ? and e.voided_at is null order by e.session_date desc, e.id desc""", planId));
             plan.put("installments", jdbc.queryForList(
                     "select number, due_date as dueDate, amount from installments where plan_id = ? order by number", planId));
             totalAll = totalAll.add(total);

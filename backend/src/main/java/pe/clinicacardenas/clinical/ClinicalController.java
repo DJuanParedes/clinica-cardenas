@@ -90,6 +90,18 @@ public class ClinicalController {
         return inventory.usageForm(itemId);
     }
 
+    @PostMapping("/diagnoses/{id}/void")
+    @PreAuthorize(CLINICAL)
+    public Diagnosis voidDiagnosis(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return service.voidDiagnosis(id, body.get("reason"));
+    }
+
+    @PostMapping("/evolutions/{id}/void")
+    @PreAuthorize(PLAN)
+    public Map<String, Object> voidEvolution(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return service.voidEvolution(id, body.get("reason"));
+    }
+
     @PostMapping("/plans/{planId}/evolutions")
     @PreAuthorize(PLAN)
     public Map<String, Object> evolution(@PathVariable Long planId, @RequestBody ClinicalService.EvolutionRequest r) {
