@@ -102,7 +102,7 @@ type Mode = 'login' | 'activar' | 'codigo';
         </div>
         <div class="field">
           <label for="dn">Número</label>
-          <input id="dn" name="dn" class="input lg tabular" [(ngModel)]="docNumber" inputmode="numeric" appOnly="alnum" maxlength="12" autocomplete="username" />
+          <input id="dn" name="dn" class="input lg tabular" [(ngModel)]="docNumber" inputmode="numeric" [appOnly]="docType === 'PAS' ? 'alnum' : 'digits'" maxlength="12" autocomplete="username" />
         </div>
       </div>
     </ng-template>

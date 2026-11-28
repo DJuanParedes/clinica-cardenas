@@ -6,7 +6,7 @@ import { Directive, ElementRef, HostListener, Input, inject } from '@angular/cor
  *  - int:      número entero sin signo (cantidades, stock, días, edades)
  *  - decimal:  importe con punto decimal y hasta 2 decimales (precios, montos, costos)
  *  - letters:  letras con tildes y ñ, espacio, apóstrofo, punto y guion (nombres y apellidos)
- *  - alnum:    letras y números en mayúscula, sin espacios (carné de extranjería, pasaporte, lote)
+ *  - alnum:    letras y números en mayúscula, sin espacios (pasaporte, lote)
  *  - phone:    números y un "+" opcional al inicio
  *  - teeth:    piezas dentales separadas por coma (11, 12, 21)
  *  - cie10:    código CIE-10 con forma K02 o K02.1

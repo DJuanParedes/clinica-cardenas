@@ -12,7 +12,7 @@ public final class PatientValidator {
 
 
     private static final Pattern DNI = Pattern.compile("^\\d{8}$");
-    private static final Pattern CE = Pattern.compile("^[A-Z0-9]{9,12}$");
+    private static final Pattern CE = Pattern.compile("^\\d{9,12}$");
     private static final Pattern PAS = Pattern.compile("^[A-Z0-9]{6,12}$");
     private static final Pattern NAME = Pattern.compile("^[\\p{L}][\\p{L} '.-]{1,79}$");
     private static final Pattern PHONE = Pattern.compile("^\\+?\\d{6,12}$");
@@ -62,7 +62,7 @@ public final class PatientValidator {
         String doc = normalizeDoc(in.docNumber());
         switch (type) {
             case "DNI" -> { if (!DNI.matcher(doc).matches()) e.put(DOCNUMBER, "El DNI debe tener 8 dígitos."); }
-            case "CE" -> { if (!CE.matcher(doc).matches()) e.put(DOCNUMBER, "El carné de extranjería tiene de 9 a 12 caracteres."); }
+            case "CE" -> { if (!CE.matcher(doc).matches()) e.put(DOCNUMBER, "El carné de extranjería tiene de 9 a 12 dígitos (solo números)."); }
             case "PAS" -> { if (!PAS.matcher(doc).matches()) e.put(DOCNUMBER, "El pasaporte tiene de 6 a 12 caracteres."); }
             default -> e.put("docType", "Selecciona el tipo de documento.");
         }

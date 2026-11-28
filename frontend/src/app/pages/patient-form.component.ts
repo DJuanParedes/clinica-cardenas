@@ -57,8 +57,8 @@ interface Form {
               <label class="req" for="dn">Número de documento</label>
               <input id="dn" name="docNumber" class="input tabular" [class.invalid]="e['docNumber']" [(ngModel)]="f.docNumber"
                      (ngModelChange)="checkDoc()" [disabled]="!!id" [attr.maxlength]="f.docType === 'DNI' ? 8 : 12"
-                     [attr.inputmode]="f.docType === 'DNI' ? 'numeric' : 'text'" autocomplete="off"
-                     [appOnly]="f.docType === 'DNI' ? 'digits' : 'alnum'" />
+                     [attr.inputmode]="f.docType === 'PAS' ? 'text' : 'numeric'" autocomplete="off"
+                     [appOnly]="f.docType === 'PAS' ? 'alnum' : 'digits'" />
               @if (e['docNumber']) { <span class="err">{{ e['docNumber'] }}</span> }
               @else if (id) { <span class="hint">El documento no se modifica después del registro.</span> }
               @else if (f.docType === 'DNI') {
@@ -168,7 +168,7 @@ interface Form {
               </div>
               <div class="field">
                 <label class="req" for="gdn">Número</label>
-                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" [appOnly]="f.guardianDocType === 'DNI' ? 'digits' : 'alnum'" />
+                <input id="gdn" name="gdn" class="input tabular" [class.invalid]="e['guardianDocNumber']" [(ngModel)]="f.guardianDocNumber" (ngModelChange)="lookupGuardian()" [attr.maxlength]="f.guardianDocType === 'DNI' ? 8 : 12" inputmode="numeric" [appOnly]="f.guardianDocType === 'PAS' ? 'alnum' : 'digits'" />
                 @if (guardianInfo && !e['guardianDocNumber']) { <span class="hint reniec" [class.ok]="guardianInfo.startsWith('✓')">{{ guardianInfo }}</span> }
                 @if (e['guardianDocNumber']) { <span class="err">{{ e['guardianDocNumber'] }}</span> }
               </div>
@@ -459,14 +459,14 @@ export class PatientFormComponent implements OnInit {
   /** Al cambiar el tipo de documento se limpia el número para no dejar letras en un DNI. */
   cleanDoc(type: string, v: string): string {
     const n = (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    return type === 'DNI' ? n.replace(/\D/g, '').slice(0, 8) : n.slice(0, 12);
+    return type === 'DNI' ? n.replace(/\D/g, '').slice(0, 8) : type === 'CE' ? n.replace(/\D/g, '').slice(0, 12) : n.slice(0, 12);
   }
 
   private validate(): boolean {
     const e: Record<string, string> = {};
     const doc = this.f.docNumber.replace(/\s/g, '').toUpperCase();
     if (this.f.docType === 'DNI' && !/^\d{8}$/.test(doc)) e['docNumber'] = 'El DNI debe tener 8 dígitos.';
-    if (this.f.docType === 'CE' && !/^[A-Z0-9]{9,12}$/.test(doc)) e['docNumber'] = 'El carné de extranjería tiene de 9 a 12 caracteres.';
+    if (this.f.docType === 'CE' && !/^\d{9,12}$/.test(doc)) e['docNumber'] = 'El carné de extranjería tiene de 9 a 12 dígitos (solo números).';
     if (this.f.docType === 'PAS' && !/^[A-Z0-9]{6,12}$/.test(doc)) e['docNumber'] = 'El pasaporte tiene de 6 a 12 caracteres.';
     if (this.f.firstName.trim().length < 2) e['firstName'] = 'Ingresa los nombres.';
     if (this.f.lastName.trim().length < 2) e['lastName'] = 'Ingresa los apellidos.';
