@@ -165,7 +165,6 @@ public class ClinicalService {
         return h;
     }
 
-    @Transactional
     /** Anula un diagnóstico registrado por error. No se borra: queda tachado con el motivo (NTS 139-MINSA). */
     @Transactional
     public Diagnosis voidDiagnosis(Long id, String reason) {
@@ -202,6 +201,7 @@ public class ClinicalService {
         return r;
     }
 
+    @Transactional
     public Diagnosis addDiagnosis(Long patientId, DiagnosisRequest r) {
         patient(patientId);
         if (r.description() == null || r.description().isBlank()) {
