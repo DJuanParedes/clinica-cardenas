@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../core/api.service';
+import { DeleteButtonComponent } from '../../shared/delete-button.component';
 import { ToastService } from '../../core/toast.service';
 import { apiError, dateTime, shortDate } from '../../core/format';
 import { IconComponent } from '../../shared/icon.component';
@@ -20,7 +21,7 @@ const blankTooth = (): Tooth => ({ missing: false, implant: false, mobility: 0, 
 @Component({
   selector: 'app-periodontogram-tab',
   standalone: true,
-  imports: [OnlyDirective, FormsModule, IconComponent],
+  imports: [OnlyDirective, FormsModule, IconComponent, DeleteButtonComponent],
   template: `
     <section class="panel">
       <div class="panel-head">
@@ -39,6 +40,7 @@ const blankTooth = (): Tooth => ({ missing: false, implant: false, mobility: 0, 
                 @for (x of exams; track x.id) { <option [ngValue]="x.id">{{ date(x.examDate) }} · IP {{ x.plaqueIndex }}% · SAS {{ x.bleedingIndex }}%</option> }
               </select>
               @if (current && isToday(current.createdAt)) { <button class="btn" type="button" (click)="edit()"><app-icon name="edit" [size]="15" /> Corregir</button> }
+              @if (current?.id && !editing) { <app-delete-button entity="periodontograms" [recordId]="current.id" what="Periodontograma" [ghost]="true" (deleted)="load()" /> }
             }
             <button class="btn primary" type="button" (click)="newExam()"><app-icon name="plus" [size]="15" /> Nuevo examen</button>
           } @else {
