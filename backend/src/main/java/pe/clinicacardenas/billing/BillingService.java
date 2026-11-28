@@ -264,6 +264,9 @@ public class BillingService {
                 it.treatmentItemId = ti.id;
                 ti.invoiceId = inv.id;
                 treatmentItems.save(ti);
+                // v2.19.1: los cobros de ese procedimiento quedan amarrados al comprobante (no se anulan a escondidas).
+                jdbc.update("update payments set invoice_id = ? where treatment_item_id = ? and status = 'VALIDO' and invoice_id is null",
+                        inv.id, ti.id);
             }
             saved.add(invoiceItems.save(it));
         }
@@ -374,6 +377,7 @@ public class BillingService {
                     treatmentItems.findById(it.treatmentItemId).ifPresent(ti -> { ti.invoiceId = null; treatmentItems.save(ti); });
                 }
             }
+            jdbc.update("update payments set invoice_id = null where invoice_id = ?", inv.id);
         }
         audit.register("COMPROBANTE", inv.id, action, inv.getFullNumber() + " → " + res.status()
                 + (res.code() == null ? "" : " (" + res.code() + ")"));

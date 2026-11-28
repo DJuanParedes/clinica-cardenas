@@ -256,7 +256,7 @@ function sendBill(body) {
   if (auth.error) return { status: 500, body: auth.error };
   const fileName = tag(body, 'fileName');
   const content = tag(body, 'contentFile');
-  if (!fileName || !/^\d{11}-(01|03)-[A-Z0-9]{4}-\d{1,8}\.zip$/i.test(fileName)) {
+  if (!fileName || !/^\d{11}-(01|03|07)-[A-Z0-9]{4}-\d{1,8}\.zip$/i.test(fileName)) {
     return { status: 500, body: fault('0151', 'El nombre del archivo ZIP no cumple el formato RUC-TIPO-SERIE-NUMERO.zip') };
   }
   if (fileName.slice(0, 11) !== auth.ruc) {
