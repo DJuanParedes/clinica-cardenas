@@ -408,6 +408,7 @@ export class Api {
   prescriptions(patientId: number): Observable<any[]> { return this.http.get<any[]>(`/api/patients/${patientId}/prescriptions`); }
   createPrescription(patientId: number, body: any): Observable<any> { return this.http.post(`/api/patients/${patientId}/prescriptions`, body); }
   voidPrescription(id: number, reason: string): Observable<any> { return this.http.post(`/api/prescriptions/${id}/void`, { reason }); }
+  acceptPlan(planId: number, via: string): Observable<any> { return this.http.post(`/api/plans/${planId}/accept`, { via }); }
   voidDiagnosis(id: number, reason: string): Observable<any> { return this.http.post(`/api/diagnoses/${id}/void`, { reason }); }
   voidEvolution(id: number, reason: string): Observable<any> { return this.http.post(`/api/evolutions/${id}/void`, { reason }); }
   deleteFile(id: number): Observable<any> { return this.http.delete(`/api/files/${id}`); }

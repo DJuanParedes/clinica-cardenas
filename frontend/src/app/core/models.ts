@@ -51,7 +51,7 @@ export interface OdontogramEntry { tooth: number; face: string; condition: strin
 
 export interface TreatmentItem { id: number; planId: number; procedure: Procedure; tooth?: number; price: number; status: string; doneAt?: string; invoiceId?: number; }
 export interface Evolution { voidedAt?: string; voidedBy?: string; voidReason?: string; id: number; planId: number; itemId?: number; sessionDate: string; notes: string; createdBy: string; dentist?: Dentist; }
-export interface TreatmentPlan { id: number; title: string; notes?: string; status: string; createdAt: string; createdBy: string; dentist?: Dentist; }
+export interface TreatmentPlan { acceptedAt?: string; acceptedBy?: string; acceptedVia?: string; id: number; title: string; notes?: string; status: string; createdAt: string; createdBy: string; dentist?: Dentist; }
 export interface PlanView { plan: TreatmentPlan; items: TreatmentItem[]; evolutions: Evolution[]; total: number; doneAmount: number; doneCount: number; itemCount: number; }
 
 export interface Invoice {

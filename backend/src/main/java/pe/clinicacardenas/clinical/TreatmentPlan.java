@@ -24,4 +24,10 @@ public class TreatmentPlan {
     public LocalDateTime createdAt;
     @Column(name = "created_by")
     public String createdBy;
+    @Column(name = "accepted_at")
+    public LocalDateTime acceptedAt;
+    @Column(name = "accepted_by")
+    public String acceptedBy;
+    @Column(name = "accepted_via")
+    public String acceptedVia;
 }
