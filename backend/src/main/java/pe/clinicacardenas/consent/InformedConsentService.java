@@ -200,7 +200,8 @@ public class InformedConsentService {
         Map<String, String> v = new LinkedHashMap<>();
         String signer = minor && p.guardianName != null && !p.guardianName.isBlank() ? p.guardianName : p.getFullName();
         v.put("firmante", signer);
-        v.put("documento_firmante", minor && p.guardianDocNumber != null ? "DNI " + p.guardianDocNumber : p.docType + " " + p.docNumber);
+        v.put("documento_firmante", minor && p.guardianDocNumber != null
+                ? docLabel(p.guardianDocType) + " " + p.guardianDocNumber : docLabel(p.docType) + " " + p.docNumber);
         String relation = p.guardianRelationship == null ? "TUTOR" : p.guardianRelationship;
         v.put("condicion", minor ? (REL.getOrDefault(relation, "apoderado(a)") + " de " + p.getFullName() + " (menor de edad)") : PACIENTE_2);
         v.put(PACIENTE_2, p.getFullName());
@@ -391,4 +392,13 @@ public class InformedConsentService {
     }
 
     private static String nz(String s) { return s == null ? "" : s; }
+
+    static String docLabel(String type) {
+        if (type == null) return "DNI";
+        return switch (type.trim().toUpperCase()) {
+            case "CE", "4" -> "carné de extranjería";
+            case "PAS", "7" -> "pasaporte";
+            default -> "DNI";
+        };
+    }
 }
