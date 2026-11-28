@@ -41,6 +41,11 @@ public class DeletionController {
         return service.trash();
     }
 
+    @PostMapping("/trash/{id}/restore")
+    public Map<String, Object> restore(@PathVariable long id) {
+        return service.restore(id);
+    }
+
     @GetMapping("/trash/{id}")
     public ResponseEntity<String> trashData(@PathVariable long id) {
         return ResponseEntity.ok()

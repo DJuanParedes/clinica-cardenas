@@ -117,7 +117,7 @@ import { OnlyDirective } from '../shared/only.directive';
       <form class="grid cols-2" (ngSubmit)="saveExpense()">
         <div class="field">
           <label class="req" for="ed">Fecha</label>
-          <input id="ed" name="ed" type="date" class="input" [class.invalid]="e['expenseDate']" [(ngModel)]="x.expenseDate" [max]="todayIso" />
+          <input id="ed" name="ed" type="date" class="input" [class.invalid]="e['expenseDate']" [(ngModel)]="x.expenseDate" [max]="todayIso" (change)="loadCashAvailable()" />
           @if (e['expenseDate']) { <span class="err">{{ e['expenseDate'] }}</span> }
         </div>
         <div class="field">
@@ -144,6 +144,10 @@ import { OnlyDirective } from '../shared/only.directive';
             <option value="">Seleccionar…</option>
             @for (mt of methods; track mt) { <option [value]="mt">{{ method(mt) }}</option> }
           </select>
+          @if (x.method === 'EFECTIVO' && cashAvailable !== null) {
+            @if (cashShort()) { <span class="err">En caja debería haber S/ {{ cashAvailable.toFixed(2) }} en efectivo: este egreso deja la caja en negativo. Revisa el importe o regístralo con otro medio.</span> }
+            @else { <span class="hint">Efectivo esperado en caja: S/ {{ cashAvailable.toFixed(2) }}</span> }
+          }
         </div>
         <div class="field">
           <label for="es">Proveedor</label>
@@ -241,13 +245,30 @@ export class CashComponent implements OnInit {
       method: d.method || '', supplier: d.party || '', reference: d.reference || '' };
     this.e = {};
     this.expenseOpen = true;
+    this.loadCashAvailable(Number(d.method === 'EFECTIVO' ? d.amount : 0));
   }
+
+  /** v2.20: efectivo que debería haber en caja ese día (fondo + cobros − egresos en efectivo), para avisar antes de dejarla en negativo. */
+  cashAvailable: number | null = null;
+  loadCashAvailable(own = 0) {
+    this.cashAvailable = null;
+    const day = String(this.x?.expenseDate || isoDate()).slice(0, 10);
+    this.api.cashClosing(day).subscribe({
+      next: (r) => {
+        const ef = (r?.methods || []).find((m: any) => m.method === 'EFECTIVO');
+        this.cashAvailable = ef ? Number(ef.expected) + own : null;
+      },
+      error: () => (this.cashAvailable = null),
+    });
+  }
+  cashShort() { return this.cashAvailable !== null && Number(this.x?.amount || 0) > this.cashAvailable + 0.001; }
 
   openExpense() {
     this.editingId = null;
     this.x = { expenseDate: isoDate(), category: '', concept: '', amount: null, method: '', supplier: '', reference: '' };
     this.e = {};
     this.expenseOpen = true;
+    this.loadCashAvailable();
   }
 
   saveExpense() {
